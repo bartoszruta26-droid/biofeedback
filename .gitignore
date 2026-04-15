@@ -1,46 +1,84 @@
+```
+# Compiled and build artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Dependencies
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.conda/
+pip-log.txt
+pipenv.lock
+requirements*.txt
+*.egg-info/
+.eggs/
+.mypy_cache/
+.pytest_cache/
+.tox/
+.coverage
+coverage/
+
 # Build directories
 build/
-cmake-build-*/
-bin/
-obj/
+dist/
+target/
+.out/
+.DS_Store
+Thumbs.db
 
-# IDE files
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+.env.*
+!.env.example
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Compiled files
-*.o
-*.so
-*.a
-*.lib
-*.dll
-*.exe
-
-# CMake generated
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-compile_commands.json
-
-# Testing
-Testing/
-CTestTestfile.cmake
-
-# Documentation
-docs/
-
-# OS files
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Compression files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
+```
