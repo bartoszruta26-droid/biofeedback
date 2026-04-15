@@ -98,6 +98,32 @@ public slots:
      */
     void showAbout();
 
+signals:
+    /**
+     * @brief Sygnał emitowany gdy rozpoczęto zbieranie danych
+     */
+    void dataCollectionStarted();
+
+    /**
+     * @brief Sygnał emitowany gdy zatrzymano zbieranie danych
+     */
+    void dataCollectionStopped();
+
+    /**
+     * @brief Sygnał emitowany przy zmianie częstotliwości próbkowania
+     */
+    void samplingRateChanged(int rate);
+
+    /**
+     * @brief Sygnał emitowany przy zmianie zakresu wykresu
+     */
+    void graphDurationChanged(int seconds);
+
+    /**
+     * @brief Sygnał emitowany przy przełączeniu autoskalowania
+     */
+    void autoScaleToggled(bool enabled);
+
 protected:
     void closeEvent(QCloseEvent *event) override;
 
