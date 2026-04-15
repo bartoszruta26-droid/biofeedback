@@ -1,7 +1,9 @@
 #include "core/Application.hpp"
 #include "core/ConfigManager.hpp"
 #include "core/Logger.hpp"
+#include "core/Authentication.hpp"
 #include "gui/MainWindow.hpp"
+#include "gui/LoginDialog.hpp"
 #include "data/DataManager.hpp"
 #include "tab/PatientTab.hpp"
 #include "tab/MeasurementTab.hpp"
@@ -17,6 +19,7 @@ Application::Application(int& argc, char* argv[])
     , m_logger(nullptr)
     , m_mainWindow(nullptr)
     , m_dataManager(nullptr)
+    , m_authentication(nullptr)
     , m_patientTab(nullptr)
     , m_measurementTab(nullptr)
     , m_outlineTab(nullptr)
@@ -36,9 +39,18 @@ int Application::run()
         return EXIT_FAILURE;
     }
     
+    // Show login dialog before main window
+    if (!showLoginDialog()) {
+        std::cout << "Login failed or cancelled. Exiting application." << std::endl;
+        if (m_logger) {
+            m_logger->warn("User login failed or was cancelled");
+        }
+        return EXIT_SUCCESS;
+    }
+    
     m_running = true;
     
-    // Show main window
+    // Show main window after successful login
     m_mainWindow->show();
     
     // Run Qt event loop
@@ -85,6 +97,16 @@ bool Application::initialize()
         m_logger = std::make_unique<Logger>(*m_configManager);
         m_logger->info("Starting Biofeedback Application");
         
+        // Initialize authentication
+        m_authentication = std::make_unique<Authentication>("config/users.json");
+        m_authentication->setEncryptionKey("BiofeedbackApp2024SecureKey!");
+        
+        // Check if passwords need encryption
+        int encryptedCount = m_authentication->encryptPasswordsIfNeeded("BiofeedbackApp2024SecureKey!");
+        if (encryptedCount > 0) {
+            m_logger->info(QString("Encrypted %1 user password(s)").arg(encryptedCount));
+        }
+        
         // Initialize data manager
         m_dataManager = std::make_unique<DataManager>(*m_configManager, *m_logger);
         
@@ -106,6 +128,22 @@ bool Application::initialize()
         }
         return false;
     }
+}
+
+bool Application::showLoginDialog()
+{
+    gui::LoginDialog loginDialog(*m_authentication);
+    
+    if (loginDialog.exec() == QDialog::Accepted && loginDialog.loginSuccess()) {
+        std::cout << "User logged in: " << loginDialog.getUsername().toStdString() 
+                  << " (Role: " << loginDialog.getRole().toStdString() << ")" << std::endl;
+        m_logger->info(QString("User logged in: %1 (%2)")
+            .arg(loginDialog.getUsername())
+            .arg(loginDialog.getRole()));
+        return true;
+    }
+    
+    return false;
 }
 
 void Application::createMainWindow()
