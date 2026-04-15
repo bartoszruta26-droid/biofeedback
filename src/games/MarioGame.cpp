@@ -351,9 +351,11 @@ void MarioGame::renderObstacles(QPainter& painter)
                 painter.setPen(Qt::black);
                 painter.drawRect(obs.rect);
                 // Górna krawędź rurki
-                QRectF rim(obs.rect.left() - 5, obs.rect.top(), obs.rect.width() + 10, 10);
-                painter.fillRect(rim, COLOR_PIPE);
-                painter.drawRect(rim);
+                {
+                    QRectF rim(obs.rect.left() - 5, obs.rect.top(), obs.rect.width() + 10, 10);
+                    painter.fillRect(rim, COLOR_PIPE);
+                    painter.drawRect(rim);
+                }
                 break;
                 
             case Obstacle::PLATFORM:
@@ -407,9 +409,9 @@ void MarioGame::renderBackground(QPainter& painter)
     painter.setPen(COLOR_CLOUD);
     for (const auto& cloud : m_clouds) {
         int r = cloud.size / 2;
-        painter.drawEllipse(cloud.pos.toPoint(), r, r * 0.6);
-        painter.drawEllipse(QPointF(cloud.pos.x() - r * 0.5, cloud.pos.y() + r * 0.2).toPoint(), r * 0.7, r * 0.5);
-        painter.drawEllipse(QPointF(cloud.pos.x() + r * 0.5, cloud.pos.y() + r * 0.2).toPoint(), r * 0.7, r * 0.5);
+        painter.drawEllipse(QPoint(cloud.pos.toPoint()), r, static_cast<int>(r * 0.6));
+        painter.drawEllipse(QPoint(cloud.pos.x() - r * 0.5, cloud.pos.y() + r * 0.2), static_cast<int>(r * 0.7), static_cast<int>(r * 0.5));
+        painter.drawEllipse(QPoint(cloud.pos.x() + r * 0.5, cloud.pos.y() + r * 0.2), static_cast<int>(r * 0.7), static_cast<int>(r * 0.5));
     }
     
     // Wzgórza w tle (proste trójkąty)
