@@ -1,0 +1,22 @@
+{
+    "app_name": "Biofeedback App",
+    "version": "1.0.0",
+    "sensor": {
+        "type": "strain_gauge",
+        "sampling_rate": 100,
+        "sensitivity": 1.0
+    },
+    "user": {
+        "name": "",
+        "age": 0
+    },
+    "thresholds": {
+        "min_force": 0.0,
+        "max_force": 100.0,
+        "target_force": 50.0
+    },
+    "ui": {
+        "theme": "default",
+        "language": "pl"
+    }
+}
