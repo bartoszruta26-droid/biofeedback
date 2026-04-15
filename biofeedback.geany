@@ -1,0 +1,52 @@
+[build_settings]
+base_path=$(dir)
+compile_cmd=cd $(dir) && mkdir -p build && cd build && cmake .. && make
+make_cmd=cd $(dir)/build && make
+make_object_cmd=cd $(dir)/build && make
+execute_cmd=$(dir)/build/biofeedback
+error_regex=^(.*):([0-9]+):(.*)$
+
+[build_menu_commands]
+menu_1_label=Clean Build
+menu_1_cmd=cd $(dir) && rm -rf build && mkdir build
+menu_2_label=Configure Only
+menu_2_cmd=cd $(dir)/build && cmake ..
+menu_3_label=Build Debug
+menu_3_cmd=cd $(dir) && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make
+menu_4_label=Build Release
+menu_4_cmd=cd $(dir) && mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make
+menu_5_label=Run Application
+menu_5_cmd=$(dir)/build/biofeedback
+
+[file_prefs]
+line_break_column=80
+use_spaces=false
+insert_spaces=false
+width=4
+tab_key_enabled=true
+backspace_key_enabled=true
+
+[editor]
+indentation_width=4
+indent_type=0
+auto_indent=true
+complete_snippets=true
+show_line_endings=false
+show_white_space=false
+show_indent_guide=true
+long_line_enabled=true
+long_line_color=#CFCFCF
+long_line_style=1
+long_line_column=80
+scheme_filename=filetypes.common
+
+[search]
+search_backwards=false
+use_regexp=false
+case_sensitive=false
+whole_word=false
+escape_sequences=false
+replace_and_find_by_default=false
+
+[tools]
+context_action_cmd=ctags --fields=+K-k+m --extra=+q+f -n -u -f /dev/null --filter=y --language-force=C++ <placeholder>
