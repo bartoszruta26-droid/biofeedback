@@ -10,7 +10,6 @@ biofeedback/
 ├── BUILD_INSTRUCTIONS.md     # Detailed build instructions
 ├── PROJECT_STRUCTURE.md      # This file
 ├── CMakeLists.txt            # CMake build configuration
-├── meson.build               # Meson build configuration
 ├── Makefile                  # GNU Make build configuration
 ├── .gitignore                # Git ignore rules
 │
@@ -131,7 +130,6 @@ biofeedback/
 
 ### Build Configuration
 - **CMakeLists.txt**: CMake build system configuration
-- **meson.build**: Meson build system configuration  
 - **Makefile**: GNU Make build system
 
 ### Configuration
@@ -197,14 +195,7 @@ cmake ..
 make -j$(nproc)
 ```
 
-### Option 2: Meson (Modern alternative)
-```bash
-meson setup build
-cd build
-ninja
-```
-
-### Option 3: Make (Direct)
+### Option 2: Make (Direct)
 ```bash
 make -j$(nproc)
 ```

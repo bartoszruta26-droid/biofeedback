@@ -29,8 +29,6 @@ sudo reboot
 sudo apt install -y \
     build-essential \
     cmake \
-    meson \
-    ninja-build \
     git \
     libgtk-4-dev \
     libadwaita-1-dev \
@@ -66,26 +64,7 @@ pkg-config --modversion gtk4
 
 ## Building the Application
 
-### Option 1: Using Meson (Recommended)
-
-```bash
-# Navigate to project directory
-cd /path/to/biofeedback
-
-# Create build directory
-mkdir build && cd build
-
-# Configure build
-meson setup ..
-
-# Build
-ninja
-
-# Install (optional)
-sudo ninja install
-```
-
-### Option 2: Using CMake
+### Option 1: Using CMake (Recommended)
 
 ```bash
 # Navigate to project directory
@@ -101,7 +80,7 @@ cmake ..
 make -j$(nproc)
 ```
 
-### Option 3: Using Makefile Directly
+### Option 2: Using Makefile Directly
 
 ```bash
 # Navigate to project directory
@@ -229,7 +208,7 @@ git pull origin main
 
 # Rebuild
 cd build
-ninja
+make -j$(nproc)
 
 # Restart application
 ```
@@ -237,8 +216,8 @@ ninja
 ## Uninstallation
 
 ```bash
-# If installed
-sudo ninja uninstall
+# Remove build artifacts
+rm -rf build
 
 # Remove configuration
 rm -rf ~/.config/biofeedback
