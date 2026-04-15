@@ -14,8 +14,33 @@
 #include <QString>
 #include <QPainter>
 #include <QPaintEvent>
+#include <QScrollArea>
+#include <QCheckBox>
+#include <QUuid>
 
 namespace tab {
+
+/**
+ * @brief Widget do wizualizacji trendów długoterminowych
+ */
+class TrendsPlotWidget : public QWidget {
+    Q_OBJECT
+public:
+    explicit TrendsPlotWidget(QWidget *parent = nullptr);
+    
+    void setData(const QVector<double>& dates, const QVector<double>& avgForces, 
+                 const QVector<double>& maxForces);
+    void clearData();
+    
+protected:
+    void paintEvent(QPaintEvent *event) override;
+
+private:
+    QVector<double> m_dates;
+    QVector<double> m_avgForces;
+    QVector<double> m_maxForces;
+    double m_maxForce;
+};
 
 /**
  * @brief Widget do wizualizacji wykresu siły w czasie rzeczywistym
@@ -81,11 +106,24 @@ struct SeriesStats {
     double seriesSpeed;                 // Szybkość wykonania serii [rep/s]
     double consistencyScore;            // Wskaźnik powtarzalności [%]
     double impulseTotal;                // Całkowity impuls [N·s]
+    QString sessionDate;                // Data sesji pomiarowej
     
     SeriesStats() : seriesNumber(0), avgPeakForce(0), medianPeakForce(0),
                     fatigueIndex(0), totalWork(0), avgRiseRate(0),
                     avgFallRate(0), seriesSpeed(0), consistencyScore(0),
                     impulseTotal(0) {}
+};
+
+/**
+ * @brief Dane sesji pomiarowej do trendów długoterminowych
+ */
+struct MeasurementSession {
+    QString sessionId;                  // Unikalny identyfikator sesji
+    QString patientId;                  // ID pacjenta
+    QString date;                       // Data pomiaru
+    QVector<SeriesStats> series;        // Serie z tej sesji
+    
+    MeasurementSession() {}
 };
 
 /**
@@ -166,6 +204,21 @@ public:
      * @brief Importuje dane sesji z CSV
      */
     bool importFromCSV(const QString& filename);
+    
+    /**
+     * @brief Eksportuje dane sesji do JSON (dla trendów długoterminowych)
+     */
+    bool exportToJSON(const QString& filename);
+    
+    /**
+     * @brief Importuje dane sesji z JSON (dla trendów długoterminowych)
+     */
+    bool importFromJSON(const QString& filename);
+    
+    /**
+     * @brief Wczytuje wszystkie pliki JSON pacjenta i wyświetla trendy długoterminowe
+     */
+    void loadPatientTrends();
 
 signals:
     void measurementStarted();
@@ -178,6 +231,7 @@ signals:
 public slots:
     void onSaveData();
     void onLoadData();
+    void onShowTrends();
 
 private slots:
     void onToggleMeasurement();
@@ -196,6 +250,10 @@ private:
     double calculateMode(const QVector<double>& values) const;
     double calculateAreaUnderCurve(const QVector<double>& forces, 
                                    const QVector<double>& times) const;
+    void setupTrendsUI();
+    void updateTrendsView();
+    QString serializeSessionToJSON(const MeasurementSession& session) const;
+    MeasurementSession deserializeSessionFromJSON(const QString& json) const;
     
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
@@ -257,6 +315,13 @@ private:
     // Wyniki
     QVector<SeriesStats> m_completedSeriesStats;
     RepetitionStats m_currentRepStats;
+    
+    // Trendy długoterminowe
+    QVector<MeasurementSession> m_patientSessions;
+    QGroupBox* m_trendsBox;
+    QScrollArea* m_trendsScrollArea;
+    QWidget* m_trendsContent;
+    QCheckBox* m_chkShowTrends;
 };
 
 } // namespace tab
