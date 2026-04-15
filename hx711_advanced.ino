@@ -7,7 +7,7 @@
  * - Cooperative pseudo-threading (non-blocking multitasking)
  * - CRC-8 checksum for data integrity
  * - Tare command via serial
- * - Binary data transmission with timestamp, value (80 samples average), CRC
+ * - Binary data transmission at 80Hz with timestamp, value, CRC
  * - Device identification on command
  * 
  * Connections:
@@ -32,8 +32,8 @@
 #define HX711_DT_PIN  2   // Data pin
 #define HX711_SCK_PIN 3   // Clock pin
 
-// Number of samples for averaging
-#define HX711_SAMPLES 80
+// Number of samples for averaging (1 sample for 80Hz output)
+#define HX711_SAMPLES 1
 
 // Serial baud rate for maximum throughput
 #define SERIAL_BAUD_RATE 115200
@@ -167,21 +167,12 @@ long readHX711Raw() {
 }
 
 int32_t readHX711Averaged(int samples) {
-    int32_t sum = 0;
-    int valid_reads = 0;
+    // Read single sample for 80Hz output (no averaging needed)
+    long reading = readHX711Raw();
+    feedWatchdog();
     
-    for (int i = 0; i < samples; i++) {
-        long reading = readHX711Raw();
-        if (reading != 0) {
-            sum += reading;
-            valid_reads++;
-        }
-        delayMicroseconds(100);  // Small delay between readings
-        feedWatchdog();
-    }
-    
-    if (valid_reads > 0) {
-        return sum / valid_reads;
+    if (reading != 0) {
+        return reading;
     }
     return 0;
 }
@@ -313,19 +304,18 @@ void processSerialCommand() {
 // PSEUDO-THREADING (Cooperative Multitasking)
 // ============================================================
 
-// Thread: HX711 Reader
+// Thread: HX711 Reader - reads at 80Hz (every ~12.5ms)
 void threadHX711() {
-    if (millis() - thread_timer_hx711 >= HX711_THREAD_INTERVAL) {
+    if (millis() - thread_timer_hx711 >= 12) {  // ~80Hz = 12.5ms interval
         thread_timer_hx711 = millis();
         
         // Check if HX711 is ready
         pinMode(HX711_DT_PIN, INPUT);
         if (digitalRead(HX711_DT_PIN) == LOW) {
-            // Read single sample (fast, for responsiveness)
+            // Read single sample at 80Hz
             long raw = readHX711Raw();
             if (raw != 0) {
-                // Simple low-pass filter
-                current_weight = (current_weight * 7 + raw) / 8;
+                current_weight = raw;
             }
         }
     }
@@ -347,9 +337,9 @@ void threadWatchdog() {
     }
 }
 
-// Thread: Continuous Data Sender
+// Thread: Continuous Data Sender - sends at 80Hz
 void threadContinuousData() {
-    if (continuous_mode && (millis() - last_data_send >= 100)) {
+    if (continuous_mode && (millis() - last_data_send >= 12)) {  // ~80Hz
         last_data_send = millis();
         sendBinaryData();
     }
