@@ -56,6 +56,7 @@ set(SOURCES
     src/tab/PatientTab.cpp
     src/tab/MeasurementTab.cpp
     src/tab/OutlineTab.cpp
+    src/tab/TrainingTab.cpp
     src/sensor/SerialCommunication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
@@ -76,6 +77,7 @@ set(HEADERS
     include/tab/PatientTab.hpp
     include/tab/MeasurementTab.hpp
     include/tab/OutlineTab.hpp
+    include/tab/TrainingTab.hpp
     include/sensor/SerialCommunication.hpp
     include/data/DataManager.hpp
     include/data/Encryption.hpp
