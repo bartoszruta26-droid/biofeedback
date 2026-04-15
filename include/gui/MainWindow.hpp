@@ -28,6 +28,7 @@ namespace tab {
     class PatientTab;
     class MeasurementTab;
     class OutlineTab;
+    class TrainingTab;
 }
 
 namespace games {
@@ -93,6 +94,11 @@ public:
      * @brief Pobiera zakładkę treningu (Outline)
      */
     tab::OutlineTab* outlineTab() const { return m_outlineTab; }
+
+    /**
+     * @brief Pobiera zakładkę TrainingTab
+     */
+    tab::TrainingTab* trainingTab() const { return m_trainingTab; }
 
     /**
      * @brief Uruchamia grę w zakładce treningu
@@ -204,6 +210,7 @@ private:
     tab::PatientTab* m_patientTab;
     tab::MeasurementTab* m_measurementTab;
     tab::OutlineTab* m_outlineTab;
+    tab::TrainingTab* m_trainingTab;
     
     // Obszar gry
     QStackedWidget* m_gameStack;

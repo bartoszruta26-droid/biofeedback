@@ -2,6 +2,7 @@
 #include "tab/PatientTab.hpp"
 #include "tab/MeasurementTab.hpp"
 #include "tab/OutlineTab.hpp"
+#include "tab/TrainingTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
 #include <QApplication>
@@ -21,6 +22,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_patientTab(nullptr)
     , m_measurementTab(nullptr)
     , m_outlineTab(nullptr)
+    , m_trainingTab(nullptr)
     , m_gameStack(nullptr)
     , m_currentGame(nullptr)
     , m_startButton(nullptr)
@@ -87,11 +89,13 @@ void MainWindow::setupTabs()
     m_patientTab = new tab::PatientTab(this);
     m_measurementTab = new tab::MeasurementTab(this);
     m_outlineTab = new tab::OutlineTab(this);
+    m_trainingTab = new tab::TrainingTab(this);
     
     // Add tabs to widget
     m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));
     m_tabWidget->addTab(m_measurementTab, tr("📊 Pomiary"));
-    m_tabWidget->addTab(m_outlineTab, tr("🎮 Trening"));
+    m_tabWidget->addTab(m_outlineTab, tr("🎮 Trening (Outline)"));
+    m_tabWidget->addTab(m_trainingTab, tr("🏋️ Trening (Gry)"));
     
     // Set default tab
     m_tabWidget->setCurrentIndex(0);
