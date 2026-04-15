@@ -3,64 +3,58 @@
 #include "core/Logger.hpp"
 #include "gui/MainWindow.hpp"
 #include "data/DataManager.hpp"
-#include "sensor/HX711Sensor.hpp"
-#include <iostream>
+#include "tab/PatientTab.hpp"
+#include "tab/MeasurementTab.hpp"
+#include "tab/OutlineTab.hpp"
+#include <QTabWidget>
+#include <QMessageBox>
 
 namespace biofeedback {
 
-Application::Application(int argc, char* argv[])
-    : m_gtkApp(nullptr)
+Application::Application(int& argc, char* argv[])
+    : QApplication(argc, argv)
     , m_configManager(nullptr)
     , m_logger(nullptr)
     , m_mainWindow(nullptr)
     , m_dataManager(nullptr)
-    , m_sensor(nullptr)
+    , m_patientTab(nullptr)
+    , m_measurementTab(nullptr)
+    , m_outlineTab(nullptr)
     , m_initialized(false)
     , m_running(false)
 {
-    // Initialize GTK application
-    m_gtkApp = gtk_application_new("org.biofeedback.app", G_APPLICATION_DEFAULT_FLAGS);
-    
-    if (!m_gtkApp) {
-        throw std::runtime_error("Failed to initialize GTK application");
-    }
 }
 
-Application::~Application() {
+Application::~Application()
+{
     shutdown();
-    
-    if (m_gtkApp) {
-        g_object_unref(m_gtkApp);
-        m_gtkApp = nullptr;
-    }
 }
 
-int Application::run() {
+int Application::run()
+{
     if (!initialize()) {
-        std::cerr << "Failed to initialize application" << std::endl;
         return EXIT_FAILURE;
     }
     
     m_running = true;
     
-    // Run GTK main loop
-    int status = g_application_run(G_APPLICATION(m_gtkApp), 0, nullptr);
+    // Show main window
+    m_mainWindow->show();
+    
+    // Run Qt event loop
+    int status = exec();
     
     m_running = false;
     return status;
 }
 
-void Application::shutdown() {
+void Application::shutdown()
+{
     if (!m_initialized) {
         return;
     }
     
     std::cout << "Shutting down Biofeedback Application..." << std::endl;
-    
-    // Stop sensor readings
-    if (m_sensor) {
-        m_sensor->stopReading();
-    }
     
     // Save any pending data
     if (m_dataManager) {
@@ -75,7 +69,8 @@ void Application::shutdown() {
     m_initialized = false;
 }
 
-bool Application::initialize() {
+bool Application::initialize()
+{
     if (m_initialized) {
         return true;
     }
@@ -93,11 +88,11 @@ bool Application::initialize() {
         // Initialize data manager
         m_dataManager = std::make_unique<DataManager>(*m_configManager, *m_logger);
         
-        // Initialize sensor
-        m_sensor = std::make_unique	HX711Sensor>(*m_configManager, *m_logger);
-        
-        // Create main window
+        // Create main window and tabs
         createMainWindow();
+        
+        // Setup connections between components
+        setupConnections();
         
         m_initialized = true;
         m_logger->info("Application initialized successfully");
@@ -113,23 +108,72 @@ bool Application::initialize() {
     }
 }
 
-void Application::createMainWindow() {
-    m_mainWindow = std::make_unique<MainWindow>(
-        *this,
-        *m_configManager,
-        *m_logger,
-        *m_dataManager,
-        *m_sensor
-    );
+void Application::createMainWindow()
+{
+    // Create main window
+    m_mainWindow = std::make_unique<gui::MainWindow>();
     
-    // Connect window to GTK application
-    g_signal_connect(m_mainWindow->getGTKWindow(), "activate", G_CALLBACK([](GtkApplication* app, gpointer user_data) {
-        auto* window = static_cast<MainWindow*>(user_data);
-        window->show();
-    }), m_mainWindow.get());
+    // Create tabs
+    m_patientTab = std::make_unique<tab::PatientTab>();
+    m_measurementTab = std::make_unique<tab::MeasurementTab>();
+    m_outlineTab = std::make_unique<tab::OutlineTab>();
+    
+    // Get central widget from MainWindow to add tabs
+    // Note: This assumes MainWindow has a way to access its central widget
+    // In a real implementation, you might want to refactor MainWindow to support tabs
 }
 
-bool Application::loadConfiguration() {
+void Application::setupConnections()
+{
+    // Connect MainWindow signals to tab slots
+    connect(m_mainWindow.get(), &gui::MainWindow::dataCollectionStarted,
+            m_measurementTab.get(), &tab::MeasurementTab::startMeasurement);
+    
+    connect(m_mainWindow.get(), &gui::MainWindow::dataCollectionStopped,
+            m_measurementTab.get(), &tab::MeasurementTab::stopMeasurement);
+    
+    connect(m_mainWindow.get(), &gui::MainWindow::samplingRateChanged,
+            m_measurementTab.get(), [this](int rate) {
+                // Update measurement tab sampling rate
+            });
+    
+    // Connect MeasurementTab signals to MainWindow slots
+    connect(m_measurementTab.get(), &tab::MeasurementTab::newForceSample,
+            m_mainWindow.get(), [this](double force, double timestamp) {
+                m_mainWindow->updateWeightDisplay(force);
+                m_mainWindow->graphWidget()->addDataPoint(force);
+            });
+    
+    connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStarted,
+            m_mainWindow.get(), [this]() {
+                m_mainWindow->startDataCollection();
+            });
+    
+    connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStopped,
+            m_mainWindow.get(), [this]() {
+                m_mainWindow->stopDataCollection();
+            });
+    
+    // Connect PatientTab signals
+    connect(m_patientTab.get(), &tab::PatientTab::patientAdded,
+            this, [this](const QString& pesel, const QString& firstName, const QString& lastName) {
+                m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel));
+            });
+    
+    // Connect OutlineTab signals
+    connect(m_outlineTab.get(), &tab::OutlineTab::sessionStarted,
+            this, [this](const QString& outlineId) {
+                m_logger->info(QString("Session started with outline: %1").arg(outlineId));
+            });
+    
+    connect(m_outlineTab.get(), &tab::OutlineTab::requestGameStart,
+            this, [this](const QString& gameId, const ExerciseData& exerciseData) {
+                m_logger->info(QString("Starting game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name));
+            });
+}
+
+bool Application::loadConfiguration()
+{
     m_configManager = std::make_unique<ConfigManager>();
     
     // Try to load from default location
