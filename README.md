@@ -6,8 +6,11 @@ A professional medical-grade biofeedback application built with C++, Qt5, and Ar
 
 - **Patient Management**: Create, edit, import, export, and delete patient records
 - **Live Measurement**: Real-time graph visualization of sensor data with statistical analysis
-- **Training Games**: Multiple biofeedback-controlled games (Sin, Tan, Flappy Bird, Pong, Arkanoid, Mario, Galaga, Archer, Scored Earth, Car Race)
-- **Exercise Plans**: Structured exercise protocols with multimedia content and game assignments
+- **Training Games**: Multiple biofeedback-controlled games including:
+  - **Sin/Tan Games** - Wave-based training exercises
+  - **Flappy Bird** - Classic flapping game controlled by strain gauge
+  - **Pong** - Retro tennis game with biofeedback paddle control
+  - **Mario Run** - 4-bit endless runner with charge-based jumping mechanics
 - **Data Security**: JSON storage with optional encryption for sensitive medical data
 - **Medical Standards**: Comprehensive logging, data validation, and audit trails
 
@@ -24,6 +27,15 @@ A professional medical-grade biofeedback application built with C++, Qt5, and Ar
 - libserialport
 - nlohmann/json
 - OpenSSL (for encryption)
+
+### Installing Dependencies on Debian/Ubuntu/Raspberry Pi OS
+
+```bash
+sudo apt update && sudo apt upgrade -y
+
+sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev \
+    nlohmann-json3-dev libssl-dev git cmake build-essential pkg-config
+```
 
 ## Installation
 

@@ -38,6 +38,8 @@ sudo apt install -y \
     pkg-config
 ```
 
+**Note**: Qt Charts (`qtcharts5-dev`) is required for the graph visualization features and all game rendering. Make sure it's properly installed.
+
 ### 3. Configure Serial Port Permissions
 ```bash
 # Add user to dialout group
