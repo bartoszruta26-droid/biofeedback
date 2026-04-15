@@ -17,6 +17,10 @@ build/
 dist/
 target/
 .gradle/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
 # Logs and temp files
 *.log
@@ -67,4 +71,21 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+# Build directories
+build/
+dist/
+target/
+*.class
+*.jar
+*.war
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.deb
+*.rpm
+
+# OS generated files
+.DS_Store
+Thumbs.db
 ```
