@@ -10,9 +10,11 @@ namespace biofeedback {
 class ConfigManager;
 class Logger;
 class DataManager;
+class Authentication;
 
 namespace gui {
     class MainWindow;
+    class LoginDialog;
 }
 
 namespace tab {
@@ -80,6 +82,12 @@ public:
      * @return gui::MainWindow* Pointer to main window
      */
     gui::MainWindow* getMainWindow() { return m_mainWindow.get(); }
+    
+    /**
+     * @brief Get the Authentication object
+     * @return Authentication& Reference to authentication manager
+     */
+    Authentication& getAuthentication() { return *m_authentication; }
 
 private:
     /**
@@ -103,17 +111,24 @@ private:
      * @brief Setup signal/slot connections between components
      */
     void setupConnections();
+    
+    /**
+     * @brief Show login dialog and authenticate user
+     * @return true if login successful
+     */
+    bool showLoginDialog();
 
 private:
     std::unique_ptr<ConfigManager> m_configManager;
     std::unique_ptr<Logger> m_logger;
     std::unique_ptr<gui::MainWindow> m_mainWindow;
     std::unique_ptr<DataManager> m_dataManager;
+    std::unique_ptr<Authentication> m_authentication;
     
-    // Tabs
-    std::unique_ptr<tab::PatientTab> m_patientTab;
-    std::unique_ptr<tab::MeasurementTab> m_measurementTab;
-    std::unique_ptr<tab::OutlineTab> m_outlineTab;
+    // Tabs - using raw pointers since we only have forward declarations
+    tab::PatientTab* m_patientTab;
+    tab::MeasurementTab* m_measurementTab;
+    tab::OutlineTab* m_outlineTab;
     
     bool m_initialized;
     bool m_running;

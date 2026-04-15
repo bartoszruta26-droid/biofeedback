@@ -1,6 +1,24 @@
 ```
-test_auth
-*.o
-*.obj
-*.out
+# CMake build artifacts
+build/
+cmake_install.cmake
+compile_commands.json
+
+# Qt/MOC auto-generated files
+*_autogen/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeRuleHashes.txt
+CMakeOutput.log
+progress.marks
+CTestTestfile.cmake
+Makefile
+
+# Configuration files that might contain sensitive data
+config/config.json
+
+# User data files
+data/outlines/*.json
 ```

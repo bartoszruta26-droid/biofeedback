@@ -51,7 +51,9 @@ set(SOURCES
     src/core/Application.cpp
     src/core/Logger.cpp
     src/core/ConfigManager.cpp
+    src/core/Authentication.cpp
     src/gui/MainWindow.cpp
+    src/gui/LoginDialog.cpp
     src/gui/GraphWidget.cpp
     src/tab/PatientTab.cpp
     src/tab/MeasurementTab.cpp
@@ -72,7 +74,9 @@ set(HEADERS
     include/core/Application.hpp
     include/core/Logger.hpp
     include/core/ConfigManager.hpp
+    include/core/Authentication.hpp
     include/gui/MainWindow.hpp
+    include/gui/LoginDialog.hpp
     include/gui/GraphWidget.hpp
     include/tab/PatientTab.hpp
     include/tab/MeasurementTab.hpp
