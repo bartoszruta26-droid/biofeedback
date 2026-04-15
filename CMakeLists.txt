@@ -21,9 +21,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 # Find dependencies
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(GTK4 REQUIRED gtk4)
+# Qt5
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Charts)
+
 pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
-pkg_check_modules(CAIRO REQUIRED cairo)
 
 find_package(nlohmann_json REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -31,17 +32,18 @@ find_package(OpenSSL REQUIRED)
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
-    ${GTK4_INCLUDE_DIRS}
     ${LIBSERIALPORT_INCLUDE_DIRS}
-    ${CAIRO_INCLUDE_DIRS}
 )
 
 # Link directories
 link_directories(
-    ${GTK4_LIBRARY_DIRS}
     ${LIBSERIALPORT_LIBRARY_DIRS}
-    ${CAIRO_LIBRARY_DIRS}
 )
+
+# Qt5 MOC headers
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
 
 # Source files
 set(SOURCES
@@ -87,18 +89,14 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
-    ${GTK4_LIBRARIES}
+    Qt5::Core
+    Qt5::Widgets
+    Qt5::Charts
     ${LIBSERIALPORT_LIBRARIES}
-    ${CAIRO_LIBRARIES}
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
     OpenSSL::Crypto
     pthread
-)
-
-# Include GTK4 definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    ${GTK4_CFLAGS_OTHER}
 )
 
 # Install rules

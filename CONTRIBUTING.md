@@ -56,7 +56,7 @@ Thank you for your interest in contributing to this medical-grade biofeedback ap
 When reporting issues, please include:
 
 - Hardware configuration (Raspberry Pi model, Arduino version)
-- Software versions (GTK4, compiler, dependencies)
+- Software versions (Qt5, compiler, dependencies)
 - Steps to reproduce
 - Expected vs. actual behavior
 - Logs or error messages

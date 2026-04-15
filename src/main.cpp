@@ -3,7 +3,7 @@
  * @brief Main entry point for Biofeedback Application
  * 
  * Medical-grade biofeedback application for Raspberry Pi 4
- * using GTK4, Arduino Nano, and HX711 strain gauge sensor.
+ * using Qt5, Arduino Nano, and HX711 strain gauge sensor.
  */
 
 #include "core/Application.hpp"

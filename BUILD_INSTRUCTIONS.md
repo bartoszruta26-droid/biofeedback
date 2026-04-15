@@ -12,7 +12,7 @@
 ### Software
 - Raspberry Pi OS (64-bit, Bullseye or later)
 - C++ compiler with C++17 support (g++ 10+)
-- GTK4 development libraries
+- Qt5 development libraries
 - Additional dependencies
 
 ## System Setup
@@ -30,13 +30,11 @@ sudo apt install -y \
     build-essential \
     cmake \
     git \
-    libgtk-4-dev \
-    libadwaita-1-dev \
+    qtbase5-dev \
+    qtcharts5-dev \
     libserialport-dev \
     nlohmann-json3-dev \
     libssl-dev \
-    libcairo2-dev \
-    libsigc++-3.0-dev \
     pkg-config
 ```
 
@@ -56,10 +54,10 @@ sudo udevadm trigger
 ls -l /dev/ttyUSB*
 ```
 
-### 4. Verify GTK4 Installation
+### 4. Verify Qt5 Installation
 ```bash
-pkg-config --modversion gtk4
-# Should return 4.x.x
+pkg-config --modversion Qt5Core
+# Should return 5.x.x
 ```
 
 ## Building the Application
@@ -112,7 +110,7 @@ dmesg | grep tty
 sudo chmod 666 /dev/ttyUSB0
 ```
 
-#### GTK4 Display Issues
+#### Qt5 Display Issues
 ```bash
 # Ensure you're running in a graphical environment
 # Check DISPLAY variable

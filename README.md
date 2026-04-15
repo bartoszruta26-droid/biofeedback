@@ -1,6 +1,6 @@
 # Biofeedback Application for Raspberry Pi 4
 
-A professional medical-grade biofeedback application built with C++, Qt, and Arduino Nano integration for strain gauge sensor (HX711) data acquisition.
+A professional medical-grade biofeedback application built with C++, Qt5, and Arduino Nano integration for strain gauge sensor (HX711) data acquisition.
 
 ## Features
 
@@ -20,11 +20,10 @@ A professional medical-grade biofeedback application built with C++, Qt, and Ard
 
 ## Software Dependencies
 
-- Q4
+- Qt5 (QtWidgets, QtCharts)
 - libserialport
 - nlohmann/json
 - OpenSSL (for encryption)
-- Cairo (for graphics)
 
 ## Installation
 
@@ -35,7 +34,7 @@ A professional medical-grade biofeedback application built with C++, Qt, and Ard
 sudo apt update && sudo apt upgrade -y
 
 # Install dependencies
-sudo apt install -y libgtk-4-dev libserialport-dev nlohmann-json3-dev libssl-dev libcairo2-dev git cmake build-essential
+sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev nlohmann-json3-dev libssl-dev git cmake build-essential
 
 # Set up serial port permissions
 sudo usermod -a -G dialout $USER
