@@ -56,11 +56,13 @@ set(SOURCES
     src/tab/PatientTab.cpp
     src/tab/MeasurementTab.cpp
     src/tab/OutlineTab.cpp
+    src/sensor/HX711Sensor.cpp
     src/sensor/SerialCommunication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
     src/games/GameEngine.cpp
     src/games/SinGame.cpp
+    src/games/PongGame.cpp
 )
 
 # Header files
@@ -73,11 +75,13 @@ set(HEADERS
     include/tab/PatientTab.hpp
     include/tab/MeasurementTab.hpp
     include/tab/OutlineTab.hpp
+    include/sensor/HX711Sensor.hpp
     include/sensor/SerialCommunication.hpp
     include/data/DataManager.hpp
     include/data/Encryption.hpp
     include/games/GameEngine.hpp
     include/games/SinGame.hpp
+    include/games/PongGame.hpp
 )
 
 # Create executable

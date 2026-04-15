@@ -30,8 +30,20 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# Logs
+*.log
+
 # Environment
 .env
 .env.local
 *.env.*
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS
+.DS_Store
+Thumbs.db
 ```
