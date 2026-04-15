@@ -1,0 +1,65 @@
+{
+    "id": "rehab_knee_001",
+    "name": "Rehabilitacja Kolana - Poziom Podstawowy",
+    "description": "Konspekt ćwiczeń rehabilitacyjnych dla kolana po urazie. Składa się z 5 ćwiczeń stopniowo zwiększających obciążenie.",
+    "author": "Dr Jan Kowalski",
+    "category": "rehabilitacja",
+    "estimatedDurationMinutes": 30,
+    "exercises": [
+        {
+            "id": "ex_001",
+            "name": "Rozgrzewka - Zginanie Kolana",
+            "description": "Powolne zginanie i prostowanie kolana w pozycji siedzącej. Wykonuj ruch w pełnym zakresie bez bólu.",
+            "imagePath": "resources/exercises/knee_warmup.jpg",
+            "videoPath": "resources/videos/knee_warmup.mp4",
+            "gameId": "sin_game",
+            "durationSeconds": 120,
+            "targetRepetitions": 10,
+            "difficulty": "easy"
+        },
+        {
+            "id": "ex_002",
+            "name": "Wzmocnienie Mięśnia Czworogłowego",
+            "description": "Izometryczne napinanie mięśnia czworogłowego uda z utrzymaniem napięcia przez 5 sekund.",
+            "imagePath": "resources/exercises/quad_iso.jpg",
+            "videoPath": "resources/videos/quad_iso.mp4",
+            "gameId": "tan_game",
+            "durationSeconds": 180,
+            "targetRepetitions": 8,
+            "difficulty": "easy"
+        },
+        {
+            "id": "ex_003",
+            "name": "Unoszenie Nogi",
+            "description": "Unoszenie wyprostowanej nogi w pozycji leżącej. Kontroluj ruch w obu fazach.",
+            "imagePath": "resources/exercises/leg_raise.jpg",
+            "videoPath": "resources/videos/leg_raise.mp4",
+            "gameId": "flappy_bird",
+            "durationSeconds": 180,
+            "targetRepetitions": 10,
+            "difficulty": "medium"
+        },
+        {
+            "id": "ex_004",
+            "name": "Mini-Przysiady",
+            "description": "Płytkie przysiady do kąta 30 stopni zgięcia kolana. Utrzymuj prawidłową postawę.",
+            "imagePath": "resources/exercises/mini_squat.jpg",
+            "videoPath": "resources/videos/mini_squat.mp4",
+            "gameId": "arkanoid",
+            "durationSeconds": 240,
+            "targetRepetitions": 12,
+            "difficulty": "medium"
+        },
+        {
+            "id": "ex_005",
+            "name": "Schodzenie ze Stopnia",
+            "description": "Powolne schodzenie tyłem z niskiego stopnia. Kontroluj fazę ekscentryczną.",
+            "imagePath": "resources/exercises/step_down.jpg",
+            "videoPath": "resources/videos/step_down.mp4",
+            "gameId": "car_race",
+            "durationSeconds": 180,
+            "targetRepetitions": 8,
+            "difficulty": "hard"
+        }
+    ]
+}
