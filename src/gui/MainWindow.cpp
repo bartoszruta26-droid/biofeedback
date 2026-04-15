@@ -1,7 +1,15 @@
 #include "gui/MainWindow.hpp"
+#include "tab/PatientTab.hpp"
+#include "tab/MeasurementTab.hpp"
+#include "tab/OutlineTab.hpp"
+#include "games/GameEngine.hpp"
+#include "games/SinGame.hpp"
 #include <QApplication>
 #include <QSettings>
 #include <QDateTime>
+#include <QTabWidget>
+#include <QStackedWidget>
+#include <QMessageBox>
 
 namespace gui {
 
@@ -9,6 +17,12 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_graphWidget(nullptr)
     , m_centralWidget(nullptr)
+    , m_tabWidget(nullptr)
+    , m_patientTab(nullptr)
+    , m_measurementTab(nullptr)
+    , m_outlineTab(nullptr)
+    , m_gameStack(nullptr)
+    , m_currentGame(nullptr)
     , m_startButton(nullptr)
     , m_stopButton(nullptr)
     , m_clearButton(nullptr)
@@ -25,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_isConnected(false)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
-    setMinimumSize(1024, 768);
+    setMinimumSize(1280, 800);
     
     setupUI();
     setupMenuBar();
@@ -49,104 +63,57 @@ void MainWindow::setupCentralWidget()
 {
     m_centralWidget = new QWidget(this);
     QVBoxLayout* mainLayout = new QVBoxLayout(m_centralWidget);
-    mainLayout->setSpacing(10);
-    mainLayout->setContentsMargins(10, 10, 10, 10);
+    mainLayout->setSpacing(0);
+    mainLayout->setContentsMargins(0, 0, 0, 0);
     
-    // Widget wykresu
-    m_graphWidget = new GraphWidget(this);
-    m_graphWidget->setTitle(tr("Wykres Siły w Czasie Rzeczywistym"));
-    m_graphWidget->setYLabel(tr("Siła [N]"));
-    m_graphWidget->setUnit(tr("N"));
-    m_graphWidget->setMinimumHeight(400);
-    mainLayout->addWidget(m_graphWidget);
+    // Setup tabs
+    setupTabs();
     
-    // Panel sterowania
-    QGroupBox* controlGroup = new QGroupBox(tr("Panel Sterowania"), this);
-    QHBoxLayout* controlLayout = new QHBoxLayout(controlGroup);
+    // Add tab widget to main layout
+    mainLayout->addWidget(m_tabWidget);
     
-    // Przyciski akcji
-    m_startButton = new QPushButton(tr("▶ Start"), this);
-    m_startButton->setMinimumHeight(40);
-    m_startButton->setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold;");
-    
-    m_stopButton = new QPushButton(tr("■ Stop"), this);
-    m_stopButton->setMinimumHeight(40);
-    m_stopButton->setEnabled(false);
-    m_stopButton->setStyleSheet("background-color: #f44336; color: white; font-weight: bold;");
-    
-    m_clearButton = new QPushButton(tr("🗑 Czyść"), this);
-    m_clearButton->setMinimumHeight(40);
-    
-    m_exportButton = new QPushButton(tr("💾 Eksportuj"), this);
-    m_exportButton->setMinimumHeight(40);
-    
-    m_configButton = new QPushButton(tr("⚙ Konfiguracja"), this);
-    m_configButton->setMinimumHeight(40);
-    
-    controlLayout->addWidget(m_startButton);
-    controlLayout->addWidget(m_stopButton);
-    controlLayout->addWidget(m_clearButton);
-    controlLayout->addWidget(m_exportButton);
-    controlLayout->addWidget(m_configButton);
-    controlLayout->addStretch();
-    
-    mainLayout->addWidget(controlGroup);
-    
-    // Panel informacji
-    QGroupBox* infoGroup = new QGroupBox(tr("Informacje"), this);
-    QVBoxLayout* infoLayout = new QVBoxLayout(infoGroup);
-    
-    // Wartość wagi
-    QHBoxLayout* weightLayout = new QHBoxLayout();
-    m_weightLabel = new QLabel(tr("Aktualna siła:"), this);
-    m_weightLabel->setFont(QFont("Arial", 12));
-    m_weightValue = new QLabel(tr("0.0 N"), this);
-    m_weightValue->setFont(QFont("Arial", 24, QFont::Bold));
-    m_weightValue->setStyleSheet("color: #2196F3;");
-    weightLayout->addWidget(m_weightLabel);
-    weightLayout->addWidget(m_weightValue);
-    weightLayout->addStretch();
-    infoLayout->addLayout(weightLayout);
-    
-    // Ustawienia
-    QHBoxLayout* settingsLayout = new QHBoxLayout();
-    settingsLayout->addWidget(new QLabel(tr("Częstotliwość próbkowania [Hz]:")));
-    m_samplingRateSpin = new QSpinBox(this);
-    m_samplingRateSpin->setRange(1, 1000);
-    m_samplingRateSpin->setValue(100);
-    m_samplingRateSpin->setSuffix(" Hz");
-    settingsLayout->addWidget(m_samplingRateSpin);
-    
-    settingsLayout->addSpacing(20);
-    
-    settingsLayout->addWidget(new QLabel(tr("Zakres wykresu [s]:")));
-    m_graphDurationSpin = new QSpinBox(this);
-    m_graphDurationSpin->setRange(5, 300);
-    m_graphDurationSpin->setValue(60);
-    m_graphDurationSpin->setSuffix(" s");
-    settingsLayout->addWidget(m_graphDurationSpin);
-    
-    settingsLayout->addSpacing(20);
-    
-    settingsLayout->addWidget(new QLabel(tr("Jednostka:")));
-    m_unitCombo = new QComboBox(this);
-    m_unitCombo->addItem("N (Newton)", "N");
-    m_unitCombo->addItem("g (gramy)", "g");
-    m_unitCombo->addItem("kg (kilogramy)", "kg");
-    settingsLayout->addWidget(m_unitCombo);
-    settingsLayout->addStretch();
-    
-    infoLayout->addLayout(settingsLayout);
-    
-    // Status
-    m_statusLabel = new QLabel(tr("Status: Rozłączono"), this);
-    m_statusLabel->setFont(QFont("Arial", 11));
-    m_statusLabel->setStyleSheet("color: orange; font-weight: bold;");
-    infoLayout->addWidget(m_statusLabel);
-    
-    mainLayout->addWidget(infoGroup);
+    // Setup game area (hidden by default)
+    createGameArea();
     
     setCentralWidget(m_centralWidget);
+}
+
+void MainWindow::setupTabs()
+{
+    m_tabWidget = new QTabWidget(this);
+    m_tabWidget->setDocumentMode(true);
+    
+    // Create tabs
+    m_patientTab = new tab::PatientTab(this);
+    m_measurementTab = new tab::MeasurementTab(this);
+    m_outlineTab = new tab::OutlineTab(this);
+    
+    // Add tabs to widget
+    m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));
+    m_tabWidget->addTab(m_measurementTab, tr("📊 Pomiary"));
+    m_tabWidget->addTab(m_outlineTab, tr("🎮 Trening"));
+    
+    // Set default tab
+    m_tabWidget->setCurrentIndex(0);
+}
+
+void MainWindow::createGameArea()
+{
+    m_gameStack = new QStackedWidget(this);
+    
+    // Placeholder when no game is active
+    QWidget* placeholder = new QWidget();
+    QVBoxLayout* placeholderLayout = new QVBoxLayout(placeholder);
+    QLabel* placeholderLabel = new QLabel(tr("Gra zostanie uruchomiona po rozpoczęciu sesji treningowej"));
+    placeholderLabel->setAlignment(Qt::AlignCenter);
+    placeholderLabel->setMinimumHeight(300);
+    placeholderLabel->setStyleSheet("font-size: 18px; color: #666;");
+    placeholderLayout->addWidget(placeholderLabel);
+    
+    m_gameStack->addWidget(placeholder);
+    
+    // Initially hidden - will be shown when game starts
+    m_gameStack->hide();
 }
 
 void MainWindow::setupMenuBar()
@@ -215,6 +182,15 @@ void MainWindow::createConnections()
     m_updateTimer->setInterval(100);  // 100ms
     connect(m_updateTimer, &QTimer::timeout, this, &MainWindow::onUpdateTimerTimeout);
     m_updateTimer->start();
+    
+    // Connect tabs to game system
+    connect(m_outlineTab, &tab::OutlineTab::requestGameStart,
+            this, [this](const QString& gameId, const tab::ExerciseData& exerciseData) {
+                startGame(gameId, exerciseData);
+            });
+    
+    connect(m_outlineTab, &tab::OutlineTab::gameFinished,
+            this, &MainWindow::onGameFinished);
 }
 
 void MainWindow::loadSettings()
@@ -378,6 +354,91 @@ void MainWindow::onAutoScaleToggled(bool enabled)
 void MainWindow::onUpdateTimerTimeout()
 {
     // Okresowa aktualizacja UI
+}
+
+void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerciseData)
+{
+    qDebug() << "Starting game:" << gameId << "for exercise:" << exerciseData.name;
+    
+    // Stop existing game if any
+    stopGame();
+    
+    // Create appropriate game based on ID
+    if (gameId == "sin_game") {
+        m_currentGame = new games::SinGame(this);
+        
+        // Connect game signals
+        connect(m_currentGame, &games::GameEngine::gameEnded,
+                this, [this](int score) {
+                    onGameFinished(score);
+                });
+        
+        // Add game to stack
+        m_gameStack->addWidget(m_currentGame);
+        m_gameStack->setCurrentWidget(m_currentGame);
+        m_gameStack->show();
+        
+        // Start the game
+        m_currentGame->start();
+        
+        qDebug() << "SinGame started successfully";
+    }
+    else if (gameId == "tan_game") {
+        // Placeholder for TanGame - can be implemented similarly
+        QMessageBox::information(this, tr("Gra"), 
+                                tr("Gra TanGame będzie dostępna w przyszłej wersji."));
+    }
+    else if (gameId.isEmpty() || gameId == "-- Wybierz grę --") {
+        QMessageBox::warning(this, tr("Brak gry"), 
+                            tr("Nie wybrano gry do uruchomienia."));
+        return;
+    }
+    else {
+        QMessageBox::warning(this, tr("Nieznana gra"), 
+                            tr("Nieznany identyfikator gry: %1").arg(gameId));
+        return;
+    }
+}
+
+void MainWindow::stopGame()
+{
+    if (m_currentGame) {
+        m_currentGame->stop();
+        m_gameStack->removeWidget(m_currentGame);
+        delete m_currentGame;
+        m_currentGame = nullptr;
+        m_gameStack->hide();
+        qDebug() << "Game stopped";
+    }
+}
+
+void MainWindow::forwardSensorToGame(double value)
+{
+    if (m_currentGame && m_currentGame->isRunning() && !m_currentGame->isPaused()) {
+        m_currentGame->handleSensorInput(value);
+    }
+}
+
+void MainWindow::onGameFinished(int score)
+{
+    qDebug() << "Game finished with score:" << score;
+    
+    // Notify outline tab
+    if (m_outlineTab) {
+        m_outlineTab->onGameFinished(score);
+    }
+    
+    // Stop and cleanup game
+    stopGame();
+    
+    // Show result
+    QMessageBox::information(this, tr("Koniec gry"), 
+                            tr("Twój wynik: %1 punktów").arg(score));
+}
+
+void MainWindow::onSensorDataForGame(double value)
+{
+    forwardSensorToGame(value);
 }
 
 } // namespace gui

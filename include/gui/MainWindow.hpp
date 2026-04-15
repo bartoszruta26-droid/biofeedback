@@ -19,8 +19,20 @@
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QCloseEvent>
+#include <QTabWidget>
+#include <QStackedWidget>
 
 #include "GraphWidget.hpp"
+
+namespace tab {
+    class PatientTab;
+    class MeasurementTab;
+    class OutlineTab;
+}
+
+namespace games {
+    class GameEngine;
+}
 
 namespace gui {
 
@@ -66,6 +78,39 @@ public:
      * @return true jeśli zbieranie jest aktywne
      */
     bool isDataCollecting() const { return m_isCollectingData; }
+
+    /**
+     * @brief Pobiera zakładkę pacjentów
+     */
+    tab::PatientTab* patientTab() const { return m_patientTab; }
+
+    /**
+     * @brief Pobiera zakładkę pomiarów
+     */
+    tab::MeasurementTab* measurementTab() const { return m_measurementTab; }
+
+    /**
+     * @brief Pobiera zakładkę treningu (Outline)
+     */
+    tab::OutlineTab* outlineTab() const { return m_outlineTab; }
+
+    /**
+     * @brief Uruchamia grę w zakładce treningu
+     * @param gameId ID gry do uruchomienia
+     * @param exerciseData Dane ćwiczenia
+     */
+    void startGame(const QString& gameId, const tab::ExerciseData& exerciseData);
+
+    /**
+     * @brief Zatrzymuje bieżącą grę
+     */
+    void stopGame();
+
+    /**
+     * @brief Przekazuje dane z sensora do aktywnej gry
+     * @param value Wartość z sensora
+     */
+    void forwardSensorToGame(double value);
 
 public slots:
     /**
@@ -139,13 +184,30 @@ private:
     void setupToolBar();
     void setupStatusBar();
     void setupCentralWidget();
+    void setupTabs();
     void createConnections();
     void loadSettings();
     void saveSettings();
+    
+    // Obsługa gier
+    void createGameArea();
+    void loadGame(const QString& gameId);
+    void onGameFinished(int score);
+    void onSensorDataForGame(double value);
 
     // Widgety główne
     GraphWidget* m_graphWidget;
     QWidget* m_centralWidget;
+    QTabWidget* m_tabWidget;
+    
+    // Zakładki
+    tab::PatientTab* m_patientTab;
+    tab::MeasurementTab* m_measurementTab;
+    tab::OutlineTab* m_outlineTab;
+    
+    // Obszar gry
+    QStackedWidget* m_gameStack;
+    games::GameEngine* m_currentGame;
     
     // Elementy panelu sterowania
     QPushButton* m_startButton;
