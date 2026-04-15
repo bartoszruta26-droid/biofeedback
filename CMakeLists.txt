@@ -63,6 +63,7 @@ set(SOURCES
     src/games/SinGame.cpp
     src/games/PongGame.cpp
     src/games/FlappyBirdGame.cpp
+    src/games/MarioGame.cpp
 )
 
 # Header files
@@ -82,6 +83,7 @@ set(HEADERS
     include/games/SinGame.hpp
     include/games/PongGame.hpp
     include/games/FlappyBirdGame.hpp
+    include/games/MarioGame.hpp
 )
 
 # Create executable
