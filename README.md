@@ -35,7 +35,7 @@ A professional medical-grade biofeedback application built with C++, GTK4, and A
 sudo apt update && sudo apt upgrade -y
 
 # Install dependencies
-sudo apt install -y libgtk-4-dev libserialport-dev nlohmann-json3-dev libssl-dev libcairo2-dev meson ninja-build git
+sudo apt install -y libgtk-4-dev libserialport-dev nlohmann-json3-dev libssl-dev libcairo2-dev git cmake build-essential
 
 # Set up serial port permissions
 sudo usermod -a -G dialout $USER
@@ -51,11 +51,11 @@ cd biofeedback-app
 # Create build directory
 mkdir build && cd build
 
-# Configure with Meson
-meson setup ..
+# Configure with CMake
+cmake ..
 
 # Build
-ninja
+make -j$(nproc)
 
 # Run
 ./biofeedback
