@@ -46,19 +46,23 @@ sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev \
 sudo apt update && sudo apt upgrade -y
 
 # Install dependencies
-sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev nlohmann-json3-dev libssl-dev git cmake build-essential
+sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev nlohmann-json3-dev libssl-dev git cmake build-essential geany
 
 # Set up serial port permissions
 sudo usermod -a -G dialout $USER
 ```
 
-### Build Instructions
+### Git Clone
 
 ```bash
-# Clone repository
+# Clone the repository
 git clone <repository-url>
 cd biofeedback-app
+```
 
+### Build Instructions (Command Line)
+
+```bash
 # Create build directory
 mkdir build && cd build
 
@@ -70,6 +74,72 @@ make -j$(nproc)
 
 # Run
 ./biofeedback
+```
+
+### Working with Geany IDE
+
+#### Opening the Project in Geany
+
+1. Launch Geany:
+   ```bash
+   geany &
+   ```
+
+2. Open the project file:
+   - Go to **File** → **Open...**
+   - Navigate to the project directory
+   - Select `biofeedback.geany` file
+   - Click **Open**
+
+   Alternatively, open from command line:
+   ```bash
+   geany biofeedback.geany
+   ```
+
+#### Configuring Geany Settings
+
+The project includes a pre-configured `biofeedback.geany` file with build settings. To verify or modify settings:
+
+1. Go to **Build** → **Set Build Commands**
+2. Verify the following commands are configured:
+   - **Compile**: `cd $(dir) && mkdir -p build && cd build && cmake .. && make`
+   - **Build**: `cd $(dir)/build && make`
+   - **Execute**: `$(dir)/build/biofeedback`
+
+3. Optional custom settings:
+   - Go to **Edit** → **Preferences**
+   - Set indentation width to 4 spaces
+   - Enable auto-indentation
+   - Set long line column to 80
+
+#### Building and Running in Geany
+
+After opening the project:
+
+1. **Build the project**:
+   - Press **F8** (Build) or go to **Build** → **Build**
+   - Or use the custom menu: **Build** → **Build Release** for optimized build
+   - Or use **Build** → **Clean Build** to start fresh
+
+2. **Run the application**:
+   - Press **F5** (Execute) or go to **Build** → **Execute**
+   - Or use the custom menu: **Build** → **Run Application**
+
+3. **Available build options** (in Build menu):
+   - **Clean Build** - Remove build directory and recreate
+   - **Configure Only** - Run CMake without building
+   - **Build Debug** - Build with debug symbols
+   - **Build Release** - Build with optimizations
+   - **Run Application** - Execute the built application
+
+#### Quick Start in Geany
+
+```bash
+# Open project in Geany
+cd biofeedback-app
+geany biofeedback.geany
+
+# Then press F8 to build, F5 to run
 ```
 
 ## Project Structure
