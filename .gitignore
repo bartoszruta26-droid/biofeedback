@@ -1,0 +1,31 @@
+```
+# Arduino build artifacts
+*.hex
+*.elf
+*.bin
+*.map
+*.d
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+
+# Build directories
+build/
+Build/
+output/
+
+# Arduino IDE specific
+*.lastuploadopts
+*.build.options.json
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db
+```
