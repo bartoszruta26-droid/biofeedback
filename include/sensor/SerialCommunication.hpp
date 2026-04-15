@@ -1,6 +1,7 @@
 #ifndef SENSOR_SERIALCOMMUNICATION_HPP
 #define SENSOR_SERIALCOMMUNICATION_HPP
 
+#include <QObject>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -63,7 +64,9 @@ struct SerialConfig {
  * - Kalibracja wartości z czujnika
  * - Identyfikacja Arduino i portu połączenia
  */
-class SerialCommunication {
+class SerialCommunication : public QObject {
+    Q_OBJECT
+    
 public:
     /**
      * @brief Typ funkcji callback dla nowych danych
@@ -77,13 +80,14 @@ public:
 
     /**
      * @brief Konstruktor
+     * @param parent Rodzic QObject
      */
-    SerialCommunication();
+    explicit SerialCommunication(QObject* parent = nullptr);
     
     /**
      * @brief Destruktor
      */
-    ~SerialCommunication();
+    ~SerialCommunication() override;
 
     // ==================== Zarządzanie połączeniem ====================
     
@@ -327,6 +331,37 @@ public:
      * @return Opis błędu
      */
     std::string getLastError() const;
+
+signals:
+    /**
+     * @brief Sygnał emitowany gdy nadejdą nowe dane
+     * @param calibratedValue Skalibrowana wartość z czujnika
+     */
+    void dataReceived(double calibratedValue);
+    
+    /**
+     * @brief Sygnał emitowany przy zmianie statusu połączenia
+     * @param connected true jeśli połączono
+     * @param message Komunikat o statusie
+     */
+    void connectionStatusChanged(bool connected, const QString& message);
+    
+    /**
+     * @brief Sygnał emitowany gdy wykryto błąd
+     * @param error Opis błędu
+     */
+    void errorOccurred(const QString& error);
+
+public slots:
+    /**
+     * @brief Rozpoczyna nasłuchiwanie danych (alias dla startAsyncReading)
+     */
+    void startListening();
+    
+    /**
+     * @brief Zatrzymuje nasłuchiwanie danych (alias dla stopAsyncReading)
+     */
+    void stopListening();
 
 private:
     // Implementacja wewnętrzna (wskaźnik do impl PImpl)
