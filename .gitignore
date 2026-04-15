@@ -3,37 +3,45 @@
 *.o
 *.obj
 *.out
-build/
-dist/
 
 # Dependencies
-.venv/
-venv/
-node_modules/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
-
-# Editors
-.vscode/
-.idea/
+*.swo
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# OS
+# Build directories
+build/
+dist/
+target/
+*.class
+*.jar
+*.war
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.deb
+*.rpm
+
+# OS generated files
 .DS_Store
 Thumbs.db
 ```
