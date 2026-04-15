@@ -12,8 +12,145 @@
 #include <algorithm>
 #include <cmath>
 #include <QMap>
+#include <QDir>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QScrollArea>
 
 namespace tab {
+
+// ============================================================================
+// TrendsPlotWidget - Implementacja
+// ============================================================================
+
+TrendsPlotWidget::TrendsPlotWidget(QWidget *parent)
+    : QWidget(parent)
+    , m_maxForce(100.0)
+{
+    setMinimumHeight(250);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+}
+
+void TrendsPlotWidget::setData(const QVector<double>& dates, const QVector<double>& avgForces, 
+                                const QVector<double>& maxForces)
+{
+    m_dates = dates;
+    m_avgForces = avgForces;
+    m_maxForces = maxForces;
+    
+    // Znajdź maksymalną siłę
+    m_maxForce = 0;
+    for (double force : m_maxForces) {
+        if (force > m_maxForce) m_maxForce = force;
+    }
+    m_maxForce *= 1.2;  // 20% marginesu
+    
+    update();
+}
+
+void TrendsPlotWidget::clearData()
+{
+    m_dates.clear();
+    m_avgForces.clear();
+    m_maxForces.clear();
+    m_maxForce = 100.0;
+    update();
+}
+
+void TrendsPlotWidget::paintEvent(QPaintEvent *event)
+{
+    Q_UNUSED(event);
+    
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    
+    int width = this->width();
+    int height = this->height();
+    int margin = 50;
+    
+    int plotWidth = width - 2 * margin;
+    int plotHeight = height - 2 * margin;
+    
+    if (plotWidth <= 0 || plotHeight <= 0 || m_dates.isEmpty()) {
+        return;
+    }
+    
+    // Tło
+    painter.fillRect(margin, margin, plotWidth, plotHeight, QColor(245, 248, 255));
+    
+    // Linie siatki
+    painter.setPen(QPen(QColor(200, 200, 200), 1, Qt::DashLine));
+    for (int i = 1; i <= 4; ++i) {
+        int y = margin + (plotHeight * i / 5);
+        painter.drawLine(margin, y, margin + plotWidth, y);
+    }
+    
+    // Oś X
+    painter.setPen(QPen(Qt::black, 2));
+    painter.drawLine(margin, margin + plotHeight, margin + plotWidth, margin + plotHeight);
+    
+    // Oś Y
+    painter.drawLine(margin, margin, margin, margin + plotHeight);
+    
+    // Etykiety osi Y
+    painter.setFont(QFont("Arial", 8));
+    painter.setPen(Qt::black);
+    for (int i = 0; i <= 5; ++i) {
+        int y = margin + plotHeight - (plotHeight * i / 5);
+        double force = m_maxForce * i / 5;
+        QString label = QString::number(force, 'f', 0);
+        painter.drawText(5, y + 3, label);
+    }
+    
+    // Rysowanie punktów i linii dla średniej siły
+    if (m_avgForces.size() >= 2) {
+        painter.setPen(QPen(QColor(0, 100, 200), 3, Qt::SolidLine));
+        
+        for (int i = 1; i < m_avgForces.size(); ++i) {
+            double x1 = margin + ((i - 1) / (double)(m_avgForces.size() - 1)) * plotWidth;
+            double y1 = margin + plotHeight - (m_avgForces[i-1] / m_maxForce) * plotHeight;
+            double x2 = margin + (i / (double)(m_avgForces.size() - 1)) * plotWidth;
+            double y2 = margin + plotHeight - (m_avgForces[i] / m_maxForce) * plotHeight;
+            
+            painter.drawLine(static_cast<int>(x1), static_cast<int>(y1), 
+                            static_cast<int>(x2), static_cast<int>(y2));
+        }
+        
+        // Punkty
+        painter.setBrush(QBrush(QColor(0, 100, 200)));
+        for (int i = 0; i < m_avgForces.size(); ++i) {
+            double x = margin + (i / (double)(m_avgForces.size() - 1)) * plotWidth;
+            double y = margin + plotHeight - (m_avgForces[i] / m_maxForce) * plotHeight;
+            painter.drawEllipse(static_cast<int>(x) - 5, static_cast<int>(y) - 5, 10, 10);
+        }
+    }
+    
+    // Rysowanie punktów dla maksymalnej siły
+    if (!m_maxForces.isEmpty()) {
+        painter.setPen(QPen(QColor(200, 50, 50), 2, Qt::DotLine));
+        painter.setBrush(QBrush(QColor(200, 50, 50)));
+        
+        for (int i = 0; i < m_maxForces.size(); ++i) {
+            double x = margin + (i / (double)(m_maxForces.size() - 1)) * plotWidth;
+            double y = margin + plotHeight - (m_maxForces[i] / m_maxForce) * plotHeight;
+            painter.drawEllipse(static_cast<int>(x) - 4, static_cast<int>(y) - 4, 8, 8);
+        }
+    }
+    
+    // Legenda
+    painter.setFont(QFont("Arial", 9, QFont::Bold));
+    painter.setPen(QColor(0, 100, 200));
+    painter.drawText(margin + 10, margin + 15, "Średnia Siła");
+    painter.setPen(QColor(200, 50, 50));
+    painter.drawText(margin + 120, margin + 15, "Maks. Siła");
+    
+    // Etykiety
+    painter.setPen(Qt::black);
+    painter.setFont(QFont("Arial", 9));
+    painter.drawText(margin + plotWidth / 2 - 60, height - 10, "Kolejne Sesje");
+    painter.drawText(5, margin - 5, "Siła [N]");
+}
 
 // ============================================================================
 // ForcePlotWidget - Implementacja
@@ -201,12 +338,17 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
+    , m_trendsBox(nullptr)
+    , m_trendsScrollArea(nullptr)
+    , m_trendsContent(nullptr)
+    , m_chkShowTrends(nullptr)
 {
     m_timer = new QTimer(this);
     m_timer->setInterval(10);  // 10 ms = 100 Hz
     connect(m_timer, &QTimer::timeout, this, &MeasurementTab::onTimerTick);
     
     setupUI();
+    setupTrendsUI();
 }
 
 MeasurementTab::~MeasurementTab()
@@ -242,10 +384,15 @@ void MeasurementTab::setupUI()
     m_btnReset = new QPushButton("RESET SESJI", this);
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
+    m_chkShowTrends = new QCheckBox("POKAŻ TRENDY DŁUGOTERMINOWE", this);
+    m_chkShowTrends->setFont(QFont("Arial", 10, QFont::Bold));
+    connect(m_chkShowTrends, &QCheckBox::toggled, this, &MeasurementTab::onShowTrends);
+    
     m_controlLayout->addWidget(m_btnStartStop);
     m_controlLayout->addWidget(m_btnReadManual);
     m_controlLayout->addWidget(m_btnSave);
     m_controlLayout->addWidget(m_btnLoad);
+    m_controlLayout->addWidget(m_chkShowTrends);
     m_controlLayout->addWidget(m_btnReset);
     
     m_mainLayout->addLayout(m_controlLayout);
@@ -320,6 +467,31 @@ void MeasurementTab::setupUI()
     rawLayout->addWidget(m_rawTable);
     m_rawBox->setLayout(rawLayout);
     m_mainLayout->addWidget(m_rawBox);
+}
+
+void MeasurementTab::setupTrendsUI()
+{
+    m_trendsBox = new QGroupBox("Trendy Długoterminowe", this);
+    m_trendsBox->setVisible(false);
+    
+    QVBoxLayout* trendsLayout = new QVBoxLayout();
+    
+    m_trendsScrollArea = new QScrollArea(this);
+    m_trendsScrollArea->setWidgetResizable(true);
+    m_trendsScrollArea->setMinimumHeight(300);
+    
+    m_trendsContent = new QWidget();
+    QVBoxLayout* contentLayout = new QVBoxLayout(m_trendsContent);
+    
+    QLabel* lblInfo = new QLabel("Wykresy trendów długoterminowych dla pacjenta: " + m_patientId, this);
+    lblInfo->setFont(QFont("Arial", 11, QFont::Bold));
+    contentLayout->addWidget(lblInfo);
+    
+    m_trendsScrollArea->setWidget(m_trendsContent);
+    trendsLayout->addWidget(m_trendsScrollArea);
+    
+    m_trendsBox->setLayout(trendsLayout);
+    m_mainLayout->addWidget(m_trendsBox);
 }
 
 void MeasurementTab::setPatientId(const QString& id)
@@ -931,6 +1103,293 @@ bool MeasurementTab::importFromCSV(const QString& filename)
     updateSeriesProgress();
     QMessageBox::information(this, "Sukces", "Dane wczytane z: " + filename);
     return true;
+}
+
+bool MeasurementTab::exportToJSON(const QString& filename)
+{
+    QFile file(filename);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Błąd", "Nie można zapisać pliku: " + filename);
+        return false;
+    }
+    
+    MeasurementSession session;
+    session.sessionId = QUuid::createUuid().toString();
+    session.patientId = m_patientId;
+    session.date = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+    session.series = m_completedSeriesStats;
+    
+    QString json = serializeSessionToJSON(session);
+    QTextStream out(&file);
+    out << json;
+    file.close();
+    
+    QMessageBox::information(this, "Sukces", "Dane sesji zapisane do: " + filename);
+    return true;
+}
+
+bool MeasurementTab::importFromJSON(const QString& filename)
+{
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::critical(this, "Błąd", "Nie można otworzyć pliku: " + filename);
+        return false;
+    }
+    
+    QTextStream in(&file);
+    QString jsonContent = in.readAll();
+    file.close();
+    
+    MeasurementSession session = deserializeSessionFromJSON(jsonContent);
+    if (!session.sessionId.isEmpty()) {
+        m_patientSessions.append(session);
+        m_patientId = session.patientId;
+        m_completedSeriesStats = session.series;
+        
+        // Odśwież widok
+        m_statsTable->setRowCount(0);
+        for (const auto& series : m_completedSeriesStats) {
+            for (const auto& rep : series.reps) {
+                m_currentRepStats = rep;
+                m_currentSeries = series.seriesNumber;
+                m_currentRepInSeries = rep.repNumber;
+                updateStatsTable();
+            }
+        }
+        updateSeriesProgress();
+        QMessageBox::information(this, "Sukces", "Sesja wczytana z: " + filename);
+        return true;
+    }
+    
+    return false;
+}
+
+void MeasurementTab::loadPatientTrends()
+{
+    if (m_patientId.isEmpty()) {
+        QMessageBox::warning(this, "Ostrzeżenie", "Najpierw ustaw ID pacjenta!");
+        return;
+    }
+    
+    QString dataDir = QDir::currentPath() + "/data/patients/" + m_patientId;
+    QDir dir(dataDir);
+    if (!dir.exists()) {
+        QMessageBox::information(this, "Informacja", "Brak zapisanych sesji dla tego pacjenta.");
+        return;
+    }
+    
+    m_patientSessions.clear();
+    QStringList jsonFiles = dir.entryList(QStringList() << "*.json", QDir::Files);
+    
+    for (const QString& fileName : jsonFiles) {
+        QString filePath = dataDir + "/" + fileName;
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            QString jsonContent = in.readAll();
+            file.close();
+            
+            MeasurementSession session = deserializeSessionFromJSON(jsonContent);
+            if (!session.sessionId.isEmpty()) {
+                m_patientSessions.append(session);
+            }
+        }
+    }
+    
+    if (m_patientSessions.isEmpty()) {
+        QMessageBox::information(this, "Informacja", "Brak zapisanych sesji JSON dla tego pacjenta.");
+        return;
+    }
+    
+    updateTrendsView();
+}
+
+void MeasurementTab::onShowTrends()
+{
+    bool showTrends = m_chkShowTrends->isChecked();
+    m_trendsBox->setVisible(showTrends);
+    
+    if (showTrends) {
+        loadPatientTrends();
+    }
+}
+
+void MeasurementTab::updateTrendsView()
+{
+    if (!m_trendsContent) return;
+    
+    QLayout* layout = m_trendsContent->layout();
+    if (layout) {
+        QLayoutItem* item;
+        while ((item = layout->takeAt(0)) != nullptr) {
+            delete item->widget();
+            delete item;
+        }
+    }
+    
+    QLabel* lblInfo = new QLabel("Wczytano " + QString::number(m_patientSessions.size()) + 
+                                  " sesji pomiarowych dla pacjenta: " + m_patientId, this);
+    lblInfo->setFont(QFont("Arial", 11, QFont::Bold));
+    layout->addWidget(lblInfo);
+    
+    QTableWidget* trendsTable = new QTableWidget(this);
+    trendsTable->setColumnCount(6);
+    trendsTable->setHorizontalHeaderLabels({
+        "Data", "Seria", "Śr. Szczyt [N]", "Maks. Szczyt [N]", 
+        "Wskaźnik Zmęczenia [%]", "Spójność [%]"
+    });
+    trendsTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    trendsTable->setAlternatingRowColors(true);
+    
+    for (const auto& session : m_patientSessions) {
+        for (const auto& series : session.series) {
+            int row = trendsTable->rowCount();
+            trendsTable->insertRow(row);
+            
+            trendsTable->setItem(row, 0, new QTableWidgetItem(session.date));
+            trendsTable->setItem(row, 1, new QTableWidgetItem(QString::number(series.seriesNumber)));
+            trendsTable->setItem(row, 2, new QTableWidgetItem(QString::number(series.avgPeakForce, 'f', 1)));
+            
+            double maxPeak = 0;
+            for (const auto& rep : series.reps) {
+                if (rep.peakForce > maxPeak) maxPeak = rep.peakForce;
+            }
+            trendsTable->setItem(row, 3, new QTableWidgetItem(QString::number(maxPeak, 'f', 1)));
+            trendsTable->setItem(row, 4, new QTableWidgetItem(QString::number(series.fatigueIndex, 'f', 1)));
+            trendsTable->setItem(row, 5, new QTableWidgetItem(QString::number(series.consistencyScore, 'f', 1)));
+        }
+    }
+    
+    layout->addWidget(trendsTable);
+    
+    QGroupBox* plotGroup = new QGroupBox("Wykres Trendów - Siła Szczytowa", this);
+    QVBoxLayout* plotLayout = new QVBoxLayout();
+    
+    TrendsPlotWidget* trendsPlot = new TrendsPlotWidget(this);
+    trendsPlot->setMinimumHeight(250);
+    
+    QVector<double> dates;
+    QVector<double> avgForces;
+    QVector<double> maxForces;
+    
+    int idx = 0;
+    for (const auto& session : m_patientSessions) {
+        for (const auto& series : session.series) {
+            dates.append(idx++);
+            avgForces.append(series.avgPeakForce);
+            
+            double maxPeak = 0;
+            for (const auto& rep : series.reps) {
+                if (rep.peakForce > maxPeak) maxPeak = rep.peakForce;
+            }
+            maxForces.append(maxPeak);
+        }
+    }
+    
+    trendsPlot->setData(dates, avgForces, maxForces);
+    plotLayout->addWidget(trendsPlot);
+    plotGroup->setLayout(plotLayout);
+    layout->addWidget(plotGroup);
+}
+
+QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session) const
+{
+    QJsonObject root;
+    root["sessionId"] = session.sessionId;
+    root["patientId"] = session.patientId;
+    root["date"] = session.date;
+    
+    QJsonArray seriesArray;
+    for (const auto& series : session.series) {
+        QJsonObject seriesObj;
+        seriesObj["seriesNumber"] = series.seriesNumber;
+        seriesObj["avgPeakForce"] = series.avgPeakForce;
+        seriesObj["medianPeakForce"] = series.medianPeakForce;
+        seriesObj["fatigueIndex"] = series.fatigueIndex;
+        seriesObj["totalWork"] = series.totalWork;
+        seriesObj["avgRiseRate"] = series.avgRiseRate;
+        seriesObj["avgFallRate"] = series.avgFallRate;
+        seriesObj["seriesSpeed"] = series.seriesSpeed;
+        seriesObj["consistencyScore"] = series.consistencyScore;
+        seriesObj["impulseTotal"] = series.impulseTotal;
+        
+        QJsonArray repsArray;
+        for (const auto& rep : series.reps) {
+            QJsonObject repObj;
+            repObj["repNumber"] = rep.repNumber;
+            repObj["peakForce"] = rep.peakForce;
+            repObj["timeToPeak"] = rep.timeToPeak;
+            repObj["riseRate"] = rep.riseRate;
+            repObj["fallRate"] = rep.fallRate;
+            repObj["duration"] = rep.duration;
+            repObj["timeInTop8pct"] = rep.timeInTop8pct;
+            repObj["timeInBottom8pct"] = rep.timeInBottom8pct;
+            repObj["areaUnderCurve"] = rep.areaUnderCurve;
+            repObj["avgForce"] = rep.avgForce;
+            repObj["medianForce"] = rep.medianForce;
+            repObj["modeForce"] = rep.modeForce;
+            repObj["isValid"] = rep.isValid;
+            repsArray.append(repObj);
+        }
+        seriesObj["repetitions"] = repsArray;
+        seriesArray.append(seriesObj);
+    }
+    root["series"] = seriesArray;
+    
+    QJsonDocument doc(root);
+    return doc.toJson(QJsonDocument::Indented);
+}
+
+MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& json) const
+{
+    MeasurementSession session;
+    
+    QJsonDocument doc = QJsonDocument::fromJson(json.toUtf8());
+    if (doc.isNull()) return session;
+    
+    QJsonObject root = doc.object();
+    session.sessionId = root["sessionId"].toString();
+    session.patientId = root["patientId"].toString();
+    session.date = root["date"].toString();
+    
+    QJsonArray seriesArray = root["series"].toArray();
+    for (const auto& seriesVal : seriesArray) {
+        QJsonObject seriesObj = seriesVal.toObject();
+        SeriesStats series;
+        series.seriesNumber = seriesObj["seriesNumber"].toInt();
+        series.avgPeakForce = seriesObj["avgPeakForce"].toDouble();
+        series.medianPeakForce = seriesObj["medianPeakForce"].toDouble();
+        series.fatigueIndex = seriesObj["fatigueIndex"].toDouble();
+        series.totalWork = seriesObj["totalWork"].toDouble();
+        series.avgRiseRate = seriesObj["avgRiseRate"].toDouble();
+        series.avgFallRate = seriesObj["avgFallRate"].toDouble();
+        series.seriesSpeed = seriesObj["seriesSpeed"].toDouble();
+        series.consistencyScore = seriesObj["consistencyScore"].toDouble();
+        series.impulseTotal = seriesObj["impulseTotal"].toDouble();
+        
+        QJsonArray repsArray = seriesObj["repetitions"].toArray();
+        for (const auto& repVal : repsArray) {
+            QJsonObject repObj = repVal.toObject();
+            RepetitionStats rep;
+            rep.repNumber = repObj["repNumber"].toInt();
+            rep.peakForce = repObj["peakForce"].toDouble();
+            rep.timeToPeak = repObj["timeToPeak"].toDouble();
+            rep.riseRate = repObj["riseRate"].toDouble();
+            rep.fallRate = repObj["fallRate"].toDouble();
+            rep.duration = repObj["duration"].toDouble();
+            rep.timeInTop8pct = repObj["timeInTop8pct"].toDouble();
+            rep.timeInBottom8pct = repObj["timeInBottom8pct"].toDouble();
+            rep.areaUnderCurve = repObj["areaUnderCurve"].toDouble();
+            rep.avgForce = repObj["avgForce"].toDouble();
+            rep.medianForce = repObj["medianForce"].toDouble();
+            rep.modeForce = repObj["modeForce"].toDouble();
+            rep.isValid = repObj["isValid"].toBool();
+            series.reps.append(rep);
+        }
+        session.series.append(series);
+    }
+    
+    return session;
 }
 
 } // namespace tab
