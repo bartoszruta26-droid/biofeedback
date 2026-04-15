@@ -51,25 +51,16 @@ set(SOURCES
     src/core/ConfigManager.cpp
     src/gui/MainWindow.cpp
     src/gui/GraphWidget.cpp
-    src/tabs/PatientTab.cpp
-    src/tabs/MeasurementTab.cpp
-    src/tabs/TrainingTab.cpp
-    src/tabs/OutlineTab.cpp
+    src/tab/PatientTab.cpp
+    src/tab/MeasurementTab.cpp
+    src/tab/OutlineTab.cpp
     src/sensor/HX711Sensor.cpp
     src/sensor/SerialCommunication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
     src/games/GameEngine.cpp
     src/games/SinGame.cpp
-    src/games/TanGame.cpp
-    src/games/FlappyBirdGame.cpp
     src/games/PongGame.cpp
-    src/games/ArkanoidGame.cpp
-    src/games/MarioGame.cpp
-    src/games/GalagaGame.cpp
-    src/games/ArcherGame.cpp
-    src/games/ScoredEarthGame.cpp
-    src/games/CarRaceGame.cpp
 )
 
 # Header files
@@ -79,25 +70,16 @@ set(HEADERS
     include/core/ConfigManager.hpp
     include/gui/MainWindow.hpp
     include/gui/GraphWidget.hpp
-    include/tabs/PatientTab.hpp
-    include/tabs/MeasurementTab.hpp
-    include/tabs/TrainingTab.hpp
-    include/tabs/OutlineTab.hpp
+    include/tab/PatientTab.hpp
+    include/tab/MeasurementTab.hpp
+    include/tab/OutlineTab.hpp
     include/sensor/HX711Sensor.hpp
     include/sensor/SerialCommunication.hpp
     include/data/DataManager.hpp
     include/data/Encryption.hpp
     include/games/GameEngine.hpp
     include/games/SinGame.hpp
-    include/games/TanGame.hpp
-    include/games/FlappyBirdGame.hpp
     include/games/PongGame.hpp
-    include/games/ArkanoidGame.hpp
-    include/games/MarioGame.hpp
-    include/games/GalagaGame.hpp
-    include/games/ArcherGame.hpp
-    include/games/ScoredEarthGame.hpp
-    include/games/CarRaceGame.hpp
 )
 
 # Create executable
