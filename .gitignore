@@ -1,31 +1,70 @@
 ```
-# Arduino build artifacts
-*.hex
-*.elf
-*.bin
-*.map
-*.d
+# Build artifacts
 *.o
+*.obj
 *.a
 *.so
 *.dylib
 *.dll
+*.exe
+*.out
 
 # Build directories
 build/
-Build/
-output/
+dist/
+target/
+cmake-build-*/
+Makefile
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
 
-# Arduino IDE specific
-*.lastuploadopts
-*.build.options.json
+# Dependencies
+.externalNativeBuild/
+.gradle/
 
-# Temporary files
-*.tmp
-*.temp
+# Logs
 *.log
 
-# OS specific
-.DS_Store
-Thumbs.db
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compression
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```
