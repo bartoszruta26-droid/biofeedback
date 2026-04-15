@@ -1,0 +1,10 @@
+{
+    "users": [
+        {
+  "username": "admin",
+  "password": "Iw0CDws=",
+  "role": "administrator",
+  "encrypted": true
+}
+    ]
+}
