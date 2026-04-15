@@ -21,9 +21,10 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 # Find dependencies
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(GTK4 REQUIRED gtk4)
+# Qt5
+find_package(Qt5 REQUIRED COMPONENTS Core Widgets Charts)
+
 pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
-pkg_check_modules(CAIRO REQUIRED cairo)
 
 find_package(nlohmann_json REQUIRED)
 find_package(OpenSSL REQUIRED)
@@ -31,17 +32,18 @@ find_package(OpenSSL REQUIRED)
 # Include directories
 include_directories(
     ${CMAKE_SOURCE_DIR}/include
-    ${GTK4_INCLUDE_DIRS}
     ${LIBSERIALPORT_INCLUDE_DIRS}
-    ${CAIRO_INCLUDE_DIRS}
 )
 
 # Link directories
 link_directories(
-    ${GTK4_LIBRARY_DIRS}
     ${LIBSERIALPORT_LIBRARY_DIRS}
-    ${CAIRO_LIBRARY_DIRS}
 )
+
+# Qt5 MOC headers
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
 
 # Source files
 set(SOURCES
@@ -51,25 +53,14 @@ set(SOURCES
     src/core/ConfigManager.cpp
     src/gui/MainWindow.cpp
     src/gui/GraphWidget.cpp
-    src/tabs/PatientTab.cpp
-    src/tabs/MeasurementTab.cpp
-    src/tabs/TrainingTab.cpp
-    src/tabs/OutlineTab.cpp
-    src/sensor/HX711Sensor.cpp
+    src/tab/PatientTab.cpp
+    src/tab/MeasurementTab.cpp
+    src/tab/OutlineTab.cpp
     src/sensor/SerialCommunication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
     src/games/GameEngine.cpp
     src/games/SinGame.cpp
-    src/games/TanGame.cpp
-    src/games/FlappyBirdGame.cpp
-    src/games/PongGame.cpp
-    src/games/ArkanoidGame.cpp
-    src/games/MarioGame.cpp
-    src/games/GalagaGame.cpp
-    src/games/ArcherGame.cpp
-    src/games/ScoredEarthGame.cpp
-    src/games/CarRaceGame.cpp
 )
 
 # Header files
@@ -79,25 +70,14 @@ set(HEADERS
     include/core/ConfigManager.hpp
     include/gui/MainWindow.hpp
     include/gui/GraphWidget.hpp
-    include/tabs/PatientTab.hpp
-    include/tabs/MeasurementTab.hpp
-    include/tabs/TrainingTab.hpp
-    include/tabs/OutlineTab.hpp
-    include/sensor/HX711Sensor.hpp
+    include/tab/PatientTab.hpp
+    include/tab/MeasurementTab.hpp
+    include/tab/OutlineTab.hpp
     include/sensor/SerialCommunication.hpp
     include/data/DataManager.hpp
     include/data/Encryption.hpp
     include/games/GameEngine.hpp
     include/games/SinGame.hpp
-    include/games/TanGame.hpp
-    include/games/FlappyBirdGame.hpp
-    include/games/PongGame.hpp
-    include/games/ArkanoidGame.hpp
-    include/games/MarioGame.hpp
-    include/games/GalagaGame.hpp
-    include/games/ArcherGame.hpp
-    include/games/ScoredEarthGame.hpp
-    include/games/CarRaceGame.hpp
 )
 
 # Create executable
@@ -105,18 +85,14 @@ add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME}
-    ${GTK4_LIBRARIES}
+    Qt5::Core
+    Qt5::Widgets
+    Qt5::Charts
     ${LIBSERIALPORT_LIBRARIES}
-    ${CAIRO_LIBRARIES}
     nlohmann_json::nlohmann_json
     OpenSSL::SSL
     OpenSSL::Crypto
     pthread
-)
-
-# Include GTK4 definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    ${GTK4_CFLAGS_OTHER}
 )
 
 # Install rules

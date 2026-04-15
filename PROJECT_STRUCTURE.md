@@ -142,8 +142,8 @@ biofeedback/
 - **Logger**: Thread-safe logging with rotation
 
 ### GUI Components
-- **MainWindow**: GTK4 main window with tabbed interface
-- **GraphWidget**: Real-time sensor data visualization
+- **MainWindow**: Qt5 main window with tabbed interface
+- **GraphWidget**: Real-time sensor data visualization using QPainter
 
 ### Tabs
 - **PatientTab**: Patient CRUD operations (new, edit, import, export, delete)
@@ -203,9 +203,8 @@ make -j$(nproc)
 ## Dependencies
 
 ### System Libraries
-- GTK4 (`libgtk-4-dev`)
+- Qt5 (`qtbase5-dev`, `qtcharts5-dev`)
 - libserialport (`libserialport-dev`)
-- Cairo (`libcairo2-dev`)
 - OpenSSL (`libssl-dev`)
 
 ### C++ Libraries
