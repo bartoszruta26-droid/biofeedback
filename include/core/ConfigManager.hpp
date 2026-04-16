@@ -5,6 +5,7 @@
 #include <map>
 #include <variant>
 #include <optional>
+#include <vector>
 
 namespace biofeedback {
 
