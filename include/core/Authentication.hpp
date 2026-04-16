@@ -19,59 +19,10 @@ struct UserData {
     bool encrypted;
     
     // Konwersja do JSON
-    std::string toJson() const {
-        std::ostringstream json;
-        json << "{\n";
-        json << "  \"username\": \"" << username << "\",\n";
-        json << "  \"password\": \"" << password << "\",\n";
-        json << "  \"role\": \"" << role << "\",\n";
-        json << "  \"encrypted\": " << (encrypted ? "true" : "false") << "\n";
-        json << "}";
-        return json.str();
-    }
+    std::string toJson() const;
     
     // Parsowanie z JSON
-    static UserData fromJson(const std::string& json) {
-        UserData user;
-        
-        // Proste parsowanie JSON bez zewnętrznych bibliotek
-        size_t pos;
-        
-        pos = json.find("\"username\"");
-        if (pos != std::string::npos) {
-            pos = json.find(':', pos);
-            pos = json.find('"', pos + 1);
-            size_t endPos = json.find('"', pos + 1);
-            if (endPos != std::string::npos) {
-                user.username = json.substr(pos + 1, endPos - pos - 1);
-            }
-        }
-        
-        pos = json.find("\"password\"");
-        if (pos != std::string::npos) {
-            pos = json.find(':', pos);
-            pos = json.find('"', pos + 1);
-            size_t endPos = json.find('"', pos + 1);
-            if (endPos != std::string::npos) {
-                user.password = json.substr(pos + 1, endPos - pos - 1);
-            }
-        }
-        
-        pos = json.find("\"role\"");
-        if (pos != std::string::npos) {
-            pos = json.find(':', pos);
-            pos = json.find('"', pos + 1);
-            size_t endPos = json.find('"', pos + 1);
-            if (endPos != std::string::npos) {
-                user.role = json.substr(pos + 1, endPos - pos - 1);
-            }
-        }
-        
-        user.encrypted = (json.find("\"encrypted\": true") != std::string::npos ||
-                         json.find("\"encrypted\":true") != std::string::npos);
-        
-        return user;
-    }
+    static UserData fromJson(const std::string& json);
 };
 
 /**
