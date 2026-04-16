@@ -232,6 +232,8 @@ public slots:
     void onSaveData();
     void onLoadData();
     void onShowTrends();
+    void onSaveMeasurementJSON();   // Zapis pojedynczego pomiaru do JSON
+    void onLoadMeasurementJSON();   // Otwieranie pojedynczego pomiaru JSON
 
 private slots:
     void onToggleMeasurement();
@@ -264,6 +266,8 @@ private:
     QPushButton* m_btnReadManual;
     QPushButton* m_btnSave;
     QPushButton* m_btnLoad;
+    QPushButton* m_btnSaveJSON;       // Zapis pojedynczego pomiaru do JSON
+    QPushButton* m_btnLoadJSON;       // Otwieranie pojedynczego pomiaru JSON
     QPushButton* m_btnReset;
     
     // Panel żywy z wykresem

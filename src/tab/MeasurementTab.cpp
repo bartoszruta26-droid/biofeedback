@@ -343,6 +343,10 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_trendsContent(nullptr)
     , m_chkShowTrends(nullptr)
 {
+    // Inicjalizacja wskaźników przycisków JSON
+    m_btnSaveJSON = nullptr;
+    m_btnLoadJSON = nullptr;
+    
     m_timer = new QTimer(this);
     m_timer->setInterval(10);  // 10 ms = 100 Hz
     connect(m_timer, &QTimer::timeout, this, &MeasurementTab::onTimerTick);
@@ -381,6 +385,12 @@ void MeasurementTab::setupUI()
     m_btnLoad = new QPushButton("WCZYTAJ CSV", this);
     connect(m_btnLoad, &QPushButton::clicked, this, &MeasurementTab::onLoadData);
     
+    m_btnSaveJSON = new QPushButton("ZAPISZ POMIAR JSON", this);
+    connect(m_btnSaveJSON, &QPushButton::clicked, this, &MeasurementTab::onSaveMeasurementJSON);
+    
+    m_btnLoadJSON = new QPushButton("OTWÓRZ POMIAR JSON", this);
+    connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
+    
     m_btnReset = new QPushButton("RESET SESJI", this);
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
@@ -392,6 +402,8 @@ void MeasurementTab::setupUI()
     m_controlLayout->addWidget(m_btnReadManual);
     m_controlLayout->addWidget(m_btnSave);
     m_controlLayout->addWidget(m_btnLoad);
+    m_controlLayout->addWidget(m_btnSaveJSON);
+    m_controlLayout->addWidget(m_btnLoadJSON);
     m_controlLayout->addWidget(m_chkShowTrends);
     m_controlLayout->addWidget(m_btnReset);
     
@@ -998,6 +1010,50 @@ void MeasurementTab::onLoadData()
     if (filename.isEmpty()) return;
     
     importFromCSV(filename);
+}
+
+void MeasurementTab::onSaveMeasurementJSON()
+{
+    if (m_completedSeriesStats.isEmpty()) {
+        QMessageBox::warning(this, "Ostrzeżenie", "Brak danych pomiarowych do zapisu!");
+        return;
+    }
+    
+    if (m_patientId.isEmpty()) {
+        QMessageBox::warning(this, "Ostrzeżenie", "Najpierw ustaw ID pacjenta!");
+        return;
+    }
+    
+    // Utwórz katalog dla pacjenta jeśli nie istnieje
+    QString dataDir = QDir::currentPath() + "/data/patients/" + m_patientId;
+    QDir dir;
+    if (!dir.exists(dataDir)) {
+        dir.mkpath(dataDir);
+    }
+    
+    // Generuj nazwę pliku z datą i numerem sesji
+    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
+    int sessionNum = m_patientSessions.size() + 1;
+    QString filename = dataDir + "/pomiar_" + timestamp + "_sesja" + QString::number(sessionNum) + ".json";
+    
+    exportToJSON(filename);
+    
+    // Dodaj do listy sesji pacjenta
+    loadPatientTrends();
+}
+
+void MeasurementTab::onLoadMeasurementJSON()
+{
+    QString filename = QFileDialog::getOpenFileName(this, "Otwórz pomiar JSON",
+                                                     "", "JSON Files (*.json)");
+    if (filename.isEmpty()) return;
+    
+    importFromJSON(filename);
+    
+    // Po wczytaniu, zaktualizuj trendy
+    if (!m_patientId.isEmpty()) {
+        loadPatientTrends();
+    }
 }
 
 bool MeasurementTab::exportToCSV(const QString& filename)
