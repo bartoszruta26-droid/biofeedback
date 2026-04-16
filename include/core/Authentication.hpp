@@ -22,7 +22,7 @@ struct UserData {
     std::string toJson() const;
     
     // Parsowanie z JSON
-    static UserData fromJson(const std::string& json);
+    static UserData fromJson(const std::string& jsonText);
 };
 
 /**
@@ -134,7 +134,7 @@ private:
     /**
      * @brief Prosta implementacja extractStringValue dla parsera JSON
      */
-    std::string extractStringValue(const std::string& json, const std::string& key) const;
+    std::string extractStringValue(const std::string& jsonContent, const std::string& key) const;
 };
 
 } // namespace biofeedback
