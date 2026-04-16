@@ -43,7 +43,7 @@ int Application::run()
     if (!showLoginDialog()) {
         std::cout << "Login failed or cancelled. Exiting application." << std::endl;
         if (m_logger) {
-            m_logger->warn("User login failed or was cancelled");
+            m_logger->warning("User login failed or was cancelled");
         }
         return EXIT_SUCCESS;
     }
@@ -104,7 +104,7 @@ bool Application::initialize()
         // Check if passwords need encryption
         int encryptedCount = m_authentication->encryptPasswordsIfNeeded("BiofeedbackApp2024SecureKey!");
         if (encryptedCount > 0) {
-            m_logger->info(QString("Encrypted %1 user password(s)").arg(encryptedCount));
+            m_logger->info(QString("Encrypted %1 user password(s)").arg(encryptedCount).toStdString());
         }
         
         // Initialize data manager
@@ -139,7 +139,7 @@ bool Application::showLoginDialog()
                   << " (Role: " << loginDialog.getRole().toStdString() << ")" << std::endl;
         m_logger->info(QString("User logged in: %1 (%2)")
             .arg(loginDialog.getUsername())
-            .arg(loginDialog.getRole()));
+            .arg(loginDialog.getRole()).toStdString());
         return true;
     }
     
@@ -195,18 +195,18 @@ void Application::setupConnections()
     // Connect PatientTab signals
     connect(m_patientTab.get(), &tab::PatientTab::patientAdded,
             this, [this](const QString& pesel, const QString& firstName, const QString& lastName) {
-                m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel));
+                m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel).toStdString());
             });
     
     // Connect OutlineTab signals
     connect(m_outlineTab.get(), &tab::OutlineTab::sessionStarted,
             this, [this](const QString& outlineId) {
-                m_logger->info(QString("Session started with outline: %1").arg(outlineId));
+                m_logger->info(QString("Session started with outline: %1").arg(outlineId).toStdString());
             });
     
     connect(m_outlineTab.get(), &tab::OutlineTab::requestGameStart,
             this, [this](const QString& gameId, const ExerciseData& exerciseData) {
-                m_logger->info(QString("Starting game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name));
+                m_logger->info(QString("Starting game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name).toStdString());
             });
 }
 

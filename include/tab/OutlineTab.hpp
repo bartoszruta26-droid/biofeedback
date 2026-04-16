@@ -18,6 +18,7 @@
 #include <QJsonDocument>
 #include <QFile>
 #include <QDir>
+#include <QProgressBar>
 
 namespace games {
     class GameEngine;
