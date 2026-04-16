@@ -52,6 +52,126 @@ std::string unescapeJsonString(const std::string& input)
     return output;
 }
 
+std::string parseJsonStringAt(const std::string& json, const size_t startQuotePos)
+{
+    if (startQuotePos >= json.size() || json[startQuotePos] != '"') {
+        return "";
+    }
+
+    std::string raw;
+    raw.reserve(32);
+
+    for (size_t i = startQuotePos + 1; i < json.size(); ++i) {
+        const char c = json[i];
+        if (c == '\\' && i + 1 < json.size()) {
+            raw += c;
+            raw += json[i + 1];
+            ++i;
+            continue;
+        }
+        if (c == '"') {
+            return unescapeJsonString(raw);
+        }
+        raw += c;
+    }
+
+    return "";
+}
+
+} // namespace
+
+std::string UserData::toJson() const
+{
+    std::ostringstream json;
+    json << "{\n";
+    json << "  \"username\": \"" << escapeJsonString(username) << "\",\n";
+    json << "  \"password\": \"" << escapeJsonString(password) << "\",\n";
+    json << "  \"role\": \"" << escapeJsonString(role) << "\",\n";
+    json << "  \"encrypted\": " << (encrypted ? "true" : "false") << "\n";
+    json << "}";
+    return json.str();
+}
+
+UserData UserData::fromJson(const std::string& json)
+{
+    UserData user{};
+    user.encrypted = false;
+
+    auto extractValue = [&](const std::string& key) -> std::string {
+        const std::string searchKey = "\"" + key + "\"";
+        const size_t keyPos = json.find(searchKey);
+        if (keyPos == std::string::npos) {
+            return "";
+        }
+
+        const size_t colonPos = json.find(':', keyPos + searchKey.size());
+        if (colonPos == std::string::npos) {
+            return "";
+        }
+
+        const size_t quotePos = json.find('"', colonPos + 1);
+        if (quotePos == std::string::npos) {
+            return "";
+        }
+
+        return parseJsonStringAt(json, quotePos);
+    };
+
+    user.username = extractValue("username");
+    user.password = extractValue("password");
+    user.role = extractValue("role");
+    user.encrypted = (json.find("\"encrypted\": true") != std::string::npos ||
+                     json.find("\"encrypted\":true") != std::string::npos);
+
+    return user;
+}
+
+std::string escapeJsonString(const std::string& input)
+{
+    std::string output;
+    output.reserve(input.size());
+
+    for (const char c : input) {
+        switch (c) {
+            case '"': output += "\\\""; break;
+            case '\\': output += "\\\\"; break;
+            case '\b': output += "\\b"; break;
+            case '\f': output += "\\f"; break;
+            case '\n': output += "\\n"; break;
+            case '\r': output += "\\r"; break;
+            case '\t': output += "\\t"; break;
+            default: output += c; break;
+        }
+    }
+
+    return output;
+}
+
+std::string unescapeJsonString(const std::string& input)
+{
+    std::string output;
+    output.reserve(input.size());
+
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (input[i] == '\\' && i + 1 < input.size()) {
+            switch (input[i + 1]) {
+                case '"': output += '"'; ++i; break;
+                case '\\': output += '\\'; ++i; break;
+                case 'b': output += '\b'; ++i; break;
+                case 'f': output += '\f'; ++i; break;
+                case 'n': output += '\n'; ++i; break;
+                case 'r': output += '\r'; ++i; break;
+                case 't': output += '\t'; ++i; break;
+                default: output += input[i]; break;
+            }
+        } else {
+            output += input[i];
+        }
+    }
+
+    return output;
+}
+
 size_t findStringTerminator(const std::string& text, const size_t start)
 {
     for (size_t i = start; i < text.size(); ++i) {
@@ -74,39 +194,19 @@ size_t findStringTerminator(const std::string& text, const size_t start)
 
 std::string extractJsonStringField(const std::string& jsonText, const std::string& key)
 {
-    const std::string searchKey = "\"" + key + "\"";
-    const size_t keyPos = jsonText.find(searchKey);
-    if (keyPos == std::string::npos) {
+    std::string searchKey = "\"" + key + "\"";
+    size_t pos = json.find(searchKey);
+
+    if (pos == std::string::npos) {
         return "";
     }
 
-    const size_t colonPos = jsonText.find(':', keyPos + searchKey.size());
-    if (colonPos == std::string::npos) {
+    pos = json.find(':', pos);
+    if (pos == std::string::npos) {
         return "";
     }
 
-    const size_t quotePos = jsonText.find('"', colonPos + 1);
-    if (quotePos == std::string::npos) {
-        return "";
-    }
-
-    const size_t endQuotePos = findStringTerminator(jsonText, quotePos + 1);
-    if (endQuotePos == std::string::npos || endQuotePos <= quotePos) {
-        return "";
-    }
-
-    return unescapeJsonString(jsonText.substr(quotePos + 1, endQuotePos - quotePos - 1));
-}
-
-bool extractJsonBoolField(const std::string& jsonText, const std::string& key, const bool defaultValue)
-{
-    const std::string searchKey = "\"" + key + "\"";
-    const size_t keyPos = jsonText.find(searchKey);
-    if (keyPos == std::string::npos) {
-        return defaultValue;
-    }
-
-    size_t pos = jsonText.find(':', keyPos + searchKey.size());
+    pos = json.find('"', pos + 1);
     if (pos == std::string::npos) {
         return defaultValue;
     }
@@ -134,130 +234,7 @@ std::string findUsersArray(const std::string& jsonContent)
         return "";
     }
 
-    const size_t bracketStart = jsonContent.find('[', keyPos + key.size());
-    if (bracketStart == std::string::npos) {
-        return "";
-    }
-
-    bool inString = false;
-    int depth = 0;
-    for (size_t i = bracketStart; i < jsonContent.size(); ++i) {
-        const char c = jsonContent[i];
-
-        if (c == '"') {
-            size_t backslashes = 0;
-            for (size_t j = i; j > 0 && jsonContent[j - 1] == '\\'; --j) {
-                ++backslashes;
-            }
-            if (backslashes % 2 == 0) {
-                inString = !inString;
-            }
-        }
-
-        if (inString) {
-            continue;
-        }
-
-        if (c == '[') {
-            ++depth;
-        } else if (c == ']') {
-            --depth;
-            if (depth == 0) {
-                return jsonContent.substr(bracketStart, i - bracketStart + 1);
-            }
-        }
-    }
-
-    return "";
-}
-
-std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
-{
-    std::vector<std::string> objects;
-
-    bool inString = false;
-    int depth = 0;
-    size_t objStart = std::string::npos;
-
-    for (size_t i = 0; i < arrayJson.size(); ++i) {
-        const char c = arrayJson[i];
-
-        if (c == '"') {
-            size_t backslashes = 0;
-            for (size_t j = i; j > 0 && arrayJson[j - 1] == '\\'; --j) {
-                ++backslashes;
-            }
-            if (backslashes % 2 == 0) {
-                inString = !inString;
-            }
-        }
-
-        if (inString) {
-            continue;
-        }
-
-        if (c == '{') {
-            if (depth == 0) {
-                objStart = i;
-            }
-            ++depth;
-            continue;
-        }
-
-        if (c == '}') {
-            --depth;
-            if (depth == 0 && objStart != std::string::npos) {
-                objects.push_back(arrayJson.substr(objStart, i - objStart + 1));
-                objStart = std::string::npos;
-            }
-        }
-    }
-
-    return objects;
-}
-
-} // namespace
-
-std::string UserData::toJson() const
-{
-    std::ostringstream json;
-    json << "{\n";
-    json << "  \"username\": \"" << escapeJsonString(username) << "\",\n";
-    json << "  \"password\": \"" << escapeJsonString(password) << "\",\n";
-    json << "  \"role\": \"" << escapeJsonString(role) << "\",\n";
-    json << "  \"encrypted\": " << (encrypted ? "true" : "false") << "\n";
-    json << "}";
-    return json.str();
-}
-
-UserData UserData::fromJson(const std::string& jsonText)
-{
-    UserData user{};
-    user.username = extractJsonStringField(jsonText, "username");
-    user.password = extractJsonStringField(jsonText, "password");
-    user.role = extractJsonStringField(jsonText, "role");
-    user.encrypted = extractJsonBoolField(jsonText, "encrypted", false);
-    return user;
-}
-
-Authentication::Authentication(const std::string& usersFilePath)
-    : usersFilePath(usersFilePath)
-    , currentUser(nullptr)
-{
-}
-
-Authentication::~Authentication()
-{
-}
-
-void Authentication::setEncryptionKey(const std::string& key)
-{
-    encryptionKey = key;
-}
-
-std::string Authentication::extractStringValue(const std::string& jsonContent, const std::string& key) const
-{
-    return extractJsonStringField(jsonContent, key);
+    return parseJsonStringAt(json, pos);
 }
 
 bool Authentication::loadUsers()
@@ -275,20 +252,33 @@ bool Authentication::loadUsers()
     std::string jsonContent = content.str();
     file.close();
 
+    // Parsowanie prostego JSON - szukamy tablicy users
     users.clear();
 
-    const std::string usersArray = findUsersArray(jsonContent);
-    if (usersArray.empty()) {
-        std::cerr << "Nieprawidłowy format pliku użytkowników (brak tablicy users)" << std::endl;
+    size_t arrayStart = jsonContent.find("[");
+    size_t arrayEnd = jsonContent.rfind("]");
+
+    if (arrayStart == std::string::npos || arrayEnd == std::string::npos) {
+        std::cerr << "Nieprawidłowy format pliku użytkowników" << std::endl;
         return false;
     }
 
-    const auto objects = splitJsonObjectsFromArray(usersArray);
-    for (const auto& objectJson : objects) {
-        UserData user = UserData::fromJson(objectJson);
+    std::string arrayContent = jsonContent.substr(arrayStart, arrayEnd - arrayStart + 1);
+
+    // Parsowanie każdego obiektu użytkownika
+    size_t objStart = 0;
+    while ((objStart = arrayContent.find("{", objStart)) != std::string::npos) {
+        size_t objEnd = arrayContent.find("}", objStart);
+        if (objEnd == std::string::npos) break;
+
+        std::string userJson = arrayContent.substr(objStart, objEnd - objStart + 1);
+        UserData user = UserData::fromJson(userJson);
+
         if (!user.username.empty()) {
             users.push_back(user);
         }
+
+        objStart = objEnd + 1;
     }
 
     std::cout << "Wczytano " << users.size() << " użytkowników" << std::endl;

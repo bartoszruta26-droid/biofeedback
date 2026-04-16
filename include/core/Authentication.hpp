@@ -22,7 +22,7 @@ struct UserData {
     std::string toJson() const;
     
     // Parsowanie z JSON
-    static UserData fromJson(const std::string& jsonText);
+    static UserData fromJson(const std::string& json);
 };
 
 /**
