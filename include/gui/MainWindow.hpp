@@ -23,6 +23,7 @@
 #include <QStackedWidget>
 
 #include "GraphWidget.hpp"
+#include "tab/OutlineTab.hpp"
 
 namespace tab {
     class PatientTab;

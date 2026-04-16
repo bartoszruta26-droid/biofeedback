@@ -21,6 +21,7 @@ namespace tab {
     class PatientTab;
     class MeasurementTab;
     class OutlineTab;
+    struct ExerciseData;
 }
 
 /**
