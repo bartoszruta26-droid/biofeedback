@@ -1,8 +1,53 @@
 #include "DataManager.hpp"
 #include <algorithm>
+#include <cctype>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <cstdio>
+
+namespace {
+
+std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson) {
+    std::vector<std::string> objects;
+    bool inString = false;
+    int depth = 0;
+    size_t objectStart = std::string::npos;
+
+    for (size_t i = 0; i < arrayJson.size(); ++i) {
+        const char c = arrayJson[i];
+
+        if (c == '"') {
+            size_t backslashes = 0;
+            for (size_t j = i; j > 0 && arrayJson[j - 1] == '\\'; --j) {
+                ++backslashes;
+            }
+            if (backslashes % 2 == 0) {
+                inString = !inString;
+            }
+        }
+
+        if (inString) {
+            continue;
+        }
+
+        if (c == '{') {
+            if (depth == 0) {
+                objectStart = i;
+            }
+            ++depth;
+        } else if (c == '}') {
+            --depth;
+            if (depth == 0 && objectStart != std::string::npos) {
+                objects.push_back(arrayJson.substr(objectStart, i - objectStart + 1));
+                objectStart = std::string::npos;
+            }
+        }
+    }
+
+    return objects;
+}
+
+} // namespace
 
 // ==================== Implementacja PatientData ====================
 
@@ -247,8 +292,12 @@ std::vector<Exercise> DataManager::loadExercises(const std::string& filename, bo
         }
     }
     
-    // Proste parsowanie tablicy ćwiczeń - w produkcji warto użyć biblioteki JSON
-    // Tutaj upraszczamy dla demonstracji
+    for (const auto& objectJson : splitJsonObjectsFromArray(content)) {
+        Exercise exercise = Exercise::fromJson(objectJson);
+        if (!exercise.id.empty() || !exercise.name.empty()) {
+            exercises.push_back(exercise);
+        }
+    }
     
     return exercises;
 }
@@ -296,7 +345,12 @@ std::vector<ExerciseResult> DataManager::loadExerciseResults(const std::string& 
         }
     }
     
-    // Proste parsowanie tablicy wyników
+    for (const auto& objectJson : splitJsonObjectsFromArray(content)) {
+        ExerciseResult result = ExerciseResult::fromJson(objectJson);
+        if (!result.id.empty() || !result.exerciseId.empty() || !result.patientId.empty()) {
+            results.push_back(result);
+        }
+    }
     
     return results;
 }
