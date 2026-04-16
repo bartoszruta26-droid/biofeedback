@@ -10,6 +10,7 @@ namespace {
 
 const char* kExercisesFile = "/tmp/biofeedback_dm_exercises.json";
 const char* kResultsFile = "/tmp/biofeedback_dm_results.json";
+const char* kPatientFile = "/tmp/biofeedback_dm_patient.json";
 
 void expect(bool condition, const std::string& message) {
     if (!condition) {
@@ -26,8 +27,8 @@ int main() {
         std::vector<Exercise> exercises;
         Exercise ex1;
         ex1.id = "ex-1";
-        ex1.name = "Bracing";
-        ex1.description = "Stabilizacja";
+        ex1.name = "Bracing \"A\"";
+        ex1.description = "Stabilizacja\\Core";
         ex1.category = "core";
         ex1.sets = 3;
         ex1.reps = 10;
@@ -52,6 +53,7 @@ int main() {
         const auto loadedExercises = dm.loadExercises(kExercisesFile, false);
         expect(loadedExercises.size() == 2, "loadExercises powinno zwrócić 2 elementy");
         expect(loadedExercises[0].id == "ex-1", "exercise[0].id");
+        expect(loadedExercises[0].name == "Bracing \"A\"", "exercise[0].name z escapowaniem");
         expect(loadedExercises[1].name == "Glute bridge", "exercise[1].name");
 
         std::vector<ExerciseResult> results;
@@ -87,13 +89,33 @@ int main() {
         expect(loadedResults[0].patientId == "p-1", "result[0].patientId");
         expect(loadedResults[1].exerciseId == "ex-2", "result[1].exerciseId");
 
+        PatientData patient;
+        patient.id = "p-1";
+        patient.firstName = "Jan \"J\"";
+        patient.lastName = "Kowalski";
+        patient.pesel = "90010112345";
+        patient.birthDate = "1990-01-01";
+        patient.gender = "M";
+        patient.phoneNumber = "+48 123 456 789";
+        patient.email = "jan@example.com";
+        patient.address = "ul. Testowa 1\\2";
+        patient.medicalHistory = "Ból kolana\npo urazie";
+
+        expect(dm.savePatientData(patient, kPatientFile, false), "savePatientData powinno się udać");
+        const auto loadedPatient = dm.loadPatientData(kPatientFile, false);
+        expect(loadedPatient.firstName == patient.firstName, "patient.firstName z escapowaniem");
+        expect(loadedPatient.address == patient.address, "patient.address z backslash");
+        expect(loadedPatient.medicalHistory == patient.medicalHistory, "patient.medicalHistory z newline");
+
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
+        std::remove(kPatientFile);
         std::cout << "OK: data_manager_regression" << std::endl;
         return 0;
     } catch (const std::exception& ex) {
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
+        std::remove(kPatientFile);
         std::cerr << "FAIL: " << ex.what() << std::endl;
         return 1;
     }

@@ -127,7 +127,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     }
     
     // Rysowanie punktów dla maksymalnej siły
-    if (!m_maxForces.isEmpty()) {
+    if (m_maxForces.size() >= 2) {
         painter.setPen(QPen(QColor(200, 50, 50), 2, Qt::DotLine));
         painter.setBrush(QBrush(QColor(200, 50, 50)));
         
@@ -360,6 +360,24 @@ MeasurementTab::~MeasurementTab()
     // Qt automatycznie czyści widgety z parentem
 }
 
+void MeasurementTab::ensureCurrentSeriesInitialized()
+{
+    if (!m_completedSeriesStats.isEmpty()) {
+        return;
+    }
+
+    SeriesStats initialSeries;
+    initialSeries.seriesNumber = 1;
+    m_completedSeriesStats.append(initialSeries);
+}
+
+void MeasurementTab::ensureSessionClockStarted()
+{
+    if (m_sessionStartTime <= 0.0) {
+        m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    }
+}
+
 void MeasurementTab::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
@@ -525,9 +543,10 @@ bool MeasurementTab::isMeasurementActive() const
 void MeasurementTab::startMeasurement()
 {
     if (m_isMeasuring) return;
-    
+
+    ensureCurrentSeriesInitialized();
     m_isMeasuring = true;
-    m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    ensureSessionClockStarted();
     m_timer->start();
     
     m_btnStartStop->setText("STOP POMIARU");
@@ -650,6 +669,9 @@ void MeasurementTab::simulateSensorData()
 
 void MeasurementTab::readSingleSample(double forceValue)
 {
+    ensureCurrentSeriesInitialized();
+    ensureSessionClockStarted();
+
     double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0 - m_sessionStartTime;
     
     m_rawForceBuffer.append(forceValue);
@@ -967,12 +989,6 @@ void MeasurementTab::onToggleMeasurement()
     if (m_isMeasuring) {
         stopMeasurement();
     } else {
-        // Inicjalizacja nowej serii jeśli to pierwszy start
-        if (m_completedSeriesStats.isEmpty()) {
-            SeriesStats initialSeries;
-            initialSeries.seriesNumber = 1;
-            m_completedSeriesStats.append(initialSeries);
-        }
         startMeasurement();
     }
 }

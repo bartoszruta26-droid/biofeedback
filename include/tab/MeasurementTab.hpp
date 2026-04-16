@@ -242,6 +242,8 @@ private slots:
     void onSelectionChanged();
 
 private:
+    void ensureCurrentSeriesInitialized();
+    void ensureSessionClockStarted();
     void setupUI();
     void updateLiveDisplay(double force);
     void detectRepetitions();
