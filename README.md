@@ -181,6 +181,103 @@ biofeedback-app/
     └── MATHEMATICAL_FORMULAS.md  # Biomechanical formulas
 ```
 
+## Arduino Nano Communication Protocol
+
+### Format Wysyłania i Odbioru Danych z Arduino Nano
+
+Komunikacja z Arduino Nano (plik `hx711_advanced.ino`) odbywa się przez port szeregowy z następującym formatem:
+
+#### Konfiguracja Portu Szeregowego
+- **Baud Rate**: 115200
+- **Data Bits**: 8
+- **Parity**: None ('N')
+- **Stop Bits**: 1
+- **Port**: `/dev/ttyUSB0` lub `/dev/ttyACM0` (automatyczne wykrywanie)
+
+#### Komendy Wysyłane do Arduino (TX - Raspberry Pi → Arduino)
+
+| Komenda | Opis | Przykład |
+|---------|------|----------|
+| `ID` lub `WHOAMI` | Pobranie identyfikacji urządzenia | `ID\n` |
+| `TARE` lub `CALZERO` | Wyzerowanie wagi (tare) | `TARE\n` |
+| `DATA` lub `READ` | Żądanie danych binarnych + odczyt | `DATA\n` |
+| `FORCE` | Żądanie odczytu siły w formacie tekstowym | `FORCE\n` |
+| `CONT` | Włączenie trybu ciągłego (80Hz) | `CONT\n` |
+| `STOP` | Wyłączenie trybu ciągłego | `STOP\n` |
+| `CAL:<grams>` | Kalibracja ze znaną wagą | `CAL:100.0\n` |
+| `RESET` | Reset urządzenia przez watchdog | `RESET\n` |
+
+#### Odpowiedzi z Arduino (RX - Arduino → Raspberry Pi)
+
+**1. Odpowiedź na komendę ID:**
+```
+DEVICE:Advanced HX711 Weight Scale
+ID:HX711-SCALE-V1.0
+FW:1.0,BR:115200
+OK
+```
+
+**2. Dane binarne (pakiet 9 bajtów + markery końca):**
+```cpp
+struct DataPacket {
+    uint32_t timestamp;  // 4 bajty - czas w milisekundach
+    int32_t value;       // 4 bajty - wartość surowa z czujnika
+    uint8_t crc;         // 1 bajt - suma kontrolna CRC-8
+};
+// Po pakiecie: 0xAA 0x55 (markery końca ramki)
+```
+
+**3. Odpowiedź tekstowa FORCE:**
+```
+FORCE:123.45g,RAW:6789,TS:1234567ms
+```
+
+**4. Potwierdzenia:**
+- `Taring...` / `Tare set!` - potwierdzenie zerowania
+- `Continuous mode ON/OFF` - status trybu ciągłego
+- `Calibrated! Factor:X.XXXXXX` - potwierdzenie kalibracji
+- `[DATA_SENT]` - potwierdzenie wysłania danych
+
+#### Suma Kontrolna CRC-8
+
+Arduino używa CRC-8 z wielomianem x^8 + x^2 + x + 1 (0x07):
+- Wartość początkowa: 0xFF
+- Obliczana dla timestamp + value (8 bajtów)
+- CRC jest ostatnim bajtem pakietu
+
+#### Tryb Ciągły (Continuous Mode)
+
+Po wysłaniu komendy `CONT`, Arduino wysyła dane binarne z częstotliwością 80Hz:
+- Pakiet binarny co ~12.5ms
+- Każdy pakiet zawiera timestamp, wartość i CRC
+- Markery końca ramki: 0xAA 0x55
+
+#### Przykład Sekwencji Komunikacji
+
+```cpp
+// 1. Połączenie i identyfikacja
+send("ID\n");
+// Oczekuj: DEVICE:..., ID:..., FW:...
+
+// 2. Zerowanie
+send("TARE\n");
+// Oczekuj: Taring... Tare set!
+
+// 3. Rozpoczęcie pomiaru ciągłego
+send("CONT\n");
+// Oczekuj: Continuous mode ON
+
+// 4. Odbieranie danych (80Hz)
+while (measuring) {
+    readBinaryPacket();  // 9 bajtów + 2 markery
+    verifyCRC();
+    processForceData();
+}
+
+// 5. Zatrzymanie
+send("STOP\n");
+```
+
 ## Mathematical Formulas
 
 For detailed mathematical formulas used to calculate biomechanical and training parameters from strain gauge data, see:

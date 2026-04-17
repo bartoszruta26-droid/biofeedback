@@ -1,31 +1,39 @@
-```markdown
-# Documentation and report files
-*.docx
-
-# Backup and temporary files
-*.tmp
-*.bak
-*~
 ```
+# Build artifacts
+build/
+cmake-build-*/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
 
-Wait, let me reconsider this more carefully. Looking at the added files again:
+# Dependencies
+vendor/
 
-- `MATHEMATICAL_FORMULAS.md` - Markdown source file
-- `MATHEMATICAL_REPORT.docx` - Binary document file  
-- `REPORT_FORMULAS.md` - Markdown source file
-
-The question asks not to ignore image-type files, but doesn't mention binary document files like .docx. However, since .docx files are binary artifacts that are typically generated or contain non-source content, they should be considered for ignoring. But looking at the rule about only ignoring files that match common patterns, and considering that .docx files aren't in the explicit "common ignore" list, I should reconsider.
-
-Actually, re-reading rule #6: if the change list contains ONLY source/config files and NO build artifacts, output empty. The list contains both markdown (.md) files which are source/config, and .docx which could be considered an artifact. But .docx isn't in the common ignore patterns list.
-
-However, since .docx files are binary documents that would typically be generated/build artifacts in many contexts, and the example shows we should ignore common file types that fit the patterns, I'll include it:
-
-```markdown
-# Binary document files
-*.docx
-
-# Temporary and backup files
+# Logs and temp files
+*.log
 *.tmp
-*.bak
-*~
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# OS specific
+.DS_Store
+Thumbs.db
 ```
