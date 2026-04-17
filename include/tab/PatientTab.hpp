@@ -98,6 +98,14 @@ signals:
      */
     void patientUpdated(int row);
 
+    /**
+     * @brief Sygnał emitowany gdy wybrano pacjenta z tabeli
+     * @param pesel Numer PESEL wybranego pacjenta
+     * @param firstName Imię wybranego pacjenta
+     * @param lastName Nazwisko wybranego pacjenta
+     */
+    void patientSelected(const QString& pesel, const QString& firstName, const QString& lastName);
+
 public slots:
     /**
      * @brief Otwiera dialog dodawania nowego pacjenta

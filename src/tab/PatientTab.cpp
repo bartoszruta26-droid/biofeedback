@@ -548,9 +548,18 @@ void PatientTab::clearTable()
 
 void PatientTab::onSelectionChanged()
 {
-    bool hasSelection = m_patientTable->currentRow() >= 0;
+    int currentRow = m_patientTable->currentRow();
+    bool hasSelection = currentRow >= 0;
     m_editButton->setEnabled(hasSelection);
     m_deleteButton->setEnabled(hasSelection);
+    
+    // Emituj sygnał patientSelected gdy wybrano pacjenta
+    if (hasSelection) {
+        QString pesel = m_patientTable->item(currentRow, 0)->text();
+        QString firstName = m_patientTable->item(currentRow, 1)->text();
+        QString lastName = m_patientTable->item(currentRow, 2)->text();
+        emit patientSelected(pesel, firstName, lastName);
+    }
 }
 
 void PatientTab::onTableRowDoubleClicked(int row, int column)
