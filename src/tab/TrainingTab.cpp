@@ -10,6 +10,7 @@
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
+#include "games/SinGame.hpp"
 
 namespace tab {
 
@@ -574,9 +575,25 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
         
         // Jeśli mamy SerialCommunication, podłącz go do gry
         if (m_serialPort) {
+            // Spróbuj rzutować na konkretny typ gry i podłącz SerialCommunication
             auto pongGame = dynamic_cast<games::PongGame*>(m_currentGame);
             if (pongGame) {
                 pongGame->setSerialConnection(m_serialPort);
+            }
+            
+            auto flappyGame = dynamic_cast<games::FlappyBirdGame*>(m_currentGame);
+            if (flappyGame) {
+                flappyGame->setSerialConnection(m_serialPort);
+            }
+            
+            auto marioGame = dynamic_cast<games::MarioGame*>(m_currentGame);
+            if (marioGame) {
+                marioGame->setSerialConnection(m_serialPort);
+            }
+            
+            auto sinGame = dynamic_cast<games::SinGame*>(m_currentGame);
+            if (sinGame) {
+                sinGame->setSerialConnection(m_serialPort);
             }
         }
     }

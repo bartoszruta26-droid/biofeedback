@@ -68,6 +68,10 @@ unsigned long thread_timer_watchdog = 0;
 const char DEVICE_ID[] = "HX711-SCALE-V1.0";
 const char DEVICE_NAME[] = "Advanced HX711 Weight Scale";
 
+// Calibration factor (grams per raw unit) - to be calibrated
+float calibration_factor = 1.0f;
+bool is_calibrated = false;
+
 // Forward declarations
 void setupWatchdog();
 void feedWatchdog();
@@ -207,17 +211,28 @@ void calculateCRC(uint8_t *data, size_t len, uint8_t *crc) {
 // ============================================================
 
 void sendDeviceID() {
-    Serial.print(F("DEVICE: "));
+    Serial.print(F("DEVICE:"));
     Serial.println(DEVICE_NAME);
-    Serial.print(F("ID: "));
+    Serial.print(F("ID:"));
     Serial.println(DEVICE_ID);
-    Serial.print(F("VERSION: 1.0"));
-    Serial.println();
-    Serial.print(F("BAUD: "));
+    Serial.print(F("FW:1.0"));
+    Serial.print(F(",BR:"));
     Serial.println(SERIAL_BAUD_RATE);
-    Serial.print(F("SAMPLES: "));
-    Serial.println(HX711_SAMPLES);
-    Serial.println(F("---"));
+    Serial.println(F("OK"));
+}
+
+void sendForceReadout() {
+    // Send human-readable force value in grams
+    int32_t raw_value = current_weight - tare_offset;
+    float force_grams = raw_value * calibration_factor;
+    
+    Serial.print(F("FORCE:"));
+    Serial.print(force_grams, 2);
+    Serial.print(F("g,RAW:"));
+    Serial.print(raw_value);
+    Serial.print(F(",TS:"));
+    Serial.print(millis());
+    Serial.println(F("ms"));
 }
 
 void sendBinaryData() {
@@ -260,17 +275,21 @@ void processSerialCommand() {
                 }
                 
                 // Process commands
-                if (strcmp(upper_buffer, "ID") == 0) {
+                if (strcmp(upper_buffer, "ID") == 0 || strcmp(upper_buffer, "WHOAMI") == 0) {
                     sendDeviceID();
                 }
-                else if (strcmp(upper_buffer, "TARE") == 0) {
+                else if (strcmp(upper_buffer, "TARE") == 0 || strcmp(upper_buffer, "CALZERO") == 0) {
                     Serial.println(F("Taring..."));
                     tare_offset = current_weight;
                     Serial.println(F("Tare set!"));
                 }
-                else if (strcmp(upper_buffer, "DATA") == 0) {
+                else if (strcmp(upper_buffer, "DATA") == 0 || strcmp(upper_buffer, "READ") == 0) {
                     sendBinaryData();
+                    sendForceReadout();
                     Serial.println(F("[DATA_SENT]"));
+                }
+                else if (strcmp(upper_buffer, "FORCE") == 0) {
+                    sendForceReadout();
                 }
                 else if (strcmp(upper_buffer, "CONT") == 0) {
                     continuous_mode = true;
@@ -285,10 +304,27 @@ void processSerialCommand() {
                     delay(100);
                     resetWatchdog();
                 }
+                else if (strncmp(upper_buffer, "CAL:", 4) == 0) {
+                    // Calibration command: CAL:<known_weight_in_grams>
+                    float known_weight = atof(buffer + 4);
+                    if (known_weight > 0) {
+                        int32_t raw_value = current_weight - tare_offset;
+                        if (raw_value != 0) {
+                            calibration_factor = known_weight / raw_value;
+                            is_calibrated = true;
+                            Serial.print(F("Calibrated! Factor:"));
+                            Serial.println(calibration_factor, 6);
+                        } else {
+                            Serial.println(F("Error: zero reading"));
+                        }
+                    } else {
+                        Serial.println(F("Error: invalid weight"));
+                    }
+                }
                 else {
-                    Serial.print(F("Unknown command: "));
+                    Serial.print(F("Unknown:"));
                     Serial.println(buffer);
-                    Serial.println(F("Commands: ID, TARE, DATA, CONT, STOP, RESET"));
+                    Serial.println(F("Cmds:ID,TARE,DATA,FORCE,CONT,STOP,CAL:<g>,RESET"));
                 }
             }
             
@@ -381,8 +417,10 @@ void setup() {
     tare_offset = readHX711Averaged(HX711_SAMPLES);
     
     Serial.println(F("System Ready!"));
-    Serial.println(F("Send 'ID' for device info, 'TARE' to zero, 'DATA' for reading"));
+    Serial.println(F("Send 'ID' for device info, 'TARE' to zero"));
+    Serial.println(F("Send 'FORCE' for force readout, 'DATA' for binary+readout"));
     Serial.println(F("Send 'CONT' for continuous mode, 'STOP' to disable"));
+    Serial.println(F("Send 'CAL:<grams>' to calibrate (e.g., CAL:100.0)"));
     Serial.println();
 }
 

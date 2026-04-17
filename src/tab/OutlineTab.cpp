@@ -1,5 +1,9 @@
 #include "tab/OutlineTab.hpp"
 #include "games/GameEngine.hpp"
+#include "games/PongGame.hpp"
+#include "games/FlappyBirdGame.hpp"
+#include "games/MarioGame.hpp"
+#include "games/SinGame.hpp"
 #include <QMessageBox>
 #include <QFileDialog>
 #include <QTextStream>
@@ -65,6 +69,7 @@ OutlineTab::OutlineTab(QWidget *parent)
     , m_exerciseStartTime(0)
     , m_outlinesDirectory("./data/outlines")
     , m_currentGame(nullptr)
+    , m_serialPort(nullptr)
 {
     setupUI();
     createConnections();
