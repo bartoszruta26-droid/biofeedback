@@ -7,42 +7,40 @@
 *.so
 *.a
 *.out
+build/
+dist/
 
 # Dependencies
-node_modules/
 venv/
 .venv/
+node_modules/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
 target/
 .gradle/
 
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
 # Logs and temp files
 *.log
 *.tmp
-*.swp
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Editors
-.vscode/
-.idea/
-
-# Build directories
-build/
-dist/
-out/
-
 # Coverage
 coverage/
 htmlcov/
 .coverage
 
-# OS generated files
+# System files
 .DS_Store
 Thumbs.db
 ```
