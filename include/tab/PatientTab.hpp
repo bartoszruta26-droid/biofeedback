@@ -105,6 +105,25 @@ signals:
      * @param lastName Nazwisko wybranego pacjenta
      */
     void patientSelected(const QString& pesel, const QString& firstName, const QString& lastName);
+    
+    /**
+     * @brief Sygnał emitowany gdy zmieniono aktualnie załadowanego pacjenta
+     * @param pesel Numer PESEL pacjenta
+     * @param patientDataPath Ścieżka do danych pacjenta
+     */
+    void currentPatientChanged(const QString& pesel, const QString& patientDataPath);
+    
+    /**
+     * @brief Pobiera aktualnie załadowanego pacjenta PESEL
+     * @return PESEL aktualnego pacjenta lub pusty jeśli brak
+     */
+    QString getCurrentPatientPesel() const;
+    
+    /**
+     * @brief Pobiera ścieżkę do danych aktualnego pacjenta
+     * @return Ścieżka do katalogu z danymi pacjenta
+     */
+    QString getCurrentPatientDataPath() const;
 
 public slots:
     /**
@@ -187,6 +206,10 @@ private:
     // Stan
     int m_currentRow;
     bool m_isEditMode;
+    
+    // Aktualnie załadowany pacjent
+    QString m_currentPatientPesel;
+    QString m_currentPatientDataPath;
 };
 
 } // namespace tab
