@@ -5,24 +5,18 @@
 #include <string>
 #include <memory>
 
+// Include full definitions for classes used with std::unique_ptr and in connect()
+#include "core/ConfigManager.hpp"
+#include "core/Logger.hpp"
+#include "core/Authentication.hpp"
+#include "data/DataManager.hpp"
+#include "gui/MainWindow.hpp"
+#include "gui/LoginDialog.hpp"
+#include "tab/PatientTab.hpp"
+#include "tab/MeasurementTab.hpp"
+#include "tab/OutlineTab.hpp"
+
 namespace biofeedback {
-
-class ConfigManager;
-class Logger;
-class DataManager;
-class Authentication;
-
-namespace gui {
-    class MainWindow;
-    class LoginDialog;
-}
-
-namespace tab {
-    class PatientTab;
-    class MeasurementTab;
-    class OutlineTab;
-    struct ExerciseData;
-}
 
 /**
  * @brief Main application class managing the biofeedback system
@@ -126,10 +120,10 @@ private:
     std::unique_ptr<DataManager> m_dataManager;
     std::unique_ptr<Authentication> m_authentication;
     
-    // Tabs - using raw pointers since we only have forward declarations
-    tab::PatientTab* m_patientTab;
-    tab::MeasurementTab* m_measurementTab;
-    tab::OutlineTab* m_outlineTab;
+    // Tabs - using unique_ptr for proper memory management
+    std::unique_ptr<tab::PatientTab> m_patientTab;
+    std::unique_ptr<tab::MeasurementTab> m_measurementTab;
+    std::unique_ptr<tab::OutlineTab> m_outlineTab;
     
     bool m_initialized;
     bool m_running;

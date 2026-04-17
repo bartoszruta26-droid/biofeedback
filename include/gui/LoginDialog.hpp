@@ -9,6 +9,7 @@
 #include <QPushButton>
 #include <QMessageBox>
 #include <QString>
+#include <QTimer>
 #include "core/Authentication.hpp"
 
 namespace gui {

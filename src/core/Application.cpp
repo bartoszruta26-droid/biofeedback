@@ -68,11 +68,6 @@ void Application::shutdown()
     
     std::cout << "Shutting down Biofeedback Application..." << std::endl;
     
-    // Save any pending data
-    if (m_dataManager) {
-        m_dataManager->flush();
-    }
-    
     // Log shutdown
     if (m_logger) {
         m_logger->info("Application shutdown complete");
@@ -108,7 +103,7 @@ bool Application::initialize()
         }
         
         // Initialize data manager
-        m_dataManager = std::make_unique<DataManager>(*m_configManager, *m_logger);
+        m_dataManager = std::make_unique<DataManager>();
         
         // Create main window and tabs
         createMainWindow();
@@ -149,12 +144,12 @@ bool Application::showLoginDialog()
 void Application::createMainWindow()
 {
     // Create main window
-    m_mainWindow = std::make_unique<gui::MainWindow>();
+    m_mainWindow = std::unique_ptr<gui::MainWindow>(new gui::MainWindow());
     
     // Create tabs
-    m_patientTab = std::make_unique<tab::PatientTab>();
-    m_measurementTab = std::make_unique<tab::MeasurementTab>();
-    m_outlineTab = std::make_unique<tab::OutlineTab>();
+    m_patientTab = std::unique_ptr<tab::PatientTab>(new tab::PatientTab());
+    m_measurementTab = std::unique_ptr<tab::MeasurementTab>(new tab::MeasurementTab());
+    m_outlineTab = std::unique_ptr<tab::OutlineTab>(new tab::OutlineTab());
     
     // Get central widget from MainWindow to add tabs
     // Note: This assumes MainWindow has a way to access its central widget
@@ -205,7 +200,7 @@ void Application::setupConnections()
             });
     
     connect(m_outlineTab.get(), &tab::OutlineTab::requestGameStart,
-            this, [this](const QString& gameId, const ExerciseData& exerciseData) {
+            this, [this](const QString& gameId, const tab::ExerciseData& exerciseData) {
                 m_logger->info(QString("Starting game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name).toStdString());
             });
 }

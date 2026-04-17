@@ -17,6 +17,7 @@
 #include <QScrollArea>
 #include <QCheckBox>
 #include <QUuid>
+#include <QHeaderView>
 
 namespace tab {
 
