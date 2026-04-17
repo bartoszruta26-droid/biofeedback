@@ -225,6 +225,23 @@ public:
     void loadPatientTrends();
     
     /**
+     * @brief Wczytuje wszystkie historyczne pomiary pacjenta do porównania 65 parametrów
+     */
+    void loadAllHistoricalMeasurements();
+    
+    /**
+     * @brief Wyświetla dane aktualnie rejestrowanego pomiaru na wykresie
+     */
+    void showCurrentMeasurementData();
+    
+    /**
+     * @brief Ustawia ID pacjenta z PatientTab i ładuje jego historyczne pomiary
+     * @param pesel PESEL pacjenta
+     * @param patientDataPath Ścieżka do danych pacjenta
+     */
+    void onPatientChanged(const QString& pesel, const QString& patientDataPath);
+    
+    /**
      * @brief Ustawia połączenie szeregowe z Arduino
      * @param serial Połączenie szeregowe
      */
