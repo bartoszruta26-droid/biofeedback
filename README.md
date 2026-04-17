@@ -76,6 +76,21 @@ make -j$(nproc)
 ./biofeedback
 ```
 
+### Mandatory Qt5 Code Example
+
+This project includes mandatory Qt5 example code in:
+
+- `examples/qt5_mandatory.cpp`
+
+Build and run it from `build/`:
+
+```bash
+./qt5_mandatory_example
+```
+
+For Raspberry Pi specific native Qt5 build notes, see:
+https://wiki.qt.io/Native_Build_of_Qt5_on_a_Raspberry_Pi
+
 ### Working with Geany IDE
 
 #### Opening the Project in Geany

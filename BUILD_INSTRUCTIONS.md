@@ -62,6 +62,16 @@ pkg-config --modversion Qt5Core
 # Should return 5.x.x
 ```
 
+### 5. Raspberry Pi Native Qt5 Reference
+
+For Raspberry Pi native Qt5 builds, use the official Qt Wiki guide:
+
+- https://wiki.qt.io/Native_Build_of_Qt5_on_a_Raspberry_Pi
+
+This repository now also ships a mandatory Qt5 code sample in:
+
+- `examples/qt5_mandatory.cpp`
+
 ## Building the Application
 
 ### Option 1: Using CMake (Recommended)
@@ -78,6 +88,12 @@ cmake ..
 
 # Build
 make -j$(nproc)
+```
+
+After building with Qt5 available, you can run the mandatory Qt5 sample:
+
+```bash
+./qt5_mandatory_example
 ```
 
 ### Option 2: Using Makefile Directly
