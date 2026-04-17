@@ -607,7 +607,8 @@ void OutlineTab::onStartSessionClicked()
     m_isPaused = false;
     m_completedExercises = 0;
     m_exerciseScores.clear();
-    m_exerciseScores.resize(m_currentOutline.exercises.size(), 0);
+    m_exerciseScores.resize(m_currentOutline.exercises.size());
+    std::fill(m_exerciseScores.begin(), m_exerciseScores.end(), 0);
     m_sessionStartTime = QDateTime::currentMSecsSinceEpoch();
     
     // Zablokuj wybór konspektu podczas sesji
