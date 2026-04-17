@@ -203,7 +203,7 @@ make -j$(nproc)
 ## Dependencies
 
 ### System Libraries
-- Qt5 (`qtbase5-dev`, `qtcharts5-dev`)
+- Qt5 (`qtbase5-dev`, `libqt5charts5-dev` / `qtcharts5-dev` depending on distro)
 - libserialport (`libserialport-dev`)
 - OpenSSL (`libssl-dev`)
 
