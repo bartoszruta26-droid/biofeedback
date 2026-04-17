@@ -141,6 +141,7 @@ if(Qt5_FOUND)
     target_link_libraries(qt5_mandatory_example
         Qt5::Core
         Qt5::Widgets
+        Qt5::Charts
     )
 else()
     message(WARNING "Qt5 not found - GUI target '${PROJECT_NAME}' will not be built. Core/regression targets remain available.")

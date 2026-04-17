@@ -33,9 +33,13 @@ A professional medical-grade biofeedback application built with C++, Qt5, and Ar
 ```bash
 sudo apt update && sudo apt upgrade -y
 
-sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev \
+sudo apt install -y qtbase5-dev libqt5charts5-dev libserialport-dev \
     nlohmann-json3-dev libssl-dev git cmake build-essential pkg-config
 ```
+
+> **Package name note:** on Ubuntu/Debian the Qt Charts development package is usually
+> `libqt5charts5-dev`. On some Raspberry Pi OS images it may be exposed as
+> `qtcharts5-dev`.
 
 ## Installation
 
@@ -46,7 +50,7 @@ sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev \
 sudo apt update && sudo apt upgrade -y
 
 # Install dependencies
-sudo apt install -y qtbase5-dev qtcharts5-dev libserialport-dev nlohmann-json3-dev libssl-dev git cmake build-essential geany
+sudo apt install -y qtbase5-dev libqt5charts5-dev libserialport-dev nlohmann-json3-dev libssl-dev git cmake build-essential geany
 
 # Set up serial port permissions
 sudo usermod -a -G dialout $USER
