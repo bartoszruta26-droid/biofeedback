@@ -112,6 +112,9 @@ if(Qt5_FOUND)
     # Create executable
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+    # Minimal mandatory Qt5 example source.
+    add_executable(qt5_mandatory_example examples/qt5_mandatory.cpp)
+
     target_include_directories(${PROJECT_NAME}
         PRIVATE
             ${CMAKE_SOURCE_DIR}/include
@@ -133,6 +136,11 @@ if(Qt5_FOUND)
         OpenSSL::SSL
         OpenSSL::Crypto
         pthread
+    )
+
+    target_link_libraries(qt5_mandatory_example
+        Qt5::Core
+        Qt5::Widgets
     )
 else()
     message(WARNING "Qt5 not found - GUI target '${PROJECT_NAME}' will not be built. Core/regression targets remain available.")
