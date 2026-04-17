@@ -176,8 +176,33 @@ biofeedback-app/
 ├── config/                # Configuration files
 ├── data/                  # Patient data storage
 ├── resources/             # Images, icons, multimedia
-└── build/                 # Build output
+├── build/                 # Build output
+└── docs/                  # Documentation
+    └── MATHEMATICAL_FORMULAS.md  # Biomechanical formulas
 ```
+
+## Mathematical Formulas
+
+For detailed mathematical formulas used to calculate biomechanical and training parameters from strain gauge data, see:
+
+- **[MATHEMATICAL_FORMULAS.md](MATHEMATICAL_FORMULAS.md)** - Complete documentation of 65+ parameters with LaTeX notation including:
+  - Force metrics (peak force, mean force, force range)
+  - Time-based parameters (rep duration, phase times, rest periods)
+  - Power and energy calculations
+  - Variability and stability indices
+  - Performance and progress tracking
+  - Advanced composite scores
+
+- **[MATHEMATICAL_REPORT.docx](MATHEMATICAL_REPORT.docx)** - Graphically formatted report document (.docx) containing:
+  - All mathematical formulas with professional formatting
+  - Variable legend tables
+  - Implementation examples in Python for Raspberry Pi
+  - Structured sections for each parameter category
+  - Ready for printing or sharing as formal documentation
+
+- **[REPORT_FORMULAS.md](REPORT_FORMULAS.md)** - Markdown version of the graphical report with full LaTeX rendering support
+
+The formulas are designed for analyzing resistance band exercises with 3 sets × 8 repetitions, captured via HX711 strain gauge sensor on Raspberry Pi.
 
 ## Configuration
 
