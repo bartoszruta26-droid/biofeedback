@@ -84,6 +84,7 @@ if(Qt5_FOUND)
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
+        src/formulas.cpp
     )
 
     # Header files
@@ -107,6 +108,7 @@ if(Qt5_FOUND)
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
+        include/formulas.hpp
     )
 
     # Create executable
