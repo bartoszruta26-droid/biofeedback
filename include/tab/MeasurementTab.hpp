@@ -18,6 +18,9 @@
 #include <QCheckBox>
 #include <QUuid>
 #include <QHeaderView>
+#include <memory>
+
+#include "sensor/SerialCommunication.hpp"
 
 namespace tab {
 
@@ -220,6 +223,18 @@ public:
      * @brief Wczytuje wszystkie pliki JSON pacjenta i wyświetla trendy długoterminowe
      */
     void loadPatientTrends();
+    
+    /**
+     * @brief Ustawia połączenie szeregowe z Arduino
+     * @param serial Połączenie szeregowe
+     */
+    void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    
+    /**
+     * @brief Sprawdza czy Arduino jest podłączone
+     * @return true jeśli Arduino Nano z HX711 jest podłączone
+     */
+    bool isArduinoConnected() const;
 
 signals:
     void measurementStarted();
@@ -228,6 +243,7 @@ signals:
     void repetitionCompleted(int seriesNum, int repNum, const RepetitionStats& stats);
     void seriesCompleted(int seriesNum, const SeriesStats& stats);
     void sessionFinished(const QVector<SeriesStats>& allStats);
+    void arduinoConnectionStatus(bool connected, const QString& message);
 
 public slots:
     void onSaveData();
@@ -235,6 +251,7 @@ public slots:
     void onShowTrends();
     void onSaveMeasurementJSON();   // Zapis pojedynczego pomiaru do JSON
     void onLoadMeasurementJSON();   // Otwieranie pojedynczego pomiaru JSON
+    void onSensorDataReceived(const sensor::SensorData& data);
 
 private slots:
     void onToggleMeasurement();
@@ -259,6 +276,9 @@ private:
     void updateTrendsView();
     QString serializeSessionToJSON(const MeasurementSession& session) const;
     MeasurementSession deserializeSessionFromJSON(const QString& json) const;
+    
+    // Metody SerialCommunication
+    void connectToArduinoAsync();
     
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
@@ -329,6 +349,11 @@ private:
     QScrollArea* m_trendsScrollArea;
     QWidget* m_trendsContent;
     QCheckBox* m_chkShowTrends;
+    
+    // Połączenie szeregowe z Arduino
+    std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SensorData m_lastSensorData;
+    bool m_hasArduinoConnection;
 };
 
 } // namespace tab

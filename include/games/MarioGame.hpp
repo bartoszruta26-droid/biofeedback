@@ -2,10 +2,12 @@
 #define GAMES_MARIOGAME_HPP
 
 #include "games/GameEngine.hpp"
+#include "sensor/SerialCommunication.hpp"
 #include <QPainter>
 #include <QVector>
 #include <QRectF>
 #include <QRandomGenerator>
+#include <memory>
 
 namespace games {
 
@@ -148,6 +150,34 @@ private:
     // Tensometr
     double m_sensorThreshold;      // Próg aktywacji
     double m_chargeStartTime;      // Czas rozpoczęcia ładowania
+    
+    // Komunikacja szeregowa z Arduino Nano HX711
+    std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    bool m_ownSerial;  // Czy gra jest właścicielem obiektu SerialCommunication
+    
+public:
+    /**
+     * @brief Podłącza obiekt SerialCommunication do gry
+     * @param serial Współdzielony wskaźnik do obiektu SerialCommunication
+     */
+    void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    
+    /**
+     * @brief Sprawdza czy połączenie szeregowe jest aktywne
+     * @return true jeśli Arduino Nano z HX711 jest podłączone
+     */
+    bool isSerialConnected() const;
+    
+private:
+    /**
+     * @brief Inicjalizuje nasłuchiwanie danych z sensora
+     */
+    void setupSensorListening();
+    
+    /**
+     * @brief Odłącza się od sensora
+     */
+    void cleanupSensorConnection();
 };
 
 } // namespace games

@@ -1,4 +1,5 @@
 #include "games/MarioGame.hpp"
+#include "sensor/SerialCommunication.hpp"
 #include <QPaintEvent>
 #include <QTime>
 #include <cmath>
@@ -14,6 +15,8 @@ MarioGame::MarioGame(QWidget *parent)
     , m_obstacleSpawnInterval(2.0)
     , m_sensorThreshold(0.3)
     , m_chargeStartTime(0.0)
+    , m_serialPort(nullptr)
+    , m_ownSerial(false)
 {
     // Inicjalizacja chmurek dekoracyjnych
     for (int i = 0; i < 5; ++i) {
@@ -28,6 +31,7 @@ MarioGame::MarioGame(QWidget *parent)
 
 MarioGame::~MarioGame()
 {
+    cleanupSensorConnection();
 }
 
 QString MarioGame::gameName() const
@@ -475,6 +479,70 @@ void MarioGame::renderUI(QPainter& painter)
         painter.setFont(QFont("Arial", 14));
         painter.drawText(rect(), Qt::AlignBottom | Qt::AlignHCenter, 
                         "Przytrzymaj tensometr aby naładować skok, puść aby skoczyć!");
+    }
+    
+    // Komunikat o braku połączenia z Arduino
+    if (m_serialPort && !m_serialPort->isConnected()) {
+        painter.setPen(QColor(255, 100, 100));
+        painter.setFont(QFont("Arial", 12, QFont::Bold));
+        painter.drawText(rect(), Qt::AlignTop | Qt::AlignHCenter,
+                        "BRAK POŁĄCZENIA Z ARDUINO NANO HX711");
+    }
+}
+
+// ==================== Metody SerialCommunication ====================
+
+void MarioGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
+{
+    if (m_ownSerial && m_serialPort) {
+        m_serialPort->stopAsyncReading();
+        m_serialPort->disconnect();
+    }
+    
+    m_serialPort = serial;
+    
+    if (m_serialPort && m_serialPort->isConnected()) {
+        setupSensorListening();
+    }
+    
+    m_ownSerial = false;
+}
+
+bool MarioGame::isSerialConnected() const
+{
+    return m_serialPort && m_serialPort->isConnected();
+}
+
+void MarioGame::setupSensorListening()
+{
+    if (!m_serialPort) return;
+    
+    m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, [this, data]() {
+            handleSensorInput(data.force);
+        }, Qt::QueuedConnection);
+    });
+    
+    m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
+        QMetaObject::invokeMethod(this, [this, connected, message]() {
+            if (!connected) {
+                // Można wyświetlić komunikat o utracie połączenia
+            }
+        }, Qt::QueuedConnection);
+    });
+    
+    m_serialPort->startAsyncReading();
+}
+
+void MarioGame::cleanupSensorConnection()
+{
+    if (m_ownSerial && m_serialPort) {
+        m_serialPort->stopAsyncReading();
+        m_serialPort->disconnect();
+        m_serialPort = nullptr;
+        m_ownSerial = false;
+    } else if (m_serialPort) {
+        m_serialPort = nullptr;
     }
 }
 

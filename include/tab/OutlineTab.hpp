@@ -19,6 +19,8 @@
 #include <QFile>
 #include <QDir>
 #include <QProgressBar>
+#include <memory>
+#include "sensor/SerialCommunication.hpp"
 
 namespace games {
     class GameEngine;
@@ -313,6 +315,22 @@ private:
     
     // Aktualnie uruchomiona gra
     games::GameEngine* m_currentGame;
+    
+    // Komunikacja szeregowa z Arduino Nano HX711
+    std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    
+public:
+    /**
+     * @brief Podłącza obiekt SerialCommunication do OutlineTab
+     * @param serial Współdzielony wskaźnik do obiektu SerialCommunication
+     */
+    void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    
+    /**
+     * @brief Sprawdza czy połączenie z Arduino jest aktywne
+     * @return true jeśli Arduino Nano z HX711 jest podłączone
+     */
+    bool isSerialConnected() const;
 };
 
 } // namespace tab
