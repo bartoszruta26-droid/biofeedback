@@ -240,24 +240,115 @@ UserData UserData::fromJson(const std::string& jsonText)
     return user;
 }
 
-Authentication::Authentication(const std::string& usersFilePath)
-    : usersFilePath(usersFilePath)
-    , currentUser(nullptr)
+std::string escapeJsonString(const std::string& input)
 {
+    std::string output;
+    output.reserve(input.size());
+
+    for (const char c : input) {
+        switch (c) {
+            case '"': output += "\\\""; break;
+            case '\\': output += "\\\\"; break;
+            case '\b': output += "\\b"; break;
+            case '\f': output += "\\f"; break;
+            case '\n': output += "\\n"; break;
+            case '\r': output += "\\r"; break;
+            case '\t': output += "\\t"; break;
+            default: output += c; break;
+        }
+    }
+
+    return output;
 }
 
-Authentication::~Authentication()
+std::string unescapeJsonString(const std::string& input)
 {
+    std::string output;
+    output.reserve(input.size());
+
+    for (size_t i = 0; i < input.size(); ++i) {
+        if (input[i] == '\\' && i + 1 < input.size()) {
+            switch (input[i + 1]) {
+                case '"': output += '"'; ++i; break;
+                case '\\': output += '\\'; ++i; break;
+                case 'b': output += '\b'; ++i; break;
+                case 'f': output += '\f'; ++i; break;
+                case 'n': output += '\n'; ++i; break;
+                case 'r': output += '\r'; ++i; break;
+                case 't': output += '\t'; ++i; break;
+                default: output += input[i]; break;
+            }
+        } else {
+            output += input[i];
+        }
+    }
+
+    return output;
 }
 
-void Authentication::setEncryptionKey(const std::string& key)
+size_t findStringTerminator(const std::string& text, const size_t start)
 {
-    encryptionKey = key;
+    for (size_t i = start; i < text.size(); ++i) {
+        if (text[i] != '"') {
+            continue;
+        }
+
+        size_t backslashes = 0;
+        for (size_t j = i; j > 0 && text[j - 1] == '\\'; --j) {
+            ++backslashes;
+        }
+
+        if (backslashes % 2 == 0) {
+            return i;
+        }
+    }
+
+    return std::string::npos;
 }
 
-std::string Authentication::extractStringValue(const std::string& jsonContent, const std::string& key) const
+std::string extractJsonStringField(const std::string& jsonText, const std::string& key)
 {
-    return extractJsonStringField(jsonContent, key);
+    std::string searchKey = "\"" + key + "\"";
+    size_t pos = json.find(searchKey);
+
+    if (pos == std::string::npos) {
+        return "";
+    }
+
+    pos = json.find(':', pos);
+    if (pos == std::string::npos) {
+        return "";
+    }
+
+    pos = json.find('"', pos + 1);
+    if (pos == std::string::npos) {
+        return defaultValue;
+    }
+
+    ++pos;
+    while (pos < jsonText.size() && std::isspace(static_cast<unsigned char>(jsonText[pos]))) {
+        ++pos;
+    }
+
+    if (jsonText.compare(pos, 4, "true") == 0) {
+        return true;
+    }
+    if (jsonText.compare(pos, 5, "false") == 0) {
+        return false;
+    }
+
+    return defaultValue;
+}
+
+std::string findUsersArray(const std::string& jsonContent)
+{
+    const std::string key = "\"users\"";
+    const size_t keyPos = jsonContent.find(key);
+    if (keyPos == std::string::npos) {
+        return "";
+    }
+
+    return parseJsonStringAt(json, pos);
 }
 
 bool Authentication::loadUsers()
