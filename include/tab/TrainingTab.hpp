@@ -50,6 +50,8 @@ private:
     double m_targetForce;
     double m_currentForce;
     int m_sessionTime;
+    
+    static QColor getForceColorStatic(double current, double target);
 };
 
 /**

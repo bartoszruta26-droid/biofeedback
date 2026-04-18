@@ -20,95 +20,139 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 # Find dependencies
 find_package(PkgConfig REQUIRED)
-
-# Qt5
-find_package(Qt5 REQUIRED COMPONENTS Core Widgets Charts)
-
-pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
-
-find_package(nlohmann_json REQUIRED)
 find_package(OpenSSL REQUIRED)
 
-# Include directories
-include_directories(
-    ${CMAKE_SOURCE_DIR}/include
-    ${LIBSERIALPORT_INCLUDE_DIRS}
-)
-
-# Link directories
-link_directories(
-    ${LIBSERIALPORT_LIBRARY_DIRS}
-)
-
-# Qt5 MOC headers
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
-
-# Source files
-set(SOURCES
-    src/main.cpp
-    src/core/Application.cpp
+# Core library (no Qt dependency) available in all environments.
+add_library(biofeedback_core STATIC
     src/core/Logger.cpp
-    src/core/ConfigManager.cpp
     src/core/Authentication.cpp
-    src/gui/MainWindow.cpp
-    src/gui/LoginDialog.cpp
-    src/gui/GraphWidget.cpp
-    src/tab/PatientTab.cpp
-    src/tab/MeasurementTab.cpp
-    src/tab/OutlineTab.cpp
-    src/tab/TrainingTab.cpp
-    src/sensor/SerialCommunication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
-    src/games/GameEngine.cpp
-    src/games/SinGame.cpp
-    src/games/PongGame.cpp
-    src/games/FlappyBirdGame.cpp
-    src/games/MarioGame.cpp
 )
 
-# Header files
-set(HEADERS
-    include/core/Application.hpp
-    include/core/Logger.hpp
-    include/core/ConfigManager.hpp
-    include/core/Authentication.hpp
-    include/gui/MainWindow.hpp
-    include/gui/LoginDialog.hpp
-    include/gui/GraphWidget.hpp
-    include/tab/PatientTab.hpp
-    include/tab/MeasurementTab.hpp
-    include/tab/OutlineTab.hpp
-    include/tab/TrainingTab.hpp
-    include/sensor/SerialCommunication.hpp
-    include/data/DataManager.hpp
-    include/data/Encryption.hpp
-    include/games/GameEngine.hpp
-    include/games/SinGame.hpp
-    include/games/PongGame.hpp
-    include/games/FlappyBirdGame.hpp
-    include/games/MarioGame.hpp
+target_include_directories(biofeedback_core
+    PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/include/core
+        ${CMAKE_SOURCE_DIR}/include/data
 )
 
-# Create executable
-add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
-
-# Link libraries
-target_link_libraries(${PROJECT_NAME}
-    Qt5::Core
-    Qt5::Widgets
-    Qt5::Charts
-    ${LIBSERIALPORT_LIBRARIES}
-    nlohmann_json::nlohmann_json
-    OpenSSL::SSL
-    OpenSSL::Crypto
-    pthread
+target_link_libraries(biofeedback_core
+    PUBLIC
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        pthread
 )
+
+# Regression targets that can be built without Qt.
+add_executable(auth_regression tests/auth_regression.cpp)
+target_link_libraries(auth_regression PRIVATE biofeedback_core)
+
+add_executable(data_manager_regression tests/data_manager_regression.cpp)
+target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
+
+# Build GUI app only when Qt5 development packages are available.
+find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
+if(Qt5_FOUND)
+    find_package(nlohmann_json REQUIRED)
+    pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
+
+    # Qt5 MOC headers
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+    set(CMAKE_AUTOUIC ON)
+
+    # Source files
+    set(SOURCES
+        src/main.cpp
+        src/core/Application.cpp
+        src/core/Logger.cpp
+        src/core/ConfigManager.cpp
+        src/core/Authentication.cpp
+        src/gui/MainWindow.cpp
+        src/gui/LoginDialog.cpp
+        src/gui/GraphWidget.cpp
+        src/tab/PatientTab.cpp
+        src/tab/MeasurementTab.cpp
+        src/tab/OutlineTab.cpp
+        src/tab/TrainingTab.cpp
+        src/sensor/SerialCommunication.cpp
+        src/data/DataManager.cpp
+        src/data/Encryption.cpp
+        src/games/GameEngine.cpp
+        src/games/SinGame.cpp
+        src/games/PongGame.cpp
+        src/games/FlappyBirdGame.cpp
+        src/games/MarioGame.cpp
+        src/formulas.cpp
+    )
+
+    # Header files
+    set(HEADERS
+        include/core/Application.hpp
+        include/core/Logger.hpp
+        include/core/ConfigManager.hpp
+        include/core/Authentication.hpp
+        include/gui/MainWindow.hpp
+        include/gui/LoginDialog.hpp
+        include/gui/GraphWidget.hpp
+        include/tab/PatientTab.hpp
+        include/tab/MeasurementTab.hpp
+        include/tab/OutlineTab.hpp
+        include/tab/TrainingTab.hpp
+        include/sensor/SerialCommunication.hpp
+        include/data/DataManager.hpp
+        include/data/Encryption.hpp
+        include/games/GameEngine.hpp
+        include/games/SinGame.hpp
+        include/games/PongGame.hpp
+        include/games/FlappyBirdGame.hpp
+        include/games/MarioGame.hpp
+        include/formulas.hpp
+    )
+
+    # Create executable
+    add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+    # Minimal mandatory Qt5 example source.
+    add_executable(qt5_mandatory_example examples/qt5_mandatory.cpp)
+
+    target_include_directories(${PROJECT_NAME}
+        PRIVATE
+            ${CMAKE_SOURCE_DIR}/include
+            ${LIBSERIALPORT_INCLUDE_DIRS}
+    )
+
+    target_link_directories(${PROJECT_NAME}
+        PRIVATE
+            ${LIBSERIALPORT_LIBRARY_DIRS}
+    )
+
+    # Link libraries
+    target_link_libraries(${PROJECT_NAME}
+        Qt5::Core
+        Qt5::Widgets
+        Qt5::Charts
+        ${LIBSERIALPORT_LIBRARIES}
+        nlohmann_json::nlohmann_json
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        pthread
+    )
+
+    target_link_libraries(qt5_mandatory_example
+        Qt5::Core
+        Qt5::Widgets
+        Qt5::Charts
+    )
+else()
+    message(WARNING "Qt5 not found - GUI target '${PROJECT_NAME}' will not be built. Core/regression targets remain available.")
+endif()
 
 # Install rules
-install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+if(TARGET ${PROJECT_NAME})
+    install(TARGETS ${PROJECT_NAME} DESTINATION bin)
+endif()
 install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config)
 install(DIRECTORY resources/ DESTINATION share/${PROJECT_NAME}/resources)
 

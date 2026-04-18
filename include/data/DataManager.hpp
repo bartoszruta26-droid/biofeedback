@@ -115,6 +115,13 @@ public:
     bool exportToJson(const std::string& data, const std::string& filename);
     std::string importFromJson(const std::string& filename);
 
+    // Pomocnicze metody do parsowania JSON (używane przez struktury danych)
+    std::string extractStringValue(const std::string& json, const std::string& key) const;
+    int extractIntValue(const std::string& json, const std::string& key) const;
+    double extractDoubleValue(const std::string& json, const std::string& key) const;
+    std::string escapeJsonString(const std::string& input) const;
+    std::string unescapeJsonString(const std::string& input) const;
+
 private:
     std::string encryptionKey;
     bool encryptionEnabled;
@@ -123,12 +130,6 @@ private:
     std::string readFile(const std::string& filename) const;
     bool writeFile(const std::string& filename, const std::string& content);
     
-    // Pomocnicze metody do parsowania JSON (prosta implementacja)
-    std::string extractStringValue(const std::string& json, const std::string& key) const;
-    int extractIntValue(const std::string& json, const std::string& key) const;
-    double extractDoubleValue(const std::string& json, const std::string& key) const;
-    std::string escapeJsonString(const std::string& input) const;
-    std::string unescapeJsonString(const std::string& input) const;
 };
 
 #endif // DATA_MANAGER_HPP

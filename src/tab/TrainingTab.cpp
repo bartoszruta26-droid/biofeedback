@@ -10,6 +10,7 @@
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
+#include "games/SinGame.hpp"
 
 namespace tab {
 
@@ -113,7 +114,7 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     double forceRatio = m_targetForce > 0 ? m_currentForce / m_targetForce : 0;
     forceRatio = qBound(0.0, forceRatio, 1.0);
     
-    QColor forceColor = getForceColor(m_currentForce, m_targetForce);
+    QColor forceColor = getForceColorStatic(m_currentForce, m_targetForce);
     painter.setBrush(forceColor);
     painter.setPen(forceColor);
     int fillWidth = static_cast<int>(barWidth * forceRatio);
@@ -126,7 +127,7 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
                     QString("%1 N").arg(m_currentForce, 0, 'f', 1));
 }
 
-QColor TrainingProgressWidget::getForceColor(double current, double target)
+QColor TrainingProgressWidget::getForceColorStatic(double current, double target)
 {
     if (target <= 0) return Qt::gray;
     
@@ -574,9 +575,25 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
         
         // Jeśli mamy SerialCommunication, podłącz go do gry
         if (m_serialPort) {
+            // Spróbuj rzutować na konkretny typ gry i podłącz SerialCommunication
             auto pongGame = dynamic_cast<games::PongGame*>(m_currentGame);
             if (pongGame) {
                 pongGame->setSerialConnection(m_serialPort);
+            }
+            
+            auto flappyGame = dynamic_cast<games::FlappyBirdGame*>(m_currentGame);
+            if (flappyGame) {
+                flappyGame->setSerialConnection(m_serialPort);
+            }
+            
+            auto marioGame = dynamic_cast<games::MarioGame*>(m_currentGame);
+            if (marioGame) {
+                marioGame->setSerialConnection(m_serialPort);
+            }
+            
+            auto sinGame = dynamic_cast<games::SinGame*>(m_currentGame);
+            if (sinGame) {
+                sinGame->setSerialConnection(m_serialPort);
             }
         }
     }
@@ -775,7 +792,11 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 1));
     m_progressWidget->setCurrentForce(force);
     
-    int barValue = m_targetForce > 0 ? static_cast<int>((force / m_targetForce) * 100) : 0;
+    double targetForce = 0.0;
+    if (!m_exercisePlan.isEmpty() && m_currentExerciseIndex < m_exercisePlan.size()) {
+        targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
+    }
+    int barValue = targetForce > 0 ? static_cast<int>((force / targetForce) * 100) : 0;
     m_forceBar->setValue(qBound(0, barValue, 100));
     
     // Przekazanie danych do gry

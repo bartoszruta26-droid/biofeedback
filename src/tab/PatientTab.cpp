@@ -2,6 +2,7 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QDateTime>
+#include <QDir>
 
 namespace tab {
 
@@ -30,6 +31,8 @@ PatientTab::PatientTab(QWidget *parent)
     , m_refreshButton(nullptr)
     , m_currentRow(-1)
     , m_isEditMode(false)
+    , m_currentPatientPesel("")
+    , m_currentPatientDataPath("")
 {
     setupUI();
     createConnections();
@@ -548,9 +551,24 @@ void PatientTab::clearTable()
 
 void PatientTab::onSelectionChanged()
 {
-    bool hasSelection = m_patientTable->currentRow() >= 0;
+    int currentRow = m_patientTable->currentRow();
+    bool hasSelection = currentRow >= 0;
     m_editButton->setEnabled(hasSelection);
     m_deleteButton->setEnabled(hasSelection);
+    
+    // Emituj sygnał patientSelected gdy wybrano pacjenta
+    if (hasSelection) {
+        QString pesel = m_patientTable->item(currentRow, 0)->text();
+        QString firstName = m_patientTable->item(currentRow, 1)->text();
+        QString lastName = m_patientTable->item(currentRow, 2)->text();
+        
+        // Ustaw aktualnie załadowanego pacjenta
+        m_currentPatientPesel = pesel;
+        m_currentPatientDataPath = QDir::currentPath() + "/data/patients/" + pesel;
+        
+        emit patientSelected(pesel, firstName, lastName);
+        emit currentPatientChanged(m_currentPatientPesel, m_currentPatientDataPath);
+    }
 }
 
 void PatientTab::onTableRowDoubleClicked(int row, int column)
@@ -561,6 +579,16 @@ void PatientTab::onTableRowDoubleClicked(int row, int column)
         m_patientTable->selectRow(row);
         editSelectedPatient();
     }
+}
+
+QString PatientTab::getCurrentPatientPesel() const
+{
+    return m_currentPatientPesel;
+}
+
+QString PatientTab::getCurrentPatientDataPath() const
+{
+    return m_currentPatientDataPath;
 }
 
 } // namespace tab

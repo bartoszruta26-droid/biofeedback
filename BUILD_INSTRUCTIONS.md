@@ -31,14 +31,18 @@ sudo apt install -y \
     cmake \
     git \
     qtbase5-dev \
-    qtcharts5-dev \
+    libqt5charts5-dev \
     libserialport-dev \
     nlohmann-json3-dev \
     libssl-dev \
     pkg-config
 ```
 
-**Note**: Qt Charts (`qtcharts5-dev`) is required for the graph visualization features and all game rendering. Make sure it's properly installed.
+**Note**: Qt Charts is required for graph visualization and game rendering.
+Depending on distro naming, install either:
+
+- `libqt5charts5-dev` (Ubuntu/Debian)
+- `qtcharts5-dev` (some Raspberry Pi OS images)
 
 ### 3. Configure Serial Port Permissions
 ```bash
@@ -60,7 +64,23 @@ ls -l /dev/ttyUSB*
 ```bash
 pkg-config --modversion Qt5Core
 # Should return 5.x.x
+
+pkg-config --modversion Qt5Charts
+# Should return 5.x.x
+
+dpkg -s libqt5charts5-dev | head -n 5
+# Should show: Status: install ok installed
 ```
+
+### 5. Raspberry Pi Native Qt5 Reference
+
+For Raspberry Pi native Qt5 builds, use the official Qt Wiki guide:
+
+- https://wiki.qt.io/Native_Build_of_Qt5_on_a_Raspberry_Pi
+
+This repository now also ships a mandatory Qt5 code sample in:
+
+- `examples/qt5_mandatory.cpp`
 
 ## Building the Application
 
@@ -78,6 +98,12 @@ cmake ..
 
 # Build
 make -j$(nproc)
+```
+
+After building with Qt5 available, you can run the mandatory Qt5 sample:
+
+```bash
+./qt5_mandatory_example
 ```
 
 ### Option 2: Using Makefile Directly

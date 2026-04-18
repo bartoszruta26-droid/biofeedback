@@ -26,6 +26,12 @@ void writeUsersJson()
            "      \"password\": \"p\\\\a\\\"ss\",\n"
            "      \"role\": \"therapist\",\n"
            "      \"encrypted\": false\n"
+           "    },\n"
+           "    {\n"
+           "      \"username\": \"brace-user\",\n"
+           "      \"password\": \"token-with-}-inside\",\n"
+           "      \"role\": \"tester\",\n"
+           "      \"encrypted\": false\n"
            "    }\n"
            "  ]\n"
            "}\n";
@@ -56,6 +62,7 @@ int main()
 
         expect(auth.login("doctor\"x", "p\\a\"ss"), "logowanie użytkownika z escapowanymi znakami powinno działać");
         expect(auth.getCurrentUsername() == "doctor\"x", "odczyt username z escapowanym cudzysłowem");
+        expect(auth.login("brace-user", "token-with-}-inside"), "logowanie użytkownika z '}' w haśle powinno działać");
 
         auth.logout();
         expect(auth.loadUsers(), "ponowne loadUsers() po logout powinno działać");

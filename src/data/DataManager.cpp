@@ -1,24 +1,108 @@
 #include "DataManager.hpp"
 #include <algorithm>
+#include <cctype>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <cstdio>
+
+namespace {
+
+std::string escapeJsonStringValue(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+
+    for (const char c : input) {
+        switch (c) {
+            case '"': output += "\\\""; break;
+            case '\\': output += "\\\\"; break;
+            case '\b': output += "\\b"; break;
+            case '\f': output += "\\f"; break;
+            case '\n': output += "\\n"; break;
+            case '\r': output += "\\r"; break;
+            case '\t': output += "\\t"; break;
+            default: output += c; break;
+        }
+    }
+
+    return output;
+}
+
+size_t findStringTerminator(const std::string& text, const size_t start) {
+    for (size_t i = start; i < text.size(); ++i) {
+        if (text[i] != '"') {
+            continue;
+        }
+
+        size_t backslashes = 0;
+        for (size_t j = i; j > 0 && text[j - 1] == '\\'; --j) {
+            ++backslashes;
+        }
+
+        if (backslashes % 2 == 0) {
+            return i;
+        }
+    }
+
+    return std::string::npos;
+}
+
+std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson) {
+    std::vector<std::string> objects;
+    bool inString = false;
+    int depth = 0;
+    size_t objectStart = std::string::npos;
+
+    for (size_t i = 0; i < arrayJson.size(); ++i) {
+        const char c = arrayJson[i];
+
+        if (c == '"') {
+            size_t backslashes = 0;
+            for (size_t j = i; j > 0 && arrayJson[j - 1] == '\\'; --j) {
+                ++backslashes;
+            }
+            if (backslashes % 2 == 0) {
+                inString = !inString;
+            }
+        }
+
+        if (inString) {
+            continue;
+        }
+
+        if (c == '{') {
+            if (depth == 0) {
+                objectStart = i;
+            }
+            ++depth;
+        } else if (c == '}') {
+            --depth;
+            if (depth == 0 && objectStart != std::string::npos) {
+                objects.push_back(arrayJson.substr(objectStart, i - objectStart + 1));
+                objectStart = std::string::npos;
+            }
+        }
+    }
+
+    return objects;
+}
+
+} // namespace
 
 // ==================== Implementacja PatientData ====================
 
 std::string PatientData::toJson() const {
     std::ostringstream json;
     json << "{\n";
-    json << "  \"id\": \"" << id << "\",\n";
-    json << "  \"firstName\": \"" << firstName << "\",\n";
-    json << "  \"lastName\": \"" << lastName << "\",\n";
-    json << "  \"pesel\": \"" << pesel << "\",\n";
-    json << "  \"birthDate\": \"" << birthDate << "\",\n";
-    json << "  \"gender\": \"" << gender << "\",\n";
-    json << "  \"phoneNumber\": \"" << phoneNumber << "\",\n";
-    json << "  \"email\": \"" << email << "\",\n";
-    json << "  \"address\": \"" << address << "\",\n";
-    json << "  \"medicalHistory\": \"" << medicalHistory << "\"\n";
+    json << "  \"id\": \"" << escapeJsonStringValue(id) << "\",\n";
+    json << "  \"firstName\": \"" << escapeJsonStringValue(firstName) << "\",\n";
+    json << "  \"lastName\": \"" << escapeJsonStringValue(lastName) << "\",\n";
+    json << "  \"pesel\": \"" << escapeJsonStringValue(pesel) << "\",\n";
+    json << "  \"birthDate\": \"" << escapeJsonStringValue(birthDate) << "\",\n";
+    json << "  \"gender\": \"" << escapeJsonStringValue(gender) << "\",\n";
+    json << "  \"phoneNumber\": \"" << escapeJsonStringValue(phoneNumber) << "\",\n";
+    json << "  \"email\": \"" << escapeJsonStringValue(email) << "\",\n";
+    json << "  \"address\": \"" << escapeJsonStringValue(address) << "\",\n";
+    json << "  \"medicalHistory\": \"" << escapeJsonStringValue(medicalHistory) << "\"\n";
     json << "}";
     return json.str();
 }
@@ -46,14 +130,14 @@ PatientData PatientData::fromJson(const std::string& json) {
 std::string Exercise::toJson() const {
     std::ostringstream json;
     json << "{\n";
-    json << "  \"id\": \"" << id << "\",\n";
-    json << "  \"name\": \"" << name << "\",\n";
-    json << "  \"description\": \"" << description << "\",\n";
-    json << "  \"category\": \"" << category << "\",\n";
+    json << "  \"id\": \"" << escapeJsonStringValue(id) << "\",\n";
+    json << "  \"name\": \"" << escapeJsonStringValue(name) << "\",\n";
+    json << "  \"description\": \"" << escapeJsonStringValue(description) << "\",\n";
+    json << "  \"category\": \"" << escapeJsonStringValue(category) << "\",\n";
     json << "  \"sets\": " << sets << ",\n";
     json << "  \"reps\": " << reps << ",\n";
     json << "  \"weight\": " << weight << ",\n";
-    json << "  \"notes\": \"" << notes << "\"\n";
+    json << "  \"notes\": \"" << escapeJsonStringValue(notes) << "\"\n";
     json << "}";
     return json.str();
 }
@@ -79,15 +163,15 @@ Exercise Exercise::fromJson(const std::string& json) {
 std::string ExerciseResult::toJson() const {
     std::ostringstream json;
     json << "{\n";
-    json << "  \"id\": \"" << id << "\",\n";
-    json << "  \"patientId\": \"" << patientId << "\",\n";
-    json << "  \"exerciseId\": \"" << exerciseId << "\",\n";
-    json << "  \"date\": \"" << date << "\",\n";
+    json << "  \"id\": \"" << escapeJsonStringValue(id) << "\",\n";
+    json << "  \"patientId\": \"" << escapeJsonStringValue(patientId) << "\",\n";
+    json << "  \"exerciseId\": \"" << escapeJsonStringValue(exerciseId) << "\",\n";
+    json << "  \"date\": \"" << escapeJsonStringValue(date) << "\",\n";
     json << "  \"completedSets\": " << completedSets << ",\n";
     json << "  \"completedReps\": " << completedReps << ",\n";
     json << "  \"actualWeight\": " << actualWeight << ",\n";
-    json << "  \"rating\": \"" << rating << "\",\n";
-    json << "  \"notes\": \"" << notes << "\"\n";
+    json << "  \"rating\": \"" << escapeJsonStringValue(rating) << "\",\n";
+    json << "  \"notes\": \"" << escapeJsonStringValue(notes) << "\"\n";
     json << "}";
     return json.str();
 }
@@ -114,12 +198,12 @@ ExerciseResult ExerciseResult::fromJson(const std::string& json) {
 std::string TrainingPlan::toJson() const {
     std::ostringstream json;
     json << "{\n";
-    json << "  \"id\": \"" << id << "\",\n";
-    json << "  \"patientId\": \"" << patientId << "\",\n";
-    json << "  \"name\": \"" << name << "\",\n";
-    json << "  \"description\": \"" << description << "\",\n";
-    json << "  \"startDate\": \"" << startDate << "\",\n";
-    json << "  \"endDate\": \"" << endDate << "\",\n";
+    json << "  \"id\": \"" << escapeJsonStringValue(id) << "\",\n";
+    json << "  \"patientId\": \"" << escapeJsonStringValue(patientId) << "\",\n";
+    json << "  \"name\": \"" << escapeJsonStringValue(name) << "\",\n";
+    json << "  \"description\": \"" << escapeJsonStringValue(description) << "\",\n";
+    json << "  \"startDate\": \"" << escapeJsonStringValue(startDate) << "\",\n";
+    json << "  \"endDate\": \"" << escapeJsonStringValue(endDate) << "\",\n";
     json << "  \"exercises\": [\n";
     
     for (size_t i = 0; i < exercises.size(); ++i) {
@@ -247,8 +331,12 @@ std::vector<Exercise> DataManager::loadExercises(const std::string& filename, bo
         }
     }
     
-    // Proste parsowanie tablicy ćwiczeń - w produkcji warto użyć biblioteki JSON
-    // Tutaj upraszczamy dla demonstracji
+    for (const auto& objectJson : splitJsonObjectsFromArray(content)) {
+        Exercise exercise = Exercise::fromJson(objectJson);
+        if (!exercise.id.empty() || !exercise.name.empty()) {
+            exercises.push_back(exercise);
+        }
+    }
     
     return exercises;
 }
@@ -296,7 +384,12 @@ std::vector<ExerciseResult> DataManager::loadExerciseResults(const std::string& 
         }
     }
     
-    // Proste parsowanie tablicy wyników
+    for (const auto& objectJson : splitJsonObjectsFromArray(content)) {
+        ExerciseResult result = ExerciseResult::fromJson(objectJson);
+        if (!result.id.empty() || !result.exerciseId.empty() || !result.patientId.empty()) {
+            results.push_back(result);
+        }
+    }
     
     return results;
 }
@@ -407,7 +500,7 @@ std::string DataManager::extractStringValue(const std::string& json, const std::
         return "";
     }
     
-    size_t endPos = json.find('"', pos + 1);
+    size_t endPos = findStringTerminator(json, pos + 1);
     if (endPos == std::string::npos) {
         return "";
     }
