@@ -1,1 +1,1 @@
-Nothing to output - the modified file 'doc/rozdzial_1_5_legalizacja.md' is a markdown document and does not require any gitignore rules.
+Nothing needs to be added to .gitignore since only a markdown documentation file was added, which is a source/config file and should not be ignored.
