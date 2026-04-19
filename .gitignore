@@ -1,1 +1,1 @@
-Nothing to output - the file changes contain only a markdown documentation file (.md) which should not be ignored.
+Nothing needs to be added to .gitignore since only a markdown documentation file was added, which is source content that should be tracked in version control.
