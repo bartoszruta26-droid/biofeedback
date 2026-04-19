@@ -1,1 +1,1 @@
-Nothing to output - the modified file 'doc/rozdzial_1_5_legalizacja.md' is a markdown document and does not require any gitignore rules.
+(doc/rozdzial_2_2_petla_sprzezenia_zwrotnego.md is a source/config file, so it should not be added to .gitignore)
