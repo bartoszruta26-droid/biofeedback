@@ -1,1 +1,1 @@
-(doc/rozdzial_2_2_petla_sprzezenia_zwrotnego.md is a source/config file, so it should not be added to .gitignore)
+Nothing to output - the change list contains only a markdown documentation file (.md) which should not be ignored.
