@@ -1,5 +1,5 @@
 # Examples 1:
-(empty)
+(empty — output nothing)
 
 # Example 2 (Project with artifacts):
 # Compiled and build artifacts
@@ -24,3 +24,6 @@ node_modules/
 # Editors
 .vscode/
 .idea/
+
+# Original rules preserved
+*.log
