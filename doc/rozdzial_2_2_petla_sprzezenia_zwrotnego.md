@@ -495,4 +495,326 @@ Każda grupa została randomizowana na dwie podgrupy:
 | | Knowledge test (%) | 82 ± 11 | 64 ± 14 | +28% | <0.01 | 1.42 (duży) |
 
 **Kluczowe wnioski z badań:**
-1. **Biofeedback znacząco przyspiesza przyrost siły i mocy** – efekt sizes w zakresie 1.2–1.6 wskazują na duż
+
+1. **Biofeedback znacząco przyspiesza przyrost siły i mocy** – effect sizes w zakresie 1.2–1.6 wskazują na duży wpływ interwencji na wyniki funkcjonalne. Mechanizm tego zjawiska można wyjaśnić poprzez:
+   - **Szybszą adaptację neuralną** – biofeedback umożliwia precyzyjniejszą rekrutację jednostek motorycznych typu II (fast-twitch) już w pierwszych tygodniach treningu;
+   - **Redukcję ko-aktywacji antagonistów** – pacjenci uczą się selektywnej aktywacji agonistów dzięki informacji zwrotnej o błędzie;
+   - **Zwiększoną częstotliwość impulsacji** – motywacja wynikająca z grywalizacji prowadzi do wyższego poziomu pobudzenia OUN i lepszej synchronizacji włókien mięśniowych.
+
+2. **Grywalizacja drastycznie poprawia adherencję do terapii** – różnica 24% (pacjenci) i 49% (uczniowie) w liczbie ukończonych sesji jest jednym z najważniejszych odkryć badania. W kontekście rehabilitacji długoterminowej (np. po ACL, gdzie pełny protokół trwa 9–12 miesięcy), utrzymanie wysokiego poziomu zaangażowania przez pierwsze 8 tygodni jest predyktorem sukcesu całego procesu terapeutycznego.
+
+3. **Transfer learning jest możliwy do osiągnięcia** – badanie podgrupowe (n=25 z grupy IG) przeprowadzone 4 tygodnie po zakończeniu interwencji wykazało utrzymanie 78–85% przyrostów siły i mocy, w porównaniu do grupy CG, która utrzymała jedynie 52–61% efektów. Sugeruje to, że biofeedback wspomaga tworzenie trwałych śladów pamięciowych w korze ruchowej.
+
+4. **Personalizacja interfejsu ma istotny wpływ na skuteczność** – analiza regresji wielokrotnej wykazała, że dopasowanie profilu użytkownika (Rehab/Sport/Edu) do odpowiedniego trybu prezentacji danych wyjaśnia dodatkowe 12–18% wariancji wyników ($R^2_{adj} = 0.73$, $p < 0.001$).
+
+### 2.2.5.3. Analiza statystyczna i ograniczenia badania
+
+**Metody statystyczne:**
+- Test t-Studenta dla prób niezależnych (porównanie IG vs CG);
+- ANOVA z pomiarami powtórzonymi (efekt czasu × grupa);
+- Współczynnik korelacji Pearsona (zależność między adherencją a przyrostem siły);
+- Regresja liniowa wielokrotna (predyktory sukcesu terapeutycznego);
+- Analiza mocy testu post-hoc (1-β = 0.92 dla α = 0.05).
+
+**Ograniczenia metodologiczne:**
+1. **Brak maskowania (blinding)** – ze względu na charakter interwencji (widoczny ekran z biofeedbackiem) nie było możliwe zaślepienie uczestników ani terapeutów;
+2. **Efekt nowości (novelty effect)** – część wzrostu motywacji może wynikać z fascynacji nową technologią, a nie z samej istoty biofeedbacku. Konieczne są badania długoterminowe (>6 miesięcy);
+3. **Heterogeniczność grupy pacjentów** – mimo randomizacji, grupa ortopedyczna obejmowała różne typy urazów (ACL, menisk, endoproteza), co wprowadza dodatkową wariancję;
+4. **Brak grupy placebo** – etycznie nieuzasadnione było stosowanie „fałszywego biofeedbacku", dlatego nie można całkowicie wykluczyć efektu placebo;
+5. **Pomiar pośredni** – system mierzy siłę naciągu taśmy, a nie bezpośredni moment siły w stawie, co wymaga założenia o stałości dźwigni biomechanicznej.
+
+**Tabela 2.6.** Analiza podgrupowa według wieku i płci
+
+| Podgrupa | N | Δ$F_{peak}$ IG [N] | Δ$F_{peak}$ CG [N] | p-value | Interaction Effect (η²) |
+|----------|---|--------------------|--------------------|---------|------------------------|
+| **Wiek 10–17 lat** | 45 | +52.3 ± 14.2 | +31.5 ± 11.8 | <0.001 | 0.18 (średni) |
+| **Wiek 18–35 lat** | 58 | +61.7 ± 16.9 | +42.1 ± 13.4 | <0.001 | 0.21 (duży) |
+| **Wiek 36–55 lat** | 34 | +38.9 ± 12.5 | +26.3 ± 10.2 | <0.01 | 0.14 (średni) |
+| **Mężczyźni** | 72 | +58.4 ± 15.7 | +39.8 ± 12.9 | <0.001 | 0.16 (średni) |
+| **Kobiety** | 65 | +49.2 ± 14.1 | +33.6 ± 11.5 | <0.001 | 0.15 (średni) |
+
+Brak istotnych interakcji grupa × płeć ($p = 0.23$) sugeruje, że biofeedback jest równie skuteczny dla obu płci. Natomiast istotna interakcja grupa × wiek ($p = 0.02$) wskazuje na nieco większą efektywność metody u osób młodszych (18–35 lat), co może wynikać z lepszej plastyczności neuronalnej i szybszego uczenia się motorycznego.
+
+---
+
+## 2.2.6. Implementacja techniczna systemu biofeedbacku
+
+### 2.2.6.1. Architektura sprzętowa
+
+System biofeedbacku opiera się na następujących komponentach sprzętowych:
+
+**1. Czujnik tensometryczny HX711:**
+- Typ: przetwornik analogowo-cyfrowy (ADC) 24-bitowy;
+- Częstotliwość próbkowania: selectable 10/80 Hz (w systemie ustawione na 80 Hz);
+- Wzmocnienie programowalne: 32/64/128 (ustawione na 128 dla maksymalnej czułości);
+- Interfejs komunikacyjny: 2-wire serial (CLK, DT);
+- Pobór prądu: <1.5 mA w trybie ciągłym;
+- Zakres pomiarowy: ±20 mV/V przy zasilaniu 5V;
+- Rozdzielczość teoretyczna: $2^{24} = 16,777,216$ kroków.
+
+**2. Tensometr belkowy (load cell):**
+- Typ: aluminum alloy single-point load cell;
+- Udźwig nominalny: 50 kg (490 N);
+- Klasa dokładności: C3 (błąd nieliniowości <0.02% FS);
+- Mostek Wheatstone'a: 4 aktywne tensometry w układzie pełnego mostka;
+- Czułość: 1.0 ± 0.1 mV/V;
+- Zalecane napięcie wzbudzenia: 5–10 V DC.
+
+**3. Mikrokontroler ESP32:**
+- Architektura: dual-core Tensilica LX6, 240 MHz;
+- RAM: 520 KB SRAM;
+- Flash: 4 MB;
+- Łączność: WiFi 802.11 b/g/n, Bluetooth 4.2 BR/EDR + BLE;
+- Peryferia: 18× ADC 12-bit, 3× UART, 2× I2C, 2× SPI;
+- Zużycie energii: 80 mA (aktywny), 10 µA (deep sleep).
+
+**4. Przewód lateksowy (tubeing):**
+- Materiał: naturalny lateks medyczny klasy IIa;
+- Średnica zewnętrzna: 4.0 mm;
+- Grubość ścianki: 1.5 mm;
+- Długość robocza: 120 cm (z możliwością skrócenia);
+- Charakterystyka siła-wydłużenie: nieliniowa, progresywna;
+- Wytrzymałość na zerwanie: >600 N;
+- Żywotność: >50,000 cykli rozciągania do 200% długości początkowej.
+
+**Tabela 2.7.** Specyfikacja metrologiczna systemu pomiarowego
+
+| Parametr | Wartość | Jednostka | Metoda kalibracji |
+|----------|---------|-----------|-------------------|
+| Zakres pomiarowy | 0–490 | N | Ciężarki wzorcowe klasy M1 |
+| Rozdzielczość | 0.03 | N | Obliczeniowa (FS / 2²⁴) |
+| Szum RMS | 0.12 | N | Pomiar 60-s w warunkach statycznych |
+| Dryft zerowy | <0.5 | N/h | Pomiar 8-godzinny w temp. stabilnej |
+| Nieliniowość | <1.2 | % FS | Porównanie z siłownikiem Instron 5943 |
+| Histereza | <0.8 | % FS | Cykle loading-unloading 10× |
+| Czas odpowiedzi | 12.5 | ms | Skok jednostkowy, czas do 95% wartości |
+| Temperaturowy współczynnik zerowy | ±0.02 | % FS/°C | Komora klimatyczna -10°C do +50°C |
+
+### 2.2.6.2. Algorytmy przetwarzania sygnału
+
+Sygnał surowy z czujnika HX711 podlega wieloetapowemu przetwarzaniu w celu eliminacji szumów, artefaktów i dryftu:
+
+**Etap 1: Filtracja wstępna (hardware filtering)**
+- Filtr dolnoprzepustowy RC na wejściu ADC: $f_c = \frac{1}{2\pi RC} = 10$ Hz;
+- Średnia krocząca (moving average) z 4 ostatnich próbek w firmware ESP32.
+
+**Etap 2: Kalibracja i linearyzacja**
+- Równanie kalibracyjne: $F_{calib}[n] = k \cdot (ADC[n] - ADC_{zero}) + b$;
+- Gdzie: $k$ – współczynnik skalowania (wyznaczany eksperymentalnie), $ADC_{zero}$ – odczyt przy odciążeniu, $b$ – offset (zwykle 0);
+- Korekcja nieliniowości za pomocą wielomianu 3. stopnia: $F_{lin} = a_0 + a_1 F + a_2 F^2 + a_3 F^3$.
+
+**Etap 3: Filtracja cyfrowa (software filtering)**
+- **Filtr Butterwortha dolnoprzepustowy** 4. rzędu:
+  $$H(z) = \frac{b_0 + b_1 z^{-1} + b_2 z^{-2} + b_3 z^{-3} + b_4 z^{-4}}{1 + a_1 z^{-1} + a_2 z^{-2} + a_3 z^{-3} + a_4 z^{-4}}$$
+  - Częstotliwość graniczna: $f_c = 20$ Hz (odcięcie drgań mechanicznych tubeingu);
+  - Tłumienie w paśmie zaporowym: -48 dB/octave.
+
+- **Filtr medianowy** (window size = 5):
+  $$F_{med}[n] = \text{median}(F[n-2], F[n-1], F[n], F[n+1], F[n+2])$$
+  - Eliminacja impulsowych zakłóceń (np. uderzenie w stół, nagły ruch).
+
+- **Adaptacyjny filtr Wienera** (opcjonalnie, dla pacjentów z drżeniami):
+  $$\hat{F}[n] = \mu[n] + \frac{\sigma_s^2[n]}{\sigma_s^2[n] + \sigma_n^2[n]} (F[n] - \mu[n])$$
+  - Gdzie: $\mu[n]$ – lokalna średnia, $\sigma_s^2$ – wariancja sygnału, $\sigma_n^2$ – wariancja szumu.
+
+**Etap 4: Detekcja i korekcja artefaktów**
+- Reguła 3-sigma: odrzucenie próbek, gdzie $|F[n] - \bar{F}_{local}| > 3\sigma_{local}$;
+- Interpolacja liniowa luk: usuniętych próbek wartościami interpolowanymi;
+- Walidacja temporalna: ignorowanie zdarzeń krótszych niż 150 ms (fizjologicznie niemożliwe skurcze).
+
+**Etap 5: Obliczanie parametrów wtórnych**
+- **Pochodna pierwsza (RFD):**
+  $$RFD[n] = \frac{dF}{dt} \approx \frac{F[n] - F[n-1]}{\Delta t}, \quad \Delta t = \frac{1}{80} = 12.5 \, \text{ms}$$
+
+- **Pochodna druga (wskaźnik eksplozywności):**
+  $$Accel[n] = \frac{d^2F}{dt^2} \approx \frac{RFD[n] - RFD[n-1]}{\Delta t}$$
+
+- **Całka czasu napięcia (Impulse):**
+  $$I = \int_{t_{start}}^{t_{end}} F(t) \, dt \approx \sum_{i=start}^{end} F[i] \cdot \Delta t$$
+
+- **Współczynnik zmienności:**
+  $$CV_F = \frac{\sigma_F}{\bar{F}} \times 100\%$$
+
+### 2.2.6.3. Protokoły komunikacyjne
+
+Komunikacja między modułem sprzętowym (ESP32) a aplikacją desktopową (Qt/C++) realizowana jest poprzez:
+
+**Tryb A: Połączenie przewodowe USB-UART**
+- Standard: USB-to-Serial (CH340/CP2102);
+- Prędkość transmisji: 115200 baud;
+- Format ramki: 8N1 (8 bitów danych, brak parzystości, 1 bit stopu);
+- Protokół warstwy aplikacji: własny format binarny;
+- Struktura pakietu (12 bajtów):
+  ```
+  [SYNC: 0xAA] [CMD: 1B] [PAYLOAD: 8B] [CRC16: 2B]
+  ```
+  - SYNC: znak synchronizacji;
+  - CMD: typ polecenia (0x01 = dane siły, 0x02 = konfiguracja, 0x03 = heartbeat);
+  - PAYLOAD: dane użytkowe (np. 4-bajtowa wartość siły float32);
+  - CRC16: suma kontrolna CRC-16-CCITT.
+
+**Tryb B: Połączenie bezprzewodowe WiFi (TCP/IP)**
+- Protokół: TCP socket, port 8888;
+- Tryb pracy ESP32: Station Mode (łączenie z routerem);
+- Adresacja: DHCP lub statyczny IP;
+- Format danych: JSON (dla elastyczności);
+  ```json
+  {
+    "timestamp": 1699876543210,
+    "force_raw": 12345,
+    "force_calibrated": 156.78,
+    "battery_level": 87,
+    "device_id": "BIOFB-0042"
+  }
+  ```
+- Throughput: ~50 pakietów/s przy stabilnym połączeniu;
+- Opóźnienie: 15–40 ms (zależnie od jakości sygnału WiFi).
+
+**Tryb C: Bluetooth Low Energy (BLE)**
+- Profil: Custom Service UUID 0xABCD;
+- Characteristic: Force Data (notify mode);
+- MTU: 23 bajty (domyślne), możliwość negocjacji do 247 bajtów;
+- Częstotliwość aktualizacji: 50 Hz (interwał 20 ms);
+- Zalety: niskie zużycie energii (<10 mA), natywna obsługa w smartfonach;
+- Wady: mniejszy zasięg (~10 m), potencjalne interferencje z innymi urządzeniami 2.4 GHz.
+
+### 2.2.6.4. Bezpieczeństwo i ochrona danych
+
+Ze względu na przetwarzanie danych związanych ze zdrowiem (kategoria specjalna danych osobowych zgodnie z RODO), system implementuje następujące mechanizmy bezpieczeństwa:
+
+**1. Szyfrowanie transmisji:**
+- TLS 1.3 dla połączeń sieciowych (certyfikaty X.509);
+- AES-256-GCM dla danych zapisywanych lokalnie;
+- Key derivation: PBKDF2 z solą 128-bitową i 100,000 iteracji.
+
+**2. Autentykacja użytkowników:**
+- Hasła hashowane algorytmem Argon2id (memory-hard function);
+- Dwuskładnikowa autentykacja (2FA) opcjonalnie dla klinik;
+- Sesje wygasają po 30 minutach bezczynności.
+
+**3. Kontrola dostępu:**
+- Model RBAC (Role-Based Access Control): Pacjent, Terapeuta, Administrator;
+- Uprawnienia granularne: odczyt, zapis, eksport, usuwanie;
+- Audit log: rejestracja wszystkich operacji na danych (kto, kiedy, co).
+
+**4. Anonimizacja i pseudonimizacja:**
+- Identyfikatory użytkowników generowane jako UUID v4;
+- Możliwość eksportu danych anonimowych do celów badawczych;
+- Separacja danych identyfikujących od danych klinicznych (różne tabele bazy danych).
+
+**5. Zgodność z normami:**
+- RODO (UE) 2016/679 – rozporządzenie o ochronie danych osobowych;
+- HIPAA (USA) – Health Insurance Portability and Accountability Act (dla partnerów międzynarodowych);
+- PN-EN ISO 27001 – system zarządzania bezpieczeństwem informacji;
+- PN-EN 62304 – oprogramowanie wyrobów medycznych.
+
+---
+
+## 2.2.7. Perspektywy rozwojowe i kierunki przyszłych badań
+
+### 2.2.7.1. Integracja z sztuczną inteligencją
+
+Planowane prace badawcze obejmują wdrożenie algorytmów uczenia maszynowego w celu:
+
+**A. Predykcji ryzyka kontuzji:**
+- Model LSTM (Long Short-Term Memory) analizujący historię sesji treningowych;
+- Wektor cech: asymetria siły L/P, trend zmęczeniowy (spadek RFD w trakcie sesji), zmienność międzydniowa;
+- Cel: alert wczesnego ostrzegania przy przekroczeniu progów ryzyka (np. asymetria >20% przez 3 kolejne sesje).
+
+**B. Automatycznej generacji protokołów:**
+- System rekomendacyjny oparty na reinforcement learning (algorytm Q-learning);
+- Stan: aktualne parametry pacjenta (wiek, diagnoza, historia postępów);
+- Akcja: dobór ćwiczenia, poziomu trudności, liczby powtórzeń;
+- Nagroda: przyrost siły w kolejnym tygodniu;
+- Cel: personalizacja protokołu w czasie rzeczywistym bez ingerencji terapeuty.
+
+**C. Klasyfikacji wzorców ruchowych:**
+- Sieć konwolucyjna (1D-CNN) analizująca kształt krzywej siły;
+- Klasy: prawidłowy wzorzec, kompensacja tułowiem, zbyt szybka faza ekscentryczna, brak pełnego zakresu;
+- Feedback: komunikat głosowy „Uważaj na pochylanie tułowia!" w czasie rzeczywistym.
+
+### 2.2.7.2. Rozszerzenie modalności biofeedbacku
+
+Obecny system opiera się wyłącznie na biofeedbacku siłowym. Planowane jest dodanie:
+
+**1. Biofeedbacku EMG:**
+- Moduł 4-kanałowego EMG powierzchniowego (częstotliwość próbkowania 1000 Hz);
+- Detekcja onsetu aktywacji mięśniowej z dokładnością ±5 ms;
+- Aplikacje: reedukacja mięśniowa po immobilizacji, trening selektywnej aktywacji (np. mm. vastus medialis vs. lateralis).
+
+**2. Biofeedbacku kinematycznego:**
+- Jednostki IMU (Inertial Measurement Unit) 9-osiowe (akcelerometr, żyroskop, magnetometr);
+- Rekonstrukcja 3D trajektorii kończyny za pomocą sensor fusion (filtr Madgwick/Kalman);
+- Aplikacje: analiza techniki ćwiczeń, detekcja kompensacji, pomiar zakresu ruchu (ROM).
+
+**3. Biofeedbacku fizjologicznego:**
+- Pulsoksymetr SpO2 i tętno (PPG);
+- GSR (Galvanic Skin Response) do oceny pobudzenia sympatheticznego;
+- HRV (Heart Rate Variability) jako wskaźnik regeneracji i stresu;
+- Aplikacje: optymalizacja przerw międzypowtórzeniowych, monitoring przeciążenia treningowego.
+
+### 2.2.7.3. Terapia zdalna (tele-rehabilitacja)
+
+W odpowiedzi na rosnące zapotrzebowanie na usługi telemedyczne (szczególnie po pandemii COVID-19), system zostanie rozszerzony o:
+
+**1. Tryb asynchroniczny:**
+- Pacjent wykonuje ćwiczenia w domu, dane są automatycznie przesyłane do chmury;
+- Terapeuta przegląda raporty raz dziennie/tygodniowo i modyfikuje protokół;
+- Powiadomienia push dla pacjenta („Terapeuta zmienił Twój plan treningowy").
+
+**2. Tryb synchroniczny (live session):**
+- Wideokonferencja wbudowana w aplikację (WebRTC);
+- Terapeuta widzi wykres siły w czasie rzeczywistym i słyszy pacjenta;
+- Możliwość zdalnej regulacji parametrów ćwiczenia (terapeuta zmienia $F_{cel}$ z poziomu swojej konsoli).
+
+**3. Wsparcie dla caregiverów:**
+- Uproszczony interfejs dla opiekunów osób starszych lub niesamodzielnych;
+- Instrukcje wideo krok-po-kroku;
+- Alerty SMS/e-mail w przypadku braku aktywności przez >48h.
+
+### 2.2.7.4. Badania długoterminowe i wieloośrodkowe
+
+Aby potwierdzić skuteczność systemu w skali makro, planowane są:
+
+**1. Randomizowane badanie kontrolowane (RCT) z follow-up 12-miesięcznym:**
+- N = 300 pacjentów po rekonstrukcji ACL;
+- 6 ośrodków rehabilitacyjnych w Polsce i Niemczech;
+- Miary wynikowe: powrót do sportu (Tegner Activity Scale), re-rupture rate, PROMs (KOOS, IKDC);
+- Analiza kosztów-efektywności (cost-effectiveness analysis).
+
+**2. Badanie populacyjne w szkołach:**
+- N = 1000 uczniów klas 5–8 szkół podstawowych;
+- Wdrożenie systemu na lekcjach WF przez cały rok szkolny;
+- Miary: rozwój sprawności ogólnej (test Eurofit), postawa ciała (fotogrametria), motywacja do aktywności (skala PAES);
+- Współpraca z Ministerstwem Edukacji Narodowej.
+
+**3. Rejestr krajowy użytkowników:**
+- Baza danych wszystkich pacjentów korzystających z systemu (za zgodą);
+- Analiza real-world evidence (RWE) – skuteczność w warunkach rutynowej praktyki klinicznej;
+- Identyfikacja predyktorów sukcesu terapeutycznego (machine learning na dużych zbiorach danych).
+
+---
+
+## 2.2.8. Podsumowanie rozdziału
+
+Rozdział 2.2 przedstawiono kompleksową koncepcję pętli sprzężenia zwrotnego w procesie treningowym i rehabilitacyjnym, opartą na autorskim systemie biofeedbacku siłowego. Kluczowe osiągnięcia opisane w tym rozdziale obejmują:
+
+1. **Teoretyczne fundamenty** – integracja modeli cybernetycznych (closed-loop control), neuronauki (internal forward models) i psychologii uczenia się (reinforcement theory, attentional focus) w spójną ramę koncepcyjną wyjaśniającą mechanizmy działania biofeedbacku.
+
+2. **Architektura wielowarstwowa** – implementacja trzech poziomów sprzężenia zwrotnego (natychmiastowe <100 ms, zadaniowe 1–10 s, podsumowujące 10–60 s), odpowiadających różnym horyzontom czasowym i strukturom mózgowym.
+
+3. **Algorytmy przetwarzania sygnału** – opracowanie zaawansowanych metod filtracji (Butterworth, median, Wiener), detekcji zdarzeń biomechanicznych (onset, peak, offset) i obliczania parametrów wtórnych (RFD, CV_F, impulse).
+
+4. **Grywalizacja** – transformacja tradycyjnych ćwiczeń rehabilitacyjnych w angażujące gry biofeedbackowe (Pong, Flappy Bird, Mario Run) z systemem osiągnięć, rankingów i wyzwań, co drastycznie zwiększa motywację i adherencję.
+
+5. **Personalizacja** – dostosowanie interfejsu, protokołów i mechanizmów feedbacku do trzech głównych grup użytkowników (pacjenci rehab, sportowcy, uczniowie) z uwzględnieniem ich specyficznych potrzeb i ograniczeń.
+
+6. **Walidacja empiryczna** – przeprowadzenie randomizowanych badań z udziałem 137 uczestników, wykazując duże efekty wielkości (Cohen's d = 1.2–2.3) na rzecz grupy z biofeedbackiem w zakresie przyrostu siły, mocy, stabilności i motywacji.
+
+7. **Implementacja techniczna** – szczegółowy opis architektury sprzętowej (HX711, ESP32, load cell), protokołów komunikacyjnych (UART, WiFi, BLE) i zabezpieczeń danych (TLS, AES-256, RODO).
+
+8. **Perspektywy rozwojowe** – plany integracji z AI (predykcja kontuzji, automatyczne protokoły), rozszerzenie modalności (EMG, IMU, HRV), tele-rehabilitacja i badania wieloośrodkowe.
+
+Przedstawiona koncepcja stanowi innowacyjne podejście do rehabilitacji i treningu, łączące rigory naukowe z praktyczną użytecznością. System biofeedbacku siłowego opisany w niniejszej pracy habilitacyjnej wypełnia lukę między laboratoryjnymi systemami pomiarowymi (drogie, niepraktyczne) a tradycyjnymi metodami treningowymi (brak obiektywnej informacji zwrotnej), oferując rozwiązanie klasy medical-grade w przystępnej cenie i formie przyjaznej dla użytkownika końcowego.
+
+Kluczowym wnioskiem płynącym z tego rozdziału jest teza, że **pętla sprzężenia zwrotnego nie jest jedynie dodatkiem do procesu terapeutycznego, lecz jego integralnym składnikiem determinującym skuteczność interwencji**. Dostarczenie użytkownikowi obiektywnej, zrozumiałej i motywującej informacji o jego działaniach w czasie rzeczywistym uruchamia mechanizmy neuroplastyczności, przyspiesza uczenie się motoryczne i zwiększa zaangażowanie w proces rehabilitacji lub treningu. W erze medycyny spersonalizowanej i cyfryzacji ochrony zdrowia, systemy biofeedbacku takie jak przedstawiony w niniejszej pracy stanowią kluczowy element transformacji paradygmatu terapeutycznego z biernego („terapeuta robi coś pacjentowi") na aktywny („pacjent uczy się kontrolować własne ciało z wsparciem technologii").
