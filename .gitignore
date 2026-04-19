@@ -1,2 +1,1 @@
-Nothing needs to be added to .gitignore since the only change is adding a markdown documentation file (.md), which is source content that should be tracked in version control.
-Nothing needs to be added to .gitignore since only a markdown documentation file was added, which is source content that should be tracked in version control.
+(doc/rozdzial_3_3_zasilanie_emc_bezpieczenstwo.md is a documentation file, which should not be ignored)
