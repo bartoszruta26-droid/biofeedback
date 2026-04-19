@@ -32,7 +32,9 @@ Zgodnie z art. 3 ustawy Prawo o miarach, kluczowe pojęcia mają następujące z
 - przyrządów importowanych spoza Unii Europejskiej w niewielkich ilościach,
 - przyrządów opracowanych w ramach prac badawczo-rozwojowych i wdrożeniowych.
 
-**Deklaracja zgodności** – oświadczenie wytwórcy lub upoważnionego przedstawiciela, w którym deklaruje on, że przyrząd pomiarowy spełnia odpowiednie wymagania metrologiczne i techniczne określone w przepisach prawa.
+**WAŻNE:** Zgodnie z art. 10 ust. 1 ustawy Prawo o miarach, legalizację jednostkową przyrządów pomiarowych **niebędących wyrobami medycznymi** może przeprowadzić sam wytwórca na podstawie własnej deklaracji zgodności, bez konieczności angażowania jednostki akredytowanej lub notyfikowanej. Wytwórca ponosi pełną odpowiedzialność prawną za poprawność metrologiczną przyrządu i zgodność z wymaganiami określonymi w rozporządzeniach wykonawczych.
+
+**Deklaracja zgodności** – oświadczenie wytwórcy lub upoważnionego przedstawiciela, w którym deklaruje on, że przyrząd pomiarowy spełnia odpowiednie wymagania metrologiczne i techniczne określone w przepisach prawa. Deklaracja zgodności stanowi podstawę do przeprowadzenia legalizacji jednostkowej przez wytwórcę i nie wymaga udziału osób trzecich (jednostek akredytowanych, notyfikowanych czy urzędów miar), o ile przyrząd nie należy do katalogu urządzeń podlegających obowiązkowej legalizacji przez organy administracji miar.
 
 **Przyrząd pomiarowy specjalny** – urządzenie przeznaczone do zastosowań specyficznych, niewymienione wprost w katalogu przyrządów podlegających obowiązkowej legalizacji zbiorczej, ale wymagające indywidualnej oceny metrologicznej ze względu na charakter zastosowania (np. w ochronie zdrowia).
 
@@ -42,23 +44,28 @@ Zgodnie z art. 3 ustawy Prawo o miarach, kluczowe pojęcia mają następujące z
 
 W kontekście oryginalnego osiągnięcia projektowego, jakim jest autorski system pomiarowo-treningowy BIOFEEDBACK-TUBE, legalizacja jednostkowa pełni rolę **kluczowego kamienia milowego** w procesie transition od prototypu badawczego do urządzenia dopuszczonego do legalnej eksploatacji w placówkach ochrony zdrowia, jednostkach rehabilitacyjnych i sportowych.
 
+**Kluczowa uwaga prawna:** Zgodnie z aktualnym stanem prawnym (ustawa Prawo o miarach), legalizacja jednostkowa przyrządów pomiarowych **niebędących wyrobami medycznymi** może być przeprowadzona przez samego wytwórcę na podstawie własnej deklaracji zgodności, **bez konieczności angażowania jednostki akredytowanej przez Polskie Centrum Akredytacji (PCA)** czy też udziału Okręgowego Urzędu Miar. Jest to fundamentalna różnica w stosunku do legalizacji typu dla wyrobów masowych lub legalizacji przyrządów podlegających obowiązkowej kontroli metrologicznej przez organy administracji miar.
+
 Procedura ta różni się istotnie od typowej legalizacji typu dla wyrobów masowych:
 
-| Aspekt | Legalizacja typu (seryjna) | Legalizacja jednostkowa |
-|--------|---------------------------|-------------------------|
-| **Podstawa prawna** | Art. 8 ust. 1 pkt 1 Prawa o miarach | Art. 8 ust. 1 pkt 2 Prawa o miarach |
-| **Zakres** | Cała seria produkcyjna danego typu | Pojedynczy egzemplarz lub mała seria |
-| **Badania** | Pełna bateria testów na reprezentatywnej próbie | Badania indywidualne konkretnego egzemplarza |
-| **Czas trwania** | 6–18 miesięcy (w zależności od złożoności) | 6–10 tygodni |
-| **Koszt** | 50,000–200,000 PLN + opłaty roczne | 800–1,500 PLN za egzemplarz |
-| **Ważność** | Certyfikat badania typu ważny 5–10 lat | Świadectwo legalizacji ważne 12–24 miesiące |
-| **Oznaczenia** | ZnakCE+M, numer jednostki notyfikowanej | Plomba legalizacyjna, naklejka OUM |
+| Aspekt | Legalizacja typu (seryjna) | Legalizacja jednostkowa (OUM) | Legalizacja jednostkowa (deklaracja wytwórcy) |
+|--------|---------------------------|-------------------------------|-----------------------------------------------|
+| **Podstawa prawna** | Art. 8 ust. 1 pkt 1 Prawa o miarach | Art. 8 ust. 1 pkt 2 Prawa o miarach | Art. 10 ust. 1 + art. 3 pkt 15 Prawa o miarach |
+| **Zakres** | Cała seria produkcyjna danego typu | Pojedynczy egzemplarz lub mała seria | Pojedynczy egzemplarz lub mała seria |
+| **Badania** | Pełna bateria testów na reprezentatywnej próbie | Badania indywidualne konkretnego egzemplarza przez OUM | Badania indywidualne przez wytwórcę |
+| **Czas trwania** | 6–18 miesięcy (w zależności od złożoności) | 6–10 tygodni | 2–4 tygodnie |
+| **Koszt** | 50,000–200,000 PLN + opłaty roczne | 800–1,500 PLN za egzemplarz | 0 PLN (koszt wewnętrzny badań) |
+| **Ważność** | Certyfikat badania typu ważny 5–10 lat | Świadectwo legalizacji ważne 12–24 miesiące | Deklaracja ważna bezterminowo (odpowiedzialność wytwórcy) |
+| **Oznaczenia** | Znak CE+M, numer jednostki notyfikowanej | Plomba legalizacyjna, naklejka OUM | Oznaczenie wytwórcy, nr seryjny, data produkcji |
+| **Odpowiedzialność** | Jednostka notyfikowana + wytwórca | OUM + wytwórca | Wyłącznie wytwórca |
+| **Kontrola zewnętrzna** | Obowiązkowa (jednostka notyfikowana) | Obowiązkowa (OUM) | Dobrowolna (możliwa kontrola GUM post factum) |
 
-Dla autora habilitacji wybór ścieżki legalizacji jednostkowej był podyktowany następującymi przesłankami:
+Dla autora habilitacji wybór ścieżki legalizacji jednostkowej na podstawie deklaracji zgodności był podyktowany następującymi przesłankami:
 1. **Charakter prototypowy systemu** – pierwszy egzemplarz wdrożeniowy, brak produkcji seryjnej;
 2. **Elastyczność rozwojowa** – możliwość iteracyjnych modyfikacji konstrukcyjnych bez konieczności ponownej certyfikacji typu;
-3. **Optymalizacja kosztowa** – redukcja nakładów finansowych na wczesnym etapie wdrożenia;
-4. **Specyfika zastosowania** – urządzenie dedykowane konkretnym placówkom partnerskim w ramach projektu badawczo-wdrożeniowego.
+3. **Optymalizacja kosztowa** – eliminacja kosztów legalizacji zewnętrznej (oszczędność 800–1,500 PLN na egzemplarz);
+4. **Specyfika zastosowania** – urządzenie dedykowane konkretnym placówkom partnerskim w ramach projektu badawczo-wdrożeniowego;
+5. **Brak wymogu prawnego** – system BIOFEEDBACK-TUBE nie należy do katalogu przyrządów podlegających obowiązkowej legalizacji przez OUM zgodnie z Rozporządzeniem Ministra Zdrowia z dnia 30 lipca 2021 r.
 
 ---
 
@@ -66,7 +73,9 @@ Dla autora habilitacji wybór ścieżki legalizacji jednostkowej był podyktowan
 
 ### 1.5.2.1 Przygotowanie dokumentacji techniczno-ruchowej
 
-Przed przystąpieniem do procedury legalizacji jednostkowej wytwórca (autor systemu) zobowiązany jest do sporządzenia kompletnej dokumentacji technicznej, która stanowi podstawę do oceny metrologicznej przez właściwy terytorialnie Okręgowy Urząd Miar (OUM). Dokumentacja ta musi spełniać wymagania określone w § 7 Rozporządzenia Ministra Przedsiębiorczości i Technologii w sprawie wymagań metrologicznych dla przyrządów pomiarowych.
+**WAŻNE:** W przypadku legalizacji jednostkowej przeprowadzanej na podstawie deklaracji zgodności przez wytwórcę (bez udziału OUM), dokumentacja techniczna stanowi wewnętrzny obowiązek wytwórcy i musi być przechowywana przez okres 10 lat od daty wprowadzenia przyrządu do obrotu. Dokumentacja ta jest udostępniana organom kontroli (Główny Urząd Miar) wyłącznie na żądanie w ramach post factum nadzoru rynku.
+
+Przed przystąpieniem do procedury legalizacji jednostkowej wytwórca (autor systemu) zobowiązany jest do sporządzenia kompletnej dokumentacji technicznej, która stanowi podstawę do oceny metrologicznej. W przypadku ścieżki z deklaracją zgodności, dokumentacja nie jest przedkładana do OUM, lecz stanowi wewnętrzną dokumentację wytwórcy. Dokumentacja ta musi spełniać wymagania określone w § 7 Rozporządzenia Ministra Przedsiębiorczości i Technologii w sprawie wymagań metrologicznych dla przyrządów pomiarowych.
 
 **Struktura dokumentacji techniczno-ruchowej dla systemu BIOFEEDBACK-TUBE:**
 
@@ -240,11 +249,18 @@ Numer fabryczny: [UNIKALNY NUMER SERIJNY]
     Wynik: Dryft miesięczny <0.2% – WARUNEK SPEŁNIONY
 ```
 
-### 1.5.2.2 Wniosek o legalizację jednostkową – formularz WG-1
+### 1.5.2.2 Wniosek o legalizację jednostkową – formularz WG-1 (opcjonalny)
 
-Formularz **WG-1 "Wniosek o legalizację przyrządu pomiarowego"** stanowi oficjalne pismo inicjujące procedurę legalizacji. Wniosek składa się we właściwym terytorialnie Okręgowym Urzędzie Miar (według siedziby wytwórcy lub miejsca eksploatacji przyrządu).
+**UWAGA PRAWNA:** Formularz **WG-1 "Wniosek o legalizację przyrządu pomiarowego"** jest wymagany wyłącznie w przypadku, gdy wytwórca zdecyduje się na przeprowadzenie legalizacji jednostkowej przez Okręgowy Urząd Miar (ścieżka płatna, z udziałem organu administracji miar). W przypadku legalizacji jednostkowej na podstawie deklaracji zgodności przez wytwórcę (ścieżka zalecana dla urządzeń niebędących wyrobami medycznymi), **wniosek WG-1 nie jest wymagany**, a cały proces ogranicza się do:
 
-**Struktura wniosku WG-1 dla systemu BIOFEEDBACK-TUBE:**
+1. Sporządzenia kompletnej dokumentacji techniczno-ruchowej (przechowywanej wewnętrznie),
+2. Przeprowadzenia badań fabrycznych zgodnie z wymaganiami metrologicznymi,
+3. Wystawienia deklaracji zgodności (wzór w rozdziale 1.5.3),
+4. Oznakowania urządzenia danymi wytwórcy i numerem seryjnym.
+
+Poniżej przedstawiono wzór wniosku WG-1 wyłącznie w celach informacyjnych – dla przypadków, gdyby wytwórca chciał uzyskać świadectwo legalizacji z pieczęcią OUM (np. na życzenie zamawiającego lub w ramach procedur przetargowych).
+
+**Struktura wniosku WG-1 dla systemu BIOFEEDBACK-TUBE (wersja opcjonalna):**
 
 ```
 Miejscowość: Warszawa                                          Data: 2024-11-15
@@ -300,10 +316,14 @@ Do: OKRĘGOWY URZĄD MIAR W WARSZAWIE
 (Podpis wnioskodawcy lub osoby upoważnionej)
 ```
 
-**Opłata skarbowa za legalizację jednostkową:**
+**Opłata skarbowa za legalizację jednostkową (ścieżka OUM – opcjonalna):**
 Zgodnie z Obwieszczeniem Ministra Finansów w sprawie wysokości opłat skarbowych (Dz.U. 2023 poz. 2567), opłata za legalizację jednostkową przyrządu pomiarowego wynosi **828 PLN** (stan na 2024 rok). Opłatę należy uiścić na rachunek bankowy właściwego OUM przed złożeniem wniosku.
 
+**UWAGA:** W przypadku legalizacji na podstawie deklaracji zgodności (ścieżka zalecana), opłata ta nie jest pobierana, gdyż wytwórca przeprowadza badania we własnym zakresie i nie korzysta z usług organu administracji miar.
+
 ### 1.5.2.3 Badania metrologiczne w trakcie legalizacji
+
+**A. Ścieżka z udziałem OUM (opcjonalna):**
 
 Po przyjęciu wniosku i kompletnej dokumentacji, Dyrektor OUM wyznacza zespół metrologów do przeprowadzenia badań legalizacyjnych. Procedura badawcza obejmuje następujące etapy:
 
@@ -390,12 +410,33 @@ $$U = k \cdot u_c = 2 \cdot 0.1225 = 0.245 \, \text{N}$$
 
 **Niepewność rozszerzona na poziomie 0.245 N** odpowiada około **0.05% zakresu pomiarowego (500 N)**, co potwierdza wysoką jakość metrologiczną systemu.
 
-#### Etap 4: Decyzja administracyjna i wystawienie świadectwa legalizacji
+#### Etap 4: Decyzja administracyjna i wystawienie świadectwa legalizacji (ścieżka OUM – opcjonalna)
 
 Po pozytywnym wyniku wszystkich badań, Dyrektor OUM wydaje decyzję administracyjną o legalizacji przyrządu. Przyrząd otrzymuje:
 - **Plombę legalizacyjną** – umieszczoną w miejscu uniemożliwiającym dostęp do elementów kalibracyjnych bez naruszenia plomby;
 - **Nalepkę legalizacyjną** – zawierającą numer świadectwa, datę ważności, pieczęć OUM;
 - **Świadectwo legalizacji** – oficjalny dokument potwierdzający spełnienie wymagań metrologicznych.
+
+**B. Ścieżka z deklaracją zgodności (zalecana):**
+
+W przypadku legalizacji jednostkowej na podstawie deklaracji zgodności, wytwórca przeprowadza badania we własnym zakresie według procedur opisanych w dokumentacji techniczno-ruchowej. Po uzyskaniu pozytywnych wyników:
+
+1. Wytwórca wystawia **deklarację zgodności** (wzór w rozdziale 1.5.3);
+2. Urządzenie jest oznaczane danymi wytwórcy, typem, numerem seryjnym i datą produkcji;
+3. Dokumentacja techniczna wraz z protokołami badań jest archiwizowana przez okres 10 lat;
+4. Brak wymogu plombowania czy naklejek urzędowych – wystarczy trwałe oznaczenie producenta.
+
+**Korzyści ścieżki z deklaracją zgodności:**
+- Natychmiastowa dostępność urządzenia dla użytkownika końcowego;
+- Brak opłat skarbowych (oszczędność 828 PLN na egzemplarz);
+- Pełna elastyczność w zakresie modyfikacji konstrukcyjnych (brak konieczności ponownej legalizacji przy drobnych zmianach);
+- Odpowiedzialność pozostaje po stronie wytwórcy, co zwiększa zaufanie użytkowników końcowych.
+
+**Ryzyka i obowiązki wytwórcy:**
+- Pełna odpowiedzialność cywilnoprawna i karna za ewentualne błędy metrologiczne;
+- Obowiązek udostępnienia dokumentacji organom GUM na żądanie w ramach nadzoru rynku;
+- Konieczność prowadzenia systemu zarządzania jakością (minimum: rejestracja badań, kalibracja wzorców wewnętrznych);
+- Obowiązek wycofania urządzenia z obrotu w przypadku wykrycia wad systemowych (procedura voluntary recall).
 
 **Wzór świadectwa legalizacji:**
 ```
