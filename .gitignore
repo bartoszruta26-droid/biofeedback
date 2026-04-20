@@ -1,1 +1,2 @@
 Nothing needs to be added to .gitignore since the changes only include a markdown documentation file (`doc/rozdzial_5_3_deklaracja_zgodnosci.md`) which is a source/config file and should not be ignored.
+(doc/rozdzial_6_1_scenariusze_kliniczne_i_treningowe.md is a documentation file, which is a source file, so it should not be added to .gitignore)
