@@ -1,34 +1,49 @@
+# Common build artifacts and temporary files
 *.pyc
 __pycache__/
-*.log
-.env
-.vscode/
-node_modules/
-dist/
-build/
-*.tmp
-*.swp
-*.swo
-Thumbs.db
-.DS_Store
-.coverage
-htmlcov/
-.mypy_cache/
-.pytest_cache/
-venv/
-.venv/
-target/
-.gradle/
+*.o
+*.obj
+*.out
 *.exe
 *.dll
 *.so
 *.a
-*.out
-*.class
-*.o
-*.obj
-*.gz
+
+# Dependencies and virtual environments
+node_modules/
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+
+# Build directories
+dist/
+build/
+target/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Logs and cache
+*.log
+.coverage
+coverage/
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Compressed files
 *.zip
+*.gz
 *.tar
 *.tgz
 *.bz2
@@ -49,3 +64,6 @@ target/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
+
+# Gradle-specific
+.gradle/
