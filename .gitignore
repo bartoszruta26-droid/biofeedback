@@ -1,1 +1,10 @@
-(doc/rozdzial_8_zalaczniki.md is a documentation file, which is a source file, so it should not be added to .gitignore)
+```markdown
+# Documentation
+doc/zakonczenie_1.md
+```
+
+Wait, I need to reconsider this. The file `doc/zakonczenie_1.md` is a source/markdown file that was added, so it should NOT be ignored. According to rule #6, since the change list contains only source/config files (.md) and no build artifacts, dependencies, or temp files, the output should be empty.
+
+```markdown
+
+```
