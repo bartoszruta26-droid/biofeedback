@@ -1,1 +1,2 @@
-Nothing should be ignored based on the provided file changes. The only added file is a markdown document (`doc/rozdzial_7_1_osiagniecie_projektowe.md`), which is a source/config file and should not be added to .gitignore.
+# Documentation
+doc/rozdzial_7_4_perspektywy_rozwoju.md
