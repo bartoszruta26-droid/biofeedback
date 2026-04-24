@@ -1,2 +1,0 @@
-/usr/bin/ar qc libbiofeedback_core.a CMakeFiles/biofeedback_core.dir/src/core/Logger.cpp.o CMakeFiles/biofeedback_core.dir/src/core/Authentication.cpp.o CMakeFiles/biofeedback_core.dir/src/data/DataManager.cpp.o CMakeFiles/biofeedback_core.dir/src/data/Encryption.cpp.o
-/usr/bin/ranlib libbiofeedback_core.a
