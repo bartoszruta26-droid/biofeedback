@@ -1,0 +1,1 @@
+/usr/bin/c++  -Wall -Wextra -Wpedantic -O3 -DNDEBUG CMakeFiles/data_manager_regression.dir/tests/data_manager_regression.cpp.o -o data_manager_regression  libbiofeedback_core.a /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so -lpthread 
