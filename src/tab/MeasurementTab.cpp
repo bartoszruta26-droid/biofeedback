@@ -19,6 +19,9 @@
 #include <QJsonArray>
 #include <QScrollArea>
 #include <memory>
+#include <thread>
+#include <iostream>
+#include <chrono>
 
 namespace tab {
 
@@ -1029,10 +1032,12 @@ void MeasurementTab::onTimerTick()
 {
     // Pobieranie danych z prawdziwego Arduino zamiast symulacji
     if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data = m_serialPort->tryReadData(m_lastSensorData);
-        if (data.isValid) {
-            m_lastSensorData = data;
-            readSingleSample(data.calibratedValue);
+        sensor::SensorData data;
+        if (m_serialPort->tryReadData(data)) {
+            if (data.isValid) {
+                m_lastSensorData = data;
+                readSingleSample(data.calibratedValue);
+            }
         }
     }
     // Jeśli Arduino nie jest podłączone, nie wykonujemy symulacji - czekamy na podłączenie
@@ -1546,7 +1551,15 @@ void MeasurementTab::connectToArduinoAsync()
                 for (const auto& port : ports) {
                     std::cout << "[MeasurementTab] Trying port: " << port << std::endl;
                     
-                    if (m_serialPort->connect({port, 115200, 8, 'N', 1.0f, 1000})) {
+                    sensor::SerialConfig config;
+                    config.portName = port;
+                    config.baudRate = 115200;
+                    config.dataBits = 8;
+                    config.parity = 'N';
+                    config.stopBits = 1.0f;
+                    config.timeout = 1000;
+                    
+                    if (m_serialPort->connect(config)) {
                         std::this_thread::sleep_for(std::chrono::milliseconds(1500));
                         
                         auto info = m_serialPort->identifyArduino(2000);

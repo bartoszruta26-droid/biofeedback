@@ -240,6 +240,19 @@ UserData UserData::fromJson(const std::string& jsonText)
     return user;
 }
 
+// ============================================================================
+// Authentication - Implementation
+// ============================================================================
+
+Authentication::Authentication(const std::string& usersFilePath)
+    : usersFilePath(usersFilePath)
+{
+}
+
+Authentication::~Authentication()
+{
+}
+
 bool Authentication::loadUsers()
 {
     currentUser = nullptr;
