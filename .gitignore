@@ -1,10 +1,1 @@
-```
-# Build artifacts
-build/
-CMakeFiles/
-*.cmake
-Makefile
-
-# Logs
-*.log
-```
+Nothing needs to be added to .gitignore since only a source code file (SerialCommunication.cpp) was modified and there are no build artifacts, dependencies, or temporary files in the changes.
