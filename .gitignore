@@ -1,1 +1,49 @@
-(doc/rozdzial_8_literatura.md is a documentation/source file, so no need to add to .gitignore)
+```
+# Build artifacts
+build/
+cmake-build-*/
+
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+*.cmake
+compile_commands.json
+
+# Compiled objects/libraries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Test executables
+*_regression
+test_*
+
+# Temporary and log files
+*.log
+*.tmp
+*.swp
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Data files (if they are temporary build outputs)
+data/
+config/
+resources/
+```
