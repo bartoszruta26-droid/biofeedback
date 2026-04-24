@@ -95,6 +95,14 @@ public:
     bool connect(const SerialConfig& config);
     
     /**
+     * @brief Nawiązuje połączenie z portem o podanej nazwie i prędkości
+     * @param portName Nazwa portu (np. "/dev/ttyUSB0", "COM3")
+     * @param baudRate Prędkość transmisji (domyślnie 115200)
+     * @return true jeśli połączenie nawiązane pomyślnie
+     */
+    bool connect(const std::string& portName, int baudRate = DEFAULT_BAUD_RATE);
+    
+    /**
      * @brief Zamyka połączenie szeregowe
      */
     void disconnect();

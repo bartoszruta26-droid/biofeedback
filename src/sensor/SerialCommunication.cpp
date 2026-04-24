@@ -214,11 +214,11 @@ SensorData SerialCommunication::readData(int timeout) {
         if (rp != std::string::npos) {
             size_t cp = resp.find(",", rp+4);
             if (cp != std::string::npos) data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
-        }
-        size_t tp = resp.find("TS:", cp);
-        if (tp != std::string::npos) {
-            size_t mp = resp.find("ms", tp);
-            if (mp != std::string::npos) data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
+            size_t tp = resp.find("TS:", rp);
+            if (tp != std::string::npos) {
+                size_t mp = resp.find("ms", tp);
+                if (mp != std::string::npos) data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
+            }
         }
         data.isValid = true;
     }

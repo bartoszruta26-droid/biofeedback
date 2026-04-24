@@ -1,1 +1,25 @@
-Nothing needs to be added to .gitignore since only a source code file (SerialCommunication.cpp) was modified and there are no build artifacts, dependencies, or temporary files in the changes.
+```
+# CMake build artifacts
+build/
+cmake_install.cmake
+compile_commands.json
+
+# Executables
+auth_regression
+data_manager_regression
+
+# Libraries
+libbiofeedback_core.a
+
+# Temporary and log files
+CMakeCache.txt
+CMakeFiles/
+Makefile
+CTestTestfile.cmake
+progress.marks
+cmake.check_cache
+
+# Data and config files that might be generated
+config/config.json
+data/outlines/
+```
