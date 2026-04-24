@@ -95,9 +95,9 @@ std::vector<std::string> SerialCommunication::scanAvailablePorts() {
     return ports;
 }
 
-bool SerialCommunication::connect(const SerialConfig& config) { return connect(config.portName, config.baudRate); }
+bool SerialCommunication::connect(const SerialConfig& config) { return openPort(config.portName, config.baudRate); }
 
-bool SerialCommunication::connect(const std::string& portName, int baudRate) {
+bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
     if (m_impl->isConnected) disconnect();
     m_impl->baudRate = baudRate;
 #ifdef _WIN32
@@ -210,10 +210,10 @@ SensorData SerialCommunication::readData(int timeout) {
         if (gp != std::string::npos) data.calibratedValue = std::stod(resp.substr(fp+6, gp-fp-6));
         size_t rp = resp.find("RAW:", gp);
         if (rp != std::string::npos) {
-            size_t cp = resp.find(",", rp+4);
-            if (cp != std::string::npos) data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
+            size_t commaPos = resp.find(",", rp+4);
+            if (commaPos != std::string::npos) data.value = std::stoi(resp.substr(rp+4, commaPos-rp-4));
         }
-        size_t tp = resp.find("TS:", cp);
+        size_t tp = resp.find("TS:", rp);
         if (tp != std::string::npos) {
             size_t mp = resp.find("ms", tp);
             if (mp != std::string::npos) data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
