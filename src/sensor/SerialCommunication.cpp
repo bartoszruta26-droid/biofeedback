@@ -95,9 +95,11 @@ std::vector<std::string> SerialCommunication::scanAvailablePorts() {
     return ports;
 }
 
-bool SerialCommunication::connect(const SerialConfig& config) { return connect(config.portName, config.baudRate); }
+bool SerialCommunication::connect(const SerialConfig& config) { return openPort(config.portName, config.baudRate); }
 
-bool SerialCommunication::connect(const std::string& portName, int baudRate) {
+bool SerialCommunication::connect(const std::string& portName, int baudRate) { return openPort(portName, baudRate); }
+
+bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
     if (m_impl->isConnected) disconnect();
     m_impl->baudRate = baudRate;
 #ifdef _WIN32
