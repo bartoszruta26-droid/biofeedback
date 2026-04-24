@@ -2,48 +2,9 @@
 # Build artifacts
 build/
 CMakeFiles/
-*.o
-*.obj
-*.a
-*.so
-*.dylib
-*.dll
-*.exe
-*.out
+*.cmake
+Makefile
 
-# Dependencies
-.venv/
-venv/
-env/
-node_modules/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-.eggs/
-
-# Logs and temp files
+# Logs
 *.log
-*.tmp
-*.swp
-*.swo
-
-# Environment
-.env
-.env.local
-.env.*
-
-# Editors
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
 ```
