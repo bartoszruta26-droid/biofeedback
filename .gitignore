@@ -1,1 +1,40 @@
+```
+# CMake build artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+CTestTestfile.cmake
+cmake.check_cache
+progress.marks
 
+# Executables and libraries
+*.exe
+*.dll
+*.so
+*.a
+*.lib
+
+# Qt auto-generated files
+*_autogen/
+
+# Object files
+*.o
+*.obj
+*.d
+
+# Temporary and log files
+*.tmp
+*.log
+*.swp
+
+# IDE files
+.vscode/
+.idea/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+```

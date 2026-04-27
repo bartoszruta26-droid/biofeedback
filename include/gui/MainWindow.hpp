@@ -246,6 +246,9 @@ private:
     QAction* m_actionExport;
     QAction* m_actionClear;
     QAction* m_actionAbout;
+
+private:
+    void setupControlPanel();
 };
 
 } // namespace gui
