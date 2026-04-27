@@ -7,6 +7,7 @@
 #include <QFont>
 #include <QRectF>
 #include <cmath>
+#include <QRandomGenerator>
 
 namespace games {
 
@@ -158,8 +159,8 @@ void PongGame::resetBall() {
     m_ballPos.setY(height() / 2.0f);
     
     // Losowy kierunek startu (w lewo lub w prawo)
-    float dirX = (qrand() % 2 == 0) ? 1.0f : -1.0f;
-    float dirY = (qrand() % 2 == 0) ? 0.5f : -0.5f;
+    float dirX = (QRandomGenerator::global()->bounded(2) == 0) ? 1.0f : -1.0f;
+    float dirY = (QRandomGenerator::global()->bounded(2) == 0) ? 0.5f : -0.5f;
     
     // Normalizacja wektora kierunku
     float length = std::sqrt(dirX * dirX + dirY * dirY);
@@ -201,7 +202,7 @@ void PongGame::checkCollisions() {
     // Kolizja piłki z górną i dolną krawędzią
     if (m_ballPos.y() - m_ballRadius <= 0 || m_ballPos.y() + m_ballRadius >= height()) {
         m_ballVel.setY(-m_ballVel.y());
-        m_ballPos.setY(qMax(m_ballRadius, qMin(m_ballPos.y(), static_cast<float>(height() - m_ballRadius))));
+        m_ballPos.setY(qMax(static_cast<qreal>(m_ballRadius), qMin(static_cast<qreal>(m_ballPos.y()), static_cast<qreal>(height() - m_ballRadius))));
     }
     
     // Kolizja z lewą paletką (gracz)
