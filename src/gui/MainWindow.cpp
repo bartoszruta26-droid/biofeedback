@@ -74,6 +74,9 @@ void MainWindow::setupCentralWidget()
     // Add tab widget to main layout
     mainLayout->addWidget(m_tabWidget);
     
+    // Setup control panel with buttons and settings
+    setupControlPanel();
+    
     // Setup game area (hidden by default)
     createGameArea();
     
