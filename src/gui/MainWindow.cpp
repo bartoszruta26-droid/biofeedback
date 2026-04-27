@@ -104,6 +104,93 @@ void MainWindow::setupTabs()
     m_tabWidget->setCurrentIndex(0);
 }
 
+void MainWindow::setupControlPanel()
+{
+    // Create control panel widget
+    QWidget* controlPanel = new QWidget(this);
+    QHBoxLayout* controlLayout = new QHBoxLayout(controlPanel);
+    controlLayout->setSpacing(10);
+    controlLayout->setContentsMargins(10, 10, 10, 10);
+    
+    // Buttons group
+    QGroupBox* buttonGroup = new QGroupBox(tr("Akcje"), this);
+    QVBoxLayout* buttonLayout = new QVBoxLayout(buttonGroup);
+    
+    m_startButton = new QPushButton(tr("▶ Rozpocznij"), this);
+    m_stopButton = new QPushButton(tr("⏹ Zatrzymaj"), this);
+    m_clearButton = new QPushButton(tr("🗑 Wyczyść"), this);
+    m_exportButton = new QPushButton(tr("💾 Eksportuj"), this);
+    m_configButton = new QPushButton(tr("⚙ Konfiguracja"), this);
+    
+    m_stopButton->setEnabled(false);
+    
+    buttonLayout->addWidget(m_startButton);
+    buttonLayout->addWidget(m_stopButton);
+    buttonLayout->addWidget(m_clearButton);
+    buttonLayout->addWidget(m_exportButton);
+    buttonLayout->addWidget(m_configButton);
+    
+    // Settings group
+    QGroupBox* settingsGroup = new QGroupBox(tr("Ustawienia"), this);
+    QVBoxLayout* settingsLayout = new QVBoxLayout(settingsGroup);
+    
+    // Sampling rate
+    QHBoxLayout* samplingLayout = new QHBoxLayout();
+    samplingLayout->addWidget(new QLabel(tr("Częstotliwość:"), this));
+    m_samplingRateSpin = new QSpinBox(this);
+    m_samplingRateSpin->setRange(10, 1000);
+    m_samplingRateSpin->setValue(100);
+    m_samplingRateSpin->setSuffix(tr(" Hz"));
+    samplingLayout->addWidget(m_samplingRateSpin);
+    settingsLayout->addLayout(samplingLayout);
+    
+    // Graph duration
+    QHBoxLayout* durationLayout = new QHBoxLayout();
+    durationLayout->addWidget(new QLabel(tr("Czas wykresu:"), this));
+    m_graphDurationSpin = new QSpinBox(this);
+    m_graphDurationSpin->setRange(10, 300);
+    m_graphDurationSpin->setValue(60);
+    m_graphDurationSpin->setSuffix(tr(" s"));
+    durationLayout->addWidget(m_graphDurationSpin);
+    settingsLayout->addLayout(durationLayout);
+    
+    // Unit selection
+    QHBoxLayout* unitLayout = new QHBoxLayout();
+    unitLayout->addWidget(new QLabel(tr("Jednostka:"), this));
+    m_unitCombo = new QComboBox(this);
+    m_unitCombo->addItem(tr("Niutony (N)"));
+    m_unitCombo->addItem(tr("Kilogramy (kg)"));
+    unitLayout->addWidget(m_unitCombo);
+    settingsLayout->addLayout(unitLayout);
+    
+    // Weight display
+    QHBoxLayout* weightLayout = new QHBoxLayout();
+    m_weightLabel = new QLabel(tr("Waga:"), this);
+    m_weightValue = new QLabel(tr("0.00 N"), this);
+    m_weightValue->setStyleSheet("font-size: 16px; font-weight: bold; color: blue;");
+    m_weightValue->setMinimumWidth(100);
+    weightLayout->addWidget(m_weightLabel);
+    weightLayout->addWidget(m_weightValue);
+    weightLayout->addStretch();
+    settingsLayout->addLayout(weightLayout);
+    
+    // Status label
+    m_statusLabel = new QLabel(tr("Status: Rozłączono"), this);
+    m_statusLabel->setStyleSheet("color: orange; font-weight: bold;");
+    settingsLayout->addWidget(m_statusLabel);
+    
+    // Add groups to main layout
+    controlLayout->addWidget(buttonGroup);
+    controlLayout->addWidget(settingsGroup);
+    controlLayout->addStretch();
+    
+    // Add control panel to main layout
+    QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout());
+    if (mainLayout) {
+        mainLayout->addWidget(controlPanel);
+    }
+}
+
 void MainWindow::createGameArea()
 {
     m_gameStack = new QStackedWidget(this);
