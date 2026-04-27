@@ -519,7 +519,7 @@ void MarioGame::setupSensorListening()
     
     m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
         QMetaObject::invokeMethod(this, [this, data]() {
-            handleSensorInput(data.force);
+            handleSensorInput(data.calibratedValue);
         }, Qt::QueuedConnection);
     });
     

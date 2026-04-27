@@ -214,8 +214,8 @@ void FlappyBirdGame::spawnObstacle() {
     float minGapY = m_minGapHeight / 2.0f;
     float maxGapY = availableHeight - m_minGapHeight / 2.0f;
     
-    obs.gapY = minGapY + QRandomGenerator::global()->generateReal() * (maxGapY - minGapY);
-    obs.gapHeight = m_minGapHeight + QRandomGenerator::global()->generateReal() * (m_maxGapHeight - m_minGapHeight);
+    obs.gapY = minGapY + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (maxGapY - minGapY);
+    obs.gapHeight = m_minGapHeight + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (m_maxGapHeight - m_minGapHeight);
     
     m_obstacles.push_back(obs);
 }
@@ -366,7 +366,7 @@ void FlappyBirdGame::render(QPainter &painter) {
     
     // 4. Ptak
     painter.setBrush(QBrush(Qt::yellow));
-    painter.setPen(QPen(Qt::orange, 2));
+    painter.setPen(QPen(QColorConstants::Svg::orange, 2));
     painter.drawEllipse(m_birdPos, m_birdRadius, m_birdRadius);
     
     // Oczy ptaka
@@ -382,7 +382,8 @@ void FlappyBirdGame::render(QPainter &painter) {
     // 5. Wynik
     painter.setPen(QPen(Qt::white, 2));
     painter.setFont(QFont("Arial", 36, QFont::Bold));
-    painter.drawText(w / 2, 50, Qt::AlignCenter, QString::number(m_score));
+    QRectF textRect(0, 0, w, 100);
+    painter.drawText(textRect, Qt::AlignCenter, QString::number(m_score));
     
     // 6. Informacje
     painter.setFont(QFont("Arial", 12));
