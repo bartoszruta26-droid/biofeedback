@@ -1,11 +1,12 @@
 #include "games/SinGame.hpp"
 #include <QPainter>
 #include <QPaintEvent>
-#include <QMath>
 #include <QDebug>
 #include <QPen>
 #include <QBrush>
 #include <QFont>
+#include <cmath>
+#include <QPainterPath>
 
 namespace games {
 
@@ -135,10 +136,12 @@ void SinGame::normalizeForceValue(double rawValue) {
     m_currentForce = qBound(0.0, normalizedForce, 1.0);
 }
 
-void SinGame::handleInput(double value) {
+bool SinGame::handleInput(double value) {
     // Ta metoda jest wywoływana przez GameEngine::handleSensorInput
     // Wartość jest już przekazana przez callback seriala, ale obsługujemy też ręczne wejście
     normalizeForceValue(value);
+    
+    return true;
 }
 
 void SinGame::calculateTargetY(double x) {
@@ -279,7 +282,7 @@ QColor SinGame::getDifficultyColor() const {
         case 1: return Qt::green;
         case 2: return Qt::cyan;
         case 3: return Qt::yellow;
-        case 4: return Qt::orange;
+        case 4: return QColorConstants::Svg::orange;
         default: return Qt::red;
     }
 }

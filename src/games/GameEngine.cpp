@@ -139,7 +139,7 @@ void GameEngine::reset()
     m_sensorValue = 0.0;
     
     // Wymuszenie odświeżenia widoku
-    update();
+    QWidget::update();
 }
 
 void GameEngine::gameLoop()
@@ -162,7 +162,7 @@ void GameEngine::gameLoop()
     update(deltaTime);
     
     // Odświeżenie widoku (wywoła paintEvent)
-    update();
+    QWidget::update();
 }
 
 void GameEngine::handleSensorInput(double value)
@@ -221,7 +221,7 @@ void GameEngine::resizeEvent(QResizeEvent* event)
     
     // Odświeżenie widoku po zmianie rozmiaru
     if (m_isRunning) {
-        update();
+        QWidget::update();
     }
 }
 
