@@ -439,4 +439,9 @@ std::string Authentication::getCurrentUserRole() const
     return "";
 }
 
+void Authentication::setEncryptionKey(const std::string& key)
+{
+    encryptionKey = key;
+}
+
 } // namespace biofeedback

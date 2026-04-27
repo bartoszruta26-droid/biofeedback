@@ -117,13 +117,13 @@ signals:
      * @brief Pobiera aktualnie załadowanego pacjenta PESEL
      * @return PESEL aktualnego pacjenta lub pusty jeśli brak
      */
-    QString getCurrentPatientPesel() const;
+    QString getCurrentPatientPesel() const { return m_currentPatientPesel; }
     
     /**
      * @brief Pobiera ścieżkę do danych aktualnego pacjenta
      * @return Ścieżka do katalogu z danymi pacjenta
      */
-    QString getCurrentPatientDataPath() const;
+    QString getCurrentPatientDataPath() const { return m_currentPatientDataPath; }
 
 public slots:
     /**
