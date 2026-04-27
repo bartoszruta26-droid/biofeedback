@@ -1,56 +1,69 @@
 ```
-# CMake build artifacts
-build/
-cmake-build-*/
-
-# Compiled objects and binaries
+# Compiled files
 *.o
 *.obj
-*.a
-*.so
-*.dll
 *.exe
-*.bin
+*.dll
+*.so
+*.a
 *.out
 
-# CMake specific files
-CMakeCache.txt
-CMakeFiles/
-CMakeOutput.log
-CMakeError.log
-compile_commands.json
+# Build artifacts
+build/
+dist/
+target/
 
-# Test executables
-*_regression
-auth_regression
-data_manager_regression
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.gradle/
 
-# Temporary and log files
-*.log
-*.tmp
-*.swp
-
-# IDE files
+# Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# Environment files
+# System files
+.DS_Store
+Thumbs.db
 .env
 .env.local
 *.env.*
 
-# Python cache
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Logs
+*.log
 
-# Distribution artifacts
-dist/
-target/
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```
