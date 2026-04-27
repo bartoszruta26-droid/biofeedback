@@ -1,1 +1,56 @@
+```
+# CMake build artifacts
+build/
+cmake-build-*/
 
+# Compiled objects and binaries
+*.o
+*.obj
+*.a
+*.so
+*.dll
+*.exe
+*.bin
+*.out
+
+# CMake specific files
+CMakeCache.txt
+CMakeFiles/
+CMakeOutput.log
+CMakeError.log
+compile_commands.json
+
+# Test executables
+*_regression
+auth_regression
+data_manager_regression
+
+# Temporary and log files
+*.log
+*.tmp
+*.swp
+
+# IDE files
+.vscode/
+.idea/
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution artifacts
+dist/
+target/
+```

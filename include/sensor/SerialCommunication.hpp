@@ -9,6 +9,9 @@
 #include <memory>
 #include <map>
 
+// Default baud rate for serial communication
+#define DEFAULT_BAUD_RATE 115200
+
 namespace sensor {
 
 /**
