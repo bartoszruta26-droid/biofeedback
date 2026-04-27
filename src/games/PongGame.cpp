@@ -1,12 +1,12 @@
 #include "games/PongGame.hpp"
 #include <QPainter>
 #include <QPaintEvent>
-#include <QMath>
 #include <QDebug>
 #include <QPen>
 #include <QBrush>
 #include <QFont>
 #include <QRectF>
+#include <cmath>
 
 namespace games {
 
@@ -337,7 +337,7 @@ QColor PongGame::getDifficultyColor() const {
         case 1: return Qt::green;
         case 2: return Qt::cyan;
         case 3: return Qt::yellow;
-        case 4: return Qt::orange;
+        case 4: return QColorConstants::Svg::orange;
         default: return Qt::red;
     }
 }
