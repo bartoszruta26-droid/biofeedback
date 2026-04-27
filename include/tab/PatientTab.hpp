@@ -112,7 +112,8 @@ signals:
      * @param patientDataPath Ścieżka do danych pacjenta
      */
     void currentPatientChanged(const QString& pesel, const QString& patientDataPath);
-    
+
+public:
     /**
      * @brief Pobiera aktualnie załadowanego pacjenta PESEL
      * @return PESEL aktualnego pacjenta lub pusty jeśli brak
