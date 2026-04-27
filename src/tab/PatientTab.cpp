@@ -581,14 +581,4 @@ void PatientTab::onTableRowDoubleClicked(int row, int column)
     }
 }
 
-QString PatientTab::getCurrentPatientPesel() const
-{
-    return m_currentPatientPesel;
-}
-
-QString PatientTab::getCurrentPatientDataPath() const
-{
-    return m_currentPatientDataPath;
-}
-
 } // namespace tab
