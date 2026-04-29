@@ -730,7 +730,7 @@ void OutlineTab::onSessionTimerTick()
     }
     
     // Aktualizuj czas sesji (można dodać wyświetlanie czasu)
-    qint64 elapsed = (QDateTime::currentMSecsSinceEpoch() - m_sessionStartTime) / 1000;
+    // qint64 elapsed = (QDateTime::currentMSecsSinceEpoch() - m_sessionStartTime) / 1000;
     // Można dodać label do wyświetlania czasu
 }
 
