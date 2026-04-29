@@ -19,10 +19,20 @@
 #include <QUuid>
 #include <QHeaderView>
 #include <memory>
+#include <QComboBox>
 
 #include "sensor/SerialCommunication.hpp"
 
 namespace tab {
+
+/**
+ * @brief Jednostki wyświetlania siły
+ */
+enum class ForceUnit {
+    Newtons,      // Siła w Newtonach [N]
+    Kilograms,    // Siła w kilogramach-siły [kgf] (1 kgf ≈ 9.81 N)
+    Raw           // Wartość surowa z czujnika (ADC counts)
+};
 
 /**
  * @brief Widget do wizualizacji trendów długoterminowych
@@ -58,6 +68,7 @@ public:
     void clearData();
     void setTargetForce(double force);
     void setMaxTimeWindow(double seconds);
+    void setUnit(ForceUnit unit);
     
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -68,6 +79,8 @@ private:
     double m_targetForce;
     double m_maxTimeWindow;
     double m_maxForce;
+    ForceUnit m_unit;
+    QString getUnitLabel() const;
 };
 
 /**
@@ -297,6 +310,12 @@ private:
     // Metody SerialCommunication
     void connectToArduinoAsync();
     
+    // Konwersja jednostek
+    double convertForce(double newtons, ForceUnit targetUnit) const;
+    ForceUnit getCurrentUnit() const { return m_currentUnit; }
+    void setCurrentUnit(ForceUnit unit);
+    void updateUnitDisplay();
+    
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
     
@@ -310,6 +329,9 @@ private:
     QPushButton* m_btnLoadJSON;       // Otwieranie pojedynczego pomiaru JSON
     QPushButton* m_btnToggleRaw;      // Przełącznik trybu Raw/Calibrated
     QPushButton* m_btnReset;
+    
+    // Wybór jednostki siły
+    QComboBox* m_unitSelector;
     
     // Panel żywy z wykresem
     QGroupBox* m_liveBox;
@@ -351,6 +373,9 @@ private:
     
     // Tryb wyświetlania: raw value vs calibrated
     bool m_showRawValues;
+    
+    // Aktualna jednostka wyświetlania
+    ForceUnit m_currentUnit;
     
     // Detekcja powtórzeń
     bool m_inContraction;

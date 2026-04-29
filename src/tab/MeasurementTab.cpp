@@ -166,9 +166,25 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     , m_targetForce(50.0)
     , m_maxTimeWindow(10.0)
     , m_maxForce(100.0)
+    , m_unit(ForceUnit::Newtons)
 {
     setMinimumHeight(200);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+}
+
+void ForcePlotWidget::setUnit(ForceUnit unit)
+{
+    m_unit = unit;
+    update();
+}
+
+QString ForcePlotWidget::getUnitLabel() const
+{
+    switch (m_unit) {
+        case ForceUnit::Kilograms: return "kg";
+        case ForceUnit::Raw: return "ADC";
+        default: return "N";
+    }
 }
 
 void ForcePlotWidget::addSample(double force, double time)
@@ -318,7 +334,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     // Etykiety osi X
     painter.setPen(Qt::black);
     painter.drawText(margin + plotWidth / 2 - 20, height - 15, "Czas [s]");
-    painter.drawText(5, margin - 5, "Siła [N]");
+    painter.drawText(5, margin - 5, QString("Siła [%1]").arg(getUnitLabel()));
 }
 
 // ============================================================================
@@ -360,6 +376,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
     , m_showRawValues(false)  // Domyślnie pokazujemy wartości skalibrowane
+    , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
+    , m_unitSelector(nullptr)
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
     , m_trendsContent(nullptr)
@@ -459,6 +477,20 @@ void MeasurementTab::setupUI()
     m_btnReset = new QPushButton("RESET SESJI", this);
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
+    // Wybór jednostki siły
+    m_unitSelector = new QComboBox(this);
+    m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
+    m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
+    m_unitSelector->addItem("Wartość surowa (ADC)", static_cast<int>(ForceUnit::Raw));
+    m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
+    m_unitSelector->setMinimumHeight(35);
+    m_unitSelector->setFont(QFont("Arial", 10));
+    connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
+            this, [this](int index) {
+        int unitValue = m_unitSelector->itemData(index).toInt();
+        setCurrentUnit(static_cast<ForceUnit>(unitValue));
+    });
+    
     m_chkShowTrends = new QCheckBox("POKAŻ TRENDY DŁUGOTERMINOWE", this);
     m_chkShowTrends->setFont(QFont("Arial", 10, QFont::Bold));
     connect(m_chkShowTrends, &QCheckBox::toggled, this, &MeasurementTab::onShowTrends);
@@ -470,6 +502,7 @@ void MeasurementTab::setupUI()
     m_controlLayout->addWidget(m_btnSaveJSON);
     m_controlLayout->addWidget(m_btnLoadJSON);
     m_controlLayout->addWidget(m_btnToggleRaw);
+    m_controlLayout->addWidget(m_unitSelector);
     m_controlLayout->addWidget(m_chkShowTrends);
     m_controlLayout->addWidget(m_btnReset);
     
