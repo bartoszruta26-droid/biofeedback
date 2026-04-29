@@ -14,6 +14,7 @@
 #include <mutex>
 #include <atomic>
 #include <climits>
+#include <cstdio>
 
 #define DEFAULT_BAUD_RATE 115200
 #define WATCHDOG_DEFAULT_TIMEOUT_MS 5000
@@ -205,23 +206,121 @@ ArduinoInfo SerialCommunication::getArduinoInfo() const { return m_impl->arduino
 SensorData SerialCommunication::readData(int timeout) {
     SensorData data;
     if (!m_impl->isConnected) return data;
-    std::string resp = sendCommand("DATA", true);
-    size_t fp = resp.find("FORCE:");
-    if (fp != std::string::npos) {
-        size_t gp = resp.find("g,", fp);
-        if (gp != std::string::npos) data.calibratedValue = std::stod(resp.substr(fp+6, gp-fp-6));
-        size_t rp = resp.find("RAW:", gp);
-        if (rp != std::string::npos) {
-            size_t cp = resp.find(",", rp+4);
-            if (cp != std::string::npos) data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
-            size_t tp = resp.find("TS:", rp);
-            if (tp != std::string::npos) {
-                size_t mp = resp.find("ms", tp);
-                if (mp != std::string::npos) data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
+    
+    std::lock_guard<std::mutex> lock(m_impl->readMutex);
+    
+    // Send DATA command
+    std::string toSend = "DATA\n";
+#ifdef _WIN32
+    DWORD w; WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), toSend.c_str(), toSend.size(), &w, nullptr);
+#else
+    write(m_impl->portHandle, toSend.c_str(), toSend.size());
+#endif
+    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    
+    // Read response - look for binary packet followed by text
+    char buf[256];
+    std::vector<uint8_t> rawData;
+    auto start = std::chrono::steady_clock::now();
+    bool gotBinaryData = false;
+    
+    while (std::chrono::duration_cast<std::chrono::milliseconds>(
+           std::chrono::steady_clock::now() - start).count() < 2000) {
+        int rd = 0;
+#ifdef _WIN32
+        DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
+#else
+        rd = read(m_impl->portHandle, buf, 255);
+#endif
+        if (rd > 0) {
+            for (int i = 0; i < rd; ++i) {
+                rawData.push_back(static_cast<uint8_t>(buf[i]));
+                
+                // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
+                // followed by end markers 0xAA 0x55
+                if (rawData.size() >= 11) {
+                    // Look for end marker pattern
+                    if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
+                        // Extract binary packet (9 bytes before end markers)
+                        if (rawData.size() >= 11) {
+                            size_t packetStart = rawData.size() - 11;
+                            uint8_t* packet = &rawData[packetStart];
+                            
+                            // Parse binary packet: timestamp(4) + value(4) + crc(1)
+                            uint32_t timestamp;
+                            int32_t value;
+                            uint8_t crc;
+                            
+                            std::memcpy(&timestamp, packet, 4);
+                            std::memcpy(&value, packet + 4, 4);
+                            crc = packet[8];
+                            
+                            // Verify CRC
+                            if (verifyCRC8(packet, 9)) {
+                                data.timestamp = timestamp;
+                                data.value = value;
+                                data.crc = crc;
+                                data.isValid = true;
+                                gotBinaryData = true;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Also check for text response as fallback
+            std::string resp(rawData.begin(), rawData.end());
+            if (!gotBinaryData && resp.find("FORCE:") != std::string::npos) {
+                size_t fp = resp.find("FORCE:");
+                size_t gp = resp.find("g,", fp);
+                if (gp != std::string::npos) {
+                    try {
+                        data.calibratedValue = std::stod(resp.substr(fp+6, gp-fp-6));
+                    } catch (...) {}
+                }
+                size_t rp = resp.find("RAW:", gp);
+                if (rp != std::string::npos) {
+                    size_t cp = resp.find(",", rp+4);
+                    if (cp != std::string::npos) {
+                        try {
+                            data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
+                        } catch (...) {}
+                    }
+                    size_t tp = resp.find("TS:", rp);
+                    if (tp != std::string::npos) {
+                        size_t mp = resp.find("ms", tp);
+                        if (mp != std::string::npos) {
+                            try {
+                                data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
+                            } catch (...) {}
+                        }
+                    }
+                }
+                data.isValid = true;
+                break;
+            }
+            
+            if (resp.find("[DATA_SENT]") != std::string::npos && gotBinaryData) {
+                break;
             }
         }
-        data.isValid = true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
+    
+    if (m_impl->verbose && data.isValid) {
+        std::cout << "[SerialComm] Data: TS=" << data.timestamp 
+                  << ", Value=" << data.value 
+                  << ", Calibrated=" << data.calibratedValue
+                  << ", CRC=" << (int)data.crc << std::endl;
+    } else if (m_impl->verbose && !data.isValid) {
+        std::cout << "[SerialComm] Failed to parse data. Raw bytes: ";
+        for (size_t i = 0; i < std::min(rawData.size(), size_t(20)); ++i) {
+            printf("%02X ", rawData[i]);
+        }
+        std::cout << std::endl;
+    }
+    
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     return data;
 }
