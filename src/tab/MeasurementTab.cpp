@@ -343,6 +343,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
+    , m_showRawValues(false)  // Domyślnie pokazujemy wartości skalibrowane
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
     , m_trendsContent(nullptr)
@@ -423,6 +424,21 @@ void MeasurementTab::setupUI()
     m_btnLoadJSON = new QPushButton("OTWÓRZ POMIAR JSON", this);
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
+    // Przełącznik trybu Raw/Calibrated
+    QPushButton* m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI SKALIBROWANE", this);
+    m_btnToggleRaw->setCheckable(true);
+    connect(m_btnToggleRaw, &QPushButton::toggled, this, [this, m_btnToggleRaw](bool checked) {
+        m_showRawValues = checked;
+        if (checked) {
+            m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
+            m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+        } else {
+            m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
+            m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+        }
+    });
+    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+    
     m_btnReset = new QPushButton("RESET SESJI", this);
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
@@ -436,6 +452,7 @@ void MeasurementTab::setupUI()
     m_controlLayout->addWidget(m_btnLoad);
     m_controlLayout->addWidget(m_btnSaveJSON);
     m_controlLayout->addWidget(m_btnLoadJSON);
+    m_controlLayout->addWidget(m_btnToggleRaw);
     m_controlLayout->addWidget(m_chkShowTrends);
     m_controlLayout->addWidget(m_btnReset);
     
@@ -1013,7 +1030,9 @@ void MeasurementTab::onReadSingleSample()
     if (m_serialPort && m_serialPort->isConnected()) {
         sensor::SensorData data = m_serialPort->readData(500);
         if (data.isValid) {
-            readSingleSample(data.calibratedValue);
+            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
+            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
+            readSingleSample(valueToUse);
             m_lastSensorData = data;
         } else {
             // Jeśli dane nie są poprawne, wyświetl komunikat
@@ -1036,7 +1055,9 @@ void MeasurementTab::onTimerTick()
         if (m_serialPort->tryReadData(data)) {
             if (data.isValid) {
                 m_lastSensorData = data;
-                readSingleSample(data.calibratedValue);
+                // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
+                double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
+                readSingleSample(valueToUse);
             }
         }
     }
@@ -1526,7 +1547,9 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     if (data.isValid) {
         m_lastSensorData = data;
         if (m_isMeasuring) {
-            readSingleSample(data.calibratedValue);
+            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
+            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
+            readSingleSample(valueToUse);
         }
     }
 }

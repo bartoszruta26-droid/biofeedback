@@ -174,7 +174,8 @@ void GraphWidget::calculateAutoScale()
     m_yMin = minVal - range * 0.1;
     m_yMax = maxVal + range * 0.1;
     
-    if (m_yMin < 0) m_yMin = 0;  // Nie pokazuj ujemnych wartości dla siły
+    // Dla wartości raw (bardzo dużych) lub ujemnych - nie ograniczaj do zera
+    // Pozwól na wyświetlanie wartości ujemnych dla tensometrów
 }
 
 void GraphWidget::paintEvent(QPaintEvent *event)
