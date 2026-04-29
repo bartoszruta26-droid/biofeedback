@@ -246,9 +246,15 @@ private:
     QAction* m_actionExport;
     QAction* m_actionClear;
     QAction* m_actionAbout;
+    QAction* m_actionStart;
+    QAction* m_actionStop;
+    
+    // Widgety ustawień (ukryte, dostępne przez menu)
+    QWidget* m_settingsWidget;
 
 private:
     void setupControlPanel();
+    void showSettingsDialog();
 };
 
 } // namespace gui
