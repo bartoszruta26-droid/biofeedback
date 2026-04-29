@@ -1,4 +1,5 @@
 #include "gui/MainWindow.hpp"
+#include "gui/GraphWidget.hpp"
 #include "tab/PatientTab.hpp"
 #include "tab/MeasurementTab.hpp"
 #include "tab/OutlineTab.hpp"
@@ -68,8 +69,18 @@ void MainWindow::setupCentralWidget()
     mainLayout->setSpacing(0);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     
+    // Create GraphWidget first - it must exist before loadSettings() is called
+    m_graphWidget = new GraphWidget(this);
+    m_graphWidget->setTitle(tr("Wykres Siły w Czasie Rzeczywistym"));
+    m_graphWidget->setYLabel(tr("Siła [N]"));
+    m_graphWidget->setUnit(tr("N"));
+    m_graphWidget->setMinimumHeight(300);
+    
     // Setup tabs
     setupTabs();
+    
+    // Add graph widget to main layout
+    mainLayout->addWidget(m_graphWidget);
     
     // Add tab widget to main layout
     mainLayout->addWidget(m_tabWidget);
@@ -298,7 +309,11 @@ void MainWindow::loadSettings()
     
     m_samplingRateSpin->setValue(samplingRate);
     m_graphDurationSpin->setValue(graphDuration);
-    m_graphWidget->setTimeRange(graphDuration);
+    
+    // Protect against null pointer - GraphWidget should be initialized by now
+    if (m_graphWidget) {
+        m_graphWidget->setTimeRange(graphDuration);
+    }
 }
 
 void MainWindow::saveSettings()
@@ -352,11 +367,18 @@ void MainWindow::stopDataCollection()
 
 void MainWindow::clearGraph()
 {
-    m_graphWidget->clear();
+    if (m_graphWidget) {
+        m_graphWidget->clear();
+    }
 }
 
 void MainWindow::exportData()
 {
+    if (!m_graphWidget) {
+        QMessageBox::warning(this, tr("Błąd"), tr("Wykres nie jest zainicjalizowany."));
+        return;
+    }
+    
     QString filename = QFileDialog::getSaveFileName(
         this,
         tr("Eksportuj dane do CSV"),
@@ -436,7 +458,9 @@ void MainWindow::onSamplingRateChanged(int rate)
 
 void MainWindow::onGraphDurationChanged(int seconds)
 {
-    m_graphWidget->setTimeRange(seconds);
+    if (m_graphWidget) {
+        m_graphWidget->setTimeRange(seconds);
+    }
     emit graphDurationChanged(seconds);
 }
 
