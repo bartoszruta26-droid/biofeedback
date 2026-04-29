@@ -316,6 +316,10 @@ private:
     void setCurrentUnit(ForceUnit unit);
     void updateUnitDisplay();
     
+    // Komponenty UI - pomocnicze
+    void updateStatsTableUnits();
+    void updateRawTableUnits();
+    
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
     

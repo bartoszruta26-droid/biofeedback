@@ -797,8 +797,33 @@ void MeasurementTab::readSingleSample(double forceValue)
 
 void MeasurementTab::updateLiveDisplay(double force)
 {
-    m_lblCurrentForce->setText(QString("Aktualna siła: %1 N").arg(force, 0, 'f', 1));
-    m_forceBar->setValue(static_cast<int>(force));
+    // Wyświetl siłę w aktualnie wybranej jednostce
+    double displayForce = force;
+    QString unitLabel = "N";
+    
+    if (!m_showRawValues) {
+        switch (m_currentUnit) {
+            case ForceUnit::Kilograms:
+                displayForce = force * 1000.0 / 9.81;  // N -> kg
+                unitLabel = "kg";
+                break;
+            case ForceUnit::Raw:
+                // Nie powinno się zdarzyć, bo raw jest obsługiwane osobno
+                displayForce = force;
+                unitLabel = "ADC";
+                break;
+            case ForceUnit::Newtons:
+            default:
+                displayForce = force;
+                unitLabel = "N";
+                break;
+        }
+    } else {
+        unitLabel = "ADC";
+    }
+    
+    m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
+    m_forceBar->setValue(static_cast<int>(displayForce));
     m_forcePlot->addSample(force, m_timeBuffer.last());
 }
 
@@ -1617,6 +1642,20 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         if (m_isMeasuring) {
             // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
             double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
+            
+            // Jeśli nie używamy wartości surowej, przelicz na wybraną jednostkę
+            if (!m_showRawValues && m_currentUnit != ForceUnit::Newtons) {
+                // calibratedValue jest w gramach, przelicz na Newtony najpierw
+                double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
+                valueToUse = convertForce(forceInNewtons, m_currentUnit);
+            } else if (m_showRawValues) {
+                // Wartość surowa - nie przeliczaj
+                valueToUse = static_cast<double>(data.value);
+            } else {
+                // calibratedValue jest w gramach, przelicz na Newtony
+                valueToUse = data.calibratedValue * 9.81 / 1000.0;
+            }
+            
             readSingleSample(valueToUse);
         }
     }
@@ -1687,6 +1726,131 @@ void MeasurementTab::connectToArduinoAsync()
             }
         }
     }).detach();
+}
+
+// ============================================================================
+// MeasurementTab - Konwersja jednostek i aktualizacja wyświetlania
+// ============================================================================
+
+double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
+{
+    switch (targetUnit) {
+        case ForceUnit::Kilograms:
+            // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
+            return newtons * 1000.0 / 9.81;  // zwraca w kg
+        case ForceUnit::Raw:
+            // Wartość surowa nie jest konwertowana z Newtonów
+            return newtons;
+        case ForceUnit::Newtons:
+        default:
+            return newtons;
+    }
+}
+
+void MeasurementTab::setCurrentUnit(ForceUnit unit)
+{
+    m_currentUnit = unit;
+    
+    // Aktualizuj wykres siły
+    if (m_forcePlot) {
+        m_forcePlot->setUnit(unit);
+    }
+    
+    // Aktualizuj etykiety w tabelach
+    updateUnitDisplay();
+    updateStatsTableUnits();
+    updateRawTableUnits();
+    
+    std::cout << "[MeasurementTab] Changed force unit to: " 
+              << (unit == ForceUnit::Newtons ? "Newtons" : 
+                  unit == ForceUnit::Kilograms ? "Kilograms" : "Raw") 
+              << std::endl;
+}
+
+void MeasurementTab::updateUnitDisplay()
+{
+    QString unitLabel;
+    switch (m_currentUnit) {
+        case ForceUnit::Kilograms:
+            unitLabel = "kg";
+            break;
+        case ForceUnit::Raw:
+            unitLabel = "ADC";
+            break;
+        case ForceUnit::Newtons:
+        default:
+            unitLabel = "N";
+            break;
+    }
+    
+    // Aktualizuj etykietę aktualnej siły z nową jednostką
+    if (m_lblCurrentForce && !m_rawForceBuffer.isEmpty()) {
+        double currentForce = m_rawForceBuffer.last();
+        double displayForce = currentForce;
+        
+        if (!m_showRawValues && m_currentUnit == ForceUnit::Kilograms) {
+            displayForce = currentForce * 1000.0 / 9.81;
+        }
+        
+        m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
+    }
+}
+
+void MeasurementTab::updateStatsTableUnits()
+{
+    if (!m_statsTable) return;
+    
+    QString unitLabel;
+    switch (m_currentUnit) {
+        case ForceUnit::Kilograms:
+            unitLabel = "kg";
+            break;
+        case ForceUnit::Raw:
+            unitLabel = "ADC";
+            break;
+        case ForceUnit::Newtons:
+        default:
+            unitLabel = "N";
+            break;
+    }
+    
+    // Aktualizuj nagłówki kolumn z siłą
+    if (m_statsTable->columnCount() > 0) {
+        // Przykładowa aktualizacja - można dostosować do rzeczywistych nagłówków
+        for (int col = 0; col < m_statsTable->columnCount(); ++col) {
+            QString header = m_statsTable->horizontalHeaderItem(col)->text();
+            if (header.contains("[N]")) {
+                header.replace("[N]", "[" + unitLabel + "]");
+                m_statsTable->horizontalHeaderItem(col)->setText(header);
+            } else if (header.contains("Siła") && !header.contains("[")) {
+                m_statsTable->horizontalHeaderItem(col)->setText(header + " [" + unitLabel + "]");
+            }
+        }
+    }
+}
+
+void MeasurementTab::updateRawTableUnits()
+{
+    if (!m_rawTable) return;
+    
+    QString unitLabel;
+    switch (m_currentUnit) {
+        case ForceUnit::Kilograms:
+            unitLabel = "kg";
+            break;
+        case ForceUnit::Raw:
+            unitLabel = "ADC";
+            break;
+        case ForceUnit::Newtons:
+        default:
+            unitLabel = "N";
+            break;
+    }
+    
+    // Aktualizuj nagłówek kolumny siły
+    if (m_rawTable->columnCount() > 1) {
+        m_rawTable->setHorizontalHeaderItem(1, new QTableWidgetItem("Siła [" + unitLabel + "]"));
+    }
 }
 
 } // namespace tab
