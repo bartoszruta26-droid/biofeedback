@@ -117,89 +117,88 @@ void MainWindow::setupTabs()
 
 void MainWindow::setupControlPanel()
 {
-    // Create control panel widget
-    QWidget* controlPanel = new QWidget(this);
-    QHBoxLayout* controlLayout = new QHBoxLayout(controlPanel);
-    controlLayout->setSpacing(10);
-    controlLayout->setContentsMargins(10, 10, 10, 10);
+    // Create minimal control panel without "Akcje" and "Ustawienia" groups
+    // These are now accessible through menu bars (Widok and Narzędzia)
     
-    // Buttons group
-    QGroupBox* buttonGroup = new QGroupBox(tr("Akcje"), this);
-    QVBoxLayout* buttonLayout = new QVBoxLayout(buttonGroup);
-    
-    m_startButton = new QPushButton(tr("▶ Rozpocznij"), this);
-    m_stopButton = new QPushButton(tr("⏹ Zatrzymaj"), this);
-    m_clearButton = new QPushButton(tr("🗑 Wyczyść"), this);
-    m_exportButton = new QPushButton(tr("💾 Eksportuj"), this);
-    m_configButton = new QPushButton(tr("⚙ Konfiguracja"), this);
-    
-    m_stopButton->setEnabled(false);
-    
-    buttonLayout->addWidget(m_startButton);
-    buttonLayout->addWidget(m_stopButton);
-    buttonLayout->addWidget(m_clearButton);
-    buttonLayout->addWidget(m_exportButton);
-    buttonLayout->addWidget(m_configButton);
-    
-    // Settings group
-    QGroupBox* settingsGroup = new QGroupBox(tr("Ustawienia"), this);
-    QVBoxLayout* settingsLayout = new QVBoxLayout(settingsGroup);
-    
-    // Sampling rate
-    QHBoxLayout* samplingLayout = new QHBoxLayout();
-    samplingLayout->addWidget(new QLabel(tr("Częstotliwość:"), this));
-    m_samplingRateSpin = new QSpinBox(this);
-    m_samplingRateSpin->setRange(10, 1000);
-    m_samplingRateSpin->setValue(100);
-    m_samplingRateSpin->setSuffix(tr(" Hz"));
-    samplingLayout->addWidget(m_samplingRateSpin);
-    settingsLayout->addLayout(samplingLayout);
-    
-    // Graph duration
-    QHBoxLayout* durationLayout = new QHBoxLayout();
-    durationLayout->addWidget(new QLabel(tr("Czas wykresu:"), this));
-    m_graphDurationSpin = new QSpinBox(this);
-    m_graphDurationSpin->setRange(10, 300);
-    m_graphDurationSpin->setValue(60);
-    m_graphDurationSpin->setSuffix(tr(" s"));
-    durationLayout->addWidget(m_graphDurationSpin);
-    settingsLayout->addLayout(durationLayout);
-    
-    // Unit selection
-    QHBoxLayout* unitLayout = new QHBoxLayout();
-    unitLayout->addWidget(new QLabel(tr("Jednostka:"), this));
-    m_unitCombo = new QComboBox(this);
-    m_unitCombo->addItem(tr("Niutony (N)"));
-    m_unitCombo->addItem(tr("Kilogramy (kg)"));
-    unitLayout->addWidget(m_unitCombo);
-    settingsLayout->addLayout(unitLayout);
-    
-    // Weight display
-    QHBoxLayout* weightLayout = new QHBoxLayout();
-    m_weightLabel = new QLabel(tr("Waga:"), this);
-    m_weightValue = new QLabel(tr("0.00 N"), this);
-    m_weightValue->setStyleSheet("font-size: 16px; font-weight: bold; color: blue;");
-    m_weightValue->setMinimumWidth(100);
-    weightLayout->addWidget(m_weightLabel);
-    weightLayout->addWidget(m_weightValue);
-    weightLayout->addStretch();
-    settingsLayout->addLayout(weightLayout);
-    
-    // Status label
+    // Status bar at bottom of central widget
     m_statusLabel = new QLabel(tr("Status: Rozłączono"), this);
     m_statusLabel->setStyleSheet("color: orange; font-weight: bold;");
-    settingsLayout->addWidget(m_statusLabel);
+    m_statusLabel->setContentsMargins(10, 5, 10, 5);
     
-    // Add groups to main layout
-    controlLayout->addWidget(buttonGroup);
-    controlLayout->addWidget(settingsGroup);
-    controlLayout->addStretch();
-    
-    // Add control panel to main layout
+    // Add status label to main layout
     QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout());
     if (mainLayout) {
-        mainLayout->addWidget(controlPanel);
+        mainLayout->addWidget(m_statusLabel);
     }
+}
+
+void MainWindow::showSettingsDialog()
+{
+    // Create settings widget if not exists
+    if (!m_settingsWidget) {
+        m_settingsWidget = new QWidget(this);
+        m_settingsWidget->setWindowTitle(tr("Ustawienia"));
+        m_settingsWidget->setMinimumSize(400, 300);
+        
+        QVBoxLayout* mainLayout = new QVBoxLayout(m_settingsWidget);
+        
+        // Settings group
+        QGroupBox* settingsGroup = new QGroupBox(tr("Ustawienia"), this);
+        QVBoxLayout* settingsLayout = new QVBoxLayout(settingsGroup);
+        
+        // Sampling rate
+        QHBoxLayout* samplingLayout = new QHBoxLayout();
+        samplingLayout->addWidget(new QLabel(tr("Częstotliwość:"), this));
+        m_samplingRateSpin = new QSpinBox(this);
+        m_samplingRateSpin->setRange(10, 1000);
+        m_samplingRateSpin->setValue(100);
+        m_samplingRateSpin->setSuffix(tr(" Hz"));
+        samplingLayout->addWidget(m_samplingRateSpin);
+        settingsLayout->addLayout(samplingLayout);
+        
+        // Graph duration
+        QHBoxLayout* durationLayout = new QHBoxLayout();
+        durationLayout->addWidget(new QLabel(tr("Czas wykresu:"), this));
+        m_graphDurationSpin = new QSpinBox(this);
+        m_graphDurationSpin->setRange(10, 300);
+        m_graphDurationSpin->setValue(60);
+        m_graphDurationSpin->setSuffix(tr(" s"));
+        durationLayout->addWidget(m_graphDurationSpin);
+        settingsLayout->addLayout(durationLayout);
+        
+        // Unit selection
+        QHBoxLayout* unitLayout = new QHBoxLayout();
+        unitLayout->addWidget(new QLabel(tr("Jednostka:"), this));
+        m_unitCombo = new QComboBox(this);
+        m_unitCombo->addItem(tr("Niutony (N)"));
+        m_unitCombo->addItem(tr("Kilogramy (kg)"));
+        unitLayout->addWidget(m_unitCombo);
+        settingsLayout->addLayout(unitLayout);
+        
+        // Weight display
+        QHBoxLayout* weightLayout = new QHBoxLayout();
+        m_weightLabel = new QLabel(tr("Waga:"), this);
+        m_weightValue = new QLabel(tr("0.00 N"), this);
+        m_weightValue->setStyleSheet("font-size: 16px; font-weight: bold; color: blue;");
+        m_weightValue->setMinimumWidth(100);
+        weightLayout->addWidget(m_weightLabel);
+        weightLayout->addWidget(m_weightValue);
+        weightLayout->addStretch();
+        settingsLayout->addLayout(weightLayout);
+        
+        mainLayout->addWidget(settingsGroup);
+        mainLayout->addStretch();
+        
+        // Connect settings signals
+        connect(m_samplingRateSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &MainWindow::onSamplingRateChanged);
+        connect(m_graphDurationSpin, QOverload<int>::of(&QSpinBox::valueChanged),
+                this, &MainWindow::onGraphDurationChanged);
+    }
+    
+    m_settingsWidget->show();
+    m_settingsWidget->raise();
+    m_settingsWidget->activateWindow();
 }
 
 void MainWindow::createGameArea()
@@ -233,15 +232,24 @@ void MainWindow::setupMenuBar()
     m_actionExit = fileMenu->addAction(tr("W&yjście"));
     m_actionExit->setShortcut(QKeySequence::Quit);
     
-    // Menu Widok
+    // Menu Widok - zawiera Akcje
     QMenu* viewMenu = menuBar->addMenu(tr("&Widok"));
+    m_actionStart = viewMenu->addAction(tr("▶ &Rozpocznij"));
+    m_actionStop = viewMenu->addAction(tr("⏹ &Zatrzymaj"));
+    viewMenu->addSeparator();
     m_actionClear = viewMenu->addAction(tr("&Wyczyść wykres"));
     m_actionClear->setShortcut(QKeySequence::Delete);
     
-    // Menu Narzędzia
+    // Disable stop action initially
+    m_actionStop->setEnabled(false);
+    
+    // Menu Narzędzia - zawiera Ustawienia
     QMenu* toolsMenu = menuBar->addMenu(tr("&Narzędzia"));
-    m_actionConfig = toolsMenu->addAction(tr("&Konfiguracja"));
+    m_actionConfig = toolsMenu->addAction(tr("&Ustawienia"));
     m_actionConfig->setShortcut(QKeySequence::Preferences);
+    toolsMenu->addSeparator();
+    QAction* actionShowSettings = toolsMenu->addAction(tr("Pokaż &panel ustawień"));
+    connect(actionShowSettings, &QAction::triggered, this, &MainWindow::showSettingsDialog);
     
     // Menu Pomoc
     QMenu* helpMenu = menuBar->addMenu(tr("&Pomoc"));
@@ -262,25 +270,35 @@ void MainWindow::setupStatusBar()
 
 void MainWindow::createConnections()
 {
-    // Przyciski
-    connect(m_startButton, &QPushButton::clicked, this, &MainWindow::startDataCollection);
-    connect(m_stopButton, &QPushButton::clicked, this, &MainWindow::stopDataCollection);
-    connect(m_clearButton, &QPushButton::clicked, this, &MainWindow::clearGraph);
-    connect(m_exportButton, &QPushButton::clicked, this, &MainWindow::exportData);
-    connect(m_configButton, &QPushButton::clicked, this, &MainWindow::openConfiguration);
+    // Przyciski (jeśli istnieją - teraz dostępne głównie przez menu)
+    if (m_startButton) {
+        connect(m_startButton, &QPushButton::clicked, this, &MainWindow::startDataCollection);
+    }
+    if (m_stopButton) {
+        connect(m_stopButton, &QPushButton::clicked, this, &MainWindow::stopDataCollection);
+    }
+    if (m_clearButton) {
+        connect(m_clearButton, &QPushButton::clicked, this, &MainWindow::clearGraph);
+    }
+    if (m_exportButton) {
+        connect(m_exportButton, &QPushButton::clicked, this, &MainWindow::exportData);
+    }
+    if (m_configButton) {
+        connect(m_configButton, &QPushButton::clicked, this, &MainWindow::openConfiguration);
+    }
     
-    // Akcje menu
-    connect(m_actionExit, &QAction::triggered, this, &MainWindow::close);
-    connect(m_actionConfig, &QAction::triggered, this, &MainWindow::openConfiguration);
-    connect(m_actionExport, &QAction::triggered, this, &MainWindow::exportData);
+    // Akcje menu - Widok (zawiera Akcje)
+    connect(m_actionStart, &QAction::triggered, this, &MainWindow::startDataCollection);
+    connect(m_actionStop, &QAction::triggered, this, &MainWindow::stopDataCollection);
     connect(m_actionClear, &QAction::triggered, this, &MainWindow::clearGraph);
-    connect(m_actionAbout, &QAction::triggered, this, &MainWindow::showAbout);
     
-    // Ustawienia
-    connect(m_samplingRateSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &MainWindow::onSamplingRateChanged);
-    connect(m_graphDurationSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-            this, &MainWindow::onGraphDurationChanged);
+    // Akcje menu - Plik
+    connect(m_actionExit, &QAction::triggered, this, &MainWindow::close);
+    connect(m_actionExport, &QAction::triggered, this, &MainWindow::exportData);
+    
+    // Akcje menu - Narzędzia (zawiera Ustawienia)
+    connect(m_actionConfig, &QAction::triggered, this, &MainWindow::showSettingsDialog);
+    connect(m_actionAbout, &QAction::triggered, this, &MainWindow::showAbout);
     
     // Timer aktualizacji
     m_updateTimer = new QTimer(this);
@@ -307,8 +325,13 @@ void MainWindow::loadSettings()
     int samplingRate = settings.value("sampling/rate", 100).toInt();
     int graphDuration = settings.value("graph/duration", 60).toInt();
     
-    m_samplingRateSpin->setValue(samplingRate);
-    m_graphDurationSpin->setValue(graphDuration);
+    // Protect against null pointer - widgets may be created in showSettingsDialog
+    if (m_samplingRateSpin) {
+        m_samplingRateSpin->setValue(samplingRate);
+    }
+    if (m_graphDurationSpin) {
+        m_graphDurationSpin->setValue(graphDuration);
+    }
     
     // Protect against null pointer - GraphWidget should be initialized by now
     if (m_graphWidget) {
@@ -321,8 +344,12 @@ void MainWindow::saveSettings()
     QSettings settings("Biofeedback", "MainWindow");
     settings.setValue("window/size", size());
     settings.setValue("window/position", pos());
-    settings.setValue("sampling/rate", m_samplingRateSpin->value());
-    settings.setValue("graph/duration", m_graphDurationSpin->value());
+    if (m_samplingRateSpin) {
+        settings.setValue("sampling/rate", m_samplingRateSpin->value());
+    }
+    if (m_graphDurationSpin) {
+        settings.setValue("graph/duration", m_graphDurationSpin->value());
+    }
 }
 
 void MainWindow::updateWeightDisplay(double weight)
@@ -348,8 +375,10 @@ void MainWindow::startDataCollection()
     if (m_isCollectingData) return;
     
     m_isCollectingData = true;
-    m_startButton->setEnabled(false);
-    m_stopButton->setEnabled(true);
+    if (m_startButton) m_startButton->setEnabled(false);
+    if (m_stopButton) m_stopButton->setEnabled(true);
+    m_actionStart->setEnabled(false);
+    m_actionStop->setEnabled(true);
     
     emit dataCollectionStarted();
 }
@@ -359,8 +388,10 @@ void MainWindow::stopDataCollection()
     if (!m_isCollectingData) return;
     
     m_isCollectingData = false;
-    m_startButton->setEnabled(true);
-    m_stopButton->setEnabled(false);
+    if (m_startButton) m_startButton->setEnabled(true);
+    if (m_stopButton) m_stopButton->setEnabled(false);
+    m_actionStart->setEnabled(true);
+    m_actionStop->setEnabled(false);
     
     emit dataCollectionStopped();
 }
