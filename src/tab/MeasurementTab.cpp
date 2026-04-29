@@ -176,9 +176,18 @@ void ForcePlotWidget::addSample(double force, double time)
     m_forces.append(force);
     m_times.append(time);
     
+    // Aktualizuj zakres osi Y uwzględniając wartości ujemne i dodatnie
     if (force > m_maxForce) {
         m_maxForce = force * 1.2;
     }
+    // Dodaj obsługę wartości ujemnych - rozszerz zakres w dół
+    static double minForce = 0.0;
+    if (force < minForce) {
+        minForce = force * 1.2;
+    }
+    // Zaktualizuj m_maxForce aby uwzględniał zakres symetryczny
+    double absMax = std::max(std::abs(m_maxForce), std::abs(minForce));
+    m_maxForce = absMax * 1.2;
     
     // Usuń stare dane poza oknem czasowym
     while (!m_times.isEmpty() && (time - m_times.first()) > m_maxTimeWindow) {
@@ -243,15 +252,20 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     // Oś siły (Y)
     painter.drawLine(margin, margin, margin, margin + plotHeight);
     
-    // Etykiety osi Y
+    // Etykiety osi Y - teraz z zakresem od -m_maxForce do +m_maxForce
     painter.setFont(QFont("Arial", 8));
     painter.setPen(Qt::black);
-    for (int i = 0; i <= 5; ++i) {
-        int y = margin + plotHeight - (plotHeight * i / 5);
-        double force = m_maxForce * i / 5;
+    for (int i = 0; i <= 10; ++i) {
+        int y = margin + plotHeight - (plotHeight * i / 10);
+        double force = -m_maxForce + (2.0 * m_maxForce * i / 10);  // Zakres od -max do +max
         QString label = QString::number(force, 'f', 0);
         painter.drawText(5, y + 3, label);
     }
+    
+    // Narysuj linię zera
+    painter.setPen(QPen(QColor(150, 150, 150), 1, Qt::DashLine));
+    int zeroY = margin + plotHeight / 2;
+    painter.drawLine(margin, zeroY, margin + plotWidth, zeroY);
     
     // Linia docelowej siły
     if (m_targetForce > 0 && m_maxForce > 0) {
@@ -276,26 +290,29 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     
     for (int i = 1; i < m_forces.size(); ++i) {
         double x1 = margin + ((m_times[i-1] - minTime) / timeRange) * plotWidth;
-        double y1 = margin + plotHeight - (m_forces[i-1] / m_maxForce) * plotHeight;
+        // Skalowanie z zakresem symetrycznym: -m_maxForce do +m_maxForce
+        double y1 = margin + plotHeight - ((m_forces[i-1] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
         double x2 = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
-        double y2 = margin + plotHeight - (m_forces[i] / m_maxForce) * plotHeight;
+        double y2 = margin + plotHeight - ((m_forces[i] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
         
         painter.drawLine(static_cast<int>(x1), static_cast<int>(y1), 
                         static_cast<int>(x2), static_cast<int>(y2));
     }
     
-    // Wypełnienie pod wykresem
+    // Wypełnienie pod wykresem - teraz względem linii zera
     painter.setBrush(QBrush(QColor(0, 100, 200, 50)));
     painter.setPen(Qt::NoPen);
     
     QVector<QPoint> fillPoints;
-    fillPoints.append(QPoint(margin, margin + plotHeight));
+    // Zaczynamy od linii zera, nie od dołu wykresu
+    int zeroY = margin + plotHeight / 2;
+    fillPoints.append(QPoint(margin, zeroY));
     for (int i = 0; i < m_forces.size(); ++i) {
         double x = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
-        double y = margin + plotHeight - (m_forces[i] / m_maxForce) * plotHeight;
+        double y = margin + plotHeight - ((m_forces[i] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
         fillPoints.append(QPoint(static_cast<int>(x), static_cast<int>(y)));
     }
-    fillPoints.append(QPoint(margin + plotWidth, margin + plotHeight));
+    fillPoints.append(QPoint(margin + plotWidth, zeroY));
     
     painter.drawPolygon(fillPoints);
     
@@ -343,6 +360,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
+    , m_showRawValues(false)  // Domyślnie pokazujemy wartości skalibrowane
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
     , m_trendsContent(nullptr)
@@ -423,6 +441,21 @@ void MeasurementTab::setupUI()
     m_btnLoadJSON = new QPushButton("OTWÓRZ POMIAR JSON", this);
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
+    // Przełącznik trybu Raw/Calibrated
+    QPushButton* m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI SKALIBROWANE", this);
+    m_btnToggleRaw->setCheckable(true);
+    connect(m_btnToggleRaw, &QPushButton::toggled, this, [this, m_btnToggleRaw](bool checked) {
+        m_showRawValues = checked;
+        if (checked) {
+            m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
+            m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+        } else {
+            m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
+            m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+        }
+    });
+    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+    
     m_btnReset = new QPushButton("RESET SESJI", this);
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
@@ -436,6 +469,7 @@ void MeasurementTab::setupUI()
     m_controlLayout->addWidget(m_btnLoad);
     m_controlLayout->addWidget(m_btnSaveJSON);
     m_controlLayout->addWidget(m_btnLoadJSON);
+    m_controlLayout->addWidget(m_btnToggleRaw);
     m_controlLayout->addWidget(m_chkShowTrends);
     m_controlLayout->addWidget(m_btnReset);
     
@@ -454,7 +488,7 @@ void MeasurementTab::setupUI()
     m_lblCurrentForce->setAlignment(Qt::AlignCenter);
     
     m_forceBar = new QProgressBar(this);
-    m_forceBar->setRange(0, 100);
+    m_forceBar->setRange(-100, 100);  // Zakres od -100 do +100 dla wartości ujemnych i dodatnich
     m_forceBar->setValue(0);
     m_forceBar->setFormat("%v N");
     
@@ -676,7 +710,8 @@ void MeasurementTab::simulateSensorData()
     }
     
     currentForce += noise;
-    if (currentForce < 0) currentForce = 0;
+    // Usunięto ograniczenie do 0 - pozwalamy na wartości ujemne dla rozciągania
+    // if (currentForce < 0) currentForce = 0;
     
     readSingleSample(currentForce);
 }
@@ -1013,7 +1048,9 @@ void MeasurementTab::onReadSingleSample()
     if (m_serialPort && m_serialPort->isConnected()) {
         sensor::SensorData data = m_serialPort->readData(500);
         if (data.isValid) {
-            readSingleSample(data.calibratedValue);
+            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
+            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
+            readSingleSample(valueToUse);
             m_lastSensorData = data;
         } else {
             // Jeśli dane nie są poprawne, wyświetl komunikat
@@ -1036,7 +1073,9 @@ void MeasurementTab::onTimerTick()
         if (m_serialPort->tryReadData(data)) {
             if (data.isValid) {
                 m_lastSensorData = data;
-                readSingleSample(data.calibratedValue);
+                // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
+                double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
+                readSingleSample(valueToUse);
             }
         }
     }
@@ -1526,7 +1565,9 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     if (data.isValid) {
         m_lastSensorData = data;
         if (m_isMeasuring) {
-            readSingleSample(data.calibratedValue);
+            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
+            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
+            readSingleSample(valueToUse);
         }
     }
 }

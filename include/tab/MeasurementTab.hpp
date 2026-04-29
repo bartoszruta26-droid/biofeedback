@@ -256,7 +256,7 @@ public:
 signals:
     void measurementStarted();
     void measurementStopped();
-    void newForceSample(double force, double timestamp);
+    void newForceSample(double force, double timestamp, bool isRaw = false);
     void repetitionCompleted(int seriesNum, int repNum, const RepetitionStats& stats);
     void seriesCompleted(int seriesNum, const SeriesStats& stats);
     void sessionFinished(const QVector<SeriesStats>& allStats);
@@ -347,6 +347,9 @@ private:
     // Bufor bieżącego powtórzenia
     QVector<double> m_currentRepForces;
     QVector<double> m_currentRepTimes;
+    
+    // Tryb wyświetlania: raw value vs calibrated
+    bool m_showRawValues;
     
     // Detekcja powtórzeń
     bool m_inContraction;
