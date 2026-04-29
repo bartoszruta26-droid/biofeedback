@@ -308,6 +308,7 @@ private:
     QPushButton* m_btnLoad;
     QPushButton* m_btnSaveJSON;       // Zapis pojedynczego pomiaru do JSON
     QPushButton* m_btnLoadJSON;       // Otwieranie pojedynczego pomiaru JSON
+    QPushButton* m_btnToggleRaw;      // Przełącznik trybu Raw/Calibrated
     QPushButton* m_btnReset;
     
     // Panel żywy z wykresem

@@ -304,8 +304,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     painter.setPen(Qt::NoPen);
     
     QVector<QPoint> fillPoints;
-    // Zaczynamy od linii zera, nie od dołu wykresu
-    int zeroY = margin + plotHeight / 2;
+    // Zaczynamy od linii zera (używamy istniejącej zmiennej zeroY zdefiniowanej wcześniej)
     fillPoints.append(QPoint(margin, zeroY));
     for (int i = 0; i < m_forces.size(); ++i) {
         double x = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
@@ -441,10 +440,11 @@ void MeasurementTab::setupUI()
     m_btnLoadJSON = new QPushButton("OTWÓRZ POMIAR JSON", this);
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
-    // Przełącznik trybu Raw/Calibrated
-    QPushButton* m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI SKALIBROWANE", this);
+    // Przełącznik trybu Raw/Calibrated - zablokowany podczas aktywnej sesji
+    m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI SKALIBROWANE", this);
     m_btnToggleRaw->setCheckable(true);
-    connect(m_btnToggleRaw, &QPushButton::toggled, this, [this, m_btnToggleRaw](bool checked) {
+    m_btnToggleRaw->setEnabled(false);  // Domyślnie wyłączone
+    connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
         m_showRawValues = checked;
         if (checked) {
             m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
@@ -597,6 +597,12 @@ void MeasurementTab::startMeasurement()
     ensureSessionClockStarted();
     m_timer->start();
     
+    // Zablokuj przycisk zmiany trybu Raw/Calibrated podczas pomiaru
+    if (m_btnToggleRaw) {
+        m_btnToggleRaw->setEnabled(false);
+        m_btnToggleRaw->setStyleSheet("background-color: #808080; color: #C0C0C0;");  // Szary kolor
+    }
+    
     m_btnStartStop->setText("STOP POMIARU");
     m_btnStartStop->setStyleSheet("background-color: #f44336; color: white;");
     m_lblStatus->setText("Status: REJESTRACJA...");
@@ -615,6 +621,17 @@ void MeasurementTab::stopMeasurement()
     // Jeśli trwa powtórzenie, zakończ je
     if (m_inContraction && !m_currentRepForces.isEmpty()) {
         calculateRepetitionStats();
+    }
+    
+    // Odblokuj przycisk zmiany trybu Raw/Calibrated po zatrzymaniu pomiaru
+    if (m_btnToggleRaw) {
+        m_btnToggleRaw->setEnabled(true);
+        // Przywróć odpowiedni kolor w zależności od stanu
+        if (m_showRawValues) {
+            m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+        } else {
+            m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+        }
     }
     
     m_btnStartStop->setText("START POMIARU");
