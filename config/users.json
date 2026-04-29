@@ -2,9 +2,9 @@
     "users": [
         {
   "username": "admin",
-  "password": "Iw0CDws=",
+  "password": "12345",
   "role": "administrator",
-  "encrypted": true
+  "encrypted": false
 }
     ]
 }
