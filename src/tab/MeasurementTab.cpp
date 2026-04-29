@@ -176,9 +176,18 @@ void ForcePlotWidget::addSample(double force, double time)
     m_forces.append(force);
     m_times.append(time);
     
+    // Aktualizuj zakres osi Y uwzględniając wartości ujemne i dodatnie
     if (force > m_maxForce) {
         m_maxForce = force * 1.2;
     }
+    // Dodaj obsługę wartości ujemnych - rozszerz zakres w dół
+    static double minForce = 0.0;
+    if (force < minForce) {
+        minForce = force * 1.2;
+    }
+    // Zaktualizuj m_maxForce aby uwzględniał zakres symetryczny
+    double absMax = std::max(std::abs(m_maxForce), std::abs(minForce));
+    m_maxForce = absMax * 1.2;
     
     // Usuń stare dane poza oknem czasowym
     while (!m_times.isEmpty() && (time - m_times.first()) > m_maxTimeWindow) {
@@ -243,15 +252,20 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     // Oś siły (Y)
     painter.drawLine(margin, margin, margin, margin + plotHeight);
     
-    // Etykiety osi Y
+    // Etykiety osi Y - teraz z zakresem od -m_maxForce do +m_maxForce
     painter.setFont(QFont("Arial", 8));
     painter.setPen(Qt::black);
-    for (int i = 0; i <= 5; ++i) {
-        int y = margin + plotHeight - (plotHeight * i / 5);
-        double force = m_maxForce * i / 5;
+    for (int i = 0; i <= 10; ++i) {
+        int y = margin + plotHeight - (plotHeight * i / 10);
+        double force = -m_maxForce + (2.0 * m_maxForce * i / 10);  // Zakres od -max do +max
         QString label = QString::number(force, 'f', 0);
         painter.drawText(5, y + 3, label);
     }
+    
+    // Narysuj linię zera
+    painter.setPen(QPen(QColor(150, 150, 150), 1, Qt::DashLine));
+    int zeroY = margin + plotHeight / 2;
+    painter.drawLine(margin, zeroY, margin + plotWidth, zeroY);
     
     // Linia docelowej siły
     if (m_targetForce > 0 && m_maxForce > 0) {
@@ -276,26 +290,29 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     
     for (int i = 1; i < m_forces.size(); ++i) {
         double x1 = margin + ((m_times[i-1] - minTime) / timeRange) * plotWidth;
-        double y1 = margin + plotHeight - (m_forces[i-1] / m_maxForce) * plotHeight;
+        // Skalowanie z zakresem symetrycznym: -m_maxForce do +m_maxForce
+        double y1 = margin + plotHeight - ((m_forces[i-1] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
         double x2 = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
-        double y2 = margin + plotHeight - (m_forces[i] / m_maxForce) * plotHeight;
+        double y2 = margin + plotHeight - ((m_forces[i] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
         
         painter.drawLine(static_cast<int>(x1), static_cast<int>(y1), 
                         static_cast<int>(x2), static_cast<int>(y2));
     }
     
-    // Wypełnienie pod wykresem
+    // Wypełnienie pod wykresem - teraz względem linii zera
     painter.setBrush(QBrush(QColor(0, 100, 200, 50)));
     painter.setPen(Qt::NoPen);
     
     QVector<QPoint> fillPoints;
-    fillPoints.append(QPoint(margin, margin + plotHeight));
+    // Zaczynamy od linii zera, nie od dołu wykresu
+    int zeroY = margin + plotHeight / 2;
+    fillPoints.append(QPoint(margin, zeroY));
     for (int i = 0; i < m_forces.size(); ++i) {
         double x = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
-        double y = margin + plotHeight - (m_forces[i] / m_maxForce) * plotHeight;
+        double y = margin + plotHeight - ((m_forces[i] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
         fillPoints.append(QPoint(static_cast<int>(x), static_cast<int>(y)));
     }
-    fillPoints.append(QPoint(margin + plotWidth, margin + plotHeight));
+    fillPoints.append(QPoint(margin + plotWidth, zeroY));
     
     painter.drawPolygon(fillPoints);
     
@@ -471,7 +488,7 @@ void MeasurementTab::setupUI()
     m_lblCurrentForce->setAlignment(Qt::AlignCenter);
     
     m_forceBar = new QProgressBar(this);
-    m_forceBar->setRange(0, 100);
+    m_forceBar->setRange(-100, 100);  // Zakres od -100 do +100 dla wartości ujemnych i dodatnich
     m_forceBar->setValue(0);
     m_forceBar->setFormat("%v N");
     
@@ -693,7 +710,8 @@ void MeasurementTab::simulateSensorData()
     }
     
     currentForce += noise;
-    if (currentForce < 0) currentForce = 0;
+    // Usunięto ograniczenie do 0 - pozwalamy na wartości ujemne dla rozciągania
+    // if (currentForce < 0) currentForce = 0;
     
     readSingleSample(currentForce);
 }
