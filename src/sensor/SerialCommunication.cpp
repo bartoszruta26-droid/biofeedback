@@ -235,36 +235,49 @@ SensorData SerialCommunication::readData(int timeout) {
         if (rd > 0) {
             for (int i = 0; i < rd; ++i) {
                 rawData.push_back(static_cast<uint8_t>(buf[i]));
-                
-                // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
-                // followed by end markers 0xAA 0x55
-                if (rawData.size() >= 11) {
-                    // Look for end marker pattern
-                    if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
-                        // Extract binary packet (9 bytes before end markers)
-                        if (rawData.size() >= 11) {
-                            size_t packetStart = rawData.size() - 11;
-                            uint8_t* packet = &rawData[packetStart];
-                            
-                            // Parse binary packet: timestamp(4) + value(4) + crc(1)
-                            uint32_t timestamp;
-                            int32_t value;
-                            uint8_t crc;
-                            
-                            std::memcpy(&timestamp, packet, 4);
-                            std::memcpy(&value, packet + 4, 4);
-                            crc = packet[8];
-                            
-                            // Verify CRC
-                            if (verifyCRC8(packet, 9)) {
-                                data.timestamp = timestamp;
-                                data.value = value;
-                                data.crc = crc;
-                                data.isValid = true;
-                                gotBinaryData = true;
-                            }
+            }
+            
+            // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
+            // followed by end markers 0xAA 0x55
+            // Only try to parse if we have enough data and see the end marker pattern
+            if (rawData.size() >= 11 && !gotBinaryData) {
+                // Look for end marker pattern at the end of buffer
+                if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
+                    // Verify this looks like binary data (not text) by checking first few bytes
+                    // Binary data should have reasonable timestamp values (not ASCII characters)
+                    size_t packetStart = rawData.size() - 11;
+                    uint8_t* packet = &rawData[packetStart];
+                    
+                    // Sanity check: timestamp should be a reasonable value (not ASCII)
+                    uint32_t testTimestamp;
+                    std::memcpy(&testTimestamp, packet, 4);
+                    
+                    // If timestamp looks like ASCII (printable chars), skip binary parsing
+                    bool looksLikeText = true;
+                    for (int j = 0; j < 4 && looksLikeText; ++j) {
+                        if (packet[j] < 32 || packet[j] > 126) {
+                            looksLikeText = false;  // Contains non-printable char, likely binary
                         }
-                        break;
+                    }
+                    
+                    if (!looksLikeText && testTimestamp > 1000 && testTimestamp < 1000000000U) {
+                        // Parse binary packet: timestamp(4) + value(4) + crc(1)
+                        uint32_t timestamp;
+                        int32_t value;
+                        uint8_t crc;
+                        
+                        std::memcpy(&timestamp, packet, 4);
+                        std::memcpy(&value, packet + 4, 4);
+                        crc = packet[8];
+                        
+                        // Verify CRC
+                        if (verifyCRC8(packet, 9)) {
+                            data.timestamp = timestamp;
+                            data.value = value;
+                            data.crc = crc;
+                            data.isValid = true;
+                            gotBinaryData = true;
+                        }
                     }
                 }
             }

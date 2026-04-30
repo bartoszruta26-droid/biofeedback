@@ -1,1 +1,67 @@
+```
+# Build artifacts
+build/
+cmake-build-*/
 
+# CMake files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+compile_commands.json
+
+# Executables and libraries
+*.exe
+*.out
+*.a
+*.so
+*.dylib
+*.dll
+
+# Object files
+*.o
+*.obj
+*.d
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node modules
+node_modules/
+
+# Virtual environments
+venv/
+.venv/
+```
