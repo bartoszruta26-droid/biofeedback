@@ -249,12 +249,9 @@ private:
     QAction* m_actionStart;
     QAction* m_actionStop;
     
-    // Widgety ustawień (ukryte, dostępne przez menu)
-    QWidget* m_settingsWidget;
-
-private:
-    void setupControlPanel();
-    void showSettingsDialog();
+    // Grupy ustawień w panelu sterowania
+    QGroupBox* m_actionsGroup;
+    QGroupBox* m_settingsGroup;
 };
 
 } // namespace gui
