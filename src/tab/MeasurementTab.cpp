@@ -626,6 +626,12 @@ void MeasurementTab::startMeasurement()
 {
     if (m_isMeasuring) return;
 
+    // Zabezpieczenie: sprawdź czy timer istnieje
+    if (!m_timer) {
+        QMessageBox::critical(this, tr("Błąd"), tr("Timer nie został zainicjalizowany."));
+        return;
+    }
+
     ensureCurrentSeriesInitialized();
     m_isMeasuring = true;
     ensureSessionClockStarted();
