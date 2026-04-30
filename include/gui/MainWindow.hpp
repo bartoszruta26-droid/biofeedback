@@ -184,6 +184,7 @@ private slots:
     void onGraphDurationChanged(int seconds);
     void onAutoScaleToggled(bool enabled);
     void onUpdateTimerTimeout();
+    void showSettingsDialog();
 
 private:
     void setupUI();
@@ -192,6 +193,7 @@ private:
     void setupStatusBar();
     void setupCentralWidget();
     void setupTabs();
+    void setupControlPanel();
     void createConnections();
     void loadSettings();
     void saveSettings();
@@ -234,6 +236,9 @@ private:
     
     // Timer do aktualizacji UI
     QTimer* m_updateTimer;
+    
+    // Dialog ustawień
+    QWidget* m_settingsWidget;
     
     // Stan aplikacji
     bool m_isCollectingData;
