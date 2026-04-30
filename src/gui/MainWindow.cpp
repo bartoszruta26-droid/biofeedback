@@ -94,8 +94,8 @@ void MainWindow::setupCentralWidget()
     
     setCentralWidget(m_centralWidget);
     
-    // Auto-start data collection after UI is ready
-    QTimer::singleShot(500, this, &MainWindow::startDataCollection);
+    // Auto-start data collection will be triggered from Application.cpp after login
+    // Do not start here to avoid conflicts with login dialog
 }
 
 void MainWindow::setupTabs()

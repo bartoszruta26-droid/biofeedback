@@ -10,6 +10,7 @@
 #include "tab/OutlineTab.hpp"
 #include <QTabWidget>
 #include <QMessageBox>
+#include <QTimer>
 
 namespace biofeedback {
 
@@ -135,6 +136,10 @@ bool Application::showLoginDialog()
         m_logger->info(QString("User logged in: %1 (%2)")
             .arg(loginDialog.getUsername())
             .arg(loginDialog.getRole()).toStdString());
+        
+        // Start data collection automatically after successful login
+        QTimer::singleShot(500, m_mainWindow.get(), &gui::MainWindow::startDataCollection);
+        
         return true;
     }
     
