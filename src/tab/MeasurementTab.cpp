@@ -825,22 +825,15 @@ void MeasurementTab::updateLiveDisplay(double force)
     
     m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
     m_forceBar->setValue(static_cast<int>(displayForce));
-    
-    // Bezpieczne wywołanie - sprawdź czy bufor nie jest pusty
-    if (!m_timeBuffer.isEmpty()) {
-        m_forcePlot->addSample(force, m_timeBuffer.last());
-    } else {
-        m_forcePlot->addSample(force, 0.0);
-    }
+    m_forcePlot->addSample(force, m_timeBuffer.last());
 }
 
 void MeasurementTab::detectRepetitions()
 {
     if (m_currentRepForces.isEmpty()) return;
     
-    // Bezpieczne wywołanie - sprawdź czy bufory nie są puste
-    double currentForce = m_currentRepForces.isEmpty() ? 0.0 : m_currentRepForces.last();
-    double currentTime = m_currentRepTimes.isEmpty() ? 0.0 : m_currentRepTimes.last();
+    double currentForce = m_currentRepForces.last();
+    double currentTime = m_currentRepTimes.last();
     
     // Detekcja początku skurcza
     if (!m_inContraction && currentForce > m_contractionThreshold) {
@@ -891,14 +884,12 @@ void MeasurementTab::calculateRepetitionStats()
             break;
         }
     }
-    if (fallEndTime - m_repPeakTime > 0 && !m_currentRepForces.isEmpty()) {
+    if (fallEndTime - m_repPeakTime > 0) {
         m_currentRepStats.fallRate = (m_repPeakForce - m_currentRepForces.last()) / (fallEndTime - m_repPeakTime);
     }
     
     // Czas trwania
-    if (!m_currentRepTimes.isEmpty()) {
-        m_currentRepStats.duration = m_currentRepTimes.last() - m_repStartTime;
-    }
+    m_currentRepStats.duration = m_currentRepTimes.last() - m_repStartTime;
     
     // Czas w górnych 8% siły
     double thresholdTop = m_repPeakForce * 0.92;
@@ -938,10 +929,7 @@ void MeasurementTab::calculateRepetitionStats()
     
     m_currentRepStats.isValid = true;
     
-    // Dodaj do bieżącej serii - sprawdź czy istnieje seria
-    if (m_completedSeriesStats.isEmpty()) {
-        ensureCurrentSeriesInitialized();
-    }
+    // Dodaj do bieżącej serii
     SeriesStats& currentSeries = m_completedSeriesStats.last();
     currentSeries.reps.append(m_currentRepStats);
     
@@ -976,18 +964,16 @@ void MeasurementTab::calculateRepetitionStats()
         currentSeries.impulseTotal = currentSeries.totalWork;
         
         // Wskaźnik zmęczenia (spadek siły względem pierwszego powtórzenia)
-        if (currentSeries.reps.size() >= 2 && !currentSeries.reps.isEmpty() && currentSeries.reps.first().peakForce > 0) {
+        if (currentSeries.reps.size() >= 2 && currentSeries.reps.first().peakForce > 0) {
             double lastPeak = currentSeries.reps.last().peakForce;
             double firstPeak = currentSeries.reps.first().peakForce;
             currentSeries.fatigueIndex = ((firstPeak - lastPeak) / firstPeak) * 100.0;
         }
         
-        // Szybkość serii - sprawdź czy repetycje istnieją
-        if (currentSeries.reps.size() >= 2 && !currentSeries.reps.isEmpty()) {
-            double seriesDuration = currentSeries.reps.last().duration - currentSeries.reps.first().duration;
-            if (seriesDuration > 0) {
-                currentSeries.seriesSpeed = currentSeries.reps.size() / seriesDuration;
-            }
+        // Szybkość serii
+        double seriesDuration = currentSeries.reps.last().duration - currentSeries.reps.first().duration;
+        if (seriesDuration > 0) {
+            currentSeries.seriesSpeed = currentSeries.reps.size() / seriesDuration;
         }
         
         // Wskaźnik powtarzalności (odwrotność odchylenia standardowego)
