@@ -1,1 +1,9 @@
-
+```
+# Build artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+*.log
+*.bin
+*.out
+```
