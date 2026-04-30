@@ -611,6 +611,67 @@ void MeasurementTab::setPatientId(const QString& id)
     m_patientId = id;
 }
 
+void MeasurementTab::onPatientChanged(const QString& pesel, const QString& patientDataPath)
+{
+    // Ustaw ID pacjenta
+    m_patientId = pesel;
+    
+    // Zaktualizuj etykietę w trendach długoterminowych
+    if (m_trendsContent) {
+        QLabel* lblInfo = m_trendsContent->findChild<QLabel*>();
+        if (lblInfo) {
+            lblInfo->setText("Wykresy trendów długoterminowych dla pacjenta: " + pesel);
+        }
+    }
+    
+    // Automatycznie ładuj historyczne pomiary pacjenta
+    if (!pesel.isEmpty()) {
+        loadAllHistoricalMeasurements();
+        loadPatientTrends();
+    }
+}
+
+void MeasurementTab::loadAllHistoricalMeasurements()
+{
+    if (m_patientId.isEmpty()) {
+        return;
+    }
+    
+    QString dataDir = QDir::currentPath() + "/data/patients/" + m_patientId;
+    QDir dir(dataDir);
+    if (!dir.exists()) {
+        return;
+    }
+    
+    // Wczytaj wszystkie historyczne sesje JSON
+    QStringList jsonFiles = dir.entryList(QStringList() << "*.json", QDir::Files);
+    
+    for (const QString& fileName : jsonFiles) {
+        QString filePath = dataDir + "/" + fileName;
+        QFile file(filePath);
+        if (file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            QTextStream in(&file);
+            QString jsonContent = in.readAll();
+            file.close();
+            
+            MeasurementSession session = deserializeSessionFromJSON(jsonContent);
+            if (!session.sessionId.isEmpty()) {
+                // Sprawdź czy sesja już istnieje (unikaj duplikatów)
+                bool exists = false;
+                for (const auto& existingSession : m_patientSessions) {
+                    if (existingSession.sessionId == session.sessionId) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    m_patientSessions.append(session);
+                }
+            }
+        }
+    }
+}
+
 void MeasurementTab::setTargetForce(double force)
 {
     m_targetForce = force;

@@ -193,6 +193,10 @@ void Application::setupConnections()
                 m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel).toStdString());
             });
     
+    // Connect PatientTab to MeasurementTab for automatic data loading when patient changes
+    connect(m_patientTab.get(), &tab::PatientTab::currentPatientChanged,
+            m_measurementTab.get(), &tab::MeasurementTab::onPatientChanged);
+    
     // Connect OutlineTab signals
     connect(m_outlineTab.get(), &tab::OutlineTab::sessionStarted,
             this, [this](const QString& outlineId) {
