@@ -93,6 +93,9 @@ void MainWindow::setupCentralWidget()
     createGameArea();
     
     setCentralWidget(m_centralWidget);
+    
+    // Auto-start data collection after UI is ready
+    QTimer::singleShot(500, this, &MainWindow::startDataCollection);
 }
 
 void MainWindow::setupTabs()
