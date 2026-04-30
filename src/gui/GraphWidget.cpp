@@ -25,7 +25,6 @@ GraphWidget::GraphWidget(QWidget *parent)
     , m_isPanning(false)
     , m_isHovering(false)
     , m_cacheValid(false)
-    , m_plotAreaCache()
 {
     setMinimumSize(400, 300);
     setMouseTracking(true);
