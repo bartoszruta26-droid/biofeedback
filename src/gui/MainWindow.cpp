@@ -40,6 +40,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_updateTimer(nullptr)
     , m_isCollectingData(false)
     , m_isConnected(false)
+    , m_settingsWidget(nullptr)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
     setMinimumSize(1280, 800);

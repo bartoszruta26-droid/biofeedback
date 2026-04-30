@@ -166,13 +166,13 @@ void Application::setupConnections()
             m_measurementTab.get(), &tab::MeasurementTab::stopMeasurement);
     
     connect(m_mainWindow.get(), &gui::MainWindow::samplingRateChanged,
-            m_measurementTab.get(), [this](int rate) {
+            m_measurementTab.get(), [this](int /*rate*/) {
                 // Update measurement tab sampling rate
             });
     
     // Connect MeasurementTab signals to MainWindow slots
     connect(m_measurementTab.get(), &tab::MeasurementTab::newForceSample,
-            m_mainWindow.get(), [this](double force, double timestamp) {
+            m_mainWindow.get(), [this](double force, double /*timestamp*/) {
                 m_mainWindow->updateWeightDisplay(force);
                 m_mainWindow->graphWidget()->addDataPoint(force);
             });
