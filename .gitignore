@@ -1,1 +1,49 @@
+```
+# CMake build system
+build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+CTestTestfile.cmake
+cmake.check_cache
+progress.marks
 
+# Qt autogen files
+*_autogen/
+
+# Executables
+*.exe
+*.out
+auth_regression
+biofeedback
+data_manager_regression
+qt5_mandatory_example
+
+# Object files
+*.o
+*.obj
+*.d
+
+# Libraries
+*.a
+*.lib
+*.so
+*.dll
+
+# Temporary and log files
+*.tmp
+*.log
+
+# IDE specific
+.vscode/
+.idea/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Configuration (if generated)
+config/config.json
+```

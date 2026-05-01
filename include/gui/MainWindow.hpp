@@ -21,6 +21,9 @@
 #include <QCloseEvent>
 #include <QTabWidget>
 #include <QStackedWidget>
+#include <QTextEdit>
+#include <QDateTime>
+#include <QScrollBar>
 
 #include "GraphWidget.hpp"
 #include "tab/OutlineTab.hpp"
@@ -61,6 +64,12 @@ public:
      * @return Wskaźnik na GraphWidget
      */
     GraphWidget* graphWidget() const { return m_graphWidget; }
+
+    /**
+     * @brief Pobiera wskaźnik do terminala debugowania
+     * @return Wskaźnik na QTextEdit (debug terminal)
+     */
+    QTextEdit* debugTerminal() const { return m_debugTerminal; }
 
     /**
      * @brief Aktualizuje wyświetlaną wartość wagi
@@ -150,6 +159,18 @@ public slots:
      */
     void showAbout();
 
+    /**
+     * @brief Dodaje wiadomość do terminala debugowania
+     * @param message Wiadomość do wyświetlenia
+     * @param type Typ wiadomości (info, error, warning, data)
+     */
+    void addDebugMessage(const QString& message, const QString& type = "INFO");
+
+    /**
+     * @brief Czyści terminal debugowania
+     */
+    void clearDebugTerminal();
+
 signals:
     /**
      * @brief Sygnał emitowany gdy rozpoczęto zbieranie danych
@@ -194,6 +215,7 @@ private:
     void setupCentralWidget();
     void setupTabs();
     void setupControlPanel();
+    void setupDebugTerminal();
     void createConnections();
     void loadSettings();
     void saveSettings();
@@ -257,6 +279,10 @@ private:
     // Grupy ustawień w panelu sterowania
     QGroupBox* m_actionsGroup;
     QGroupBox* m_settingsGroup;
+    
+    // Debug terminal
+    QTextEdit* m_debugTerminal;
+    int m_debugMaxLines;
 };
 
 } // namespace gui
