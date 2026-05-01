@@ -178,8 +178,10 @@ void Application::setupConnections()
     // Connect MeasurementTab signals to MainWindow slots
     connect(m_measurementTab.get(), &tab::MeasurementTab::newForceSample,
             m_mainWindow.get(), [this](double force, double /*timestamp*/, bool /*isRaw*/) {
-                m_mainWindow->updateWeightDisplay(force);
-                m_mainWindow->graphWidget()->addDataPoint(force);
+                if (m_mainWindow && m_mainWindow->graphWidget()) {
+                    m_mainWindow->updateWeightDisplay(force);
+                    m_mainWindow->graphWidget()->addDataPoint(force);
+                }
             });
     
     connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStarted,
