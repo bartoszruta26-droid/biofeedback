@@ -869,13 +869,24 @@ void MeasurementTab::readSingleSample(double forceValue)
     std::cout << "[DEBUG] readSingleSample START: forceValue=" << forceValue 
               << " m_completedSeriesStats.size()=" << m_completedSeriesStats.size() << std::endl;
     
-    ensureCurrentSeriesInitialized();
-    ensureSessionClockStarted();
+    // Safety check - ensure series is initialized
+    if (m_completedSeriesStats.isEmpty()) {
+        std::cout << "[DEBUG] readSingleSample: No series initialized, calling ensureCurrentSeriesInitialized" << std::endl;
+        ensureCurrentSeriesInitialized();
+    }
+    
+    // Safety check - ensure session clock is started
+    if (m_sessionStartTime <= 0.0) {
+        std::cout << "[DEBUG] readSingleSample: Session clock not started, calling ensureSessionClockStarted" << std::endl;
+        ensureSessionClockStarted();
+    }
 
-    std::cout << "[DEBUG] readSingleSample After ensure: m_completedSeriesStats.size()=" 
-              << m_completedSeriesStats.size() << std::endl;
+    std::cout << "[DEBUG] readSingleSample After checks: m_completedSeriesStats.size()=" 
+              << m_completedSeriesStats.size() << " m_sessionStartTime=" << m_sessionStartTime << std::endl;
 
     double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0 - m_sessionStartTime;
+    
+    std::cout << "[DEBUG] readSingleSample: currentTime=" << currentTime << std::endl;
     
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
@@ -883,8 +894,18 @@ void MeasurementTab::readSingleSample(double forceValue)
     m_currentRepForces.append(forceValue);
     m_currentRepTimes.append(currentTime);
     
-    std::cout << "[DEBUG] readSingleSample Before emit newForceSample" << std::endl;
-    emit newForceSample(forceValue, currentTime);
+    std::cout << "[DEBUG] readSingleSample Before emit newForceSample, force=" << forceValue 
+              << " timestamp=" << currentTime << std::endl;
+    
+    try {
+        // Emit signal with all three parameters to match the signal definition
+        emit newForceSample(forceValue, currentTime, m_showRawValues);
+        std::cout << "[DEBUG] readSingleSample: Signal emitted successfully" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "[ERROR] readSingleSample: Exception while emitting signal: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[ERROR] readSingleSample: Unknown exception while emitting signal" << std::endl;
+    }
     
     std::cout << "[DEBUG] readSingleSample Before updateLiveDisplay" << std::endl;
     updateLiveDisplay(forceValue);
@@ -894,15 +915,19 @@ void MeasurementTab::readSingleSample(double forceValue)
     
     std::cout << "[DEBUG] readSingleSample END" << std::endl;
     
-    // Aktualizuj tabelę surowych danych (ostatnie 100)
-    if (m_rawTable->rowCount() >= 100) {
-        m_rawTable->removeRow(0);
+    // Aktualizuj tabelę surowych danych (ostatnie 100) - safety check for null pointer
+    if (m_rawTable != nullptr) {
+        if (m_rawTable->rowCount() >= 100) {
+            m_rawTable->removeRow(0);
+        }
+        int row = m_rawTable->rowCount();
+        m_rawTable->insertRow(row);
+        m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
+        m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(forceValue, 'f', 2)));
+        m_rawTable->scrollToBottom();
+    } else {
+        std::cerr << "[ERROR] readSingleSample: m_rawTable is null!" << std::endl;
     }
-    int row = m_rawTable->rowCount();
-    m_rawTable->insertRow(row);
-    m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
-    m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(forceValue, 'f', 2)));
-    m_rawTable->scrollToBottom();
 }
 
 void MeasurementTab::updateLiveDisplay(double force)
@@ -1315,7 +1340,15 @@ void MeasurementTab::onTimerTick()
                 // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
                 double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
                 std::cout << "[DEBUG] onTimerTick: Received valid data, value=" << valueToUse << std::endl;
-                readSingleSample(valueToUse);
+                
+                // Safety check before calling readSingleSample
+                try {
+                    readSingleSample(valueToUse);
+                } catch (const std::exception& e) {
+                    std::cerr << "[ERROR] onTimerTick: Exception in readSingleSample: " << e.what() << std::endl;
+                } catch (...) {
+                    std::cerr << "[ERROR] onTimerTick: Unknown exception in readSingleSample" << std::endl;
+                }
             } else {
                 std::cout << "[DEBUG] onTimerTick: Received invalid data" << std::endl;
             }
