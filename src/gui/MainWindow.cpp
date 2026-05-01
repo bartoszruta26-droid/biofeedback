@@ -41,6 +41,8 @@ MainWindow::MainWindow(QWidget *parent)
     , m_isCollectingData(false)
     , m_isConnected(false)
     , m_settingsWidget(nullptr)
+    , m_debugTerminal(nullptr)
+    , m_debugMaxLines(500)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
     setMinimumSize(1280, 800);
@@ -85,6 +87,9 @@ void MainWindow::setupCentralWidget()
     
     // Add tab widget to main layout
     mainLayout->addWidget(m_tabWidget);
+    
+    // Setup debug terminal
+    setupDebugTerminal();
     
     // Setup control panel with buttons and settings
     setupControlPanel();
@@ -133,6 +138,81 @@ void MainWindow::setupControlPanel()
     QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout());
     if (mainLayout) {
         mainLayout->addWidget(m_statusLabel);
+    }
+}
+
+void MainWindow::setupDebugTerminal()
+{
+    // Create debug terminal widget
+    m_debugTerminal = new QTextEdit(this);
+    m_debugTerminal->setMinimumHeight(120);
+    m_debugTerminal->setMaximumHeight(200);
+    m_debugTerminal->setReadOnly(true);
+    m_debugTerminal->setPlaceholderText(tr("Terminal debugowania - tutaj będą wyświetlane komunikaty z aplikacji"));
+    m_debugTerminal->setFont(QFont("Courier New", 9));
+    m_debugTerminal->setStyleSheet(
+        "QTextEdit { "
+        "    background-color: #1e1e1e; "
+        "    color: #d4d4d4; "
+        "    border: 1px solid #3e3e3e; "
+        "    padding: 5px; "
+        "} "
+        "QTextEdit:focus { "
+        "    border: 1px solid #007acc; "
+        "}"
+    );
+    
+    // Add to main layout
+    QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout());
+    if (mainLayout) {
+        mainLayout->addWidget(m_debugTerminal);
+    }
+    
+    // Initial debug message
+    addDebugMessage("=== Debug Terminal Initialized ===", "INFO");
+    addDebugMessage(QString("Application started at %1").arg(QDateTime::currentDateTime().toString()), "INFO");
+}
+
+void MainWindow::addDebugMessage(const QString& message, const QString& type)
+{
+    if (!m_debugTerminal) return;
+    
+    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+    QString coloredMessage;
+    
+    if (type == "ERROR") {
+        coloredMessage = QString("<span style='color: #ff6b6b;'>[%1] [ERROR] %2</span><br>").arg(timestamp).arg(message);
+    } else if (type == "WARNING") {
+        coloredMessage = QString("<span style='color: #ffd93d;'>[%1] [WARNING] %2</span><br>").arg(timestamp).arg(message);
+    } else if (type == "DATA") {
+        coloredMessage = QString("<span style='color: #6bcb77;'>[%1] [DATA] %2</span><br>").arg(timestamp).arg(message);
+    } else if (type == "SERIAL") {
+        coloredMessage = QString("<span style='color: #4d96ff;'>[%1] [SERIAL] %2</span><br>").arg(timestamp).arg(message);
+    } else {
+        coloredMessage = QString("<span style='color: #c4c4c4;'>[%1] [INFO] %2</span><br>").arg(timestamp).arg(message);
+    }
+    
+    m_debugTerminal->append(coloredMessage);
+    
+    // Limit number of lines to prevent memory issues
+    QStringList lines = m_debugTerminal->toPlainText().split("\n");
+    if (lines.size() > m_debugMaxLines) {
+        QTextCursor cursor(m_debugTerminal->document());
+        cursor.movePosition(QTextCursor::Start);
+        cursor.select(QTextCursor::BlockUnderCursor);
+        cursor.deleteChar(); // Delete the newline after the block
+        cursor.deleteChar(); // Delete the block itself
+    }
+    
+    // Auto-scroll to bottom
+    m_debugTerminal->verticalScrollBar()->setValue(m_debugTerminal->verticalScrollBar()->maximum());
+}
+
+void MainWindow::clearDebugTerminal()
+{
+    if (m_debugTerminal) {
+        m_debugTerminal->clear();
+        addDebugMessage("Debug terminal cleared", "INFO");
     }
 }
 
@@ -243,6 +323,9 @@ void MainWindow::setupMenuBar()
     viewMenu->addSeparator();
     m_actionClear = viewMenu->addAction(tr("&Wyczyść wykres"));
     m_actionClear->setShortcut(QKeySequence::Delete);
+    viewMenu->addSeparator();
+    QAction* actionClearDebug = viewMenu->addAction(tr("Wyczyść terminal debugowania"));
+    connect(actionClearDebug, &QAction::triggered, this, &MainWindow::clearDebugTerminal);
     
     // Disable stop action initially
     m_actionStop->setEnabled(false);
@@ -507,6 +590,12 @@ void MainWindow::onAutoScaleToggled(bool enabled)
 void MainWindow::onUpdateTimerTimeout()
 {
     // Okresowa aktualizacja UI
+    // Dodajemy debug message co 10 wywołań (co ~1 sekundę)
+    static int callCount = 0;
+    callCount++;
+    if (callCount % 10 == 0 && m_debugTerminal) {
+        // Można dodać okresowe logowanie statusu
+    }
 }
 
 void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerciseData)

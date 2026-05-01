@@ -11,6 +11,7 @@
 #include <QTabWidget>
 #include <QMessageBox>
 #include <QTimer>
+#include <QDebug>
 
 namespace biofeedback {
 
@@ -137,6 +138,15 @@ bool Application::showLoginDialog()
             .arg(loginDialog.getUsername())
             .arg(loginDialog.getRole()).toStdString());
         
+        // Log to debug terminal before starting data collection
+        if (m_mainWindow && m_mainWindow->debugTerminal()) {
+            m_mainWindow->addDebugMessage(
+                QString("User logged in: %1 (%2)").arg(loginDialog.getUsername()).arg(loginDialog.getRole()),
+                "INFO"
+            );
+            m_mainWindow->addDebugMessage("Starting automatic data collection...", "INFO");
+        }
+        
         // Start data collection automatically after successful login
         QTimer::singleShot(500, m_mainWindow.get(), &gui::MainWindow::startDataCollection);
         
@@ -181,23 +191,43 @@ void Application::setupConnections()
                 if (m_mainWindow && m_mainWindow->graphWidget()) {
                     m_mainWindow->updateWeightDisplay(force);
                     m_mainWindow->graphWidget()->addDataPoint(force);
+                    
+                    // Debug logging for data processing
+                    if (m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage(
+                            QString("Received force data: %1 N").arg(force, 0, 'f', 2), 
+                            "DATA"
+                        );
+                    }
                 }
             });
     
     connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStarted,
             m_mainWindow.get(), [this]() {
                 m_mainWindow->startDataCollection();
+                if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                    m_mainWindow->addDebugMessage("Measurement started by MeasurementTab", "INFO");
+                }
             });
     
     connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStopped,
             m_mainWindow.get(), [this]() {
                 m_mainWindow->stopDataCollection();
+                if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                    m_mainWindow->addDebugMessage("Measurement stopped by MeasurementTab", "INFO");
+                }
             });
     
     // Connect PatientTab signals
     connect(m_patientTab.get(), &tab::PatientTab::patientAdded,
             this, [this](const QString& pesel, const QString& firstName, const QString& lastName) {
                 m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel).toStdString());
+                if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                    m_mainWindow->addDebugMessage(
+                        QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel),
+                        "INFO"
+                    );
+                }
             });
     
     // Connect PatientTab to MeasurementTab for automatic data loading when patient changes
@@ -208,11 +238,23 @@ void Application::setupConnections()
     connect(m_outlineTab.get(), &tab::OutlineTab::sessionStarted,
             this, [this](const QString& outlineId) {
                 m_logger->info(QString("Session started with outline: %1").arg(outlineId).toStdString());
+                if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                    m_mainWindow->addDebugMessage(
+                        QString("Session started with outline: %1").arg(outlineId),
+                        "INFO"
+                    );
+                }
             });
     
     connect(m_outlineTab.get(), &tab::OutlineTab::requestGameStart,
             this, [this](const QString& gameId, const tab::ExerciseData& exerciseData) {
                 m_logger->info(QString("Starting game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name).toStdString());
+                if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                    m_mainWindow->addDebugMessage(
+                        QString("Request to start game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name),
+                        "INFO"
+                    );
+                }
             });
 }
 
