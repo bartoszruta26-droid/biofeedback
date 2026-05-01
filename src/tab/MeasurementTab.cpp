@@ -1920,6 +1920,9 @@ void MeasurementTab::connectToArduinoAsync()
                             m_hasArduinoConnection = true;
                             connected = true;
                             
+                            // URUCHOM ASYNCHRONICZNE CZYTANIE DANYCH
+                            m_serialPort->startAsyncReading();
+                            
                             // Emituj sygnał w głównym wątku
                             QMetaObject::invokeMethod(this, [this, info]() {
                                 m_lblStatus->setText("Status: ARDUINO PODŁĄCZONE");
