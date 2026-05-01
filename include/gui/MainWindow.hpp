@@ -23,6 +23,7 @@
 #include <QStackedWidget>
 #include <QTextEdit>
 #include <QDateTime>
+#include <QScrollBar>
 
 #include "GraphWidget.hpp"
 #include "tab/OutlineTab.hpp"
@@ -214,6 +215,7 @@ private:
     void setupCentralWidget();
     void setupTabs();
     void setupControlPanel();
+    void setupDebugTerminal();
     void createConnections();
     void loadSettings();
     void saveSettings();
