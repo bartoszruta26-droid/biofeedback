@@ -1,1 +1,70 @@
+```
+# CMake build artifacts
+build/
+cmake-build-*/
 
+# Qt autogen files
+*_autogen/
+
+# Compiled object files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+
+# Executables
+*.exe
+*.out
+
+# CMake specific files
+CMakeCache.txt
+CMakeFiles/
+CMakeOutput.log
+CMakeError.log
+compile_commands.json
+
+# Test executables
+*_regression
+*_example
+
+# Generated moc files
+moc_*.cpp
+moc_*.h
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.d
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+.coverage
+
+# Package managers
+node_modules/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+```

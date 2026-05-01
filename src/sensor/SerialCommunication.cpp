@@ -244,24 +244,32 @@ SensorData SerialCommunication::readData(int timeout) {
                         // Extract binary packet (9 bytes before end markers)
                         if (rawData.size() >= 11) {
                             size_t packetStart = rawData.size() - 11;
-                            uint8_t* packet = &rawData[packetStart];
                             
-                            // Parse binary packet: timestamp(4) + value(4) + crc(1)
-                            uint32_t timestamp;
-                            int32_t value;
-                            uint8_t crc;
-                            
-                            std::memcpy(&timestamp, packet, 4);
-                            std::memcpy(&value, packet + 4, 4);
-                            crc = packet[8];
-                            
-                            // Verify CRC
-                            if (verifyCRC8(packet, 9)) {
-                                data.timestamp = timestamp;
-                                data.value = value;
-                                data.crc = crc;
-                                data.isValid = true;
-                                gotBinaryData = true;
+                            // Safety check - ensure we have enough data
+                            if (packetStart + 9 <= rawData.size()) {
+                                // Copy data to local buffer to avoid vector reallocation issues
+                                uint8_t packet[9];
+                                for (size_t j = 0; j < 9; ++j) {
+                                    packet[j] = rawData[packetStart + j];
+                                }
+                                
+                                // Parse binary packet: timestamp(4) + value(4) + crc(1)
+                                uint32_t timestamp;
+                                int32_t value;
+                                uint8_t crc;
+                                
+                                std::memcpy(&timestamp, packet, 4);
+                                std::memcpy(&value, packet + 4, 4);
+                                crc = packet[8];
+                                
+                                // Verify CRC
+                                if (verifyCRC8(packet, 9)) {
+                                    data.timestamp = timestamp;
+                                    data.value = value;
+                                    data.crc = crc;
+                                    data.isValid = true;
+                                    gotBinaryData = true;
+                                }
                             }
                         }
                         break;
