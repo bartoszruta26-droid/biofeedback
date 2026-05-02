@@ -2,6 +2,8 @@
 #include <QPainterPath>
 #include <QGradient>
 #include <QLinearGradient>
+#include <cmath>
+#include <iostream>
 
 namespace gui {
 
@@ -41,14 +43,26 @@ GraphWidget::~GraphWidget()
 
 void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
 {
-    m_dataPoints.append(DataPoint(timestamp, value));
-    
-    if (m_autoScaleY) {
-        calculateAutoScale();
+    try {
+        // Validate input value - check for NaN or infinity
+        if (std::isnan(value) || std::isinf(value)) {
+            std::cerr << "[GraphWidget] WARNING: Invalid data point value (NaN/Inf), skipping" << std::endl;
+            return;
+        }
+        
+        m_dataPoints.append(DataPoint(timestamp, value));
+        
+        if (m_autoScaleY) {
+            calculateAutoScale();
+        }
+        
+        m_cacheValid = false;
+        update();
+    } catch (const std::exception& e) {
+        std::cerr << "[GraphWidget] ERROR in addDataPoint: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "[GraphWidget] ERROR in addDataPoint: Unknown exception" << std::endl;
     }
-    
-    m_cacheValid = false;
-    update();
 }
 
 void GraphWidget::clear()
@@ -153,29 +167,44 @@ void GraphWidget::pruneOldData()
 
 void GraphWidget::calculateAutoScale()
 {
-    if (m_dataPoints.isEmpty()) {
+    try {
+        if (m_dataPoints.isEmpty()) {
+            m_yMin = 0.0;
+            m_yMax = 100.0;
+            return;
+        }
+        
+        double minVal = std::numeric_limits<double>::max();
+        double maxVal = std::numeric_limits<double>::lowest();
+        
+        for (const DataPoint& point : m_dataPoints) {
+            // Skip invalid values
+            if (std::isnan(point.value) || std::isinf(point.value)) {
+                continue;
+            }
+            if (point.value < minVal) minVal = point.value;
+            if (point.value > maxVal) maxVal = point.value;
+        }
+        
+        // Dodaj margines 10%
+        double range = maxVal - minVal;
+        if (range < 0.001) range = 100.0;  // Minimalny zakres
+        
+        m_yMin = minVal - range * 0.1;
+        m_yMax = maxVal + range * 0.1;
+        
+        // Dla wartości raw (bardzo dużych) lub ujemnych - nie ograniczaj do zera
+        // Pozwól na wyświetlanie wartości ujemnych dla tensometrów
+    } catch (const std::exception& e) {
+        std::cerr << "[GraphWidget] ERROR in calculateAutoScale: " << e.what() << std::endl;
+        // Set safe defaults on error
         m_yMin = 0.0;
         m_yMax = 100.0;
-        return;
+    } catch (...) {
+        std::cerr << "[GraphWidget] ERROR in calculateAutoScale: Unknown exception" << std::endl;
+        m_yMin = 0.0;
+        m_yMax = 100.0;
     }
-    
-    double minVal = std::numeric_limits<double>::max();
-    double maxVal = std::numeric_limits<double>::lowest();
-    
-    for (const DataPoint& point : m_dataPoints) {
-        if (point.value < minVal) minVal = point.value;
-        if (point.value > maxVal) maxVal = point.value;
-    }
-    
-    // Dodaj margines 10%
-    double range = maxVal - minVal;
-    if (range < 0.001) range = 100.0;  // Minimalny zakres
-    
-    m_yMin = minVal - range * 0.1;
-    m_yMax = maxVal + range * 0.1;
-    
-    // Dla wartości raw (bardzo dużych) lub ujemnych - nie ograniczaj do zera
-    // Pozwól na wyświetlanie wartości ujemnych dla tensometrów
 }
 
 void GraphWidget::paintEvent(QPaintEvent *event)
