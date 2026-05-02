@@ -189,21 +189,27 @@ QString ForcePlotWidget::getUnitLabel() const
 
 void ForcePlotWidget::addSample(double force, double time)
 {
+    std::cout << "[DEBUG] ForcePlotWidget::addSample ENTER: force=" << force << " time=" << time 
+              << " m_forces.size()=" << m_forces.size() << std::endl;
+    
     m_forces.append(force);
     m_times.append(time);
     
     // Aktualizuj zakres osi Y uwzględniając wartości ujemne i dodatnie
     if (force > m_maxForce) {
         m_maxForce = force * 1.2;
+        std::cout << "[DEBUG] ForcePlotWidget::addSample: Updated m_maxForce to " << m_maxForce << std::endl;
     }
     // Dodaj obsługę wartości ujemnych - rozszerz zakres w dół
     static double minForce = 0.0;
     if (force < minForce) {
         minForce = force * 1.2;
+        std::cout << "[DEBUG] ForcePlotWidget::addSample: Updated minForce to " << minForce << std::endl;
     }
     // Zaktualizuj m_maxForce aby uwzględniał zakres symetryczny
     double absMax = std::max(std::abs(m_maxForce), std::abs(minForce));
     m_maxForce = absMax * 1.2;
+    std::cout << "[DEBUG] ForcePlotWidget::addSample: Final m_maxForce=" << m_maxForce << std::endl;
     
     // Usuń stare dane poza oknem czasowym
     while (!m_times.isEmpty() && (time - m_times.first()) > m_maxTimeWindow) {
@@ -211,7 +217,9 @@ void ForcePlotWidget::addSample(double force, double time)
         m_times.removeFirst();
     }
     
+    std::cout << "[DEBUG] ForcePlotWidget::addSample: Before update(), m_forces.size()=" << m_forces.size() << std::endl;
     update();
+    std::cout << "[DEBUG] ForcePlotWidget::addSample EXIT" << std::endl;
 }
 
 void ForcePlotWidget::clearData()
@@ -894,6 +902,9 @@ void MeasurementTab::readSingleSample(double forceValue)
     m_currentRepForces.append(forceValue);
     m_currentRepTimes.append(currentTime);
     
+    std::cout << "[DEBUG] readSingleSample: Data prepared for display - rawForceBuffer.size()=" 
+              << m_rawForceBuffer.size() << " currentRepForces.size()=" << m_currentRepForces.size() << std::endl;
+    
     std::cout << "[DEBUG] readSingleSample Before emit newForceSample, force=" << forceValue 
               << " timestamp=" << currentTime << std::endl;
     
@@ -909,9 +920,11 @@ void MeasurementTab::readSingleSample(double forceValue)
     
     std::cout << "[DEBUG] readSingleSample Before updateLiveDisplay" << std::endl;
     updateLiveDisplay(forceValue);
+    std::cout << "[DEBUG] readSingleSample: updateLiveDisplay completed" << std::endl;
     
     std::cout << "[DEBUG] readSingleSample Before detectRepetitions" << std::endl;
     detectRepetitions();
+    std::cout << "[DEBUG] readSingleSample: detectRepetitions completed" << std::endl;
     
     std::cout << "[DEBUG] readSingleSample END" << std::endl;
     
@@ -932,6 +945,9 @@ void MeasurementTab::readSingleSample(double forceValue)
 
 void MeasurementTab::updateLiveDisplay(double force)
 {
+    std::cout << "[DEBUG] updateLiveDisplay START: force=" << force 
+              << " m_showRawValues=" << m_showRawValues << " m_currentUnit=" << static_cast<int>(m_currentUnit) << std::endl;
+    
     // Wyświetl siłę w aktualnie wybranej jednostce
     double displayForce = force;
     QString unitLabel = "N";
@@ -941,25 +957,34 @@ void MeasurementTab::updateLiveDisplay(double force)
             case ForceUnit::Kilograms:
                 displayForce = force * 1000.0 / 9.81;  // N -> kg
                 unitLabel = "kg";
+                std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
                 break;
             case ForceUnit::Raw:
                 // Nie powinno się zdarzyć, bo raw jest obsługiwane osobno
                 displayForce = force;
                 unitLabel = "ADC";
+                std::cout << "[DEBUG] updateLiveDisplay: Raw mode, displayForce=" << displayForce << std::endl;
                 break;
             case ForceUnit::Newtons:
             default:
                 displayForce = force;
                 unitLabel = "N";
+                std::cout << "[DEBUG] updateLiveDisplay: Newtons mode, displayForce=" << displayForce << std::endl;
                 break;
         }
     } else {
         unitLabel = "ADC";
+        std::cout << "[DEBUG] updateLiveDisplay: showRawValues=true, displayForce=" << displayForce << std::endl;
     }
     
+    std::cout << "[DEBUG] updateLiveDisplay: Before updating UI components" << std::endl;
     m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
     m_forceBar->setValue(static_cast<int>(displayForce));
-    m_forcePlot->addSample(force, m_timeBuffer.last());
+    
+    double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
+    std::cout << "[DEBUG] updateLiveDisplay: Before addSample, force=" << force << " time=" << lastTime << std::endl;
+    m_forcePlot->addSample(force, lastTime);
+    std::cout << "[DEBUG] updateLiveDisplay END" << std::endl;
 }
 
 void MeasurementTab::detectRepetitions()
@@ -976,7 +1001,9 @@ void MeasurementTab::detectRepetitions()
     double currentTime = m_currentRepTimes.last();
     
     std::cout << "[DEBUG] detectRepetitions: currentForce=" << currentForce 
-              << " m_inContraction=" << m_inContraction << std::endl;
+              << " currentTime=" << currentTime
+              << " m_inContraction=" << m_inContraction 
+              << " m_contractionThreshold=" << m_contractionThreshold << std::endl;
     
     // Detekcja początku skurcza
     if (!m_inContraction && currentForce > m_contractionThreshold) {
@@ -990,6 +1017,7 @@ void MeasurementTab::detectRepetitions()
         m_currentRepTimes.clear();
         m_currentRepForces.append(currentForce);
         m_currentRepTimes.append(currentTime);
+        std::cout << "[DEBUG] detectRepetitions: Contraction started, repStartTime=" << m_repStartTime << std::endl;
     }
     // Śledzenie szczytu
     else if (m_inContraction && currentForce > m_repPeakForce) {
@@ -1006,6 +1034,7 @@ void MeasurementTab::detectRepetitions()
         m_inContraction = false;
         m_currentRepForces.clear();
         m_currentRepTimes.clear();
+        std::cout << "[DEBUG] detectRepetitions: Contraction ended, reset state" << std::endl;
     }
     
     std::cout << "[DEBUG] detectRepetitions END" << std::endl;
@@ -1336,14 +1365,21 @@ void MeasurementTab::onTimerTick()
         sensor::SensorData data;
         if (m_serialPort->tryReadData(data)) {
             if (data.isValid) {
+                std::cout << "[DEBUG] onTimerTick: RAW DATA FROM ARDUINO - timestamp=" << data.timestamp 
+                          << " value=" << data.value << " calibratedValue=" << data.calibratedValue 
+                          << " isValid=" << data.isValid << " crc=" << static_cast<int>(data.crc) << std::endl;
+                
                 m_lastSensorData = data;
                 // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
                 double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-                std::cout << "[DEBUG] onTimerTick: Received valid data, value=" << valueToUse << std::endl;
+                std::cout << "[DEBUG] onTimerTick: valueToUse after conversion=" << valueToUse 
+                          << " m_showRawValues=" << m_showRawValues << std::endl;
                 
                 // Safety check before calling readSingleSample
                 try {
+                    std::cout << "[DEBUG] onTimerTick: About to call readSingleSample with value=" << valueToUse << std::endl;
                     readSingleSample(valueToUse);
+                    std::cout << "[DEBUG] onTimerTick: readSingleSample completed successfully" << std::endl;
                 } catch (const std::exception& e) {
                     std::cerr << "[ERROR] onTimerTick: Exception in readSingleSample: " << e.what() << std::endl;
                 } catch (...) {
