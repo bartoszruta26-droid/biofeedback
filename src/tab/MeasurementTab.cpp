@@ -1829,7 +1829,11 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
     m_serialPort = serial;
     if (m_serialPort) {
         m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            onSensorDataReceived(data);
+            // Callback przychodzi z wątku odczytu szeregowego -
+            // przekaż dane bezpiecznie do wątku GUI.
+            QMetaObject::invokeMethod(this, [this, data]() {
+                onSensorDataReceived(data);
+            }, Qt::QueuedConnection);
         });
     }
 }
