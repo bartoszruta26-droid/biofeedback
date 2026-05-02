@@ -16,6 +16,7 @@
 #include <QComboBox>
 #include <QSlider>
 #include <QSpinBox>
+#include <QTextEdit>
 #include <memory>
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -192,6 +193,18 @@ public:
      */
     bool exportTrainingPlan(const QString& filename);
 
+    /**
+     * @brief Inicjalizuje terminal debugowania w zakładce Training
+     */
+    void setupDebugTerminal();
+    
+    /**
+     * @brief Dodaje wiadomość do terminala debugowania
+     * @param message Wiadomość do wyświetlenia
+     * @param type Typ wiadomości (INFO, ERROR, WARNING, DATA, SERIAL)
+     */
+    void addDebugMessage(const QString& message, const QString& type = "INFO");
+
 signals:
     void trainingStarted();
     void trainingStopped();
@@ -271,6 +284,10 @@ private:
     // Tabela statystyk
     QGroupBox* m_statsBox;
     QWidget* m_statsContainer;
+    
+    // Terminal debugowania
+    QTextEdit* m_debugTerminal;
+    int m_debugMaxLines;
     
     // Logika i dane
     QTimer* m_timer;

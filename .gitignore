@@ -1,36 +1,41 @@
 ```
-# CMake build artifacts
-build/
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-compile_commands.json
-CTestTestfile.cmake
-cmake.check_cache
-progress.marks
-
-# Compiled objects and executables
+# Compiled and build artifacts
 *.o
 *.obj
-*.a
-*.so
-*.dll
-*.exe
 *.out
+build/
+dist/
 
-# Qt auto-generated files
-*moc_*.cpp
-*moc_*.h
-*qrc_*.cpp
-*uic_*.h
-*_autogen/
+# Dependencies
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Generated files
-config/config.json
-config/users.json
+# Logs and temp files
+*.log
+*.tmp
+*.swp
 
-# OS specific
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# OS
 .DS_Store
 Thumbs.db
 ```
