@@ -172,6 +172,8 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_currentGame(nullptr)
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
+    , m_debugTerminal(nullptr)
+    , m_debugMaxLines(500)
     , m_timer(nullptr)
     , m_restTimer(nullptr)
     , m_isTraining(false)
@@ -349,6 +351,9 @@ void TrainingTab::setupUI()
     statsLayout->addWidget(m_statsContainer);
     
     m_mainLayout->addWidget(m_statsBox);
+    
+    // Terminal debugowania - ukryty w zakładce Training
+    setupDebugTerminal();
     
     // Timer
     m_timer = new QTimer(this);
@@ -986,6 +991,74 @@ QColor TrainingTab::getForceColor(double current, double target) const
     if (ratio < 0.8) return QColor(255, 200, 100);
     if (ratio < 1.0) return QColor(100, 255, 100);
     return QColor(50, 200, 50);
+}
+
+} // namespace tab
+
+// ==================== Debug Terminal Methods ====================
+
+void TrainingTab::setupDebugTerminal()
+{
+    // Create debug terminal widget
+    m_debugTerminal = new QTextEdit(this);
+    m_debugTerminal->setMinimumHeight(150);
+    m_debugTerminal->setMaximumHeight(200);
+    m_debugTerminal->setReadOnly(true);
+    m_debugTerminal->setPlaceholderText(tr("Terminal debugowania - tutaj będą wyświetlane komunikaty z aplikacji"));
+    m_debugTerminal->setFont(QFont("Courier New", 9));
+    m_debugTerminal->setStyleSheet(
+        "QTextEdit { "
+        "    background-color: #1e1e1e; "
+        "    color: #d4d4d4; "
+        "    border: 1px solid #3e3e3e; "
+        "    padding: 5px; "
+        "} "
+        "QTextEdit:focus { "
+        "    border: 1px solid #007acc; "
+        "}"
+    );
+    
+    // Add to main layout
+    m_mainLayout->addWidget(m_debugTerminal);
+    
+    // Initial debug message
+    addDebugMessage("=== Training Tab Debug Terminal Initialized ===", "INFO");
+    addDebugMessage(QString("Training tab opened at %1").arg(QDateTime::currentDateTime().toString()), "INFO");
+}
+
+void TrainingTab::addDebugMessage(const QString& message, const QString& type)
+{
+    if (!m_debugTerminal) return;
+    
+    QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
+    QString coloredMessage;
+    
+    if (type == "ERROR") {
+        coloredMessage = QString("<span style='color: #ff6b6b;'>[%1] [ERROR] %2</span><br>").arg(timestamp).arg(message);
+    } else if (type == "WARNING") {
+        coloredMessage = QString("<span style='color: #ffd93d;'>[%1] [WARNING] %2</span><br>").arg(timestamp).arg(message);
+    } else if (type == "DATA") {
+        coloredMessage = QString("<span style='color: #6bcb77;'>[%1] [DATA] %2</span><br>").arg(timestamp).arg(message);
+    } else if (type == "SERIAL") {
+        coloredMessage = QString("<span style='color: #4d96ff;'>[%1] [SERIAL] %2</span><br>").arg(timestamp).arg(message);
+    } else {
+        coloredMessage = QString("<span style='color: #c4c4c4;'>[%1] [INFO] %2</span><br>").arg(timestamp).arg(message);
+    }
+    
+    m_debugTerminal->append(coloredMessage);
+    
+    // Limit number of lines to prevent memory issues
+    QStringList lines = m_debugTerminal->toPlainText().split("\n");
+    if (lines.size() > m_debugMaxLines) {
+        QTextCursor cursor(m_debugTerminal->document());
+        cursor.movePosition(QTextCursor::Start);
+        cursor.select(QTextCursor::BlockUnderCursor);
+        cursor.deleteChar(); // Delete the newline after the block
+        cursor.deleteChar(); // Delete the block itself
+    }
+    
+    // Auto-scroll to bottom
+    m_debugTerminal->verticalScrollBar()->setValue(m_debugTerminal->verticalScrollBar()->maximum());
 }
 
 } // namespace tab
