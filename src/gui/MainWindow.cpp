@@ -441,6 +441,12 @@ void MainWindow::saveSettings()
 
 void MainWindow::updateWeightDisplay(double weight)
 {
+    // m_weightValue jest tworzony dopiero po otwarciu okna ustawień,
+    // więc podczas normalnej pracy może być null.
+    if (!m_weightValue) {
+        return;
+    }
+
     m_weightValue->setText(QString("%1 N").arg(weight, 0, 'f', 2));
 }
 
