@@ -1,49 +1,43 @@
 ```
-# CMake build system
-build/
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-compile_commands.json
-CTestTestfile.cmake
-cmake.check_cache
-progress.marks
-
-# Qt autogen files
-*_autogen/
-
-# Executables
-*.exe
-*.out
-auth_regression
-biofeedback
-data_manager_regression
-qt5_mandatory_example
-
-# Object files
+# Compiled and build artifacts
 *.o
 *.obj
-*.d
-
-# Libraries
-*.a
-*.lib
-*.so
+*.exe
 *.dll
+*.so
+*.a
+*.out
 
-# Temporary and log files
-*.tmp
-*.log
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
 
-# IDE specific
+# Build directories
+build/
+dist/
+
+# Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# OS specific
+# Logs and temp files
+*.log
+*.tmp
+
+# System files
 .DS_Store
 Thumbs.db
 
-# Configuration (if generated)
-config/config.json
+# Environment
+.env
+.env.local
+*.env.*
 ```

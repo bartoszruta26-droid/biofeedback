@@ -467,6 +467,9 @@ void MainWindow::startDataCollection()
     m_actionStart->setEnabled(false);
     m_actionStop->setEnabled(true);
     
+    // Add debug message when data collection starts
+    addDebugMessage("Data collection started via menu Widok->Rozpocznij", "INFO");
+    
     emit dataCollectionStarted();
 }
 
@@ -479,6 +482,9 @@ void MainWindow::stopDataCollection()
     if (m_stopButton) m_stopButton->setEnabled(false);
     m_actionStart->setEnabled(true);
     m_actionStop->setEnabled(false);
+    
+    // Add debug message when data collection stops
+    addDebugMessage("Data collection stopped via menu Widok->Zatrzymaj", "INFO");
     
     emit dataCollectionStopped();
 }

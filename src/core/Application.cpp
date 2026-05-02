@@ -144,11 +144,11 @@ bool Application::showLoginDialog()
                 QString("User logged in: %1 (%2)").arg(loginDialog.getUsername()).arg(loginDialog.getRole()),
                 "INFO"
             );
-            m_mainWindow->addDebugMessage("Starting automatic data collection...", "INFO");
+            m_mainWindow->addDebugMessage("Login successful. Data collection will start after clicking Widok->Rozpocznij", "INFO");
         }
         
-        // Start data collection automatically after successful login
-        QTimer::singleShot(500, m_mainWindow.get(), &gui::MainWindow::startDataCollection);
+        // DO NOT start data collection automatically - wait for user to click menu Widok->Rozpocznij
+        // QTimer::singleShot(500, m_mainWindow.get(), &gui::MainWindow::startDataCollection);
         
         return true;
     }
@@ -188,33 +188,78 @@ void Application::setupConnections()
     // Connect MeasurementTab signals to MainWindow slots
     connect(m_measurementTab.get(), &tab::MeasurementTab::newForceSample,
             m_mainWindow.get(), [this](double force, double /*timestamp*/, bool /*isRaw*/) {
-                if (m_mainWindow && m_mainWindow->graphWidget()) {
-                    m_mainWindow->updateWeightDisplay(force);
-                    m_mainWindow->graphWidget()->addDataPoint(force);
-                    
-                    // Debug logging for data processing
-                    if (m_mainWindow->debugTerminal()) {
+                try {
+                    if (m_mainWindow && m_mainWindow->graphWidget()) {
+                        m_mainWindow->updateWeightDisplay(force);
+                        m_mainWindow->graphWidget()->addDataPoint(force);
+                        
+                        // Debug logging for data processing
+                        if (m_mainWindow->debugTerminal()) {
+                            m_mainWindow->addDebugMessage(
+                                QString("Received force data: %1 N").arg(force, 0, 'f', 2), 
+                                "DATA"
+                            );
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "[ERROR] Exception processing force data: " << e.what() << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
                         m_mainWindow->addDebugMessage(
-                            QString("Received force data: %1 N").arg(force, 0, 'f', 2), 
-                            "DATA"
+                            QString("ERROR processing data: %1").arg(e.what()), 
+                            "ERROR"
                         );
+                    }
+                } catch (...) {
+                    std::cerr << "[ERROR] Unknown exception processing force data" << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage("ERROR: Unknown exception processing data", "ERROR");
                     }
                 }
             });
     
     connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStarted,
             m_mainWindow.get(), [this]() {
-                m_mainWindow->startDataCollection();
-                if (m_mainWindow && m_mainWindow->debugTerminal()) {
-                    m_mainWindow->addDebugMessage("Measurement started by MeasurementTab", "INFO");
+                try {
+                    m_mainWindow->startDataCollection();
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage("Measurement started by MeasurementTab", "INFO");
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "[ERROR] Exception starting measurement: " << e.what() << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage(
+                            QString("ERROR starting measurement: %1").arg(e.what()), 
+                            "ERROR"
+                        );
+                    }
+                } catch (...) {
+                    std::cerr << "[ERROR] Unknown exception starting measurement" << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage("ERROR: Unknown exception starting measurement", "ERROR");
+                    }
                 }
             });
     
     connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStopped,
             m_mainWindow.get(), [this]() {
-                m_mainWindow->stopDataCollection();
-                if (m_mainWindow && m_mainWindow->debugTerminal()) {
-                    m_mainWindow->addDebugMessage("Measurement stopped by MeasurementTab", "INFO");
+                try {
+                    m_mainWindow->stopDataCollection();
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage("Measurement stopped by MeasurementTab", "INFO");
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "[ERROR] Exception stopping measurement: " << e.what() << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage(
+                            QString("ERROR stopping measurement: %1").arg(e.what()), 
+                            "ERROR"
+                        );
+                    }
+                } catch (...) {
+                    std::cerr << "[ERROR] Unknown exception stopping measurement" << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage("ERROR: Unknown exception stopping measurement", "ERROR");
+                    }
                 }
             });
     
