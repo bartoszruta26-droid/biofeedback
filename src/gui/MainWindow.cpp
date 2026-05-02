@@ -126,15 +126,39 @@ void MainWindow::setupTabs()
 
 void MainWindow::setupDebugTerminal()
 {
-    // Create debug terminal widget as part of TrainingTab
-    // The debug terminal will be embedded in the TrainingTab
+    // Create debug terminal widget directly in MainWindow (background initialization)
+    m_debugTerminal = new QTextEdit(this);
+    m_debugTerminal->setMinimumHeight(150);
+    m_debugTerminal->setMaximumHeight(200);
+    m_debugTerminal->setReadOnly(true);
+    m_debugTerminal->setPlaceholderText(tr("Terminal debugowania - tutaj będą wyświetlane komunikaty z aplikacji"));
+    m_debugTerminal->setFont(QFont("Courier New", 9));
+    m_debugTerminal->setStyleSheet(
+        "QTextEdit { "
+        "    background-color: #1e1e1e; "
+        "    color: #d4d4d4; "
+        "    border: 1px solid #3e3e3e; "
+        "    padding: 5px; "
+        "} "
+        "QTextEdit:focus { "
+        "    border: 1px solid #007acc; "
+        "}"
+    );
+    
+    // Add to main layout
+    QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout());
+    if (mainLayout) {
+        mainLayout->addWidget(m_debugTerminal);
+    }
+    
+    // Initial debug message
+    addDebugMessage("=== Debug Terminal Initialized ===", "INFO");
+    addDebugMessage(QString("Application started at %1").arg(QDateTime::currentDateTime().toString()), "INFO");
+    
+    // Also initialize debug terminal in TrainingTab for consistency
     if (m_trainingTab) {
         m_trainingTab->setupDebugTerminal();
     }
-    
-    // Initial debug message - will be shown in TrainingTab's debug field
-    addDebugMessage("=== Debug Terminal Initialized ===", "INFO");
-    addDebugMessage(QString("Application started at %1").arg(QDateTime::currentDateTime().toString()), "INFO");
 }
 
 void MainWindow::setupControlPanel()

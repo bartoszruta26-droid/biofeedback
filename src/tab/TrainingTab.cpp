@@ -352,8 +352,9 @@ void TrainingTab::setupUI()
     
     m_mainLayout->addWidget(m_statsBox);
     
-    // Terminal debugowania - ukryty w zakładce Training
-    setupDebugTerminal();
+    // Terminal debugowania jest inicjalizowany w MainWindow podczas startu aplikacji
+    // Nie inicjalizuj go ponownie tutaj - TrainingTab może używać addDebugMessage()
+    // który będzie wysyłał wiadomości do głównego terminala w MainWindow
     
     // Timer
     m_timer = new QTimer(this);
