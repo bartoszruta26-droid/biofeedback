@@ -1,22 +1,29 @@
 ```
-# Build artifacts
+# Compiled and build artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
 build/
-CMakeCache.txt
-CMakeFiles/
-CMakeOutput.log
-cmake.check_cache
-progress.marks
-compile_commands.json
+dist/
 
-# Logs
+# Dependencies
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+node_modules/
+
+# Logs and temp files
 *.log
-
-# Temporary and cache files
 *.tmp
 *.swp
-*.swo
 
-# Environment files
+# Environment
 .env
 .env.local
 *.env.*
@@ -24,34 +31,19 @@ compile_commands.json
 # Editors
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# OS specific
+# System files
 .DS_Store
 Thumbs.db
 
-# Coverage reports
+# Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-
-# Compiled files
-*.o
-*.obj
-*.out
-*.exe
-*.dll
-*.so
-*.a
-
-# Compressed files
+# Compression
 *.zip
 *.gz
 *.tar

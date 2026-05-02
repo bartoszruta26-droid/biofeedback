@@ -63,6 +63,9 @@ private:
     void createConnections();
     bool attemptLogin(const std::string& username, const std::string& password);
 
+    // Referencja do obiektu Authentication (must be first - reference member)
+    biofeedback::Authentication& m_authentication;
+
     // Widgety
     QLabel* m_titleLabel;
     QLabel* m_usernameLabel;
@@ -72,9 +75,6 @@ private:
     QPushButton* m_loginButton;
     QPushButton* m_cancelButton;
     QLabel* m_statusLabel;
-
-    // Referencja do obiektu Authentication
-    biofeedback::Authentication& m_authentication;
 
     // Stan logowania
     QString m_username;
