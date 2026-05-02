@@ -630,7 +630,7 @@ void MeasurementTab::setPatientId(const QString& id)
     m_patientId = id;
 }
 
-void MeasurementTab::onPatientChanged(const QString& pesel, const QString& patientDataPath)
+void MeasurementTab::onPatientChanged(const QString& pesel, const QString& /*patientDataPath*/)
 {
     // Ustaw ID pacjenta
     m_patientId = pesel;

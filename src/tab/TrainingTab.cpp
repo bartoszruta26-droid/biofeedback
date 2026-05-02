@@ -813,7 +813,7 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     emit newForceSample(force);
 }
 
-void TrainingTab::onGameEnded(int score)
+void TrainingTab::onGameEnded(int /*score*/)
 {
     // Gra zakończona - można zarejestrować wynik
     calculateExerciseStats();
@@ -824,7 +824,7 @@ void TrainingTab::onGameStarted()
     // Gra rozpoczęta
 }
 
-void TrainingTab::onScoreChanged(int score)
+void TrainingTab::onScoreChanged(int /*score*/)
 {
     // Wynik zmieniony
 }
@@ -993,8 +993,6 @@ QColor TrainingTab::getForceColor(double current, double target) const
     if (ratio < 1.0) return QColor(100, 255, 100);
     return QColor(50, 200, 50);
 }
-
-} // namespace tab
 
 // ==================== Debug Terminal Methods ====================
 
