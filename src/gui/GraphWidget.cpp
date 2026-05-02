@@ -370,7 +370,6 @@ void GraphWidget::drawGrid(QPainter& painter)
         }
         
         QRectF area = plotArea();
-        std::cout << "[GraphWidget::drawGrid] Plot area: " << area.toString().toStdString() << std::endl;
         
         painter.setPen(QPen(m_gridColor, 1, Qt::DashLine));
         
@@ -406,7 +405,6 @@ void GraphWidget::drawAxes(QPainter& painter)
         std::cout << "[GraphWidget::drawAxes] START" << std::endl;
         
         QRectF area = plotArea();
-        std::cout << "[GraphWidget::drawAxes] Plot area: " << area.toString().toStdString() << std::endl;
         
         painter.setPen(QPen(m_textColor, 2));
         
@@ -446,7 +444,6 @@ void GraphWidget::drawDataLine(QPainter& painter)
         }
         
         QRectF area = plotArea();
-        std::cout << "[GraphWidget::drawDataLine] Plot area: " << area.toString().toStdString() << std::endl;
         
         // Ścieżka linii
         QPainterPath path;
@@ -562,7 +559,6 @@ void GraphWidget::drawLabels(QPainter& painter)
         std::cout << "[GraphWidget::drawLabels] START" << std::endl;
         
         QRectF area = plotArea();
-        std::cout << "[GraphWidget::drawLabels] Plot area: " << area.toString().toStdString() << std::endl;
         
         painter.setPen(m_textColor);
         painter.setFont(QFont("Arial", 9));
