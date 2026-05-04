@@ -76,6 +76,7 @@ if(Qt5_FOUND)
         src/tab/MeasurementTab.cpp
         src/tab/OutlineTab.cpp
         src/tab/TrainingTab.cpp
+        src/tab/DebugTab.cpp
         src/sensor/SerialCommunication.cpp
         src/data/DataManager.cpp
         src/data/Encryption.cpp
@@ -100,6 +101,7 @@ if(Qt5_FOUND)
         include/tab/MeasurementTab.hpp
         include/tab/OutlineTab.hpp
         include/tab/TrainingTab.hpp
+        include/tab/DebugTab.hpp
         include/sensor/SerialCommunication.hpp
         include/data/DataManager.hpp
         include/data/Encryption.hpp

@@ -1946,6 +1946,13 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     
     if (data.isValid) {
         m_lastSensorData = data;
+        
+        // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
+        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
+            .arg(data.value)
+            .arg(data.calibratedValue);
+        addDebugMessage(arduinoDebug, "ARDUINO");
+        
         if (m_isMeasuring) {
             // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
             double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
@@ -1977,6 +1984,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         }
     } else {
         std::cout << "[DEBUG] onSensorDataReceived: Received invalid data" << std::endl;
+        addDebugMessage("Otrzymano nieprawidłowe dane z Arduino", "WARNING");
     }
 }
 

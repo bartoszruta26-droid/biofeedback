@@ -1,1 +1,29 @@
-Nothing should be ignored based on the provided file changes. The modification of 'src/tab/MeasurementTab.cpp' is a source code file that should be tracked in version control. No build artifacts, dependencies, temporary files, or other ignorable content was detected in the changes.
+```
+# Build artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+
+# Compiled files
+*.o
+*.obj
+*.out
+
+# Dependencies
+venv/
+.venv/
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Editors
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+*.env.*
+```

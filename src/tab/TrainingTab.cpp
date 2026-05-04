@@ -815,6 +815,12 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     double force = data.calibratedValue;
     m_currentForce = force;
     
+    // Dodaj dane z Arduino do terminala debugowania
+    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
+        .arg(data.value)
+        .arg(data.calibratedValue);
+    addDebugMessage(arduinoDebug, "ARDUINO");
+    
     // Śledzenie siły szczytowej w powtórzeniu
     if (force > m_peakForceInRep) {
         m_peakForceInRep = force;
