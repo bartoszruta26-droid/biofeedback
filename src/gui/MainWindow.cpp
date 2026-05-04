@@ -4,6 +4,7 @@
 #include "tab/MeasurementTab.hpp"
 #include "tab/OutlineTab.hpp"
 #include "tab/TrainingTab.hpp"
+#include "tab/DebugTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -26,6 +27,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_measurementTab(nullptr)
     , m_outlineTab(nullptr)
     , m_trainingTab(nullptr)
+    , m_debugTab(nullptr)
     , m_gameStack(nullptr)
     , m_currentGame(nullptr)
     , m_startButton(nullptr)
@@ -112,18 +114,22 @@ void MainWindow::setupTabs()
     m_measurementTab = new tab::MeasurementTab(this);
     m_outlineTab = new tab::OutlineTab(this);
     m_trainingTab = new tab::TrainingTab(this);
+    m_debugTab = new tab::DebugTab(this);
     
-    // Udostępnij połączenie szeregowe obu zakładkom
+    // Udostępnij połączenie szeregowe wszystkim zakładkom
     if (m_serialPort) {
         m_measurementTab->setSerialConnection(m_serialPort);
         m_outlineTab->setSerialConnection(m_serialPort);
+        m_trainingTab->setSerialConnection(m_serialPort);
+        m_debugTab->setSerialConnection(m_serialPort);
     }
     
-    // Add tabs to widget
+    // Add tabs to widget - DebugTab jako ostatnia zakładka
     m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));
     m_tabWidget->addTab(m_measurementTab, tr("📊 Pomiary"));
     m_tabWidget->addTab(m_outlineTab, tr("🎮 Trening (Outline)"));
     m_tabWidget->addTab(m_trainingTab, tr("🏋️ Trening (Gry)"));
+    m_tabWidget->addTab(m_debugTab, tr("🔍 Debug Terminal"));
     
     // Set default tab
     m_tabWidget->setCurrentIndex(0);

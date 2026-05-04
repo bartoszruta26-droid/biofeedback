@@ -1,1 +1,29 @@
-Nothing should be ignored based on the provided file changes. The added file 'include/tab/DebugTab.hpp' is a source code header file that should be tracked in version control.
+```
+# Build artifacts
+build/
+CMakeCache.txt
+CMakeFiles/
+
+# Compiled files
+*.o
+*.obj
+*.out
+
+# Dependencies
+venv/
+.venv/
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Editors
+.vscode/
+.idea/
+
+# Environment
+.env
+.env.local
+*.env.*
+```

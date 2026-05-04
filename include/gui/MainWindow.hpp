@@ -29,11 +29,18 @@
 #include "tab/OutlineTab.hpp"
 #include "sensor/SerialCommunication.hpp"
 
+namespace gui {
+
+class DebugTab;
+
+}
+
 namespace tab {
     class PatientTab;
     class MeasurementTab;
     class OutlineTab;
     class TrainingTab;
+    class DebugTab;
 }
 
 namespace games {
@@ -110,6 +117,11 @@ public:
      * @brief Pobiera zakładkę TrainingTab
      */
     tab::TrainingTab* trainingTab() const { return m_trainingTab; }
+
+    /**
+     * @brief Pobiera zakładkę DebugTab
+     */
+    tab::DebugTab* debugTab() const { return m_debugTab; }
 
     /**
      * @brief Uruchamia grę w zakładce treningu
@@ -237,6 +249,7 @@ private:
     tab::MeasurementTab* m_measurementTab;
     tab::OutlineTab* m_outlineTab;
     tab::TrainingTab* m_trainingTab;
+    tab::DebugTab* m_debugTab;
     
     // Obszar gry
     QStackedWidget* m_gameStack;
