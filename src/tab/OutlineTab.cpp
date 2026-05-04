@@ -896,9 +896,6 @@ QVector<OutlineData> OutlineTab::getOutlines() const
     return m_outlines;
 }
 
-} // namespace tab
-
-
 // ==================== Serial Communication Methods ====================
 
 void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
@@ -946,3 +943,5 @@ void OutlineTab::onSensorDataReceived(const sensor::SensorData& data)
         // through MainWindow
     }
 }
+
+} // namespace tab
