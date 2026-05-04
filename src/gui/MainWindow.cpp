@@ -72,19 +72,11 @@ void MainWindow::setupCentralWidget()
     mainLayout->setSpacing(0);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     
-    // Create GraphWidget - it will be shown only in MeasurementTab
-    m_graphWidget = new GraphWidget(this);
-    m_graphWidget->setTitle(tr("Wykres Siły w Czasie Rzeczywistym"));
-    m_graphWidget->setYLabel(tr("Siła [N]"));
-    m_graphWidget->setUnit(tr("N"));
-    m_graphWidget->setMinimumHeight(300);
+    // GraphWidget is now managed by MeasurementTab - do not create it here
+    m_graphWidget = nullptr;  // Will be accessed via measurementTab()->graphWidget()
     
     // Setup tabs
     setupTabs();
-    
-    // Add graph widget to main layout (will be hidden by default, shown only in MeasurementTab)
-    mainLayout->addWidget(m_graphWidget);
-    m_graphWidget->hide();  // Hide by default, show only in MeasurementTab
     
     // Add tab widget to main layout
     mainLayout->addWidget(m_tabWidget);
@@ -95,7 +87,7 @@ void MainWindow::setupCentralWidget()
     // Setup control panel with buttons and settings
     setupControlPanel();
     
-    // Setup game area (hidden by default)
+    // Setup game area (hidden by default) - used for global game management
     createGameArea();
     
     setCentralWidget(m_centralWidget);
@@ -408,15 +400,7 @@ void MainWindow::createConnections()
     connect(m_outlineTab, &tab::OutlineTab::gameFinished,
             this, &MainWindow::onGameFinished);
     
-    // Connect tab changes to show/hide GraphWidget only in MeasurementTab
-    connect(m_tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
-        // Show graph widget only in MeasurementTab (index 1)
-        if (index == 1) {
-            m_graphWidget->show();
-        } else {
-            m_graphWidget->hide();
-        }
-    });
+    // GraphWidget is now managed by MeasurementTab - no need for tab change handling here
 }
 
 void MainWindow::loadSettings()
@@ -436,10 +420,7 @@ void MainWindow::loadSettings()
         m_graphDurationSpin->setValue(graphDuration);
     }
     
-    // Protect against null pointer - GraphWidget should be initialized by now
-    if (m_graphWidget) {
-        m_graphWidget->setTimeRange(graphDuration);
-    }
+    // GraphWidget is now managed by MeasurementTab - settings are handled there
 }
 
 void MainWindow::saveSettings()
@@ -513,52 +494,20 @@ void MainWindow::stopDataCollection()
 
 void MainWindow::clearGraph()
 {
-    if (m_graphWidget) {
-        m_graphWidget->clear();
+    // GraphWidget is now managed by MeasurementTab - delegate to it
+    if (m_measurementTab) {
+        m_measurementTab->resetSession();  // This clears the ForcePlotWidget data
     }
 }
 
 void MainWindow::exportData()
 {
-    if (!m_graphWidget) {
-        QMessageBox::warning(this, tr("Błąd"), tr("Wykres nie jest zainicjalizowany."));
-        return;
+    // Export functionality is now handled by MeasurementTab
+    if (m_measurementTab) {
+        m_measurementTab->onSaveMeasurementJSON();  // Or onSaveData() for CSV export
+    } else {
+        QMessageBox::warning(this, tr("Błąd"), tr("Zakładka pomiarów nie jest zainicjalizowana."));
     }
-    
-    QString filename = QFileDialog::getSaveFileName(
-        this,
-        tr("Eksportuj dane do CSV"),
-        QDateTime::currentDateTime().toString("yyyy-MM-dd_HH-mm-ss") + "_measurements.csv",
-        tr("Pliki CSV (*.csv)")
-    );
-    
-    if (filename.isEmpty()) return;
-    
-    QVector<DataPoint> data = m_graphWidget->getData();
-    
-    QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::critical(this, tr("Błąd"), tr("Nie można zapisać pliku: ") + filename);
-        return;
-    }
-    
-    QTextStream out(&file);
-    out.setCodec("UTF-8");
-    
-    // Nagłówek
-    out << "Timestamp,Value\n";
-    
-    // Dane
-    for (const DataPoint& point : data) {
-        out << point.timestamp.toString(Qt::ISODate) << "," 
-            << QString::number(point.value, 'f', 4) << "\n";
-    }
-    
-    file.close();
-    
-    QMessageBox::information(this, tr("Sukces"), 
-                            tr("Wyeksportowano %1 punktów danych do:\n%2")
-                            .arg(data.size()).arg(filename));
 }
 
 void MainWindow::openConfiguration()
@@ -604,9 +553,7 @@ void MainWindow::onSamplingRateChanged(int rate)
 
 void MainWindow::onGraphDurationChanged(int seconds)
 {
-    if (m_graphWidget) {
-        m_graphWidget->setTimeRange(seconds);
-    }
+    // GraphWidget is now managed by MeasurementTab - settings are handled there
     emit graphDurationChanged(seconds);
 }
 
