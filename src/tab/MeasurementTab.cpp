@@ -392,6 +392,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_chkShowTrends(nullptr)
     , m_serialPort(nullptr)
     , m_hasArduinoConnection(false)
+    , m_debugTerminal(nullptr)
+    , m_debugMaxLines(500)
 {
     // Inicjalizacja wskaźników przycisków JSON
     m_btnSaveJSON = nullptr;
@@ -403,6 +405,9 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     
     // Próba automatycznego podłączenia do Arduino w tle
     connectToArduinoAsync();
+    
+    // Inicjalizacja terminala debugowania
+    setupDebugTerminal();
     
     m_timer = new QTimer(this);
     m_timer->setInterval(10);  // 10 ms = 100 Hz

@@ -1,19 +1,70 @@
 ```
-# CMake build artifacts
+# Compiled and build artifacts
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.a
+*.out
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+dist/
 build/
-CMakeCache.txt
-CMakeFiles/
-cmake_install.cmake
-Makefile
-compile_commands.json
-CTestTestfile.cmake
-cmake.check_cache
-progress.marks
+target/
+.gradle/
 
-# Configuration files that might contain sensitive data
-config.json
-users.json
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
 
-# Log files
-CMakeOutput.log
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.tar.zst
 ```

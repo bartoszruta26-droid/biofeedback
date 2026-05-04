@@ -18,6 +18,7 @@
 #include <QCheckBox>
 #include <QUuid>
 #include <QHeaderView>
+#include <QTextEdit>
 #include <memory>
 #include <QComboBox>
 
@@ -265,6 +266,18 @@ public:
      * @return true jeśli Arduino Nano z HX711 jest podłączone
      */
     bool isArduinoConnected() const;
+    
+    /**
+     * @brief Inicjalizuje terminal debugowania w zakładce Measurement
+     */
+    void setupDebugTerminal();
+    
+    /**
+     * @brief Dodaje wiadomość do terminala debugowania
+     * @param message Treść wiadomości
+     * @param type Typ wiadomości (INFO, ERROR, WARNING, DATA, SERIAL)
+     */
+    void addDebugMessage(const QString& message, const QString& type = "INFO");
 
 signals:
     void measurementStarted();
@@ -404,6 +417,10 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SensorData m_lastSensorData;
     bool m_hasArduinoConnection;
+    
+    // Terminal debugowania
+    QTextEdit* m_debugTerminal;
+    int m_debugMaxLines;
 };
 
 } // namespace tab
