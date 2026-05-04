@@ -27,6 +27,7 @@
 
 #include "GraphWidget.hpp"
 #include "tab/OutlineTab.hpp"
+#include "sensor/SerialCommunication.hpp"
 
 namespace tab {
     class PatientTab;
@@ -283,6 +284,9 @@ private:
     // Debug terminal
     QTextEdit* m_debugTerminal;
     int m_debugMaxLines;
+    
+    // Połączenie szeregowe z Arduino - współdzielone między zakładkami
+    std::shared_ptr<sensor::SerialCommunication> m_serialPort;
 };
 
 } // namespace gui
