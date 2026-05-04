@@ -189,9 +189,10 @@ void Application::setupConnections()
     connect(m_measurementTab.get(), &tab::MeasurementTab::newForceSample,
             m_mainWindow.get(), [this](double force, double /*timestamp*/, bool /*isRaw*/) {
                 try {
-                    if (m_mainWindow && m_mainWindow->graphWidget()) {
+                    if (m_mainWindow && m_mainWindow->measurementTab()) {
                         m_mainWindow->updateWeightDisplay(force);
-                        m_mainWindow->graphWidget()->addDataPoint(force);
+                        // GraphWidget is now managed by MeasurementTab - data is added there directly
+                        // via ForcePlotWidget
                         
                         // Debug logging for data processing
                         if (m_mainWindow->debugTerminal()) {

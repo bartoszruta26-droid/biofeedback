@@ -199,15 +199,19 @@ TrainingTab::~TrainingTab()
 void TrainingTab::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(10);
-    m_mainLayout->setContentsMargins(10, 10, 10, 10);
+    m_mainLayout->setSpacing(15);
+    m_mainLayout->setContentsMargins(15, 15, 15, 15);
     
     // Panel konfiguracji
     m_configBox = new QGroupBox("Konfiguracja ćwiczenia", this);
+    m_configBox->setFont(QFont("Arial", 11, QFont::Bold));
     QHBoxLayout* configLayout = new QHBoxLayout(m_configBox);
+    configLayout->setSpacing(10);
     
     m_exerciseSelector = new QComboBox(this);
     m_exerciseSelector->setMinimumWidth(200);
+    m_exerciseSelector->setMinimumHeight(35);
+    m_exerciseSelector->setFont(QFont("Arial", 10));
     configLayout->addWidget(new QLabel("Ćwiczenie:", this));
     configLayout->addWidget(m_exerciseSelector);
     
@@ -216,24 +220,32 @@ void TrainingTab::setupUI()
     m_targetForceSpin->setRange(0, 500);
     m_targetForceSpin->setValue(50.0);
     m_targetForceSpin->setDecimals(1);
+    m_targetForceSpin->setMinimumHeight(35);
+    m_targetForceSpin->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_targetForceSpin);
     
     configLayout->addWidget(new QLabel("Serie:", this));
     m_seriesSpin = new QSpinBox(this);
     m_seriesSpin->setRange(1, 20);
     m_seriesSpin->setValue(3);
+    m_seriesSpin->setMinimumHeight(35);
+    m_seriesSpin->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_seriesSpin);
     
     configLayout->addWidget(new QLabel("Powtórzenia:", this));
     m_repsSpin = new QSpinBox(this);
     m_repsSpin->setRange(1, 50);
     m_repsSpin->setValue(8);
+    m_repsSpin->setMinimumHeight(35);
+    m_repsSpin->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_repsSpin);
     
     configLayout->addWidget(new QLabel("Odpoczynek [s]:", this));
     m_restTimeSpin = new QSpinBox(this);
     m_restTimeSpin->setRange(0, 300);
     m_restTimeSpin->setValue(60);
+    m_restTimeSpin->setMinimumHeight(35);
+    m_restTimeSpin->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_restTimeSpin);
     
     configLayout->addWidget(new QLabel("Gra:", this));
@@ -241,23 +253,30 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Pong", "pong");
     m_gameTypeCombo->addItem("Flappy Bird", "flappy");
     m_gameTypeCombo->addItem("Mario", "mario");
+    m_gameTypeCombo->setMinimumHeight(35);
+    m_gameTypeCombo->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_gameTypeCombo);
     
     m_btnAddExercise = new QPushButton("Dodaj", this);
     m_btnAddExercise->setMaximumWidth(80);
+    m_btnAddExercise->setMinimumHeight(35);
+    m_btnAddExercise->setFont(QFont("Arial", 10, QFont::Bold));
     configLayout->addWidget(m_btnAddExercise);
     
     m_btnRemoveExercise = new QPushButton("Usuń", this);
     m_btnRemoveExercise->setMaximumWidth(80);
+    m_btnRemoveExercise->setMinimumHeight(35);
+    m_btnRemoveExercise->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_btnRemoveExercise);
     
     m_mainLayout->addWidget(m_configBox);
     
     // Panel sterowania
     m_controlLayout = new QHBoxLayout();
+    m_controlLayout->setSpacing(12);
     
     m_btnStartStop = new QPushButton("Start", this);
-    m_btnStartStop->setMinimumHeight(40);
+    m_btnStartStop->setMinimumHeight(45);
     m_btnStartStop->setFont(QFont("Arial", 12, QFont::Bold));
     m_controlLayout->addWidget(m_btnStartStop);
     
@@ -268,12 +287,18 @@ void TrainingTab::setupUI()
     m_controlLayout->addWidget(m_btnPauseResume);
     
     m_btnSave = new QPushButton("Zapisz wyniki", this);
+    m_btnSave->setMinimumHeight(35);
+    m_btnSave->setFont(QFont("Arial", 10));
     m_controlLayout->addWidget(m_btnSave);
     
     m_btnLoad = new QPushButton("Wczytaj plan", this);
+    m_btnLoad->setMinimumHeight(35);
+    m_btnLoad->setFont(QFont("Arial", 10));
     m_controlLayout->addWidget(m_btnLoad);
     
     m_btnExport = new QPushButton("Eksportuj plan", this);
+    m_btnExport->setMinimumHeight(35);
+    m_btnExport->setFont(QFont("Arial", 10));
     m_controlLayout->addWidget(m_btnExport);
     
     m_mainLayout->addLayout(m_controlLayout);
@@ -328,23 +353,24 @@ void TrainingTab::setupUI()
     
     m_mainLayout->addWidget(m_progressBox);
     
-    // Widget gry
+    // Widget gry - miejsce na silnik gier
     m_gameBox = new QGroupBox("Gra treningowa", this);
     QVBoxLayout* gameLayout = new QVBoxLayout(m_gameBox);
-    gameLayout->setContentsMargins(5, 5, 5, 5);
+    gameLayout->setContentsMargins(0, 0, 0, 0);
+    gameLayout->setSpacing(0);
     
     // Placeholder dla gry - będzie zastąpiony przez rzeczywisty widget gry
     QLabel* gamePlaceholder = new QLabel("Wybierz grę i rozpocznij trening", this);
     gamePlaceholder->setAlignment(Qt::AlignCenter);
-    gamePlaceholder->setMinimumHeight(200);
-    gamePlaceholder->setStyleSheet("background-color: #1a1a1a; color: #888; font-size: 16px;");
+    gamePlaceholder->setMinimumHeight(400);
+    gamePlaceholder->setStyleSheet("background-color: #1a1a1a; color: #888; font-size: 18px; border: 2px solid #333;");
     gameLayout->addWidget(gamePlaceholder);
     
-    m_mainLayout->addWidget(m_gameBox);
+    m_mainLayout->addWidget(m_gameBox, 1);  // Stretch factor 1 to give more space
     
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki sesji", this);
-    m_statsBox->setMaximumHeight(200);
+    m_statsBox->setMaximumHeight(150);
     QVBoxLayout* statsLayout = new QVBoxLayout(m_statsBox);
     
     m_statsContainer = new QWidget(this);
