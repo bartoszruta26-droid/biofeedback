@@ -392,8 +392,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_chkShowTrends(nullptr)
     , m_serialPort(nullptr)
     , m_hasArduinoConnection(false)
-    , m_debugTerminal(nullptr)
-    , m_debugMaxLines(500)
 {
     // Inicjalizacja wskaźników przycisków JSON
     m_btnSaveJSON = nullptr;
@@ -406,8 +404,9 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // Próba automatycznego podłączenia do Arduino w tle
     connectToArduinoAsync();
     
-    // Inicjalizacja terminala debugowania
-    setupDebugTerminal();
+    // MeasurementTab nie posiada własnego terminala debugowego.
+    // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
+    // który przekazuje je do centralnej zakładki DebugTab.
     
     m_timer = new QTimer(this);
     m_timer->setInterval(10);  // 10 ms = 100 Hz
@@ -595,33 +594,10 @@ void MeasurementTab::setupUI()
     m_mainLayout->addWidget(m_liveBox);
     
 
-    // Terminal debugowania - dane z Arduino i logi systemowe
-    QGroupBox* debugBox = new QGroupBox("Terminal Debugowania (Dane z Arduino)", this);
-    debugBox->setFont(QFont("Arial", 11, QFont::Bold));
-    QVBoxLayout* debugLayout = new QVBoxLayout();
+    // MeasurementTab nie posiada własnego terminala debugowego.
+    // Wszystkie wiadomości debugowe są wysyłane do centralnej zakładki DebugTab
+    // poprzez DebugManager.
     
-    m_debugTerminal = new QTextEdit(this);
-    m_debugTerminal->setReadOnly(true);
-    m_debugTerminal->setFont(QFont("Courier New", 9));
-    m_debugTerminal->setMinimumHeight(150);
-    m_debugTerminal->setMaximumHeight(200);
-    m_debugTerminal->setPlaceholderText("Tu będą wyświetlane dane z Arduino Nano z HX711 oraz komunikaty systemowe...");
-    
-    // Przycisk czyszczenia terminala
-    QPushButton* btnClearDebug = new QPushButton("WYCZYŚĆ TERMINAL", this);
-    btnClearDebug->setMinimumHeight(30);
-    btnClearDebug->setFont(QFont("Arial", 9));
-    connect(btnClearDebug, &QPushButton::clicked, this, [this]() {
-        if (m_debugTerminal) {
-            m_debugTerminal->clear();
-            addDebugMessage("Terminal wyczyszczony", "INFO");
-        }
-    });
-    
-    debugLayout->addWidget(m_debugTerminal);
-    debugLayout->addWidget(btnClearDebug);
-    debugBox->setLayout(debugLayout);
-    m_mainLayout->addWidget(debugBox);
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki Serii i Powtórzeń", this);
     m_statsBox->setFont(QFont("Arial", 11, QFont::Bold));
@@ -2183,46 +2159,16 @@ void MeasurementTab::updateRawTableUnits()
 
 void MeasurementTab::setupDebugTerminal()
 {
-    // Terminal debugowania jest inicjalizowany w setupUI()
-    // Ta metoda może być używana do dodatkowej konfiguracji jeśli potrzebna
+    // Terminal debugowania jest teraz centralny w DebugTab
+    // Ta metoda może być używana do inicjalizacji jeśli potrzebna
     addDebugMessage("=== TERMINAL DEBUGOWANIA URUCHOMIONY ===", "INFO");
     addDebugMessage("Oczekiwanie na dane z Arduino Nano z HX711...", "SERIAL");
 }
 
 void MeasurementTab::addDebugMessage(const QString& message, const QString& type)
 {
-    if (!m_debugTerminal) return;
-
-    QString timestamp = QDateTime::currentDateTime().toString("HH:mm:ss.zzz");
-    QString formattedMessage;
-
-    // Kolorowanie w zależności od typu wiadomości
-    if (type == "ERROR") {
-        formattedMessage = QString("<span style=\"color: red; font-weight: bold;\">[%1] [%2] %3</span>").arg(timestamp, type, message);
-    } else if (type == "WARNING") {
-        formattedMessage = QString("<span style=\"color: orange; font-weight: bold;\">[%1] [%2] %3</span>").arg(timestamp, type, message);
-    } else if (type == "DATA") {
-        formattedMessage = QString("<span style=\"color: green;\">[%1] [DATA] %3</span>").arg(timestamp, message);
-    } else if (type == "SERIAL") {
-        formattedMessage = QString("<span style=\"color: blue;\">[%1] [SERIAL] %3</span>").arg(timestamp, message);
-    } else {
-        formattedMessage = QString("[%1] [%2] %3").arg(timestamp, type, message);
-    }
-
-    m_debugTerminal->append(formattedMessage);
-
-    // Ogranicz liczbę linii
-    QStringList lines = m_debugTerminal->toPlainText().split("\n");
-    while (lines.size() > m_debugMaxLines) {
-        lines.removeFirst();
-    }
-
-    // Wyczyść i przywróć ograniczoną zawartość
-    m_debugTerminal->clear();
-    m_debugTerminal->append(lines.join("\n"));
-
-    // Przewiń do ostatniej linii
-    m_debugTerminal->verticalScrollBar()->setValue(m_debugTerminal->verticalScrollBar()->maximum());
+    // Wysyłaj wiadomość do centralnego DebugManager, który przekaże ją do DebugTab
+    core::DebugManager::instance().sendDebugMessage(message, type);
 }
 
 } // namespace tab

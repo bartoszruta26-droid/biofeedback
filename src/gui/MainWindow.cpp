@@ -137,38 +137,19 @@ void MainWindow::setupTabs()
 
 void MainWindow::setupDebugTerminal()
 {
-    // Create debug terminal widget directly in MainWindow (background initialization)
-    m_debugTerminal = new QTextEdit(this);
-    m_debugTerminal->setMinimumHeight(150);
-    m_debugTerminal->setMaximumHeight(200);
-    m_debugTerminal->setReadOnly(true);
-    m_debugTerminal->setPlaceholderText(tr("Terminal debugowania - tutaj będą wyświetlane komunikaty z aplikacji"));
-    m_debugTerminal->setFont(QFont("Courier New", 9));
-    m_debugTerminal->setStyleSheet(
-        "QTextEdit { "
-        "    background-color: #1e1e1e; "
-        "    color: #d4d4d4; "
-        "    border: 1px solid #3e3e3e; "
-        "    padding: 5px; "
-        "} "
-        "QTextEdit:focus { "
-        "    border: 1px solid #007acc; "
-        "}"
-    );
+    // Terminal debugowy jest teraz tylko w DebugTab
+    // Ta metoda inicjalizuje DebugManager i rejestruje DebugTab jako odbiorcę
     
-    // Add to main layout
-    QVBoxLayout* mainLayout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout());
-    if (mainLayout) {
-        mainLayout->addWidget(m_debugTerminal);
-    }
-    
-    // Initial debug message
+    // Initial debug message via DebugManager
     addDebugMessage("=== Debug Terminal Initialized ===", "INFO");
     addDebugMessage(QString("Application started at %1").arg(QDateTime::currentDateTime().toString()), "INFO");
     
-    // Also initialize debug terminal in TrainingTab for consistency
+    // Initialize debug terminals in tabs (they will use DebugManager)
     if (m_trainingTab) {
         m_trainingTab->setupDebugTerminal();
+    }
+    if (m_measurementTab) {
+        m_measurementTab->setupDebugTerminal();
     }
 }
 

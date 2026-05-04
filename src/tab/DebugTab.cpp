@@ -1,4 +1,5 @@
 #include "tab/DebugTab.hpp"
+#include "core/DebugManager.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QFileDialog>
 #include <QTextStream>
@@ -6,6 +7,7 @@
 #include <QFont>
 #include <QScrollBar>
 #include <QMessageBox>
+#include <QThread>
 #include <iostream>
 #include <mutex>
 
@@ -41,11 +43,13 @@ DebugTab::DebugTab(QWidget *parent)
 {
     setupUI();
     setupDebugTerminal();
+    registerAsDebugReceiver();
 }
 
 DebugTab::~DebugTab() override
 {
-    // Czyszczenie zasobów
+    // Odłącz callback przy niszczeniu
+    core::DebugManager::instance().unregisterDebugCallback();
 }
 
 void DebugTab::setupUI()
@@ -283,6 +287,26 @@ int DebugTab::getMessageCount() const
 void DebugTab::setMaxLines(int maxLines)
 {
     m_maxLines = maxLines;
+}
+
+void DebugTab::registerAsDebugReceiver()
+{
+    // Rejestrujemy lambda jako callback do DebugManager
+    // Dzięki temu wszystkie wiadomości z innych zakładek trafią do DebugTab
+    auto debugCallback = [this](const QString& message, const QString& type) {
+        // Wywołujemy addDebugMessage w głównym wątku GUI
+        if (QThread::currentThread() != this->thread()) {
+            QMetaObject::invokeMethod(this, "addDebugMessage", 
+                                      Qt::QueuedConnection,
+                                      Q_ARG(QString, message), 
+                                      Q_ARG(QString, type));
+        } else {
+            addDebugMessage(message, type);
+        }
+    };
+    
+    core::DebugManager::instance().registerDebugCallback(debugCallback);
+    addDebugMessage("DebugTab registered as central debug receiver", "INFO");
 }
 
 void DebugTab::onSensorDataReceived(const sensor::SensorData& data)

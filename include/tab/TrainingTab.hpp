@@ -20,6 +20,7 @@
 #include <memory>
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "core/DebugManager.hpp"
 
 namespace tab {
 
@@ -194,14 +195,12 @@ public:
     bool exportTrainingPlan(const QString& filename);
 
     /**
-     * @brief Inicjalizuje terminal debugowania w zakładce Training
-     */
-    void setupDebugTerminal();
-    
-    /**
-     * @brief Dodaje wiadomość do terminala debugowania
+     * @brief Dodaje wiadomość do centralnego terminala debugowego (DebugTab)
      * @param message Wiadomość do wyświetlenia
      * @param type Typ wiadomości (INFO, ERROR, WARNING, DATA, SERIAL)
+     * 
+     * Ta metoda wysyła wiadomość do DebugManager, który przekazuje ją do DebugTab.
+     * TrainingTab nie posiada już własnego terminala debugowego.
      */
     void addDebugMessage(const QString& message, const QString& type = "INFO");
 
@@ -284,10 +283,6 @@ private:
     // Tabela statystyk
     QGroupBox* m_statsBox;
     QWidget* m_statsContainer;
-    
-    // Terminal debugowania
-    QTextEdit* m_debugTerminal;
-    int m_debugMaxLines;
     
     // Logika i dane
     QTimer* m_timer;
