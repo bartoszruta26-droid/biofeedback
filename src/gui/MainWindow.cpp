@@ -72,7 +72,7 @@ void MainWindow::setupCentralWidget()
     mainLayout->setSpacing(0);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     
-    // Create GraphWidget first - it must exist before loadSettings() is called
+    // Create GraphWidget - it will be shown only in MeasurementTab
     m_graphWidget = new GraphWidget(this);
     m_graphWidget->setTitle(tr("Wykres Siły w Czasie Rzeczywistym"));
     m_graphWidget->setYLabel(tr("Siła [N]"));
@@ -82,8 +82,9 @@ void MainWindow::setupCentralWidget()
     // Setup tabs
     setupTabs();
     
-    // Add graph widget to main layout
+    // Add graph widget to main layout (will be hidden by default, shown only in MeasurementTab)
     mainLayout->addWidget(m_graphWidget);
+    m_graphWidget->hide();  // Hide by default, show only in MeasurementTab
     
     // Add tab widget to main layout
     mainLayout->addWidget(m_tabWidget);
@@ -406,6 +407,16 @@ void MainWindow::createConnections()
     
     connect(m_outlineTab, &tab::OutlineTab::gameFinished,
             this, &MainWindow::onGameFinished);
+    
+    // Connect tab changes to show/hide GraphWidget only in MeasurementTab
+    connect(m_tabWidget, &QTabWidget::currentChanged, this, [this](int index) {
+        // Show graph widget only in MeasurementTab (index 1)
+        if (index == 1) {
+            m_graphWidget->show();
+        } else {
+            m_graphWidget->hide();
+        }
+    });
 }
 
 void MainWindow::loadSettings()

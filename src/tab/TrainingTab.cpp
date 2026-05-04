@@ -353,23 +353,24 @@ void TrainingTab::setupUI()
     
     m_mainLayout->addWidget(m_progressBox);
     
-    // Widget gry
+    // Widget gry - miejsce na silnik gier
     m_gameBox = new QGroupBox("Gra treningowa", this);
     QVBoxLayout* gameLayout = new QVBoxLayout(m_gameBox);
-    gameLayout->setContentsMargins(5, 5, 5, 5);
+    gameLayout->setContentsMargins(0, 0, 0, 0);
+    gameLayout->setSpacing(0);
     
     // Placeholder dla gry - będzie zastąpiony przez rzeczywisty widget gry
     QLabel* gamePlaceholder = new QLabel("Wybierz grę i rozpocznij trening", this);
     gamePlaceholder->setAlignment(Qt::AlignCenter);
-    gamePlaceholder->setMinimumHeight(200);
-    gamePlaceholder->setStyleSheet("background-color: #1a1a1a; color: #888; font-size: 16px;");
+    gamePlaceholder->setMinimumHeight(400);
+    gamePlaceholder->setStyleSheet("background-color: #1a1a1a; color: #888; font-size: 18px; border: 2px solid #333;");
     gameLayout->addWidget(gamePlaceholder);
     
-    m_mainLayout->addWidget(m_gameBox);
+    m_mainLayout->addWidget(m_gameBox, 1);  // Stretch factor 1 to give more space
     
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki sesji", this);
-    m_statsBox->setMaximumHeight(200);
+    m_statsBox->setMaximumHeight(150);
     QVBoxLayout* statsLayout = new QVBoxLayout(m_statsBox);
     
     m_statsContainer = new QWidget(this);
