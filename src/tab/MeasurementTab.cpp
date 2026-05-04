@@ -2159,46 +2159,16 @@ void MeasurementTab::updateRawTableUnits()
 
 void MeasurementTab::setupDebugTerminal()
 {
-    // Terminal debugowania jest inicjalizowany w setupUI()
-    // Ta metoda może być używana do dodatkowej konfiguracji jeśli potrzebna
+    // Terminal debugowania jest teraz centralny w DebugTab
+    // Ta metoda może być używana do inicjalizacji jeśli potrzebna
     addDebugMessage("=== TERMINAL DEBUGOWANIA URUCHOMIONY ===", "INFO");
     addDebugMessage("Oczekiwanie na dane z Arduino Nano z HX711...", "SERIAL");
 }
 
 void MeasurementTab::addDebugMessage(const QString& message, const QString& type)
 {
-    if (!m_debugTerminal) return;
-
-    QString timestamp = QDateTime::currentDateTime().toString("HH:mm:ss.zzz");
-    QString formattedMessage;
-
-    // Kolorowanie w zależności od typu wiadomości
-    if (type == "ERROR") {
-        formattedMessage = QString("<span style=\"color: red; font-weight: bold;\">[%1] [%2] %3</span>").arg(timestamp, type, message);
-    } else if (type == "WARNING") {
-        formattedMessage = QString("<span style=\"color: orange; font-weight: bold;\">[%1] [%2] %3</span>").arg(timestamp, type, message);
-    } else if (type == "DATA") {
-        formattedMessage = QString("<span style=\"color: green;\">[%1] [DATA] %3</span>").arg(timestamp, message);
-    } else if (type == "SERIAL") {
-        formattedMessage = QString("<span style=\"color: blue;\">[%1] [SERIAL] %3</span>").arg(timestamp, message);
-    } else {
-        formattedMessage = QString("[%1] [%2] %3").arg(timestamp, type, message);
-    }
-
-    m_debugTerminal->append(formattedMessage);
-
-    // Ogranicz liczbę linii
-    QStringList lines = m_debugTerminal->toPlainText().split("\n");
-    while (lines.size() > m_debugMaxLines) {
-        lines.removeFirst();
-    }
-
-    // Wyczyść i przywróć ograniczoną zawartość
-    m_debugTerminal->clear();
-    m_debugTerminal->append(lines.join("\n"));
-
-    // Przewiń do ostatniej linii
-    m_debugTerminal->verticalScrollBar()->setValue(m_debugTerminal->verticalScrollBar()->maximum());
+    // Wysyłaj wiadomość do centralnego DebugManager, który przekaże ją do DebugTab
+    core::DebugManager::instance().sendDebugMessage(message, type);
 }
 
 } // namespace tab
