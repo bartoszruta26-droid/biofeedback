@@ -23,6 +23,7 @@
 #include <QComboBox>
 
 #include "sensor/SerialCommunication.hpp"
+#include "core/DebugManager.hpp"
 
 namespace tab {
 
@@ -268,14 +269,12 @@ public:
     bool isArduinoConnected() const;
     
     /**
-     * @brief Inicjalizuje terminal debugowania w zakładce Measurement
-     */
-    void setupDebugTerminal();
-    
-    /**
-     * @brief Dodaje wiadomość do terminala debugowania
+     * @brief Dodaje wiadomość do centralnego terminala debugowego (DebugTab)
      * @param message Treść wiadomości
      * @param type Typ wiadomości (INFO, ERROR, WARNING, DATA, SERIAL)
+     * 
+     * Ta metoda wysyła wiadomość do DebugManager, który przekazuje ją do DebugTab.
+     * MeasurementTab nie posiada już własnego terminala debugowego.
      */
     void addDebugMessage(const QString& message, const QString& type = "INFO");
 
@@ -417,10 +416,6 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SensorData m_lastSensorData;
     bool m_hasArduinoConnection;
-    
-    // Terminal debugowania
-    QTextEdit* m_debugTerminal;
-    int m_debugMaxLines;
 };
 
 } // namespace tab

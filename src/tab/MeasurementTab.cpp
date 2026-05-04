@@ -392,8 +392,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_chkShowTrends(nullptr)
     , m_serialPort(nullptr)
     , m_hasArduinoConnection(false)
-    , m_debugTerminal(nullptr)
-    , m_debugMaxLines(500)
 {
     // Inicjalizacja wskaźników przycisków JSON
     m_btnSaveJSON = nullptr;
@@ -406,8 +404,9 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // Próba automatycznego podłączenia do Arduino w tle
     connectToArduinoAsync();
     
-    // Inicjalizacja terminala debugowania
-    setupDebugTerminal();
+    // MeasurementTab nie posiada własnego terminala debugowego.
+    // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
+    // który przekazuje je do centralnej zakładki DebugTab.
     
     m_timer = new QTimer(this);
     m_timer->setInterval(10);  // 10 ms = 100 Hz
@@ -595,33 +594,10 @@ void MeasurementTab::setupUI()
     m_mainLayout->addWidget(m_liveBox);
     
 
-    // Terminal debugowania - dane z Arduino i logi systemowe
-    QGroupBox* debugBox = new QGroupBox("Terminal Debugowania (Dane z Arduino)", this);
-    debugBox->setFont(QFont("Arial", 11, QFont::Bold));
-    QVBoxLayout* debugLayout = new QVBoxLayout();
+    // MeasurementTab nie posiada własnego terminala debugowego.
+    // Wszystkie wiadomości debugowe są wysyłane do centralnej zakładki DebugTab
+    // poprzez DebugManager.
     
-    m_debugTerminal = new QTextEdit(this);
-    m_debugTerminal->setReadOnly(true);
-    m_debugTerminal->setFont(QFont("Courier New", 9));
-    m_debugTerminal->setMinimumHeight(150);
-    m_debugTerminal->setMaximumHeight(200);
-    m_debugTerminal->setPlaceholderText("Tu będą wyświetlane dane z Arduino Nano z HX711 oraz komunikaty systemowe...");
-    
-    // Przycisk czyszczenia terminala
-    QPushButton* btnClearDebug = new QPushButton("WYCZYŚĆ TERMINAL", this);
-    btnClearDebug->setMinimumHeight(30);
-    btnClearDebug->setFont(QFont("Arial", 9));
-    connect(btnClearDebug, &QPushButton::clicked, this, [this]() {
-        if (m_debugTerminal) {
-            m_debugTerminal->clear();
-            addDebugMessage("Terminal wyczyszczony", "INFO");
-        }
-    });
-    
-    debugLayout->addWidget(m_debugTerminal);
-    debugLayout->addWidget(btnClearDebug);
-    debugBox->setLayout(debugLayout);
-    m_mainLayout->addWidget(debugBox);
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki Serii i Powtórzeń", this);
     m_statsBox->setFont(QFont("Arial", 11, QFont::Bold));

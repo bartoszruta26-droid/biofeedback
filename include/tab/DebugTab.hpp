@@ -16,7 +16,9 @@
 #include <QScrollBar>
 #include <memory>
 #include <mutex>
+#include <functional>
 #include "sensor/SerialCommunication.hpp"
+#include "core/DebugManager.hpp"
 
 namespace tab {
 
@@ -84,6 +86,11 @@ public:
      * @brief Ustawia maksymalną liczbę linii w terminalu
      */
     void setMaxLines(int maxLines);
+
+    /**
+     * @brief Rejestruje DebugTab w DebugManager jako odbiorcę wiadomości debugowych
+     */
+    void registerAsDebugReceiver();
 
 signals:
     void arduinoDataReceived(const sensor::SensorData& data);
