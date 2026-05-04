@@ -6,12 +6,14 @@
 #include "tab/TrainingTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
+#include "sensor/SerialCommunication.hpp"
 #include <QApplication>
 #include <QSettings>
 #include <QDateTime>
 #include <QTabWidget>
 #include <QStackedWidget>
 #include <QMessageBox>
+#include <memory>
 
 namespace gui {
 
@@ -43,9 +45,13 @@ MainWindow::MainWindow(QWidget *parent)
     , m_settingsWidget(nullptr)
     , m_debugTerminal(nullptr)
     , m_debugMaxLines(500)
+    , m_serialPort(nullptr)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
     setMinimumSize(1280, 800);
+    
+    // Inicjalizacja połączenia szeregowego
+    m_serialPort = std::make_shared<sensor::SerialCommunication>();
     
     setupUI();
     setupMenuBar();
@@ -106,6 +112,12 @@ void MainWindow::setupTabs()
     m_measurementTab = new tab::MeasurementTab(this);
     m_outlineTab = new tab::OutlineTab(this);
     m_trainingTab = new tab::TrainingTab(this);
+    
+    // Udostępnij połączenie szeregowe obu zakładkom
+    if (m_serialPort) {
+        m_measurementTab->setSerialConnection(m_serialPort);
+        m_outlineTab->setSerialConnection(m_serialPort);
+    }
     
     // Add tabs to widget
     m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));

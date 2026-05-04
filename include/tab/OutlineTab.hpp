@@ -197,6 +197,12 @@ public slots:
      * @param score Wynik gry
      */
     void onGameFinished(int score);
+    
+    /**
+     * @brief Obsługuje dane z sensora Arduino
+     * @param data Dane z czujnika
+     */
+    void onSensorDataReceived(const sensor::SensorData& data);
 
 private slots:
     void onOutlineSelected(int index);
@@ -331,6 +337,12 @@ public:
      * @return true jeśli Arduino Nano z HX711 jest podłączone
      */
     bool isSerialConnected() const;
+    
+    /**
+     * @brief Pobiera obiekt SerialCommunication
+     * @return Współdzielony wskaźnik do obiektu SerialCommunication
+     */
+    std::shared_ptr<sensor::SerialCommunication> getSerialPort() const { return m_serialPort; }
 };
 
 } // namespace tab
