@@ -88,8 +88,8 @@ OutlineTab::~OutlineTab()
 void OutlineTab::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(10);
-    m_mainLayout->setContentsMargins(10, 10, 10, 10);
+    m_mainLayout->setSpacing(15);
+    m_mainLayout->setContentsMargins(15, 15, 15, 15);
     
     setupOutlineSelector();
     setupExerciseView();
@@ -101,15 +101,21 @@ void OutlineTab::setupOutlineSelector()
 {
     // Sekcja wyboru konspektu
     m_outlineGroup = new QGroupBox(tr("Wybór Konspektu"), this);
+    m_outlineGroup->setFont(QFont("Arial", 11, QFont::Bold));
     m_outlineSelectorLayout = new QHBoxLayout();
     
     m_outlineLabel = new QLabel(tr("Konspekt:"), this);
+    m_outlineLabel->setFont(QFont("Arial", 10, QFont::Bold));
     m_outlineCombo = new QComboBox(this);
     m_outlineCombo->setMinimumWidth(300);
+    m_outlineCombo->setMinimumHeight(35);
+    m_outlineCombo->setFont(QFont("Arial", 10));
     m_outlineCombo->addItem(tr("-- Wybierz konspekt --"), QString());
     
     m_loadOutlineButton = new QPushButton(tr("Wczytaj..."), this);
     m_loadOutlineButton->setToolTip(tr("Wczytaj plik JSON konspektu"));
+    m_loadOutlineButton->setMinimumHeight(35);
+    m_loadOutlineButton->setFont(QFont("Arial", 10));
     
     m_outlineSelectorLayout->addWidget(m_outlineLabel);
     m_outlineSelectorLayout->addWidget(m_outlineCombo, 1);
