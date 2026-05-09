@@ -2050,6 +2050,9 @@ option_8_factory() {
     echo ""
     
     wait_for_key
+}
+
+# ------------------------------------------------------------------------------
 # Opcja 7: Czysty Terminal Monitor Danych (SZCZEGÓŁOWA IMPLEMENTACJA)
 # ------------------------------------------------------------------------------
 
@@ -2600,86 +2603,260 @@ option_7_monitor() {
 }
 
 # ------------------------------------------------------------------------------
-# Opcja 8: Przywrócenie Ustawień Fabrycznych
+# Opcja 8: Diagnostyka i Testowanie Mikrokontrolera
 # ------------------------------------------------------------------------------
 
-option_8_factory() {
+option_8_diagnostics() {
     clear
     echo -e "${CYAN}==============================================================================${NC}"
-    echo -e "${CYAN}          OPCJA 8: PRZYWRÓCENIE USTAWIEŃ FABRYCZNYCH                          ${NC}"
+    echo -e "${CYAN}          OPCJA 8: DIAGNOSTYKA I TESTOWANIE MIKROKONTROLERA                   ${NC}"
     echo -e "${CYAN}==============================================================================${NC}"
     echo ""
     
-    print_warning "UWAGA! Ta operacja:"
-    echo "  - Usunie wszystkie pobrane pliki źródłowe"
-    echo "  - Usunie wszystkie skompilowane pliki"
-    echo "  - Usunie pliki konfiguracyjne użytkownika"
-    echo "  - Usunie logi i dane tymczasowe"
-    echo "  - Przywróci domyślne ustawienia skryptu"
-    echo ""
-    
-    read -p "Czy jesteś ABSOLUTNIE pewien? (wpisz 'TAK' aby potwierdzić): " confirm
-    
-    if [[ "$confirm" == "TAK" ]]; then
-        print_info "Rozpoczynanie przywracania ustawień fabrycznych..."
+    while true; do
+        echo "1. Test połączenia szeregowego"
+        echo "2. Sprawdź wykryte urządzenia USB"
+        echo "3. Test prędkości transmisji (Baud Rate)"
+        echo "4. Monitoruj sygnały DTR/RTS"
+        echo "5. Wykryj chip ID (ESP32)"
+        echo "6. Test pamięci Flash"
+        echo "0. Powrót do menu głównego"
         echo ""
         
-        # Usuń katalog repozytorium
-        if [ -d "$REPO_DIR" ]; then
-            echo -e "${YELLOW}[1/5] Usuwanie katalogu źródłowego ($REPO_DIR)...${NC}"
-            rm -rf "$REPO_DIR"
-            echo -e "${GREEN}Usunięto.${NC}"
-        else
-            echo -e "${BLUE}[1/5] Katalog źródłowy nie istnieje - pominięto.${NC}"
-        fi
+        read -p "Wybierz opcję: " diag_choice
         
-        # Usuń katalog build
-        if [ -d "$BUILD_DIR" ]; then
-            echo -e "${YELLOW}[2/5] Usuwanie katalogu build...${NC}"
-            rm -rf "$BUILD_DIR"
-            echo -e "${GREEN}Usunięto.${NC}"
-        else
-            echo -e "${BLUE}[2/5] Katalog build nie istnieje - pominięto.${NC}"
-        fi
+        case $diag_choice in
+            1)
+                clear
+                echo -e "${CYAN}--- Test Połączenia Szeregowego ---${NC}"
+                echo ""
+                
+                # Wykryj porty
+                local ports=()
+                for port in /dev/ttyUSB* /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        ports+=("$port")
+                    fi
+                done
+                
+                if [ ${#ports[@]} -eq 0 ]; then
+                    print_error "Brak wykrytych portów szeregowych!"
+                    print_info "Podłącz mikrokontroler i spróbuj ponownie."
+                else
+                    print_success "Wykryto ${#ports[@]} port(ów):"
+                    for p in "${ports[@]}"; do
+                        echo "  - $p"
+                    done
+                    echo ""
+                    
+                    read -p "Podaj numer portu do testu (1-${#ports[@]}): " port_num
+                    if [[ "$port_num" =~ ^[0-9]+$ ]] && [ "$port_num" -le "${#ports[@]}" ] && [ "$port_num" -ge 1 ]; then
+                        selected_port="${ports[$((port_num-1))]}"
+                        echo ""
+                        print_info "Testowanie portu $selected_port..."
+                        
+                        # Sprawdź uprawnienia
+                        if [ -r "$selected_port" ] && [ -w "$selected_port" ]; then
+                            print_success "Port jest dostępny do odczytu i zapisu."
+                        else
+                            print_warning "Brak uprawnień do portu. Spróbuj: sudo usermod -a -G dialout \$USER"
+                        fi
+                        
+                        # Sprawdź czy port nie jest zajęty
+                        if command -v lsof &> /dev/null; then
+                            local users=$(lsof "$selected_port" 2>/dev/null)
+                            if [ -n "$users" ]; then
+                                print_warning "Port jest używany przez inny proces:"
+                                echo "$users"
+                            else
+                                print_success "Port jest wolny."
+                            fi
+                        fi
+                    else
+                        print_error "Nieprawidłowy numer portu."
+                    fi
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            2)
+                clear
+                echo -e "${CYAN}--- Wykryte Urządzenia USB ---${NC}"
+                echo ""
+                
+                if command -v lsusb &> /dev/null; then
+                    print_info "Lista urządzeń USB:"
+                    lsusb
+                    echo ""
+                    
+                    print_info "Urządzenia związane z UART/Serial:"
+                    lsusb | grep -iE "serial|ftdi|cp210|ch340|ch341|esp32|stm32|arduino|silicon|tty" || echo "  Brak typowych konwerterów UART."
+                else
+                    print_warning "Narzędzie lsusb niedostępne."
+                fi
+                
+                echo ""
+                echo -e "${BLUE}Porty szeregowe w systemie:${NC}"
+                ls -la /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || echo "  Brak portów ttyUSB/ttyACM"
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            3)
+                clear
+                echo -e "${CYAN}--- Test Prędkości Transmisji ---${NC}"
+                echo ""
+                
+                read -p "Podaj port (np. /dev/ttyUSB0): " test_port
+                if [ ! -e "$test_port" ]; then
+                    print_error "Port nie istnieje!"
+                    wait_for_key
+                    continue
+                fi
+                
+                echo ""
+                echo "Dostępne prędkości:"
+                echo "1. 9600"
+                echo "2. 19200"
+                echo "3. 57600"
+                echo "4. 115200 (domyślna)"
+                echo "5. 230400"
+                echo "6. 460800"
+                echo "7. 921600"
+                echo ""
+                
+                read -p "Wybierz prędkość (1-7): " baud_choice
+                case $baud_choice in
+                    1) test_baud=9600 ;;
+                    2) test_baud=19200 ;;
+                    3) test_baud=57600 ;;
+                    4) test_baud=115200 ;;
+                    5) test_baud=230400 ;;
+                    6) test_baud=460800 ;;
+                    7) test_baud=921600 ;;
+                    *) test_baud=115200 ;;
+                esac
+                
+                echo ""
+                print_info "Monitorowanie portu $test_port z prędkością $test_baud..."
+                print_info "Naciśnij Ctrl+C aby przerwać."
+                echo ""
+                
+                if command -v screen &> /dev/null; then
+                    screen "$test_port" "$test_baud"
+                elif command -v minicom &> /dev/null; then
+                    minicom -D "$test_port" -b "$test_baud"
+                elif command -v picocom &> /dev/null; then
+                    picocom -b "$test_baud" "$test_port"
+                else
+                    print_warning "Brak narzędzi screen/minicom/picocom."
+                    print_info "Spróbuj: cat $test_port"
+                    timeout 5 cat "$test_port"
+                fi
+                
+                wait_for_key
+                ;;
+                
+            4)
+                clear
+                echo -e "${CYAN}--- Monitor Sygnałów DTR/RTS ---${NC}"
+                echo ""
+                
+                print_info "Sygnały sterujące w portach szeregowych:"
+                echo ""
+                
+                for port in /dev/ttyUSB* /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        echo "Port: $port"
+                        if command -v setserial &> /dev/null; then
+                            setserial "$port" 2>/dev/null || echo "  Nie można odczytać"
+                        else
+                            echo "  Narzędzie setserial niedostępne"
+                        fi
+                        echo ""
+                    fi
+                done
+                
+                print_info "DTR (Data Terminal Ready) i RTS (Request To Send) to sygnały sterujące."
+                print_info "Używane m.in. do resetowania Arduino/ESP32 podczas wgrywania."
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            5)
+                clear
+                echo -e "${CYAN}--- Wykrywanie Chip ID (ESP32) ---${NC}"
+                echo ""
+                
+                if ! command -v esptool.py &> /dev/null && ! command -v esptool &> /dev/null; then
+                    print_warning "Narzędzie esptool nie jest zainstalowane."
+                    print_info "Zainstaluj: pip3 install esptool"
+                else
+                    read -p "Podaj port ESP32 (np. /dev/ttyUSB0): " esp_port
+                    if [ -e "$esp_port" ]; then
+                        print_info "Odczytywanie Chip ID..."
+                        
+                        if command -v esptool.py &> /dev/null; then
+                            esptool.py --port "$esp_port" chip_id
+                        else
+                            esptool --port "$esp_port" chip_id
+                        fi
+                    else
+                        print_error "Port nie istnieje!"
+                    fi
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            6)
+                clear
+                echo -e "${CYAN}--- Test Pamięci Flash ---${NC}"
+                echo ""
+                
+                if ! command -v esptool.py &> /dev/null && ! command -v esptool &> /dev/null; then
+                    print_warning "Narzędzie esptool nie jest zainstalowane."
+                    print_info "Zainstaluj: pip3 install esptool"
+                else
+                    read -p "Podaj port (np. /dev/ttyUSB0): " flash_port
+                    if [ -e "$flash_port" ]; then
+                        print_info "Odczytywanie informacji o pamięci Flash..."
+                        
+                        if command -v esptool.py &> /dev/null; then
+                            esptool.py --port "$flash_port" flash_id
+                        else
+                            esptool --port "$flash_port" flash_id
+                        fi
+                    else
+                        print_error "Port nie istnieje!"
+                    fi
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            0)
+                return
+                ;;
+            *)
+                print_error "Nieprawidłowa opcja."
+                sleep 1
+                ;;
+        esac
         
-        # Usuń pliki konfiguracyjne
-        echo -e "${YELLOW}[3/5] Usuwanie plików konfiguracyjnych...${NC}"
-        rm -f config/user.conf 2>/dev/null
-        rm -f config/custom.conf 2>/dev/null
-        rm -f *.conf 2>/dev/null
-        echo -e "${GREEN}Usunięto.${NC}"
-        
-        # Usuń logi
-        echo -e "${YELLOW}[4/5] Czyszczenie logów...${NC}"
-        rm -f logs/*.log 2>/dev/null
-        rm -f serial_data_*.log 2>/dev/null
-        rm -f /tmp/detected_ports.txt 2>/dev/null
-        echo -e "${GREEN}Usunięto.${NC}"
-        
-        # Przywróć domyślne zmienne
-        echo -e "${YELLOW}[5/5] Przywracanie domyślnych ustawień...${NC}"
-        REPO_URL="https://github.com/bartoszruta26-droid/biofeedback"
-        REPO_DIR="biofeedback"
-        BUILD_DIR="build"
-        LANG="pl"
-        SERIAL_PORT=""
-        BAUD_RATE="115200"
-        echo -e "${GREEN}Przywrócono.${NC}"
-        
+        # Wyczyść ekran przed następną iteracją
+        clear
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo -e "${CYAN}          OPCJA 8: DIAGNOSTYKA I TESTOWANIE MIKROKONTROLERA                   ${NC}"
+        echo -e "${CYAN}==============================================================================${NC}"
         echo ""
-        echo -e "${GREEN}==============================================================================${NC}"
-        echo -e "${GREEN}  PRZYWRÓCONO USTAWIENIA FABRYCZNE!${NC}"
-        echo -e "${GREEN}==============================================================================${NC}"
-        echo ""
-        print_info "Skrypt jest teraz w stanie początkowym."
-        print_info "Aby ponownie używać aplikację, należy:"
-        echo "  1. Wybrać opcję 2 (Instalacja zależności)"
-        echo "  2. Wybrać opcję 3 (Git Pull & Kompilacja)"
-    else
-        print_info "Operacja anulowana."
-    fi
-    
-    wait_for_key
+    done
 }
 
 # ------------------------------------------------------------------------------
@@ -3039,7 +3216,7 @@ main_menu() {
         echo "5. Ustawienia i pliki konfiguracyjne"
         echo "6. Przywracanie ustawień domyślnych"
         echo "7. Czysty terminal monitor danych"
-        echo "8. Przywrócenie ustawień fabrycznych"
+        echo "8. Diagnostyka i testowanie mikrokontrolera"
         echo "9. Inne opcje"
         echo "0. Wyjście"
         echo ""
@@ -3054,7 +3231,7 @@ main_menu() {
             5) option_5_config ;;
             6) option_6_defaults ;;
             7) option_7_monitor ;;
-            8) option_8_factory ;;
+            8) option_8_diagnostics ;;
             9) option_9_extra ;;
             0) 
                 clear
