@@ -1801,6 +1801,206 @@ EOF
 }
 
 # ------------------------------------------------------------------------------
+# Implementacja Opcji 8: Przywrócenie ustawień fabrycznych (FACTORY RESET)
+# ------------------------------------------------------------------------------
+# Różnica między opcją 6 a 8:
+# - Opcja 6 (defaults): Resetuje tylko pliki konfiguracyjne do domyślnych wartości
+# - Opcja 8 (factory): Całkowite czyszczenie projektu - usuwa build, cache, config,
+#   logi, dane użytkownika, przywraca repozytorium do czystego stanu po clone
+
+option_8_factory() {
+    local confirm_reset=""
+    
+    clear
+    echo -e "${RED}==============================================================================${NC}"
+    echo -e "${RED}          PRZYWRÓCENIE USTAWIEŃ FABRYCZNYCH (FACTORY RESET)                   ${NC}"
+    echo -e "${RED}==============================================================================${NC}"
+    echo ""
+    echo -e "${YELLOW}OSTRZEŻENIE: Ta operacja jest NIEODWRACALNA!${NC}"
+    echo ""
+    echo "Ta opcja spowoduje:"
+    echo "  ✓ Usunięcie całego katalogu build/ (wyniki kompilacji)"
+    echo "  ✓ Usunięcie plików cache CMake (CMakeCache.txt, CMakeFiles/)"
+    echo "  ✓ Usunięcie wszystkich plików konfiguracyjnych użytkownika"
+    echo "  ✓ Usunięcie logów i danych sesyjnych"
+    echo "  ✓ Usunięcie pobranych danych pomiarowych (data/)"
+    echo "  ✓ Przywrócenie repozytorium do czystego stanu (git reset --hard)"
+    echo "  ✓ Usunięcie tymczasowych plików instalacyjnych"
+    echo ""
+    echo -e "${RED}UWAGA: Twoje dane pomiarowe i konfiguracje zostaną trwale utracone!${NC}"
+    echo ""
+    
+    read -p "Czy na pewno chcesz kontynuować? (wpisz 'TAK' aby potwierdzić): " confirm_reset
+    
+    if [ "$confirm_reset" != "TAK" ]; then
+        echo ""
+        print_info "Operacja anulowana przez użytkownika."
+        wait_for_key
+        return 1
+    fi
+    
+    echo ""
+    echo -e "${CYAN}Rozpoczynanie procesu przywracania ustawień fabrycznych...${NC}"
+    echo ""
+    
+    # Krok 1: Zatrzymanie ewentualnych procesów
+    print_info "[Krok 1/7] Zatrzymywanie procesów biofeedback..."
+    pkill -f "biofeedback" 2>/dev/null && echo "  - Zatrzymano procesy biofeedback" || echo "  - Brak aktywnych procesów"
+    sleep 1
+    
+    # Krok 2: Usunięcie katalogu build
+    print_info "[Krok 2/7] Usuwanie katalogu build..."
+    if [ -d "$REPO_DIR/$BUILD_DIR" ]; then
+        rm -rf "$REPO_DIR/$BUILD_DIR"
+        print_success "  - Usunięto: $REPO_DIR/$BUILD_DIR"
+    else
+        echo "  - Katalog build nie istnieje"
+    fi
+    
+    # Krok 3: Czyszczenie cache CMake w głównym katalogu
+    print_info "[Krok 3/7] Czyszczenie plików cache CMake..."
+    local cmake_cache_removed=0
+    if [ -f "CMakeCache.txt" ]; then
+        rm -f CMakeCache.txt
+        echo "  - Usunięto: CMakeCache.txt"
+        cmake_cache_removed=1
+    fi
+    if [ -d "CMakeFiles" ]; then
+        rm -rf CMakeFiles
+        echo "  - Usunięto: CMakeFiles/"
+        cmake_cache_removed=1
+    fi
+    if [ $cmake_cache_removed -eq 0 ]; then
+        echo "  - Brak plików cache CMake do usunięcia"
+    fi
+    
+    # Krok 4: Usunięcie plików konfiguracyjnych użytkownika
+    print_info "[Krok 4/7] Usuwanie plików konfiguracyjnych..."
+    local config_files=(
+        "config/user_config.json"
+        "config/settings.ini"
+        "config/calibration.dat"
+        ".biofeedback_config"
+        "config/custom_profiles.json"
+    )
+    
+    local config_removed=0
+    for cfg in "${config_files[@]}"; do
+        if [ -f "$cfg" ]; then
+            rm -f "$cfg"
+            echo "  - Usunięto: $cfg"
+            config_removed=1
+        fi
+    done
+    
+    # Sprawdź również wewnątrz repozytorium
+    if [ -d "$REPO_DIR/config" ]; then
+        for cfg in "$REPO_DIR/config"/*.user "$REPO_DIR/config"/*.bak "$REPO_DIR/config"/*.old; do
+            if [ -f "$cfg" ]; then
+                rm -f "$cfg"
+                echo "  - Usunięto: $cfg"
+                config_removed=1
+            fi
+        done
+    fi
+    
+    if [ $config_removed -eq 0 ]; then
+        echo "  - Brak plików konfiguracyjnych do usunięcia"
+    fi
+    
+    # Krok 5: Usunięcie logów i danych tymczasowych
+    print_info "[Krok 5/7] Czyszczenie logów i danych tymczasowych..."
+    local logs_removed=0
+    
+    if [ -d "logs" ]; then
+        find logs -type f -name "*.log" -delete 2>/dev/null
+        echo "  - Wyczyszczono pliki .log z logs/"
+        logs_removed=1
+    fi
+    
+    if [ -d "$REPO_DIR/logs" ]; then
+        find "$REPO_DIR/logs" -type f -name "*.log" -delete 2>/dev/null
+        echo "  - Wyczyszczono pliki .log z $REPO_DIR/logs/"
+        logs_removed=1
+    fi
+    
+    # Usuń pliki tymczasowe
+    rm -f /tmp/detected_ports.txt 2>/dev/null
+    rm -f /tmp/biofeedback_*.tmp 2>/dev/null
+    echo "  - Usunięto pliki tymczasowe z /tmp/"
+    
+    if [ $logs_removed -eq 0 ]; then
+        echo "  - Brak logów do czyszczenia"
+    fi
+    
+    # Krok 6: Usunięcie danych pomiarowych użytkownika
+    print_info "[Krok 6/7] Usuwanie danych pomiarowych..."
+    local data_removed=0
+    
+    if [ -d "data" ]; then
+        local data_count=$(find data -type f 2>/dev/null | wc -l)
+        if [ $data_count -gt 0 ]; then
+            rm -rf data/*
+            echo "  - Usunięto $data_count plików z data/"
+            data_removed=1
+        fi
+    fi
+    
+    if [ -d "$REPO_DIR/data" ]; then
+        local repo_data_count=$(find "$REPO_DIR/data" -type f 2>/dev/null | wc -l)
+        if [ $repo_data_count -gt 0 ]; then
+            rm -rf "$REPO_DIR/data"/*
+            echo "  - Usunięto $repo_data_count plików z $REPO_DIR/data/"
+            data_removed=1
+        fi
+    fi
+    
+    if [ $data_removed -eq 0 ]; then
+        echo "  - Brak danych pomiarowych do usunięcia"
+    fi
+    
+    # Krok 7: Reset repozytorium Git do czystego stanu
+    print_info "[Krok 7/7] Przywracanie repozytorium do czystego stanu..."
+    if [ -d "$REPO_DIR/.git" ]; then
+        cd "$REPO_DIR" || exit
+        
+        # Usuń wszystkie nieśledzone pliki
+        git clean -fdx 2>/dev/null && echo "  - Usunięto nieśledzone pliki i katalogi"
+        
+        # Przywróć wszystkie śledzone pliki do ostatniego commita
+        git reset --hard HEAD 2>/dev/null && echo "  - Przywrócono pliki do ostatniego commita"
+        
+        # Sprawdź aktualny branch
+        local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        echo "  - Aktualny branch: $current_branch"
+        
+        cd ..
+    else
+        echo "  - Katalog nie jest repozytorium Git lub nie istnieje"
+    fi
+    
+    # Podsumowanie
+    echo ""
+    echo -e "${GREEN}==============================================================================${NC}"
+    echo -e "${GREEN}  PRZYWRÓCENIE USTAWIEŃ FABRYCZNYCH ZAKOŃCZONE POWODZENIEM                    ${NC}"
+    echo -e "${GREEN}==============================================================================${NC}"
+    echo ""
+    echo "Co zostało wykonane:"
+    echo "  ✓ Katalog build został usunięty"
+    echo "  ✓ Cache CMake wyczyszczone"
+    echo "  ✓ Pliki konfiguracyjne usunięte"
+    echo "  ✓ Logi i dane tymczasowe wyczyszczone"
+    echo "  ✓ Dane pomiarowe usunięte"
+    echo "  ✓ Repozytorium przywrócone do czystego stanu"
+    echo ""
+    echo -e "${YELLOW}Następne kroki:${NC}"
+    echo "  1. Uruchom ponownie skrypt instalacyjny"
+    echo "  2. Wybierz opcję 2 (Instalacja zależności) jeśli potrzebna"
+    echo "  3. Wybierz opcję 3 (Git Pull & Kompilacja) aby pobrać i zbudować projekt"
+    echo "  4. Skonfiguruj aplikację od nowa"
+    echo ""
+    
+    wait_for_key
 # Opcja 7: Czysty Terminal Monitor Danych (SZCZEGÓŁOWA IMPLEMENTACJA)
 # ------------------------------------------------------------------------------
 
