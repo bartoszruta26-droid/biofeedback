@@ -133,13 +133,251 @@ detect_serial_ports() {
         fi
     done
 
-    # macOS: cu.usb*, cu.serial*
-    for port in /dev/cu.usb*; do
-        if [ -e "$port" ]; then
-            ports+=("$port")
-            echo "  - $port"
+option_install_dependencies() {
+    echo ""
+    echo -e "${BLUE}--- ${LANG[OPT2]} ---${NC}"
+    echo -e "${YELLOW}${LANG[DEP_INSTALL]}${NC}"
+    echo ""
+    
+    # Detect package manager
+    local pkg_manager=""
+    local update_cmd=""
+    local install_cmd=""
+    
+    if command -v apt &> /dev/null; then
+        pkg_manager="apt"
+        update_cmd="sudo apt update"
+        install_cmd="sudo apt install -y"
+    elif command -v dnf &> /dev/null; then
+        pkg_manager="dnf"
+        update_cmd="sudo dnf makecache --refresh"
+        install_cmd="sudo dnf install -y"
+    elif command -v yum &> /dev/null; then
+        pkg_manager="yum"
+        update_cmd="sudo yum makecache"
+        install_cmd="sudo yum install -y"
+    elif command -v pacman &> /dev/null; then
+        pkg_manager="pacman"
+        update_cmd="sudo pacman -Sy"
+        install_cmd="sudo pacman -S --noconfirm"
+    elif command -v zypper &> /dev/null; then
+        pkg_manager="zypper"
+        update_cmd="sudo zypper refresh"
+        install_cmd="sudo zypper install -y"
+    else
+        echo -e "${RED}Error: No supported package manager found (apt, dnf, yum, pacman, zypper)${NC}"
+        wait_for_key
+        return 1
+    fi
+    
+    echo -e "${CYAN}Detected package manager: ${pkg_manager}${NC}"
+    echo ""
+    
+    # Update package lists
+    echo -e "${YELLOW}[1/4] Updating package lists...${NC}"
+    eval $update_cmd
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to update package lists${NC}"
+        wait_for_key
+        return 1
+    fi
+    echo -e "${GREEN}Package lists updated successfully${NC}"
+    echo ""
+    
+    # Install core build tools
+    echo -e "${YELLOW}[2/4] Installing core build tools...${NC}"
+    
+    if [ "$pkg_manager" = "apt" ]; then
+        eval $install_cmd build-essential cmake git pkg-config
+    elif [ "$pkg_manager" = "dnf" ] || [ "$pkg_manager" = "yum" ]; then
+        eval $install_cmd gcc-c++ make cmake git pkgconfig
+    elif [ "$pkg_manager" = "pacman" ]; then
+        eval $install_cmd base-devel cmake git pkg-config
+    elif [ "$pkg_manager" = "zypper" ]; then
+        eval $install_cmd gcc-c++ make cmake git pkg-config
+    fi
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to install core build tools${NC}"
+        wait_for_key
+        return 1
+    fi
+    echo -e "${GREEN}Core build tools installed successfully${NC}"
+    echo ""
+    
+    # Install Qt5 dependencies
+    echo -e "${YELLOW}[3/4] Installing Qt5 development libraries...${NC}"
+    
+    if [ "$pkg_manager" = "apt" ]; then
+        # Try primary package names first
+        eval $install_cmd qtbase5-dev libqt5charts5-dev
+        if [ $? -ne 0 ]; then
+            # Fallback to alternative package names (some Raspberry Pi OS versions)
+            echo -e "${YELLOW}Primary Qt5 packages failed, trying alternatives...${NC}"
+            eval $install_cmd qtbase5-dev qtcharts5-dev
         fi
-    done
+    elif [ "$pkg_manager" = "dnf" ] || [ "$pkg_manager" = "yum" ]; then
+        eval $install_cmd qt5-qtbase-devel qt5-qtcharts-devel
+    elif [ "$pkg_manager" = "pacman" ]; then
+        eval $install_cmd qt5-base qt5-charts
+    elif [ "$pkg_manager" = "zypper" ]; then
+        eval $install_cmd libQt5Core-devel libQt5Charts-devel
+    fi
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Warning: Some Qt5 packages may have failed to install${NC}"
+        echo -e "${YELLOW}You may need to install Qt5 manually${NC}"
+    else
+        echo -e "${GREEN}Qt5 development libraries installed successfully${NC}"
+    fi
+    echo ""
+    
+    # Install additional dependencies
+    echo -e "${YELLOW}[4/4] Installing additional dependencies...${NC}"
+    
+    if [ "$pkg_manager" = "apt" ]; then
+        eval $install_cmd libserialport-dev nlohmann-json3-dev libssl-dev
+    elif [ "$pkg_manager" = "dnf" ] || [ "$pkg_manager" = "yum" ]; then
+        eval $install_cmd libserialport-devel nlohmann-json-devel openssl-devel
+    elif [ "$pkg_manager" = "pacman" ]; then
+        eval $install_cmd libserialport nlohmann-json openssl
+    elif [ "$pkg_manager" = "zypper" ]; then
+        eval $install_cmd libserialport-devel jsoncpp-devel libopenssl-devel
+    fi
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Warning: Some additional packages may have failed to install${NC}"
+    else
+        echo -e "${GREEN}Additional dependencies installed successfully${NC}"
+    fi
+    echo ""
+    
+    # Configure serial port permissions (Debian/Ubuntu based only)
+    if [ "$pkg_manager" = "apt" ]; then
+        echo -e "${YELLOW}Configuring serial port permissions...${NC}"
+        sudo usermod -a -G dialout $(whoami) 2>/dev/null || true
+        
+        # Create udev rule for Arduino
+        echo -e "${CYAN}Creating udev rule for Arduino...${NC}"
+        echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", MODE="0666"' | sudo tee /etc/udev/rules.d/50-arduino.rules > /dev/null 2>&1
+        
+        # Reload udev rules
+        sudo udevadm control --reload-rules 2>/dev/null || true
+        sudo udevadm trigger 2>/dev/null || true
+        
+        echo -e "${GREEN}Serial port permissions configured${NC}"
+        echo -e "${YELLOW}Note: You may need to log out and log back in for group changes to take effect${NC}"
+        echo ""
+    fi
+    
+    # Verify installations
+    echo -e "${CYAN}Verifying installations...${NC}"
+    echo ""
+    
+    local verify_ok=true
+    
+    # Check g++
+    if command -v g++ &> /dev/null; then
+        local gcc_ver=$(g++ --version | head -n1)
+        echo -e "${GREEN}✓${NC} g++: ${gcc_ver}"
+    else
+        echo -e "${RED}✗${NC} g++: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check cmake
+    if command -v cmake &> /dev/null; then
+        local cmake_ver=$(cmake --version | head -n1)
+        echo -e "${GREEN}✓${NC} cmake: ${cmake_ver}"
+    else
+        echo -e "${RED}✗${NC} cmake: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check git
+    if command -v git &> /dev/null; then
+        local git_ver=$(git --version)
+        echo -e "${GREEN}✓${NC} git: ${git_ver}"
+    else
+        echo -e "${RED}✗${NC} git: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check pkg-config
+    if command -v pkg-config &> /dev/null; then
+        echo -e "${GREEN}✓${NC} pkg-config: installed"
+    else
+        echo -e "${RED}✗${NC} pkg-config: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check Qt5
+    if pkg-config --exists Qt5Core 2>/dev/null; then
+        local qt5_ver=$(pkg-config --modversion Qt5Core 2>/dev/null)
+        echo -e "${GREEN}✓${NC} Qt5 Core: version ${qt5_ver}"
+    else
+        echo -e "${YELLOW}!${NC} Qt5 Core: NOT DETECTED by pkg-config"
+    fi
+    
+    if pkg-config --exists Qt5Charts 2>/dev/null; then
+        local qt5charts_ver=$(pkg-config --modversion Qt5Charts 2>/dev/null)
+        echo -e "${GREEN}✓${NC} Qt5 Charts: version ${qt5charts_ver}"
+    else
+        echo -e "${YELLOW}!${NC} Qt5 Charts: NOT DETECTED by pkg-config"
+    fi
+    
+    # Check OpenSSL
+    if pkg-config --exists OpenSSL 2>/dev/null; then
+        local openssl_ver=$(pkg-config --modversion OpenSSL 2>/dev/null)
+        echo -e "${GREEN}✓${NC} OpenSSL: version ${openssl_ver}"
+    else
+        echo -e "${YELLOW}!${NC} OpenSSL: NOT DETECTED by pkg-config"
+    fi
+    
+    # Check nlohmann-json
+    if pkg-config --exists nlohmann_json 2>/dev/null; then
+        local json_ver=$(pkg-config --modversion nlohmann_json 2>/dev/null)
+        echo -e "${GREEN}✓${NC} nlohmann-json: version ${json_ver}"
+    else
+        # Check if header exists
+        if [ -f "/usr/include/nlohmann/json.hpp" ] || [ -f "/usr/local/include/nlohmann/json.hpp" ]; then
+            echo -e "${GREEN}✓${NC} nlohmann-json: installed (header found)"
+        else
+            echo -e "${YELLOW}!${NC} nlohmann-json: NOT DETECTED"
+        fi
+    fi
+    
+    # Check libserialport
+    if pkg-config --exists libserialport 2>/dev/null; then
+        local serialport_ver=$(pkg-config --modversion libserialport 2>/dev/null)
+        echo -e "${GREEN}✓${NC} libserialport: version ${serialport_ver}"
+    else
+        echo -e "${YELLOW}!${NC} libserialport: NOT DETECTED by pkg-config"
+    fi
+    
+    echo ""
+    
+    if [ "$verify_ok" = true ]; then
+        echo -e "${GREEN}============================================${NC}"
+        echo -e "${GREEN}  ${LANG[DEP_DONE]}${NC}"
+        echo -e "${GREEN}============================================${NC}"
+        echo ""
+        echo -e "${CYAN}Next steps:${NC}"
+        echo "  1. Log out and log back in (for group permissions)"
+        echo "  2. Run 'git pull' to download the source code"
+        echo "  3. Create build directory: mkdir build && cd build"
+        echo "  4. Configure: cmake .."
+        echo "  5. Build: make -j\$(nproc)"
+        echo "  6. Run: ./biofeedback"
+    else
+        echo -e "${YELLOW}============================================${NC}"
+        echo -e "${YELLOW}  Some critical dependencies are missing${NC}"
+        echo -e "${YELLOW}  Please install them manually${NC}"
+        echo -e "${YELLOW}============================================${NC}"
+    fi
+    
+    echo ""
+    wait_for_key
+}
 
     if [ ${#ports[@]} -eq 0 ]; then
         echo "  Brak wykrytych portów szeregowych."
