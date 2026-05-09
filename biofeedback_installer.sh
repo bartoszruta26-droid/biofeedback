@@ -125,8 +125,15 @@ detect_serial_ports() {
 
     echo -e "${BLUE}Wykryte porty szeregowe:${NC}"
     
-    # Linux: ttyUSB, ttyACM
-    for port in /dev/ttyUSB* /dev/ttyACM*; do
+    # Linux: ttyUSB, ttyACM - sprawdzaj osobno aby uniknąć błędów przy nieistniejących globach
+    for port in /dev/ttyUSB*; do
+        if [ -e "$port" ]; then
+            ports+=("$port")
+            echo "  - $port"
+        fi
+    done
+    
+    for port in /dev/ttyACM*; do
         if [ -e "$port" ]; then
             ports+=("$port")
             echo "  - $port"
@@ -2060,8 +2067,14 @@ option_8_factory() {
 detect_ports_for_monitor() {
     local ports=()
     
-    # Sprawdź porty ttyUSB i ttyACM
-    for port in /dev/ttyUSB* /dev/ttyACM*; do
+    # Sprawdź porty ttyUSB i ttyACM - osobno aby uniknąć błędów przy nieistniejących globach
+    for port in /dev/ttyUSB*; do
+        if [ -e "$port" ]; then
+            ports+=("$port")
+        fi
+    done
+    
+    for port in /dev/ttyACM*; do
         if [ -e "$port" ]; then
             ports+=("$port")
         fi
@@ -2110,9 +2123,14 @@ option_8_diagnostics() {
                 echo -e "${CYAN}--- Test Połączenia Szeregowego ---${NC}"
                 echo ""
                 
-                # Wykryj porty
+                # Wykryj porty - osobno aby uniknąć błędów przy nieistniejących globach
                 local ports=()
-                for port in /dev/ttyUSB* /dev/ttyACM*; do
+                for port in /dev/ttyUSB*; do
+                    if [ -e "$port" ]; then
+                        ports+=("$port")
+                    fi
+                done
+                for port in /dev/ttyACM*; do
                     if [ -e "$port" ]; then
                         ports+=("$port")
                     fi
@@ -2178,7 +2196,28 @@ option_8_diagnostics() {
                 
                 echo ""
                 echo -e "${BLUE}Porty szeregowe w systemie:${NC}"
-                ls -la /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || echo "  Brak portów ttyUSB/ttyACM"
+                
+                local found_ports=false
+                
+                # Sprawdź /dev/ttyUSB*
+                for port in /dev/ttyUSB*; do
+                    if [ -e "$port" ]; then
+                        ls -la "$port"
+                        found_ports=true
+                    fi
+                done
+                
+                # Sprawdź /dev/ttyACM*
+                for port in /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        ls -la "$port"
+                        found_ports=true
+                    fi
+                done
+                
+                if [ "$found_ports" = false ]; then
+                    echo "  Brak portów ttyUSB/ttyACM"
+                fi
                 
                 echo ""
                 wait_for_key
@@ -2247,7 +2286,9 @@ option_8_diagnostics() {
                 print_info "Sygnały sterujące w portach szeregowych:"
                 echo ""
                 
-                for port in /dev/ttyUSB* /dev/ttyACM*; do
+                local found_any=false
+                
+                for port in /dev/ttyUSB*; do
                     if [ -e "$port" ]; then
                         echo "Port: $port"
                         if command -v setserial &> /dev/null; then
@@ -2256,8 +2297,27 @@ option_8_diagnostics() {
                             echo "  Narzędzie setserial niedostępne"
                         fi
                         echo ""
+                        found_any=true
                     fi
                 done
+                
+                for port in /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        echo "Port: $port"
+                        if command -v setserial &> /dev/null; then
+                            setserial "$port" 2>/dev/null || echo "  Nie można odczytać"
+                        else
+                            echo "  Narzędzie setserial niedostępne"
+                        fi
+                        echo ""
+                        found_any=true
+                    fi
+                done
+                
+                if [ "$found_any" = false ]; then
+                    echo "  Brak portów ttyUSB/ttyACM"
+                    echo ""
+                fi
                 
                 print_info "DTR (Data Terminal Ready) i RTS (Request To Send) to sygnały sterujące."
                 print_info "Używane m.in. do resetowania Arduino/ESP32 podczas wgrywania."
