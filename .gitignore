@@ -1,39 +1,37 @@
-# Environment
+# Environment files
 .env
 .env.local
 *.env.*
 
-# Logs and temp files
+# Logs and temporary files
 *.log
 *.tmp
 *.swp
 
-# Editors
+# Editors and IDEs
 .vscode/
 .idea/
-
-# Dependencies
-.venv/
-venv/
-node_modules/
-
-# Build artifacts
-dist/
-build/
-target/
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
 
 # Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.py~
+
+# Build artifacts
+dist/
+build/
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+
+# Dependencies
+node_modules/
+venv/
+.venv/
 .mypy_cache/
 .pytest_cache/
 .coverage
