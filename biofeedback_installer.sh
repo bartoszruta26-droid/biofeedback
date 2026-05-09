@@ -618,9 +618,655 @@ option_2_deps() {
     wait_for_key
 }
 
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 5: Ustawienia i Pliki Konfiguracyjne
+# ------------------------------------------------------------------------------
+
+CONFIG_FILE="config/config.json"
+CONFIG_BACKUP_DIR="config/backup"
+
+# Funkcja do tworzenia kopii zapasowej konfiguracji
+backup_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_warning "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    mkdir -p "$CONFIG_BACKUP_DIR"
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    cp "$CONFIG_FILE" "$CONFIG_BACKUP_DIR/config_${timestamp}.json"
+    print_success "Utworzono kopię zapasową: config_${timestamp}.json"
+    return 0
+}
+
+# Funkcja do wyświetlania obecnej konfiguracji w czytelnej formie
+show_current_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_warning "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    echo -e "${CYAN}=== Obecna konfiguracja ===${NC}"
+    echo ""
+    
+    # Sprawdź czy jq jest dostępne
+    if command -v jq &> /dev/null; then
+        jq '.' "$CONFIG_FILE"
+    else
+        # Fallback - wyświetl surowy JSON z kolorowaniem
+        cat "$CONFIG_FILE" | while IFS= read -r line; do
+            echo -e "${BLUE}$line${NC}"
+        done
+    fi
+    echo ""
+}
+
+# Funkcja do zmiany wartości w config.json przy użyciu jq
+update_config_value() {
+    local key_path="$1"
+    local new_value="$2"
+    local value_type="$3" # string, number, boolean
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_error "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    if ! command -v jq &> /dev/null; then
+        print_error "jq nie jest zainstalowane. Instaluję..."
+        if command -v apt &> /dev/null; then
+            sudo apt install -y jq
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y jq
+        elif command -v pacman &> /dev/null; then
+            sudo pacman -S --noconfirm jq
+        else
+            print_error "Nie można automatycznie zainstalować jq. Zainstaluj ręcznie."
+            return 1
+        fi
+    fi
+    
+    # Tworzenie kopii zapasowej przed modyfikacją
+    backup_config
+    
+    local typed_value
+    case "$value_type" in
+        string)
+            typed_value="$new_value"
+            ;;
+        number)
+            typed_value="$new_value"
+            ;;
+        boolean)
+            if [[ "$new_value" == "true" || "$new_value" == "t" || "$new_value" == "1" ]]; then
+                typed_value="true"
+            else
+                typed_value="false"
+            fi
+            ;;
+        *)
+            typed_value="$new_value"
+            ;;
+    esac
+    
+    # Aktualizacja pliku JSON
+    if jq --argjson val "$typed_value" ".${key_path} = \$val" "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"; then
+        print_success "Zaktualizowano: $key_path = $typed_value"
+        return 0
+    else
+        print_error "Błąd podczas aktualizacji konfiguracji."
+        rm -f "${CONFIG_FILE}.tmp"
+        return 1
+    fi
+}
+
+# Funkcja do zmiany wartości w config.json bez jq (sed-based)
+update_config_value_sed() {
+    local key="$1"
+    local new_value="$2"
+    local value_type="$3"
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_error "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    backup_config
+    
+    local typed_value
+    case "$value_type" in
+        string)
+            typed_value="\"$new_value\""
+            ;;
+        number|boolean)
+            typed_value="$new_value"
+            ;;
+    esac
+    
+    # Prosta zamiana sed (działa dla prostych przypadków)
+    if sed -i "s/\"$key\": .*/\"$key\": $typed_value/" "$CONFIG_FILE"; then
+        print_success "Zaktualizowano: $key = $typed_value"
+        return 0
+    else
+        print_error "Błąd podczas aktualizacji konfiguracji."
+        return 1
+    fi
+}
+
+# Podmenu: Konfiguracja Portu Szeregowego
+config_serial_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Portu Szeregowego ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Port:     $(jq -r '.serial.port' "$CONFIG_FILE")"
+                echo "BaudRate: $(jq -r '.serial.baud_rate' "$CONFIG_FILE")"
+                echo "Timeout:  $(jq -r '.serial.timeout_ms' "$CONFIG_FILE") ms"
+                echo "Retries:  $(jq -r '.serial.retry_count' "$CONFIG_FILE")"
+            else
+                grep -E '"port"|"baud_rate"|"timeout_ms"|"retry_count"' "$CONFIG_FILE" | head -4
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień port szeregowy"
+        echo "2. Zmień baud rate"
+        echo "3. Zmień timeout (ms)"
+        echo "4. Zmień liczbę retry"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                read -p "Podaj nowy port (np. /dev/ttyUSB0): " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "serial.port" "\"$new_val\"" string || \
+                    update_config_value_sed "port" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            2)
+                read -p "Podaj baud rate (np. 115200): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "serial.baud_rate" "$new_val" number || \
+                    update_config_value_sed "baud_rate" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            3)
+                read -p "Podaj timeout w ms (np. 1000): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "serial.timeout_ms" "$new_val" number || \
+                    update_config_value_sed "timeout_ms" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Podaj liczbę retry (np. 3): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "serial.retry_count" "$new_val" number || \
+                    update_config_value_sed "retry_count" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Konfiguracja UI
+config_ui_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Interfejsu Użytkownika (UI) ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Theme:       $(jq -r '.ui.theme' "$CONFIG_FILE")"
+                echo "Language:    $(jq -r '.ui.language' "$CONFIG_FILE")"
+                echo "Font Size:   $(jq -r '.ui.font_size' "$CONFIG_FILE")"
+                echo "Update Int.: $(jq -r '.ui.graph_update_interval_ms' "$CONFIG_FILE") ms"
+                echo "Samples:     $(jq -r '.ui.graph_samples_visible' "$CONFIG_FILE")"
+            else
+                grep -E '"theme"|"language"|"font_size"|"graph_update_interval_ms"|"graph_samples_visible"' "$CONFIG_FILE" | head -5
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień motyw (theme)"
+        echo "2. Zmień język (pl/en)"
+        echo "3. Zmień rozmiar czcionki"
+        echo "4. Zmień interwał odświeżania wykresu (ms)"
+        echo "5. Zmień liczbę widocznych próbek na wykresie"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                echo "Dostępne motywy: default, dark, light"
+                read -p "Podaj nazwę motywu: " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "ui.theme" "\"$new_val\"" string || \
+                    update_config_value_sed "theme" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            2)
+                echo "Dostępne języki: pl, en"
+                read -p "Podaj kod języka (pl/en): " new_val
+                if [[ "$new_val" == "pl" || "$new_val" == "en" ]]; then
+                    update_config_value "ui.language" "\"$new_val\"" string || \
+                    update_config_value_sed "language" "$new_val" string
+                    LANG="$new_val"
+                    print_success "Język zmieniony na: $new_val"
+                else
+                    print_error "Nieprawidłowy kod języka!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            3)
+                read -p "Podaj rozmiar czcionki (np. 12): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "ui.font_size" "$new_val" number || \
+                    update_config_value_sed "font_size" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Podaj interwał w ms (np. 100): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "ui.graph_update_interval_ms" "$new_val" number || \
+                    update_config_value_sed "graph_update_interval_ms" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            5)
+                read -p "Podaj liczbę próbek (np. 300): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "ui.graph_samples_visible" "$new_val" number || \
+                    update_config_value_sed "graph_samples_visible" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Konfiguracja Sensora
+config_sensor_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Sensora (HX711) ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Type:              $(jq -r '.sensor.type' "$CONFIG_FILE")"
+                echo "Sample Rate (Hz):  $(jq -r '.sensor.sample_rate_hz' "$CONFIG_FILE")"
+                echo "Gain:              $(jq -r '.sensor.gain' "$CONFIG_FILE")"
+                echo "Calibration:       $(jq -r '.sensor.calibration_enabled' "$CONFIG_FILE")"
+                echo "Zero Threshold:    $(jq -r '.sensor.zero_threshold' "$CONFIG_FILE")"
+            else
+                grep -E '"type"|"sample_rate_hz"|"gain"|"calibration_enabled"|"zero_threshold"' "$CONFIG_FILE" | head -5
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień typ sensora"
+        echo "2. Zmień sample rate (Hz)"
+        echo "3. Zmień gain (wzmocnienie)"
+        echo "4. Włącz/Wyłącz kalibrację"
+        echo "5. Zmień zero threshold"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                read -p "Podaj typ sensora (np. HX711): " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "sensor.type" "\"$new_val\"" string || \
+                    update_config_value_sed "type" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            2)
+                echo "Dostępne wartości: 10, 80"
+                read -p "Podaj sample rate (Hz): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "sensor.sample_rate_hz" "$new_val" number || \
+                    update_config_value_sed "sample_rate_hz" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            3)
+                echo "Dostępne wartości: 32, 64, 128"
+                read -p "Podaj gain: " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "sensor.gain" "$new_val" number || \
+                    update_config_value_sed "gain" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                if command -v jq &> /dev/null; then
+                    current=$(jq -r '.sensor.calibration_enabled' "$CONFIG_FILE")
+                else
+                    current=$(grep '"calibration_enabled"' "$CONFIG_FILE" | grep -o 'true\|false')
+                fi
+                
+                if [[ "$current" == "true" ]]; then
+                    new_val="false"
+                else
+                    new_val="true"
+                fi
+                
+                update_config_value "sensor.calibration_enabled" "$new_val" boolean || \
+                update_config_value_sed "calibration_enabled" "$new_val" boolean
+                wait_for_key
+                ;;
+            5)
+                read -p "Podaj zero threshold (np. 0.5): " new_val
+                if [[ "$new_val" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+                    update_config_value "sensor.zero_threshold" "$new_val" number || \
+                    update_config_value_sed "zero_threshold" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Konfiguracja Logowania
+config_logging_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Logowania ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Level:         $(jq -r '.logging.level' "$CONFIG_FILE")"
+                echo "File:          $(jq -r '.logging.file' "$CONFIG_FILE")"
+                echo "Max Size (MB): $(jq -r '.logging.max_size_mb' "$CONFIG_FILE")"
+                echo "Rotate Count:  $(jq -r '.logging.rotate_count' "$CONFIG_FILE")"
+                echo "Console Out:   $(jq -r '.logging.console_output' "$CONFIG_FILE")"
+            else
+                grep -E '"level"|"file"|"max_size_mb"|"rotate_count"|"console_output"' "$CONFIG_FILE" | head -5
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień poziom logowania (DEBUG/INFO/WARNING/ERROR)"
+        echo "2. Zmień ścieżkę do pliku logów"
+        echo "3. Zmień maksymalny rozmiar pliku (MB)"
+        echo "4. Zmień liczbę rotacji plików"
+        echo "5. Włącz/Wyłącz output na konsolę"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                echo "Dostępne poziomy: DEBUG, INFO, WARNING, ERROR"
+                read -p "Podaj poziom logowania: " new_val
+                new_val=$(echo "$new_val" | tr '[:lower:]' '[:upper:]')
+                if [[ "$new_val" == "DEBUG" || "$new_val" == "INFO" || "$new_val" == "WARNING" || "$new_val" == "ERROR" ]]; then
+                    update_config_value "logging.level" "\"$new_val\"" string || \
+                    update_config_value_sed "level" "$new_val" string
+                else
+                    print_error "Nieprawidłowy poziom logowania!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            2)
+                read -p "Podaj ścieżkę do pliku logów: " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "logging.file" "\"$new_val\"" string || \
+                    update_config_value_sed "file" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            3)
+                read -p "Podaj maksymalny rozmiar w MB (np. 10): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "logging.max_size_mb" "$new_val" number || \
+                    update_config_value_sed "max_size_mb" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Podaj liczbę rotacji (np. 5): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "logging.rotate_count" "$new_val" number || \
+                    update_config_value_sed "rotate_count" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            5)
+                if command -v jq &> /dev/null; then
+                    current=$(jq -r '.logging.console_output' "$CONFIG_FILE")
+                else
+                    current=$(grep '"console_output"' "$CONFIG_FILE" | grep -o 'true\|false')
+                fi
+                
+                if [[ "$current" == "true" ]]; then
+                    new_val="false"
+                else
+                    new_val="true"
+                fi
+                
+                update_config_value "logging.console_output" "$new_val" boolean || \
+                update_config_value_sed "console_output" "$new_val" boolean
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Zarządzanie Kopiami Zapasowymi
+config_backup_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Zarządzanie Kopiami Zapasowymi Konfiguracji ---${NC}"
+        echo ""
+        
+        if [ -d "$CONFIG_BACKUP_DIR" ]; then
+            echo -e "${BLUE}Dostępne kopie zapasowe:${NC}"
+            ls -la "$CONFIG_BACKUP_DIR"/*.json 2>/dev/null || echo "Brak kopii zapasowych"
+        else
+            echo "Brak katalogu z kopiami zapasowymi."
+        fi
+        
+        echo ""
+        echo "1. Utwórz kopię zapasową TERAZ"
+        echo "2. Przywróć z ostatniej kopii"
+        echo "3. Przywróć z wybranej kopii"
+        echo "4. Usuń wszystkie kopie zapasowe"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                backup_config
+                wait_for_key
+                ;;
+            2)
+                if [ -d "$CONFIG_BACKUP_DIR" ]; then
+                    latest=$(ls -t "$CONFIG_BACKUP_DIR"/*.json 2>/dev/null | head -n 1)
+                    if [ -n "$latest" ]; then
+                        print_info "Przywracanie z: $latest"
+                        cp "$latest" "$CONFIG_FILE"
+                        print_success "Przywrócono konfigurację!"
+                    else
+                        print_warning "Brak kopii zapasowych do przywrócenia."
+                    fi
+                else
+                    print_warning "Brak katalogu z kopiami zapasowymi."
+                fi
+                wait_for_key
+                ;;
+            3)
+                if [ -d "$CONFIG_BACKUP_DIR" ]; then
+                    echo "Dostępne kopie:"
+                    select backup_file in "$CONFIG_BACKUP_DIR"/*.json; do
+                        if [ -n "$backup_file" ] && [ -f "$backup_file" ]; then
+                            print_info "Przywracanie z: $backup_file"
+                            cp "$backup_file" "$CONFIG_FILE"
+                            print_success "Przywrócono konfigurację!"
+                            break
+                        else
+                            print_error "Nieprawidłowy wybór."
+                        fi
+                    done
+                else
+                    print_warning "Brak katalogu z kopiami zapasowymi."
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Czy na pewno usunąć wszystkie kopie zapasowe? (t/n): " confirm
+                if [[ "$confirm" == "t" || "$confirm" == "T" ]]; then
+                    rm -rf "$CONFIG_BACKUP_DIR"
+                    print_success "Usunięto wszystkie kopie zapasowe."
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Główna funkcja Opcji 5
 option_5_config() {
-    echo "Konfiguracja - W implementacji..."
-    wait_for_key
+    # Sprawdź czy plik configu istnieje, jeśli nie, spróbuj skopiować z example
+    if [ ! -f "$CONFIG_FILE" ] && [ -f "${CONFIG_FILE}.example" ]; then
+        print_info "Tworzenie pliku konfiguracyjnego z wzorca..."
+        cp "${CONFIG_FILE}.example" "$CONFIG_FILE"
+        print_success "Utworzono plik konfiguracyjny."
+    fi
+    
+    while true; do
+        clear
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo -e "${CYAN}          Ustawienia i Pliki Konfiguracyjne                                   ${NC}"
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo ""
+        
+        show_current_config
+        
+        echo -e "${BLUE}--- Kategorie Konfiguracji ---${NC}"
+        echo "1. Konfiguracja Portu Szeregowego"
+        echo "2. Konfiguracja Interfejsu (UI)"
+        echo "3. Konfiguracja Sensora"
+        echo "4. Konfiguracja Logowania"
+        echo "5. Zarządzanie Kopiami Zapasowymi"
+        echo "6. Edytuj plik konfiguracyjny ręcznie (nano/vim)"
+        echo "7. Pokaż lokalizację pliku konfiguracyjnego"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
+        read -p "Wybierz opcję: " choice
+        
+        case $choice in
+            1) config_serial_menu ;;
+            2) config_ui_menu ;;
+            3) config_sensor_menu ;;
+            4) config_logging_menu ;;
+            5) config_backup_menu ;;
+            6)
+                if [ -f "$CONFIG_FILE" ]; then
+                    if command -v nano &> /dev/null; then
+                        nano "$CONFIG_FILE"
+                    elif command -v vim &> /dev/null; then
+                        vim "$CONFIG_FILE"
+                    elif command -v vi &> /dev/null; then
+                        vi "$CONFIG_FILE"
+                    else
+                        print_error "Brak edytora tekstu. Zainstaluj nano lub vim."
+                        wait_for_key
+                    fi
+                else
+                    print_warning "Plik konfiguracyjny nie istnieje."
+                    wait_for_key
+                fi
+                ;;
+            7)
+                if [ -f "$CONFIG_FILE" ]; then
+                    abs_path=$(realpath "$CONFIG_FILE")
+                    print_info "Plik konfiguracyjny: $abs_path"
+                else
+                    print_warning "Plik konfiguracyjny nie istnieje."
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
 }
 
 # ------------------------------------------------------------------------------
