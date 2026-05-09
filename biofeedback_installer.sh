@@ -771,7 +771,8 @@ update_config_value_sed() {
     # Prosta zamiana sed (działa dla prostych przypadków)
     # Escape special characters in the replacement value for sed
     local escaped_value
-    escaped_value=$(printf '%s\n' "$typed_value" | sed 's/[&/\]/\\&/g')
+    # Escape special characters for sed replacement with | delimiter: \ & and |
+    escaped_value=$(printf '%s\n' "$typed_value" | sed 's/[&|\]/\\&/g')
     # Use | as delimiter to avoid issues with / in values like /dev/ttyUSB0
     if sed -i "s|\"$key\": .*|\"$key\": $escaped_value|" "$CONFIG_FILE"; then
         print_success "Zaktualizowano: $key = $typed_value"
@@ -1676,23 +1677,38 @@ EOF
                 local backup_timestamp=$(date +%Y%m%d_%H%M%S)
                 local backup_archive="$backup_dir/biofeedback_backup_$backup_timestamp.tar.gz"
                 
+                # Backup both config directory and user config file if they exist
+                local has_backup_items=false
+                
+                # Create temporary directory for backup contents
+                local temp_backup_dir=$(mktemp -d)
+                
+                # Copy config directory if it exists
                 if [ -d "$config_dir" ] && [ "$(ls -A $config_dir 2>/dev/null)" ]; then
-                    tar -czf "$backup_archive" -C "$REPO_DIR" config
+                    cp -r "$config_dir" "$temp_backup_dir/"
+                    has_backup_items=true
+                fi
+                
+                # Copy user config file if it exists
+                if [ -f "$user_config_file" ]; then
+                    cp "$user_config_file" "$temp_backup_dir/"
+                    has_backup_items=true
+                fi
+                
+                if [ "$has_backup_items" = true ]; then
+                    tar -czf "$backup_archive" -C "$temp_backup_dir" .
+                    rm -rf "$temp_backup_dir"
                     if [ $? -eq 0 ]; then
                         print_success "Wykonano kopię zapasową!"
                         echo ""
                         echo "Lokalizacja: $backup_archive"
                         echo "Rozmiar: $(du -h "$backup_archive" | cut -f1)"
-                    else
-                        print_error "Nie udało się wykonać kopii zapasowej."
-                    fi
-                elif [ -f "$user_config_file" ]; then
-                    cp "$user_config_file" "$backup_dir/user_config_backup_$backup_timestamp"
-                    if [ $? -eq 0 ]; then
-                        print_success "Wykonano kopię zapasową konfiguracji użytkownika!"
                         echo ""
-                        echo "Lokalizacja: $backup_dir/user_config_backup_$backup_timestamp"
+                        echo "Zapisane konfiguracje:"
+                        [ -d "$config_dir" ] && echo "  ✓ Katalog config/"
+                        [ -f "$user_config_file" ] && echo "  ✓ Plik ~/.biofeedback_config"
                     else
+                        rm -rf "$temp_backup_dir"
                         print_error "Nie udało się wykonać kopii zapasowej."
                     fi
                 else
@@ -1716,13 +1732,19 @@ EOF
                 
                 echo "Dostępne kopie zapasowe:"
                 echo ""
+                # List both tar.gz archives and legacy user_config_backup files
                 ls -lht "$backup_dir"/*.tar.gz 2>/dev/null | head -10
+                ls -lht "$backup_dir"/user_config_backup_* 2>/dev/null | head -10
                 echo ""
                 
                 read -p "Podaj nazwę pliku kopii zapasowej (lub naciśnij Enter dla najnowszej): " backup_file
                 
                 if [ -z "$backup_file" ]; then
+                    # Try tar.gz first, then legacy user_config_backup files
                     backup_file=$(ls -t "$backup_dir"/*.tar.gz 2>/dev/null | head -1)
+                    if [ -z "$backup_file" ]; then
+                        backup_file=$(ls -t "$backup_dir"/user_config_backup_* 2>/dev/null | head -1)
+                    fi
                 else
                     backup_file="$backup_dir/$backup_file"
                 fi
@@ -1740,13 +1762,40 @@ EOF
                     continue
                 fi
                 
-                tar -xzf "$backup_file" -C "$REPO_DIR"
-                if [ $? -eq 0 ]; then
-                    print_success "Przywrócono konfigurację z kopii zapasowej!"
-                    echo ""
-                    echo "Plik: $backup_file"
+                # Check if it's a tar.gz archive or a legacy user config file
+                if [[ "$backup_file" == *.tar.gz ]]; then
+                    # Extract tar.gz archive to temp dir first
+                    local temp_restore_dir=$(mktemp -d)
+                    tar -xzf "$backup_file" -C "$temp_restore_dir"
+                    if [ $? -eq 0 ]; then
+                        # Restore config directory if it exists in archive
+                        if [ -d "$temp_restore_dir/config" ]; then
+                            mkdir -p "$REPO_DIR"
+                            cp -r "$temp_restore_dir/config" "$REPO_DIR/"
+                        fi
+                        # Restore user config file if it exists in archive
+                        if [ -f "$temp_restore_dir/.biofeedback_config" ]; then
+                            cp "$temp_restore_dir/.biofeedback_config" "$HOME/"
+                        fi
+                        rm -rf "$temp_restore_dir"
+                        print_success "Przywrócono konfigurację z kopii zapasowej!"
+                        echo ""
+                        echo "Plik: $backup_file"
+                    else
+                        rm -rf "$temp_restore_dir"
+                        print_error "Nie udało się przywrócić konfiguracji."
+                    fi
                 else
-                    print_error "Nie udało się przywrócić konfiguracji."
+                    # Legacy user config backup file - restore to ~/.biofeedback_config
+                    cp "$backup_file" "$HOME/.biofeedback_config"
+                    if [ $? -eq 0 ]; then
+                        print_success "Przywrócono konfigurację użytkownika z kopii zapasowej!"
+                        echo ""
+                        echo "Plik: $backup_file"
+                        echo "Przywrócono do: $HOME/.biofeedback_config"
+                    else
+                        print_error "Nie udało się przywrócić konfiguracji."
+                    fi
                 fi
                 
                 wait_for_key
@@ -2028,6 +2077,19 @@ detect_ports_for_monitor() {
     echo "${ports[@]}"
 }
 
+option_9_extra() {
+    # Save current working directory to return to it later
+    local original_cwd=$(pwd)
+    
+    while true; do
+        clear
+        echo -e "${CYAN}--- Inne opcje ---${NC}"
+        echo ""
+        echo "1. Test połączenia z repozytorium"
+        echo "2. Informacje o systemie"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
 # Funkcja czytająca dane z portu szeregowego i wyświetlająca je w czasie rzeczywistym
 serial_monitor_clean() {
     local port="$1"
@@ -2222,6 +2284,70 @@ option_7_monitor() {
         
         case $sub_choice in
             1)
+                # Repository diagnostics
+                clear
+                echo -e "${CYAN}--- Test połączenia z repozytorium ---${NC}"
+                echo ""
+                
+                if [ ! -d "$REPO_DIR/.git" ]; then
+                    print_warning "Repozytorium nie istnieje. Klonowanie..."
+                    git clone "$REPO_URL"
+                else
+                    cd "$REPO_DIR" || exit
+                    
+                    echo "Lokalne repozytorium:"
+                    git status --short
+                    echo ""
+                    
+                    echo "Zdalne repozytorium:"
+                    git remote -v
+                    echo ""
+                    
+                    echo "Test połączenia (fetch):"
+                    git fetch origin 2>&1
+                    if [ $? -eq 0 ]; then
+                        print_success "Połączenie z repozytorium działa poprawnie."
+                    else
+                        print_error "Nie udało się połączyć z repozytorium."
+                    fi
+                    
+                    # Return to original directory using saved path
+                    cd "$original_cwd" || exit
+                fi
+                
+                wait_for_key
+                ;;
+            
+            2)
+                # System information
+                clear
+                echo -e "${CYAN}--- Informacje o systemie ---${NC}"
+                echo ""
+                
+                echo "System operacyjny:"
+                uname -a
+                echo ""
+                
+                echo "Wersja bash:"
+                bash --version | head -n1
+                echo ""
+                
+                echo "Dostępne narzędzia:"
+                command -v git &>/dev/null && echo "  ✓ git" || echo "  ✗ git"
+                command -v cmake &>/dev/null && echo "  ✓ cmake" || echo "  ✗ cmake"
+                command -v g++ &>/dev/null && echo "  ✓ g++" || echo "  ✗ g++"
+                command -v make &>/dev/null && echo "  ✓ make" || echo "  ✗ make"
+                echo ""
+                
+                wait_for_key
+                ;;
+            
+            0)
+                return
+                ;;
+            
+            *)
+                print_error "Nieprawidłowa opcja"
                 clear
                 echo -e "${CYAN}--- Wykrywanie Portów Szeregowych ---${NC}"
                 echo ""
