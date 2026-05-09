@@ -201,11 +201,11 @@ option_install_dependencies() {
         install_cmd="sudo apt install -y"
     elif command -v dnf &> /dev/null; then
         pkg_manager="dnf"
-        update_cmd="sudo dnf check-update"
+        update_cmd="sudo dnf makecache --refresh"
         install_cmd="sudo dnf install -y"
     elif command -v yum &> /dev/null; then
         pkg_manager="yum"
-        update_cmd="sudo yum check-update"
+        update_cmd="sudo yum makecache"
         install_cmd="sudo yum install -y"
     elif command -v pacman &> /dev/null; then
         pkg_manager="pacman"
@@ -237,7 +237,16 @@ option_install_dependencies() {
     
     # Install core build tools
     echo -e "${YELLOW}[2/4] Installing core build tools...${NC}"
-    eval $install_cmd build-essential cmake git pkg-config
+    
+    if [ "$pkg_manager" = "apt" ]; then
+        eval $install_cmd build-essential cmake git pkg-config
+    elif [ "$pkg_manager" = "dnf" ] || [ "$pkg_manager" = "yum" ]; then
+        eval $install_cmd gcc-c++ make cmake git pkgconfig
+    elif [ "$pkg_manager" = "pacman" ]; then
+        eval $install_cmd base-devel cmake git pkg-config
+    elif [ "$pkg_manager" = "zypper" ]; then
+        eval $install_cmd gcc-c++ make cmake git pkg-config
+    fi
     if [ $? -ne 0 ]; then
         echo -e "${RED}Failed to install core build tools${NC}"
         wait_for_key
