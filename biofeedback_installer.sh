@@ -1,11 +1,19 @@
 #!/bin/bash
 
-# Biofeedback Installer - TUI/CLI Script
-# Shell script for managing biofeedback application installation process
+# ==============================================================================
+# BioFeedback Installer & Manager
+# Opis: Skrypt TUI do zarządzania instalacją, kompilacją i wgrywaniem firmware
+#       do mikrokontrolerów (ESP32, STM32 itp.)
+# Repozytorium: https://github.com/bartoszruta26-droid/biofeedback
+# ==============================================================================
 
-set -e
+# Konfiguracja globalna
+REPO_URL="https://github.com/bartoszruta26-droid/biofeedback"
+REPO_DIR="biofeedback"
+BUILD_DIR="build"
+LANG="pl" # domyślny język
 
-# Colors for TUI
+# Kolory ANSI
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -13,176 +21,117 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Global variables
-CURRENT_LANG="en"
-REPO_URL="https://github.com/bartoszruta26-droid/biofeedback"
-WORK_DIR="$(pwd)"
-CONFIG_FILE="config.ini"
-
-# =============================================================================
-# LANGUAGE STRINGS
-# =============================================================================
-
-declare -A LANG_EN=(
-    [TITLE]="Biofeedback Installer"
-    [MENU_TITLE]="Main Menu"
-    [OPT1]="Select Language (pl/en)"
-    [OPT2]="Install Dependencies"
-    [OPT3]="Git Pull from Repository"
-    [OPT4]="Compile Code"
-    [OPT5]="Upload Code to Microcontroller"
-    [OPT6]="Settings and Configuration Files"
-    [OPT7]="Restore Default Settings"
-    [OPT8]="Clean Terminal - Data Monitor"
-    [OPT9]="Factory Reset"
-    [OPT10]="System Information"
-    [OPT11]="Check Updates"
-    [OPT12]="Backup Configuration"
-    [OPT0]="Exit"
-    [PROMPT]="Select option (0-12): "
-    [LANG_SELECTED]="Language selected: "
-    [PRESS_KEY]="Press any key to continue..."
-    [INVALID_OPT]="Invalid option. Please try again."
-    [EXITING]="Exiting installer. Goodbye!"
-    [DEP_INSTALL]="Installing dependencies..."
-    [DEP_DONE]="Dependencies installed successfully."
-    [GIT_PULL]="Pulling latest changes from repository..."
-    [GIT_DONE]="Repository updated successfully."
-    [COMPILING]="Compiling code..."
-    [COMPILE_DONE]="Compilation completed successfully."
-    [UPLOADING]="Uploading code to microcontroller..."
-    [UPLOAD_DONE]="Upload completed successfully."
-    [SETTINGS]="Opening settings menu..."
-    [DEFAULTS]="Restoring default settings..."
-    [DEFAULTS_DONE]="Default settings restored."
-    [MONITOR]="Starting clean terminal data monitor..."
-    [FACTORY]="Performing factory reset..."
-    [FACTORY_DONE]="Factory reset completed."
-    [SYS_INFO]="Displaying system information..."
-    [UPDATES]="Checking for updates..."
-    [BACKUP]="Creating configuration backup..."
-    [BACKUP_DONE]="Backup created successfully."
-)
-
-declare -A LANG_PL=(
-    [TITLE]="Instalator Biofeedback"
-    [MENU_TITLE]="Menu Główne"
-    [OPT1]="Wybierz Język (pl/en)"
-    [OPT2]="Instaluj Zależności"
-    [OPT3]="Git Pull z Repozytorium"
-    [OPT4]="Kompiluj Kod"
-    [OPT5]="Wgraj Kod do Mikrokontrolera"
-    [OPT6]="Ustawienia i Pliki Konfiguracyjne"
-    [OPT7]="Przywróć Ustawienia Domyślne"
-    [OPT8]="Czysty Terminal - Monitor Danych"
-    [OPT9]="Przywrócenie Ustawień Fabrycznych"
-    [OPT10]="Informacje Systemowe"
-    [OPT11]="Sprawdź Aktualizacje"
-    [OPT12]="Kopia Zapasowa Konfiguracji"
-    [OPT0]="Wyjście"
-    [PROMPT]="Wybierz opcję (0-12): "
-    [LANG_SELECTED]="Wybrano język: "
-    [PRESS_KEY]="Naciśnij dowolny klawisz, aby kontynuować..."
-    [INVALID_OPT]="Nieprawidłowa opcja. Spróbuj ponownie."
-    [EXITING]="Wyjście z instalatora. Do widzenia!"
-    [DEP_INSTALL]="Instalowanie zależności..."
-    [DEP_DONE]="Zależności zainstalowane pomyślnie."
-    [GIT_PULL]="Pobieranie najnowszych zmian z repozytorium..."
-    [GIT_DONE]="Repozytorium zaktualizowane pomyślnie."
-    [COMPILING]="Kompilowanie kodu..."
-    [COMPILE_DONE]="Kompilacja zakończona pomyślnie."
-    [UPLOADING]="Wgrywanie kodu do mikrokontrolera..."
-    [UPLOAD_DONE]="Wgrywanie zakończone pomyślnie."
-    [SETTINGS]="Otwieranie menu ustawień..."
-    [DEFAULTS]="Przywracanie ustawień domyślnych..."
-    [DEFAULTS_DONE]="Ustawienia domyślne przywrócone."
-    [MONITOR]="Uruchamianie czystego terminala monitora danych..."
-    [FACTORY]="Wykonywanie resetu fabrycznego..."
-    [FACTORY_DONE]="Reset fabryczny zakończony."
-    [SYS_INFO]="Wyświetlanie informacji systemowych..."
-    [UPDATES]="Sprawdzanie aktualizacji..."
-    [BACKUP]="Tworzenie kopii zapasowej konfiguracji..."
-    [BACKUP_DONE]="Kopia zapasowa utworzona pomyślnie."
-)
-
-# Current language dictionary (will be set based on selection)
-declare -A LANG
-
-# =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
-
-clear_screen() {
-    clear
-}
+# ------------------------------------------------------------------------------
+# Funkcje pomocnicze (Utils)
+# ------------------------------------------------------------------------------
 
 print_header() {
-    echo -e "${CYAN}============================================${NC}"
-    echo -e "${CYAN}          ${LANG[TITLE]}                  ${NC}"
-    echo -e "${CYAN}============================================${NC}"
+    clear
+    echo -e "${CYAN}==============================================================================${NC}"
+    echo -e "${CYAN}          BioFeedback Installer & Manager - Menu Główne                       ${NC}"
+    echo -e "${CYAN}==============================================================================${NC}"
     echo ""
 }
 
-print_menu() {
-    print_header
-    echo -e "${YELLOW}${LANG[MENU_TITLE]}:${NC}"
-    echo ""
-    echo -e "  1. ${LANG[OPT1]}"
-    echo -e "  2. ${LANG[OPT2]}"
-    echo -e "  3. ${LANG[OPT3]}"
-    echo -e "  4. ${LANG[OPT4]}"
-    echo -e "  5. ${LANG[OPT5]}"
-    echo -e "  6. ${LANG[OPT6]}"
-    echo -e "  7. ${LANG[OPT7]}"
-    echo -e "  8. ${LANG[OPT8]}"
-    echo -e "  9. ${LANG[OPT9]}"
-    echo -e " 10. ${LANG[OPT10]}"
-    echo -e " 11. ${LANG[OPT11]}"
-    echo -e " 12. ${LANG[OPT12]}"
-    echo -e "  0. ${LANG[OPT0]}"
-    echo ""
+print_error() {
+    echo -e "${RED}[BŁĄD]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUKCES]${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[OSTRZEŻENIE]${NC} $1"
 }
 
 wait_for_key() {
     echo ""
-    echo -e "${YELLOW}${LANG[PRESS_KEY]}${NC}"
-    read -n 1 -s
+    read -p "Naciśnij Enter, aby kontynuować..."
 }
 
-# =============================================================================
-# FEATURE FUNCTIONS (STUBS - TO BE IMPLEMENTED LATER)
-# =============================================================================
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 3: Git Pull & Kompilacja (Zaimplementowana wcześniej)
+# ------------------------------------------------------------------------------
+option_3_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Opcja 3: Zarządzanie Kodem i Kompilacja ---${NC}"
+        echo "1. Git Pull (Pobierz zmiany)"
+        echo "2. Kompiluj projekt (CMake)"
+        echo "3. Rekompiluj (Czysty build)"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        read -p "Wybierz opcję: " sub_choice
 
-option_language() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT1]} ---${NC}"
-    echo "  1. English"
-    echo "  2. Polski"
-    echo ""
-    read -p "Choose language (1-2): " lang_choice
-    
-    case $lang_choice in
-        1)
-            CURRENT_LANG="en"
-            for key in "${!LANG_EN[@]}"; do
-                LANG[$key]="${LANG_EN[$key]}"
-            done
-            ;;
-        2)
-            CURRENT_LANG="pl"
-            for key in "${!LANG_PL[@]}"; do
-                LANG[$key]="${LANG_PL[$key]}"
-            done
-            ;;
-        *)
-            echo -e "${RED}Invalid choice${NC}"
-            return
-            ;;
-    esac
-    
-    echo -e "${GREEN}${LANG[LANG_SELECTED]}${CURRENT_LANG}${NC}"
-    wait_for_key
+        case $sub_choice in
+            1)
+                print_info "Aktualizowanie repozytorium..."
+                if [ -d "$REPO_DIR/.git" ]; then
+                    cd "$REPO_DIR" || exit
+                    git fetch origin
+                    git pull origin main
+                    cd ..
+                else
+                    print_warning "Repozytorium nie istnieje. Klonowanie..."
+                    git clone "$REPO_URL"
+                fi
+                wait_for_key
+                ;;
+            2)
+                print_info "Kompilowanie projektu..."
+                if [ ! -d "$REPO_DIR" ]; then print_error "Brak katalogu źródłowego!"; wait_for_key; continue; fi
+                mkdir -p "$REPO_DIR/$BUILD_DIR"
+                cd "$REPO_DIR/$BUILD_DIR" || exit
+                cmake .. && make -j$(nproc)
+                cd ../..
+                wait_for_key
+                ;;
+            3)
+                print_warning "Czyszczenie i ponowna kompilacja..."
+                if [ -d "$REPO_DIR/$BUILD_DIR" ]; then
+                    rm -rf "$REPO_DIR/$BUILD_DIR"
+                fi
+                mkdir -p "$REPO_DIR/$BUILD_DIR"
+                cd "$REPO_DIR/$BUILD_DIR" || exit
+                cmake .. && make -j$(nproc)
+                cd ../..
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
 }
+
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 4: Wgrywanie kodu do mikrokontrolera (NOWE)
+# ------------------------------------------------------------------------------
+
+# Funkcja do wykrywania dostępnych portów szeregowych
+detect_serial_ports() {
+    local ports=()
+    
+    # Sprawdź typowe lokalizacje portów w Linux
+    if command -v lsusb &> /dev/null; then
+        echo -e "${BLUE}Skonfigurowane urządzenia USB:${NC}"
+        lsusb | grep -i "serial\|ftdi\|silicon\|cp210x\|ch34\|esp32\|stm32" || echo "Brak typowych konwerterów w lsusb."
+        echo ""
+    fi
+
+    echo -e "${BLUE}Wykryte porty szeregowe:${NC}"
+    
+    # Linux: ttyUSB, ttyACM
+    for port in /dev/ttyUSB* /dev/ttyACM*; do
+        if [ -e "$port" ]; then
+            ports+=("$port")
+            echo "  - $port"
+        fi
+    done
 
 option_install_dependencies() {
     echo ""
@@ -430,174 +379,314 @@ option_install_dependencies() {
     wait_for_key
 }
 
-option_git_pull() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT3]} ---${NC}"
-    echo -e "${YELLOW}${LANG[GIT_PULL]}${NC}"
-    # TODO: Implement git pull logic
-    echo -e "${GREEN}${LANG[GIT_DONE]}${NC}"
-    wait_for_key
+    if [ ${#ports[@]} -eq 0 ]; then
+        echo "  Brak wykrytych portów szeregowych."
+        return 1
+    fi
+    
+    # Zwracamy listę portów jako wynik (w bashu trudno zwrócić tablicę, więc drukujemy)
+    echo "${ports[@]}" > /tmp/detected_ports.txt
+    return 0
 }
 
-option_compile_code() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT4]} ---${NC}"
-    echo -e "${YELLOW}${LANG[COMPILING]}${NC}"
-    # TODO: Implement compilation logic
-    echo -e "${GREEN}${LANG[COMPILE_DONE]}${NC}"
-    wait_for_key
+# Funkcja szukająca pliki binarne w katalogu build
+find_firmware_file() {
+    local search_dir="$REPO_DIR/$BUILD_DIR"
+    local file_ext="$1" # np. "bin" lub "hex"
+    
+    if [ ! -d "$search_dir" ]; then
+        return 1
+    fi
+
+    find "$search_dir" -name "*.$file_ext" -type f 2>/dev/null | head -n 1
 }
 
-option_upload_code() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT5]} ---${NC}"
-    echo -e "${YELLOW}${LANG[UPLOADING]}${NC}"
-    # TODO: Implement upload logic
-    echo -e "${GREEN}${LANG[UPLOAD_DONE]}${NC}"
-    wait_for_key
-}
-
-option_settings() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT6]} ---${NC}"
-    echo -e "${YELLOW}${LANG[SETTINGS]}${NC}"
-    # TODO: Implement settings menu
-    wait_for_key
-}
-
-option_restore_defaults() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT7]} ---${NC}"
-    echo -e "${YELLOW}${LANG[DEFAULTS]}${NC}"
-    # TODO: Implement restore defaults logic
-    echo -e "${GREEN}${LANG[DEFAULTS_DONE]}${NC}"
-    wait_for_key
-}
-
-option_clean_terminal() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT8]} ---${NC}"
-    echo -e "${YELLOW}${LANG[MONITOR]}${NC}"
-    # TODO: Implement clean terminal monitor
-    wait_for_key
-}
-
-option_factory_reset() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT9]} ---${NC}"
-    echo -e "${YELLOW}${LANG[FACTORY]}${NC}"
-    # TODO: Implement factory reset logic
-    echo -e "${GREEN}${LANG[FACTORY_DONE]}${NC}"
-    wait_for_key
-}
-
-option_system_info() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT10]} ---${NC}"
-    echo -e "${YELLOW}${LANG[SYS_INFO]}${NC}"
-    # TODO: Implement system information display
-    wait_for_key
-}
-
-option_check_updates() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT11]} ---${NC}"
-    echo -e "${YELLOW}${LANG[UPDATES]}${NC}"
-    # TODO: Implement update check logic
-    wait_for_key
-}
-
-option_backup_config() {
-    echo ""
-    echo -e "${BLUE}--- ${LANG[OPT12]} ---${NC}"
-    echo -e "${YELLOW}${LANG[BACKUP]}${NC}"
-    # TODO: Implement backup logic
-    echo -e "${GREEN}${LANG[BACKUP_DONE]}${NC}"
-    wait_for_key
-}
-
-# =============================================================================
-# MAIN MENU LOOP
-# =============================================================================
-
-main_menu() {
-    local choice
+# Główna funkcja opcji 4
+option_4_menu() {
+    local selected_port=""
     
     while true; do
-        clear_screen
-        print_menu
-        read -p "${LANG[PROMPT]}" choice
+        clear
+        echo -e "${CYAN}--- Opcja 4: Wgrywanie Firmware do Mikrokontrolera ---${NC}"
+        echo ""
+        echo "1. Wykryj podłączone urządzenia"
+        echo "2. Wybierz port ręcznie"
+        echo "3. Wgraj firmware (ESP32 / esptool)"
+        echo "4. Wgraj firmware (STM32 / st-flash)"
+        echo "5. Wgraj przez USB-CDC / DFU (Mass Storage)"
+        echo "6. Monitor portu szeregowego (Logi startowe)"
+        echo "0. Powrót do menu głównego"
+        echo ""
         
-        case $choice in
+        if [ -n "$selected_port" ]; then
+            echo -e "${GREEN}Aktywny port: $selected_port${NC}"
+        else
+            echo -e "${YELLOW}Aktywny port: NIEWYBRANY${NC}"
+        fi
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+
+        case $sub_choice in
             1)
-                option_language
+                detect_serial_ports
+                if [ -f /tmp/detected_ports.txt ]; then
+                    read -p "Czy chcesz ustawić pierwszy wykryty port jako aktywny? (t/n): " confirm
+                    if [[ "$confirm" == "t" || "$confirm" == "T" ]]; then
+                        selected_port=$(head -n 1 /tmp/detected_ports.txt | awk '{print $1}')
+                        print_success "Wybrano port: $selected_port"
+                    fi
+                fi
+                wait_for_key
                 ;;
+                
             2)
-                option_install_dependencies
+                read -p "Podaj ścieżkę do portu (np. /dev/ttyUSB0): " selected_port
+                if [ -e "$selected_port" ]; then
+                    print_success "Port $selected_port istnieje."
+                else
+                    print_warning "Port $selected_port nie istnieje w systemie!"
+                fi
+                wait_for_key
                 ;;
+
             3)
-                option_git_pull
+                # Logika dla ESP32
+                if [ -z "$selected_port" ]; then
+                    print_error "Najpierw wybierz port (opcja 1 lub 2)!"
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Szukanie pliku firmware (.bin)..."
+                fw_file=$(find_firmware_file "bin")
+                
+                if [ -z "$fw_file" ]; then
+                    print_error "Nie znaleziono pliku .bin w katalogu $REPO_DIR/$BUILD_DIR"
+                    print_info "Czy chcesz wskazać plik ręcznie?"
+                    read -p "Ścieżka do pliku .bin: " fw_file
+                fi
+
+                if [ ! -f "$fw_file" ]; then
+                    print_error "Plik firmware nie istnieje!"
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Wykrywanie esptool..."
+                if command -v esptool.py &> /dev/null; then
+                    ESPTOOL_CMD="esptool.py"
+                elif command -v esptool &> /dev/null; then
+                    ESPTOOL_CMD="esptool"
+                else
+                    print_error "Nie znaleziono narzędzia esptool. Zainstaluj: pip install esptool"
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Wgrywanie $fw_file na $selected_port ..."
+                # Przykładowa komenda dla ESP32 (może wymagać dostosowania adresu 0x1000)
+                $ESPTOOL_CMD --chip esp32 --port "$selected_port" write_flash 0x1000 "$fw_file"
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Wgrywanie zakończone powodzeniem!"
+                else
+                    print_error "Błąd wgrywania firmware."
+                fi
+                wait_for_key
                 ;;
+
             4)
-                option_compile_code
+                # Logika dla STM32 (st-link)
+                if [ -z "$selected_port" ]; then
+                     # Dla ST-Link port nie zawsze jest potrzebny w trybie SWD, ale warto mieć wybrane urządzenie
+                     print_info "Tryb ST-Link często nie wymaga wyboru portu COM, ale upewnij się, że urządzenie jest podłączone USB."
+                fi
+
+                print_info "Szukanie pliku firmware (.bin lub .hex)..."
+                fw_file=$(find_firmware_file "bin")
+                if [ -z "$fw_file" ]; then
+                    fw_file=$(find_firmware_file "hex")
+                fi
+
+                if [ -z "$fw_file" ] || [ ! -f "$fw_file" ]; then
+                    print_error "Nie znaleziono pliku .bin ani .hex do wgrania."
+                    wait_for_key
+                    continue
+                fi
+
+                if ! command -v st-flash &> /dev/null; then
+                    print_error "Nie znaleziono narzędzia 'st-flash'. Zainstaluj pakiet stlink-tools."
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Wgrywanie $fw_file przez ST-Link..."
+                # Przykład: st-flash write firmware.bin 0x8000000
+                # Adres zależy od konkretnego modelu STM32, zakładamy standardowy 0x8000000
+                st-flash write "$fw_file" 0x8000000
+
+                if [ $? -eq 0 ]; then
+                    print_success "Wgrywanie na STM32 zakończone!"
+                else
+                    print_error "Błąd komunikacji ze ST-Link lub błędny adres flasha."
+                fi
+                wait_for_key
                 ;;
+
             5)
-                option_upload_code
+                # Logika DFU / Mass Storage
+                print_info "Tryb DFU / Disk Copy."
+                read -p "Podaj ścieżkę do montowania (np. /media/user/DEVICE lub urządzenie DFU): " target_path
+                
+                if [ -d "$target_path" ]; then
+                    print_info "Kopiowanie pliku bin/hex na urządzenie..."
+                    # Szukaj dowolnego pliku wykonywalnego
+                    fw_file=$(find_firmware_file "bin")
+                    if [ -z "$fw_file" ]; then fw_file=$(find_firmware_file "hex"); fi
+                    
+                    if [ -n "$fw_file" ]; then
+                        cp "$fw_file" "$target_path/"
+                        sync
+                        print_success "Kopiowanie zakończone. Odłącz device aby zresetować."
+                    else
+                        print_error "Brak pliku do skopiowania."
+                    fi
+                else
+                    # Próba użycia dfu-util jeśli ścieżka nie jest katalogiem
+                    if command -v dfu-util &> /dev/null; then
+                        read -p "Podaj ID urządzenia DFU (np. 0483:df11): " dfu_id
+                        fw_file=$(find_firmware_file "bin")
+                        if [ -n "$fw_file" ]; then
+                            dfu-util -d "$dfu_id" -D "$fw_file"
+                        else
+                            print_error "Brak pliku bin."
+                        fi
+                    else
+                        print_error "Ścieżka nie istnieje i brak dfu-util."
+                    fi
+                fi
+                wait_for_key
                 ;;
+
             6)
-                option_settings
+                # Monitor szeregowy
+                if [ -z "$selected_port" ]; then
+                    print_error "Wybierz port najpierw!"
+                    wait_for_key
+                    continue
+                fi
+                
+                print_info "Uruchamianie monitora szeregowego na $selected_port (Baud: 115200)..."
+                print_info "Naciśnij Ctrl+A, potem X aby wyjść (screen) lub Ctrl+C (minicom/cat)."
+                
+                if command -v screen &> /dev/null; then
+                    screen "$selected_port" 115200
+                elif command -v minicom &> /dev/null; then
+                    minicom -D "$selected_port" -b 115200
+                elif command -v cat &> /dev/null; then
+                    # Prosty podgląd
+                    cat "$selected_port"
+                else
+                    print_error "Brak dostępnego programu terminala (screen, minicom)."
+                fi
+                wait_for_key
                 ;;
-            7)
-                option_restore_defaults
-                ;;
-            8)
-                option_clean_terminal
-                ;;
-            9)
-                option_factory_reset
-                ;;
-            10)
-                option_system_info
-                ;;
-            11)
-                option_check_updates
-                ;;
-            12)
-                option_backup_config
-                ;;
+
             0)
-                clear_screen
-                echo -e "${GREEN}${LANG[EXITING]}${NC}"
-                exit 0
+                return
                 ;;
             *)
-                echo -e "${RED}${LANG[INVALID_OPT]}${NC}"
-                sleep 2
+                print_error "Nieprawidłowa opcja."
+                sleep 1
                 ;;
         esac
     done
 }
 
-# =============================================================================
-# INITIALIZATION
-# =============================================================================
+# ------------------------------------------------------------------------------
+# Pozostałe opcje (Szkielet)
+# ------------------------------------------------------------------------------
 
-init() {
-    # Set default language to English
-    for key in "${!LANG_EN[@]}"; do
-        LANG[$key]="${LANG_EN[$key]}"
-    done
-    
-    # Check if running as root (optional, can be removed if not needed)
-    # if [[ $EUID -ne 0 ]]; then
-    #     echo -e "${YELLOW}Warning: Some operations may require root privileges${NC}"
-    #     sleep 2
-    # fi
+option_1_language() {
+    echo "Wybór języka (PL/EN) - W implementacji..."
+    wait_for_key
 }
 
-# =============================================================================
-# SCRIPT ENTRY POINT
-# =============================================================================
+option_2_deps() {
+    echo "Instalacja zależności - W implementacji..."
+    wait_for_key
+}
 
-init
+option_5_config() {
+    echo "Konfiguracja - W implementacji..."
+    wait_for_key
+}
+
+option_6_defaults() {
+    echo "Przywracanie ustawień domyślnych - W implementacji..."
+    wait_for_key
+}
+
+option_7_monitor() {
+    echo "Czysty terminal monitora - W implementacji..."
+    wait_for_key
+}
+
+option_8_factory() {
+    echo "Przywrócenie ustawień fabrycznych - W implementacji..."
+    wait_for_key
+}
+
+option_9_extra() {
+    echo "Inne opcje (Backup, Info o systemie) - W implementacji..."
+    wait_for_key
+}
+
+# ------------------------------------------------------------------------------
+# Pętla Główna Menu
+# ------------------------------------------------------------------------------
+
+main_menu() {
+    while true; do
+        print_header
+        
+        echo "1. Wybór języka (pl/en)"
+        echo "2. Instalacja zależności"
+        echo "3. Git Pull & Kompilacja"
+        echo "4. Wgrywanie kodu do mikrokontrolera"
+        echo "5. Ustawienia i pliki konfiguracyjne"
+        echo "6. Przywracanie ustawień domyślnych"
+        echo "7. Czysty terminal monitor danych"
+        echo "8. Przywrócenie ustawień fabrycznych"
+        echo "9. Inne opcje"
+        echo "0. Wyjście"
+        echo ""
+        
+        read -p "Wybierz opcję [0-9]: " choice
+
+        case $choice in
+            1) option_1_language ;;
+            2) option_2_deps ;;
+            3) option_3_menu ;;
+            4) option_4_menu ;;
+            5) option_5_config ;;
+            6) option_6_defaults ;;
+            7) option_7_monitor ;;
+            8) option_8_factory ;;
+            9) option_9_extra ;;
+            0) 
+                clear
+                echo "Do widzenia!"
+                exit 0
+                ;;
+            *) 
+                print_error "Nieprawidłowy wybór. Spróbuj ponownie."
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# Uruchomienie skryptu
 main_menu
