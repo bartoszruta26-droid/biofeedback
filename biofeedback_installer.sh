@@ -2050,6 +2050,9 @@ option_8_factory() {
     echo ""
     
     wait_for_key
+}
+
+# ------------------------------------------------------------------------------
 # Opcja 7: Czysty Terminal Monitor Danych (SZCZEGÓŁOWA IMPLEMENTACJA)
 # ------------------------------------------------------------------------------
 
@@ -2077,514 +2080,243 @@ detect_ports_for_monitor() {
     echo "${ports[@]}"
 }
 
-option_9_extra() {
-    # Save current working directory to return to it later
-    local original_cwd=$(pwd)
+
+# ------------------------------------------------------------------------------
+# Opcja 8: Diagnostyka i Testowanie Mikrokontrolera
+# ------------------------------------------------------------------------------
+
+option_8_diagnostics() {
+    clear
+    echo -e "${CYAN}==============================================================================${NC}"
+    echo -e "${CYAN}          OPCJA 8: DIAGNOSTYKA I TESTOWANIE MIKROKONTROLERA                   ${NC}"
+    echo -e "${CYAN}==============================================================================${NC}"
+    echo ""
     
     while true; do
-        clear
-        echo -e "${CYAN}--- Inne opcje ---${NC}"
-        echo ""
-        echo "1. Test połączenia z repozytorium"
-        echo "2. Informacje o systemie"
+        echo "1. Test połączenia szeregowego"
+        echo "2. Sprawdź wykryte urządzenia USB"
+        echo "3. Test prędkości transmisji (Baud Rate)"
+        echo "4. Monitoruj sygnały DTR/RTS"
+        echo "5. Wykryj chip ID (ESP32)"
+        echo "6. Test pamięci Flash"
         echo "0. Powrót do menu głównego"
         echo ""
         
-# Funkcja czytająca dane z portu szeregowego i wyświetlająca je w czasie rzeczywistym
-serial_monitor_clean() {
-    local port="$1"
-    local baud="${2:-115200}"
-    
-    if [ ! -e "$port" ]; then
-        print_error "Port $port nie istnieje!"
-        return 1
-    fi
-    
-    # Sprawdź uprawnienia
-    if [ ! -r "$port" ]; then
-        print_error "Brak uprawnień do odczytu portu $port"
-        print_info "Spróbuj: sudo usermod -a -G dialout \$USER"
-        print_info "Lub uruchom skrypt z sudo"
-        return 1
-    fi
-    
-    clear
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo -e "${CYAN}          CZYSTY MONITOR DANYCH SZEREGOWYCH                                   ${NC}"
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo ""
-    echo -e "${BLUE}Port:${NC} $port"
-    echo -e "${BLUE}Szybkość:${NC} $baud baud"
-    echo -e "${BLUE}Czas startu:${NC} $(date '+%Y-%m-%d %H:%M:%S')"
-    echo ""
-    echo -e "${YELLOW}Naciśnij Ctrl+C aby wyjść${NC}"
-    echo -e "${YELLOW}Naciśnij Ctrl+\\ aby wysłać sygnał quit${NC}"
-    echo ""
-    echo -e "${GREEN}--- STRUMIEŃ DANYCH ---${NC}"
-    echo ""
-    
-    # Używamy cat do czytania danych z portu
-    # stty konfiguruje port przed otwarciem
-    stty -F "$port" "$baud" raw -echo -icanon isig 2>/dev/null
-    
-    # Czytaj dane z portu
-    cat "$port" 2>/dev/null
-}
-
-# Funkcja monitora z filtrowaniem i statystykami
-serial_monitor_with_stats() {
-    local port="$1"
-    local baud="${2:-115200}"
-    
-    if [ ! -e "$port" ]; then
-        print_error "Port $port nie istnieje!"
-        return 1
-    fi
-    
-    local line_count=0
-    local byte_count=0
-    local start_time=$(date +%s)
-    
-    clear
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo -e "${CYAN}          MONITOR DANYCH ZE STATYSTYKAMI                                      ${NC}"
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo ""
-    echo -e "${BLUE}Port:${NC} $port"
-    echo -e "${BLUE}Szybkość:${NC} $baud baud"
-    echo -e "${BLUE}Start:${NC} $(date '+%Y-%m-%d %H:%M:%S')"
-    echo ""
-    echo -e "${YELLOW}Ctrl+C aby wyjść${NC}"
-    echo ""
-    
-    # Konfiguracja portu
-    stty -F "$port" "$baud" raw -echo -icanon isig 2>/dev/null
-    
-    # Czytaj i przetwarzaj dane
-    while IFS= read -r line; do
-        ((line_count++))
-        byte_count=$((byte_count + ${#line}))
+        read -p "Wybierz opcję: " diag_choice
         
-        local current_time=$(date +%s)
-        local elapsed=$((current_time - start_time))
-        local rate=0
-        if [ $elapsed -gt 0 ]; then
-            rate=$((line_count / elapsed))
-        fi
-        
-        # Wyświetl linię z numerem
-        echo -e "${GREEN}[$line_count]${NC} $line"
-        
-        # Co 100 linii pokaż statystyki
-        if [ $((line_count % 100)) -eq 0 ]; then
-            echo ""
-            echo -e "${CYAN}--- Statystyki ---${NC}"
-            echo "  Linie: $line_count"
-            echo "  Bajty: ~$byte_count"
-            echo "  Czas: ${elapsed}s"
-            echo "  Śr. linie/s: $rate"
-            echo ""
-        fi
-    done < "$port" 2>/dev/null
-}
-
-# Funkcja monitora z wykresem ASCII (dla danych numerycznych)
-serial_monitor_ascii_graph() {
-    local port="$1"
-    local baud="${2:-115200}"
-    local graph_width=60
-    local max_value=100
-    local min_value=0
-    
-    if [ ! -e "$port" ]; then
-        print_error "Port $port nie istnieje!"
-        return 1
-    fi
-    
-    clear
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo -e "${CYAN}          MONITOR Z WYKRESEM ASCII                                            ${NC}"
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo ""
-    echo -e "${BLUE}Port:${NC} $port"
-    echo -e "${BLUE}Szybkość:${NC} $baud baud"
-    echo -e "${BLUE}Zakres:${NC} $min_value - $max_value"
-    echo ""
-    echo -e "${YELLOW}Ctrl+C aby wyjść${NC}"
-    echo ""
-    
-    # Konfiguracja portu
-    stty -F "$port" "$baud" 2>/dev/null
-    
-    # Czytaj dane i rysuj wykres
-    while IFS= read -r line; do
-        # Spróbuj wyodrębnić liczbę z linii
-        local number=$(echo "$line" | grep -oE '[-]?[0-9]+\.?[0-9]*' | head -n 1)
-        
-        if [ -n "$number" ]; then
-            # Oblicz długość paska
-            local range=$((max_value - min_value))
-            if [ $range -eq 0 ]; then range=1; fi
-            
-            # Skaluj wartość do zakresu 0-graph_width
-            local scaled=$(( (number - min_value) * graph_width / range ))
-            
-            # Ogranicz do zakresu
-            if [ $scaled -lt 0 ]; then scaled=0; fi
-            if [ $scaled -gt $graph_width ]; then scaled=$graph_width; fi
-            
-            # Narysuj pasek
-            local bar=""
-            for ((i=0; i<scaled; i++)); do
-                bar="${bar}#"
-            done
-            
-            # Wyświetl wartość i pasek
-            printf "\r${GREEN}%8.2f${NC} |%-${graph_width}s| " "$number" "$bar"
-            echo ""
-        else
-            # Jeśli nie liczba, wyświetl surowe dane
-            echo -e "${YELLOW}RAW:${NC} $line"
-        fi
-    done < "$port" 2>/dev/null
-}
-
-# Główna funkcja opcji 7
-option_7_monitor() {
-    local selected_port=""
-    local selected_baud="115200"
-    
-    while true; do
-        clear
-        echo -e "${CYAN}==============================================================================${NC}"
-        echo -e "${CYAN}          OPCJA 7: CZYSTY TERMINAL MONITOR DANYCH                             ${NC}"
-        echo -e "${CYAN}==============================================================================${NC}"
-        echo ""
-        echo "1. Wykryj dostępne porty szeregowe"
-        echo "2. Wybierz port ręcznie"
-        echo "3. Ustaw szybkość transmisji (baud rate)"
-        echo "4. Uruchom czysty monitor (surowe dane)"
-        echo "5. Uruchom monitor ze statystykami"
-        echo "6. Uruchom monitor z wykresem ASCII"
-        echo "7. Test połączenia (krótki odczyt)"
-        echo "8. Zapisz dane do pliku"
-        echo "0. Powrót do menu głównego"
-        echo ""
-        
-        if [ -n "$selected_port" ]; then
-            echo -e "${GREEN}Aktywny port: $selected_port${NC}"
-            echo -e "${GREEN}Baud rate: $selected_baud${NC}"
-        else
-            echo -e "${YELLOW}Aktywny port: NIEWYBRANY${NC}"
-            echo -e "${YELLOW}Baud rate: $selected_baud${NC}"
-        fi
-        echo ""
-        
-        read -p "Wybierz opcję: " sub_choice
-        
-        case $sub_choice in
+        case $diag_choice in
             1)
-                # Repository diagnostics
                 clear
-                echo -e "${CYAN}--- Test połączenia z repozytorium ---${NC}"
+                echo -e "${CYAN}--- Test Połączenia Szeregowego ---${NC}"
                 echo ""
                 
-                if [ ! -d "$REPO_DIR/.git" ]; then
-                    print_warning "Repozytorium nie istnieje. Klonowanie..."
-                    git clone "$REPO_URL"
-                else
-                    cd "$REPO_DIR" || exit
-                    
-                    echo "Lokalne repozytorium:"
-                    git status --short
-                    echo ""
-                    
-                    echo "Zdalne repozytorium:"
-                    git remote -v
-                    echo ""
-                    
-                    echo "Test połączenia (fetch):"
-                    git fetch origin 2>&1
-                    if [ $? -eq 0 ]; then
-                        print_success "Połączenie z repozytorium działa poprawnie."
-                    else
-                        print_error "Nie udało się połączyć z repozytorium."
-                    fi
-                    
-                    # Return to original directory using saved path
-                    cd "$original_cwd" || exit
-                fi
-                
-                wait_for_key
-                ;;
-            
-            2)
-                # System information
-                clear
-                echo -e "${CYAN}--- Informacje o systemie ---${NC}"
-                echo ""
-                
-                echo "System operacyjny:"
-                uname -a
-                echo ""
-                
-                echo "Wersja bash:"
-                bash --version | head -n1
-                echo ""
-                
-                echo "Dostępne narzędzia:"
-                command -v git &>/dev/null && echo "  ✓ git" || echo "  ✗ git"
-                command -v cmake &>/dev/null && echo "  ✓ cmake" || echo "  ✗ cmake"
-                command -v g++ &>/dev/null && echo "  ✓ g++" || echo "  ✗ g++"
-                command -v make &>/dev/null && echo "  ✓ make" || echo "  ✗ make"
-                echo ""
-                
-                wait_for_key
-                ;;
-            
-            0)
-                return
-                ;;
-            
-            *)
-                print_error "Nieprawidłowa opcja"
-                clear
-                echo -e "${CYAN}--- Wykrywanie Portów Szeregowych ---${NC}"
-                echo ""
-                
-                # Sprawdź lsusb
-                if command -v lsusb &> /dev/null; then
-                    echo -e "${BLUE}Urządzenia USB:${NC}"
-                    lsusb 2>/dev/null | grep -iE "serial|ftdi|silicon|cp210|ch34|esp32|stm32|arduino" || echo "  Brak typowych konwerterów USB-Serial"
-                    echo ""
-                fi
-                
-                # Sprawdź porty
-                echo -e "${BLUE}Dostępne porty szeregowe:${NC}"
-                local found=0
-                
-                for port in /dev/ttyUSB* /dev/ttyACM* /dev/ttyS*; do
+                # Wykryj porty
+                local ports=()
+                for port in /dev/ttyUSB* /dev/ttyACM*; do
                     if [ -e "$port" ]; then
-                        # Pomiń ttyS0 jeśli to konsola
-                        if [ "$port" = "/dev/ttyS0" ]; then
-                            if mount | grep -q "on / "; then
-                                continue
-                            fi
-                        fi
-                        
-                        echo "  - $port"
-                        found=1
-                        
-                        # Spróbuj uzyskać informacje
-                        if command -v setserial &> /dev/null && [[ "$port" == /dev/ttyS* ]]; then
-                            setserial "$port" 2>/dev/null | head -n 1
-                        fi
+                        ports+=("$port")
                     fi
                 done
                 
-                if [ $found -eq 0 ]; then
-                    echo "  Brak wykrytych portów szeregowych."
+                if [ ${#ports[@]} -eq 0 ]; then
+                    print_error "Brak wykrytych portów szeregowych!"
+                    print_info "Podłącz mikrokontroler i spróbuj ponownie."
+                else
+                    print_success "Wykryto ${#ports[@]} port(ów):"
+                    for p in "${ports[@]}"; do
+                        echo "  - $p"
+                    done
                     echo ""
-                    print_info "Upewnij się, że:"
-                    echo "  - Mikrokontroler jest podłączony przez USB"
-                    echo "  - Sterowniki są zainstalowane (CP210x, CH340, FTDI itp.)"
-                    echo "  - Masz uprawnienia do portów (grupa dialout)"
-                fi
-                
-                echo ""
-                
-                # Propozycja automatycznego wyboru
-                if [ $found -gt 0 ]; then
-                    read -p "Czy ustawić pierwszy wykryty port jako aktywny? (t/n): " confirm
-                    if [[ "$confirm" == "t" || "$confirm" == "T" ]]; then
-                        for port in /dev/ttyUSB* /dev/ttyACM*; do
-                            if [ -e "$port" ]; then
-                                selected_port="$port"
-                                print_success "Wybrano port: $selected_port"
-                                break
+                    
+                    read -p "Podaj numer portu do testu (1-${#ports[@]}): " port_num
+                    if [[ "$port_num" =~ ^[0-9]+$ ]] && [ "$port_num" -le "${#ports[@]}" ] && [ "$port_num" -ge 1 ]; then
+                        selected_port="${ports[$((port_num-1))]}"
+                        echo ""
+                        print_info "Testowanie portu $selected_port..."
+                        
+                        # Sprawdź uprawnienia
+                        if [ -r "$selected_port" ] && [ -w "$selected_port" ]; then
+                            print_success "Port jest dostępny do odczytu i zapisu."
+                        else
+                            print_warning "Brak uprawnień do portu. Spróbuj: sudo usermod -a -G dialout \$USER"
+                        fi
+                        
+                        # Sprawdź czy port nie jest zajęty
+                        if command -v lsof &> /dev/null; then
+                            local users=$(lsof "$selected_port" 2>/dev/null)
+                            if [ -n "$users" ]; then
+                                print_warning "Port jest używany przez inny proces:"
+                                echo "$users"
+                            else
+                                print_success "Port jest wolny."
                             fi
-                        done
+                        fi
+                    else
+                        print_error "Nieprawidłowy numer portu."
                     fi
                 fi
                 
+                echo ""
                 wait_for_key
                 ;;
                 
             2)
-                read -p "Podaj ścieżkę do portu (np. /dev/ttyUSB0): " selected_port
+                clear
+                echo -e "${CYAN}--- Wykryte Urządzenia USB ---${NC}"
+                echo ""
                 
-                if [ -e "$selected_port" ]; then
-                    print_success "Port $selected_port istnieje."
+                if command -v lsusb &> /dev/null; then
+                    print_info "Lista urządzeń USB:"
+                    lsusb
+                    echo ""
                     
-                    # Sprawdź uprawnienia
-                    if [ -r "$selected_port" ]; then
-                        echo -e "${GREEN}Masz uprawnienia do odczytu.${NC}"
-                    else
-                        echo -e "${RED}Brak uprawnień do odczytu!${NC}"
-                        print_info "Spróbuj: sudo usermod -a -G dialout \$USER"
-                        print_info "Potem wyloguj się i zaloguj ponownie."
-                    fi
+                    print_info "Urządzenia związane z UART/Serial:"
+                    lsusb | grep -iE "serial|ftdi|cp210|ch340|ch341|esp32|stm32|arduino|silicon|tty" || echo "  Brak typowych konwerterów UART."
                 else
-                    print_warning "Port $selected_port nie istnieje w systemie!"
+                    print_warning "Narzędzie lsusb niedostępne."
                 fi
+                
+                echo ""
+                echo -e "${BLUE}Porty szeregowe w systemie:${NC}"
+                ls -la /dev/ttyUSB* /dev/ttyACM* 2>/dev/null || echo "  Brak portów ttyUSB/ttyACM"
+                
+                echo ""
                 wait_for_key
                 ;;
                 
             3)
-                echo "Dostępne szybkości transmisji:"
-                echo "  1. 9600"
-                echo "  2. 19200"
-                echo "  3. 38400"
-                echo "  4. 57600"
-                echo "  5. 115200 (domyślna)"
-                echo "  6. 230400"
-                echo "  7. 460800"
-                echo "  8. 921600"
-                echo "  9. Własna wartość"
+                clear
+                echo -e "${CYAN}--- Test Prędkości Transmisji ---${NC}"
                 echo ""
                 
-                read -p "Wybierz szybkość: " baud_choice
+                read -p "Podaj port (np. /dev/ttyUSB0): " test_port
+                if [ ! -e "$test_port" ]; then
+                    print_error "Port nie istnieje!"
+                    wait_for_key
+                    continue
+                fi
                 
+                echo ""
+                echo "Dostępne prędkości:"
+                echo "1. 9600"
+                echo "2. 19200"
+                echo "3. 57600"
+                echo "4. 115200 (domyślna)"
+                echo "5. 230400"
+                echo "6. 460800"
+                echo "7. 921600"
+                echo ""
+                
+                read -p "Wybierz prędkość (1-7): " baud_choice
                 case $baud_choice in
-                    1) selected_baud="9600" ;;
-                    2) selected_baud="19200" ;;
-                    3) selected_baud="38400" ;;
-                    4) selected_baud="57600" ;;
-                    5) selected_baud="115200" ;;
-                    6) selected_baud="230400" ;;
-                    7) selected_baud="460800" ;;
-                    8) selected_baud="921600" ;;
-                    9) 
-                        read -p "Podaj własną wartość baud: " selected_baud
-                        ;;
-                    *) print_error "Nieprawidłowy wybór"; sleep 1; continue ;;
+                    1) test_baud=9600 ;;
+                    2) test_baud=19200 ;;
+                    3) test_baud=57600 ;;
+                    4) test_baud=115200 ;;
+                    5) test_baud=230400 ;;
+                    6) test_baud=460800 ;;
+                    7) test_baud=921600 ;;
+                    *) test_baud=115200 ;;
                 esac
                 
-                print_success "Ustawiono baud rate: $selected_baud"
+                echo ""
+                print_info "Monitorowanie portu $test_port z prędkością $test_baud..."
+                print_info "Naciśnij Ctrl+C aby przerwać."
+                echo ""
+                
+                if command -v screen &> /dev/null; then
+                    screen "$test_port" "$test_baud"
+                elif command -v minicom &> /dev/null; then
+                    minicom -D "$test_port" -b "$test_baud"
+                elif command -v picocom &> /dev/null; then
+                    picocom -b "$test_baud" "$test_port"
+                else
+                    print_warning "Brak narzędzi screen/minicom/picocom."
+                    print_info "Spróbuj: cat $test_port"
+                    timeout 5 cat "$test_port"
+                fi
+                
                 wait_for_key
                 ;;
                 
             4)
-                if [ -z "$selected_port" ]; then
-                    print_error "Najpierw wybierz port (opcja 1 lub 2)!"
-                    wait_for_key
-                    continue
-                fi
-                
-                print_info "Uruchamianie czystego monitora..."
-                print_info "Naciśnij Ctrl+C aby wyjść."
-                sleep 2
-                
-                # Uruchom monitor w tle z obsługą sygnałów
-                serial_monitor_clean "$selected_port" "$selected_baud"
-                ;;
-                
-            5)
-                if [ -z "$selected_port" ]; then
-                    print_error "Najpierw wybierz port (opcja 1 lub 2)!"
-                    wait_for_key
-                    continue
-                fi
-                
-                print_info "Uruchamianie monitora ze statystykami..."
-                print_info "Naciśnij Ctrl+C aby wyjść."
-                sleep 2
-                
-                serial_monitor_with_stats "$selected_port" "$selected_baud"
-                ;;
-                
-            6)
-                if [ -z "$selected_port" ]; then
-                    print_error "Najpierw wybierz port (opcja 1 lub 2)!"
-                    wait_for_key
-                    continue
-                fi
-                
-                # Konfiguracja zakresu wykresu
-                echo ""
-                echo "Konfiguracja wykresu ASCII:"
-                read -p "Wartość minimalna (domyślnie 0): " min_v
-                read -p "Wartość maksymalna (domyślnie 100): " max_v
-                
-                if [ -n "$min_v" ]; then
-                    # Dla uproszczenia używamy globalnych zmiennych w funkcji
-                    :
-                fi
-                
-                print_info "Uruchamianie monitora z wykresem ASCII..."
-                print_info "Naciśnij Ctrl+C aby wyjść."
-                sleep 2
-                
-                serial_monitor_ascii_graph "$selected_port" "$selected_baud"
-                ;;
-                
-            7)
-                if [ -z "$selected_port" ]; then
-                    print_error "Najpierw wybierz port (opcja 1 lub 2)!"
-                    wait_for_key
-                    continue
-                fi
-                
-                print_info "Testowanie połączenia z $selected_port (${selected_baud} baud)..."
-                
-                # Konfiguracja portu
-                stty -F "$selected_port" "$selected_baud" 2>/dev/null
-                
-                # Przeczytaj krótki fragment danych (timeout 3 sekundy)
-                echo -e "${BLUE}Odczyt danych (3 sekundy timeout):${NC}"
+                clear
+                echo -e "${CYAN}--- Monitor Sygnałów DTR/RTS ---${NC}"
                 echo ""
                 
-                timeout 3 cat "$selected_port" 2>/dev/null
-                
-                local exit_code=$?
+                print_info "Sygnały sterujące w portach szeregowych:"
                 echo ""
                 
-                if [ $exit_code -eq 0 ]; then
-                    print_success "Połączenie działa poprawnie!"
-                elif [ $exit_code -eq 124 ]; then
-                    print_success "Połączenie działa (timeout po 3s - normalne)."
-                else
-                    print_warning "Możliwe problemy z połączeniem."
-                fi
+                for port in /dev/ttyUSB* /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        echo "Port: $port"
+                        if command -v setserial &> /dev/null; then
+                            setserial "$port" 2>/dev/null || echo "  Nie można odczytać"
+                        else
+                            echo "  Narzędzie setserial niedostępne"
+                        fi
+                        echo ""
+                    fi
+                done
                 
+                print_info "DTR (Data Terminal Ready) i RTS (Request To Send) to sygnały sterujące."
+                print_info "Używane m.in. do resetowania Arduino/ESP32 podczas wgrywania."
+                
+                echo ""
                 wait_for_key
                 ;;
                 
-            8)
-                if [ -z "$selected_port" ]; then
-                    print_error "Najpierw wybierz port (opcja 1 lub 2)!"
-                    wait_for_key
-                    continue
-                fi
-                
-                local timestamp=$(date +%Y%m%d_%H%M%S)
-                local filename="serial_data_${timestamp}.log"
-                
-                print_info "Zapisywanie danych do pliku: $filename"
-                print_info "Naciśnij Ctrl+C aby zakończyć zapis."
+            5)
+                clear
+                echo -e "${CYAN}--- Wykrywanie Chip ID (ESP32) ---${NC}"
                 echo ""
                 
-                # Konfiguracja portu
-                stty -F "$selected_port" "$selected_baud" 2>/dev/null
-                
-                # Zapisz dane do pliku
-                timeout 60 cat "$selected_port" >> "$filename" 2>/dev/null &
-                local pid=$!
-                
-                echo -e "${GREEN}Zapis w toku... (PID: $pid)${NC}"
-                echo "Dane będą zapisywane przez 60 sekund lub do naciśnięcia Ctrl+C"
-                echo ""
-                
-                wait $pid 2>/dev/null
-                
-                if [ -f "$filename" ]; then
-                    local lines=$(wc -l < "$filename")
-                    local size=$(du -h "$filename" | cut -f1)
-                    print_success "Zapisano dane do $filename"
-                    echo "  Linie: $lines"
-                    echo "  Rozmiar: $size"
+                if ! command -v esptool.py &> /dev/null && ! command -v esptool &> /dev/null; then
+                    print_warning "Narzędzie esptool nie jest zainstalowane."
+                    print_info "Zainstaluj: pip3 install esptool"
+                else
+                    read -p "Podaj port ESP32 (np. /dev/ttyUSB0): " esp_port
+                    if [ -e "$esp_port" ]; then
+                        print_info "Odczytywanie Chip ID..."
+                        
+                        if command -v esptool.py &> /dev/null; then
+                            esptool.py --port "$esp_port" chip_id
+                        else
+                            esptool --port "$esp_port" chip_id
+                        fi
+                    else
+                        print_error "Port nie istnieje!"
+                    fi
                 fi
                 
+                echo ""
+                wait_for_key
+                ;;
+                
+            6)
+                clear
+                echo -e "${CYAN}--- Test Pamięci Flash ---${NC}"
+                echo ""
+                
+                if ! command -v esptool.py &> /dev/null && ! command -v esptool &> /dev/null; then
+                    print_warning "Narzędzie esptool nie jest zainstalowane."
+                    print_info "Zainstaluj: pip3 install esptool"
+                else
+                    read -p "Podaj port (np. /dev/ttyUSB0): " flash_port
+                    if [ -e "$flash_port" ]; then
+                        print_info "Odczytywanie informacji o pamięci Flash..."
+                        
+                        if command -v esptool.py &> /dev/null; then
+                            esptool.py --port "$flash_port" flash_id
+                        else
+                            esptool --port "$flash_port" flash_id
+                        fi
+                    else
+                        print_error "Port nie istnieje!"
+                    fi
+                fi
+                
+                echo ""
                 wait_for_key
                 ;;
                 
@@ -2596,90 +2328,14 @@ option_7_monitor() {
                 sleep 1
                 ;;
         esac
+        
+        # Wyczyść ekran przed następną iteracją
+        clear
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo -e "${CYAN}          OPCJA 8: DIAGNOSTYKA I TESTOWANIE MIKROKONTROLERA                   ${NC}"
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo ""
     done
-}
-
-# ------------------------------------------------------------------------------
-# Opcja 8: Przywrócenie Ustawień Fabrycznych
-# ------------------------------------------------------------------------------
-
-option_8_factory() {
-    clear
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo -e "${CYAN}          OPCJA 8: PRZYWRÓCENIE USTAWIEŃ FABRYCZNYCH                          ${NC}"
-    echo -e "${CYAN}==============================================================================${NC}"
-    echo ""
-    
-    print_warning "UWAGA! Ta operacja:"
-    echo "  - Usunie wszystkie pobrane pliki źródłowe"
-    echo "  - Usunie wszystkie skompilowane pliki"
-    echo "  - Usunie pliki konfiguracyjne użytkownika"
-    echo "  - Usunie logi i dane tymczasowe"
-    echo "  - Przywróci domyślne ustawienia skryptu"
-    echo ""
-    
-    read -p "Czy jesteś ABSOLUTNIE pewien? (wpisz 'TAK' aby potwierdzić): " confirm
-    
-    if [[ "$confirm" == "TAK" ]]; then
-        print_info "Rozpoczynanie przywracania ustawień fabrycznych..."
-        echo ""
-        
-        # Usuń katalog repozytorium
-        if [ -d "$REPO_DIR" ]; then
-            echo -e "${YELLOW}[1/5] Usuwanie katalogu źródłowego ($REPO_DIR)...${NC}"
-            rm -rf "$REPO_DIR"
-            echo -e "${GREEN}Usunięto.${NC}"
-        else
-            echo -e "${BLUE}[1/5] Katalog źródłowy nie istnieje - pominięto.${NC}"
-        fi
-        
-        # Usuń katalog build
-        if [ -d "$BUILD_DIR" ]; then
-            echo -e "${YELLOW}[2/5] Usuwanie katalogu build...${NC}"
-            rm -rf "$BUILD_DIR"
-            echo -e "${GREEN}Usunięto.${NC}"
-        else
-            echo -e "${BLUE}[2/5] Katalog build nie istnieje - pominięto.${NC}"
-        fi
-        
-        # Usuń pliki konfiguracyjne
-        echo -e "${YELLOW}[3/5] Usuwanie plików konfiguracyjnych...${NC}"
-        rm -f config/user.conf 2>/dev/null
-        rm -f config/custom.conf 2>/dev/null
-        rm -f *.conf 2>/dev/null
-        echo -e "${GREEN}Usunięto.${NC}"
-        
-        # Usuń logi
-        echo -e "${YELLOW}[4/5] Czyszczenie logów...${NC}"
-        rm -f logs/*.log 2>/dev/null
-        rm -f serial_data_*.log 2>/dev/null
-        rm -f /tmp/detected_ports.txt 2>/dev/null
-        echo -e "${GREEN}Usunięto.${NC}"
-        
-        # Przywróć domyślne zmienne
-        echo -e "${YELLOW}[5/5] Przywracanie domyślnych ustawień...${NC}"
-        REPO_URL="https://github.com/bartoszruta26-droid/biofeedback"
-        REPO_DIR="biofeedback"
-        BUILD_DIR="build"
-        LANG="pl"
-        SERIAL_PORT=""
-        BAUD_RATE="115200"
-        echo -e "${GREEN}Przywrócono.${NC}"
-        
-        echo ""
-        echo -e "${GREEN}==============================================================================${NC}"
-        echo -e "${GREEN}  PRZYWRÓCONO USTAWIENIA FABRYCZNE!${NC}"
-        echo -e "${GREEN}==============================================================================${NC}"
-        echo ""
-        print_info "Skrypt jest teraz w stanie początkowym."
-        print_info "Aby ponownie używać aplikację, należy:"
-        echo "  1. Wybrać opcję 2 (Instalacja zależności)"
-        echo "  2. Wybrać opcję 3 (Git Pull & Kompilacja)"
-    else
-        print_info "Operacja anulowana."
-    fi
-    
-    wait_for_key
 }
 
 # ------------------------------------------------------------------------------
@@ -3039,7 +2695,7 @@ main_menu() {
         echo "5. Ustawienia i pliki konfiguracyjne"
         echo "6. Przywracanie ustawień domyślnych"
         echo "7. Czysty terminal monitor danych"
-        echo "8. Przywrócenie ustawień fabrycznych"
+        echo "8. Diagnostyka i testowanie mikrokontrolera"
         echo "9. Inne opcje"
         echo "0. Wyjście"
         echo ""
@@ -3054,7 +2710,7 @@ main_menu() {
             5) option_5_config ;;
             6) option_6_defaults ;;
             7) option_7_monitor ;;
-            8) option_8_factory ;;
+            8) option_8_diagnostics ;;
             9) option_9_extra ;;
             0) 
                 clear
