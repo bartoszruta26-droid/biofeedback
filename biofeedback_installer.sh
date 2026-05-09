@@ -193,22 +193,243 @@ option_install_dependencies() {
     wait_for_key
 }
 
-option_git_pull() {
+# =============================================================================
+# OPTION 3: GIT PULL + COMPILATION MENU
+# =============================================================================
+
+show_git_compile_menu() {
+    local choice
+    while true; do
+        clear_screen
+        print_header
+        echo -e "${YELLOW}--- Git & Compilation Menu ---${NC}"
+        echo ""
+        echo -e "  1. ${LANG[OPT3]}"
+        echo -e "  2. ${LANG[OPT4]}"
+        echo -e "  3. Recompile (Clean Build)"
+        echo -e "  4. Back to Main Menu"
+        echo ""
+        read -p "Select option (1-4): " choice
+        
+        case $choice in
+            1)
+                do_git_pull
+                ;;
+            2)
+                do_compile
+                ;;
+            3)
+                do_recompile_clean
+                ;;
+            4)
+                return
+                ;;
+            *)
+                echo -e "${RED}Invalid option${NC}"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+do_git_pull() {
     echo ""
     echo -e "${BLUE}--- ${LANG[OPT3]} ---${NC}"
-    echo -e "${YELLOW}${LANG[GIT_PULL]}${NC}"
-    # TODO: Implement git pull logic
-    echo -e "${GREEN}${LANG[GIT_DONE]}${NC}"
+    echo -e "${CYAN}Repository: ${REPO_URL}${NC}"
+    echo ""
+    
+    # Check if .git directory exists
+    if [ ! -d ".git" ]; then
+        echo -e "${YELLOW}No git repository found. Cloning from ${REPO_URL}...${NC}"
+        read -p "Continue? (y/n): " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            git clone "$REPO_URL" temp_clone 2>&1 || {
+                echo -e "${RED}Failed to clone repository${NC}"
+                wait_for_key
+                return
+            }
+            # Move contents if needed
+            if [ -d "temp_clone" ]; then
+                echo -e "${CYAN}Cloned successfully. Moving contents...${NC}"
+                cp -r temp_clone/* . 2>/dev/null || true
+                cp -r temp_clone/.* . 2>/dev/null || true
+                rm -rf temp_clone
+            fi
+        else
+            echo -e "${YELLOW}Operation cancelled${NC}"
+            wait_for_key
+            return
+        fi
+    else
+        echo -e "${YELLOW}${LANG[GIT_PULL]}${NC}"
+        echo ""
+        
+        # Show current branch
+        current_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
+        echo -e "${CYAN}Current branch: ${current_branch}${NC}"
+        
+        # Fetch latest changes
+        echo -e "${CYAN}Fetching remote changes...${NC}"
+        git fetch origin 2>&1 || {
+            echo -e "${RED}Failed to fetch from remote${NC}"
+            wait_for_key
+            return
+        }
+        
+        # Pull changes
+        echo -e "${CYAN}Pulling changes...${NC}"
+        git pull origin "$current_branch" 2>&1
+        pull_result=$?
+        
+        if [ $pull_result -eq 0 ]; then
+            echo ""
+            echo -e "${GREEN}${LANG[GIT_DONE]}${NC}"
+            # Show commit info
+            echo ""
+            echo -e "${CYAN}Latest commit:${NC}"
+            git log -1 --pretty=format:"%h - %s (%ar)" 2>/dev/null
+            echo ""
+        else
+            echo -e "${RED}Git pull failed with error code: $pull_result${NC}"
+        fi
+    fi
+    
     wait_for_key
 }
 
-option_compile_code() {
+do_compile() {
     echo ""
     echo -e "${BLUE}--- ${LANG[OPT4]} ---${NC}"
     echo -e "${YELLOW}${LANG[COMPILING]}${NC}"
-    # TODO: Implement compilation logic
-    echo -e "${GREEN}${LANG[COMPILE_DONE]}${NC}"
+    echo ""
+    
+    # Check if CMakeLists.txt exists
+    if [ ! -f "CMakeLists.txt" ]; then
+        echo -e "${RED}CMakeLists.txt not found in current directory${NC}"
+        echo -e "${YELLOW}Current directory: $(pwd)${NC}"
+        wait_for_key
+        return
+    fi
+    
+    # Create build directory if it doesn't exist
+    BUILD_DIR="build"
+    if [ ! -d "$BUILD_DIR" ]; then
+        echo -e "${CYAN}Creating build directory...${NC}"
+        mkdir -p "$BUILD_DIR"
+    fi
+    
+    cd "$BUILD_DIR" || {
+        echo -e "${RED}Failed to enter build directory${NC}"
+        wait_for_key
+        return
+    }
+    
+    # Run CMake configuration
+    echo -e "${CYAN}Running CMake configuration...${NC}"
+    cmake .. 2>&1
+    cmake_result=$?
+    
+    if [ $cmake_result -ne 0 ]; then
+        echo -e "${RED}CMake configuration failed${NC}"
+        cd ..
+        wait_for_key
+        return
+    fi
+    
+    # Build the project
+    echo ""
+    echo -e "${CYAN}Building project...${NC}"
+    cmake --build . -j$(nproc) 2>&1
+    build_result=$?
+    
+    cd ..
+    
+    echo ""
+    if [ $build_result -eq 0 ]; then
+        echo -e "${GREEN}${LANG[COMPILE_DONE]}${NC}"
+        echo ""
+        echo -e "${CYAN}Build artifacts location: $(pwd)/build/${NC}"
+        # List built executables
+        echo -e "${CYAN}Built executables:${NC}"
+        find "$BUILD_DIR" -maxdepth 2 -type f -executable -name "biofeedback*" 2>/dev/null | head -5
+    else
+        echo -e "${RED}Build failed with error code: $build_result${NC}"
+    fi
+    
     wait_for_key
+}
+
+do_recompile_clean() {
+    echo ""
+    echo -e "${BLUE}--- Clean Recompile ---${NC}"
+    echo -e "${YELLOW}Performing clean build (removing old build artifacts)...${NC}"
+    echo ""
+    
+    read -p "This will remove the build directory. Continue? (y/n): " confirm
+    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Operation cancelled${NC}"
+        wait_for_key
+        return
+    fi
+    
+    BUILD_DIR="build"
+    
+    # Remove old build directory
+    if [ -d "$BUILD_DIR" ]; then
+        echo -e "${CYAN}Removing old build directory...${NC}"
+        rm -rf "$BUILD_DIR"
+        echo -e "${GREEN}Build directory removed${NC}"
+    fi
+    
+    # Create fresh build directory
+    echo -e "${CYAN}Creating new build directory...${NC}"
+    mkdir -p "$BUILD_DIR"
+    
+    cd "$BUILD_DIR" || {
+        echo -e "${RED}Failed to enter build directory${NC}"
+        wait_for_key
+        return
+    }
+    
+    # Run CMake configuration
+    echo ""
+    echo -e "${CYAN}Running CMake configuration (fresh)...${NC}"
+    cmake .. 2>&1
+    cmake_result=$?
+    
+    if [ $cmake_result -ne 0 ]; then
+        echo -e "${RED}CMake configuration failed${NC}"
+        cd ..
+        wait_for_key
+        return
+    fi
+    
+    # Build the project
+    echo ""
+    echo -e "${CYAN}Building project (clean build)...${NC}"
+    cmake --build . -j$(nproc) 2>&1
+    build_result=$?
+    
+    cd ..
+    
+    echo ""
+    if [ $build_result -eq 0 ]; then
+        echo -e "${GREEN}Clean compilation completed successfully${NC}"
+        echo ""
+        echo -e "${CYAN}Build artifacts location: $(pwd)/build/${NC}"
+        # List built executables
+        echo -e "${CYAN}Built executables:${NC}"
+        find "$BUILD_DIR" -maxdepth 2 -type f -executable -name "biofeedback*" 2>/dev/null | head -5
+    else
+        echo -e "${RED}Build failed with error code: $build_result${NC}"
+    fi
+    
+    wait_for_key
+}
+
+option_git_pull() {
+    # Call the submenu for option 3
+    show_git_compile_menu
 }
 
 option_upload_code() {
