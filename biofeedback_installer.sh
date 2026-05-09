@@ -623,9 +623,492 @@ option_5_config() {
     wait_for_key
 }
 
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 6: Przywracanie ustawień domyślnych (NOWE)
+# ------------------------------------------------------------------------------
+
 option_6_defaults() {
-    echo "Przywracanie ustawień domyślnych - W implementacji..."
-    wait_for_key
+    local config_dir="$REPO_DIR/config"
+    local backup_dir="$REPO_DIR/backups"
+    local user_config_file="$HOME/.biofeedback_config"
+    local default_serial_baud="115200"
+    local default_log_level="INFO"
+    local default_language="pl"
+    
+    while true; do
+        clear
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo -e "${CYAN}     Opcja 6: Przywracanie Ustawień Domyślnych                               ${NC}"
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo ""
+        echo -e "${YELLOW}UWAGA:${NC} Ta opcja przywróci wybrane konfiguracje do wartości fabrycznych."
+        echo -e "${YELLOW}      Zalecane jest wykonanie kopii zapasowej przed kontynuacją.${NC}"
+        echo ""
+        echo "1. Przywróć domyślne ustawienia komunikacji szeregowej"
+        echo "2. Przywróć domyślne ustawienia interfeusu użytkownika (GUI)"
+        echo "3. Przywróć domyślne ustawienia rejestracji danych (Logging)"
+        echo "4. Przywróć domyślne ustawienia kalibracji sensorów"
+        echo "5. Przywróć WSZYSTKIE ustawienia do wartości domyślnych"
+        echo "6. Wykonaj kopię zapasową obecnych ustawień"
+        echo "7. Przywróć z kopii zapasowej"
+        echo "8. Pokaż obecne ustawienia"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
+        read -p "Wybierz opcję [0-8]: " sub_choice
+        
+        case $sub_choice in
+            1)
+                # Przywracanie ustawień komunikacji szeregowej
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień komunikacji szeregowej ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia szeregowe? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                # Tworzenie/aktualizacja pliku konfiguracyjnego
+                mkdir -p "$config_dir"
+                
+                cat > "$config_dir/serial.conf" << EOF
+# BioFeedback Serial Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+BAUD_RATE=$default_serial_baud
+DATA_BITS=8
+PARITY=none
+STOP_BITS=1
+FLOW_CONTROL=none
+TIMEOUT_MS=1000
+RECONNECT_ATTEMPTS=3
+RECONNECT_DELAY_MS=500
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia komunikacji szeregowej!"
+                    echo ""
+                    echo "Parametry:"
+                    echo "  - Baud Rate: $default_serial_baud"
+                    echo "  - Data Bits: 8"
+                    echo "  - Parity: none"
+                    echo "  - Stop Bits: 1"
+                    echo "  - Flow Control: none"
+                else
+                    print_error "Nie udało się zapisać konfiguracji szeregowej."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            2)
+                # Przywracanie ustawień GUI
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień interfejsu użytkownika ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia GUI? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                mkdir -p "$config_dir"
+                
+                cat > "$config_dir/gui.conf" << EOF
+# BioFeedback GUI Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+LANGUAGE=$default_language
+WINDOW_WIDTH=1280
+WINDOW_HEIGHT=720
+THEME=default
+REFRESH_RATE_MS=100
+SHOW_GRID=true
+SHOW_LEGEND=true
+CHART_TYPE=line
+COLOR_SCHEME=default
+FONT_SIZE=12
+AUTO_SCALE=true
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia interfejsu użytkownika!"
+                    echo ""
+                    echo "Parametry:"
+                    echo "  - Język: $default_language"
+                    echo "  - Rozmiar okna: 1280x720"
+                    echo "  - Motyw: default"
+                    echo "  - Częstotliwość odświeżania: 100ms"
+                else
+                    print_error "Nie udało się zapisać konfiguracji GUI."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            3)
+                # Przywracanie ustawień logowania
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień rejestracji danych ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia logowania? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                mkdir -p "$config_dir"
+                mkdir -p "$REPO_DIR/logs"
+                
+                cat > "$config_dir/logging.conf" << EOF
+# BioFeedback Logging Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+LOG_LEVEL=$default_log_level
+LOG_TO_FILE=true
+LOG_TO_CONSOLE=true
+LOG_DIRECTORY=$REPO_DIR/logs
+MAX_LOG_SIZE_MB=10
+MAX_LOG_FILES=5
+LOG_FORMAT=%(asctime)s - %(levelname)s - %(message)s
+LOG_DATE_FORMAT=%Y-%m-%d %H:%M:%S
+ENABLE_DEBUG=false
+ENABLE_TIMESTAMP=true
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia rejestracji danych!"
+                    echo ""
+                    echo "Parametry:"
+                    echo "  - Poziom logowania: $default_log_level"
+                    echo "  - Logowanie do pliku: tak"
+                    echo "  - Logowanie do konsoli: tak"
+                    echo "  - Maksymalny rozmiar pliku: 10MB"
+                    echo "  - Maksymalna liczba plików: 5"
+                else
+                    print_error "Nie udało się zapisać konfiguracji logowania."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            4)
+                # Przywracanie ustawień kalibracji
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień kalibracji sensorów ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia kalibracji? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                mkdir -p "$config_dir"
+                
+                cat > "$config_dir/calibration.conf" << EOF
+# BioFeedback Sensor Calibration Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+# EKG/EMG Settings
+ECG_GAIN=1000
+ECG_OFFSET=0
+ECG_FILTER_ENABLED=true
+ECG_LOW_CUTOFF_HZ=0.5
+ECG_HIGH_CUTOFF_HZ=100
+
+# GSR (Galvanic Skin Response) Settings
+GSR_GAIN=1
+GSR_OFFSET=0
+GSR_FILTER_ENABLED=true
+
+# Temperature Settings
+TEMP_OFFSET=0
+TEMP_SCALE=1.0
+
+# Accelerometer Settings
+ACC_ENABLED=true
+ACC_RANGE=2
+ACC_FILTER_ENABLED=true
+
+# Auto-calibration
+AUTO_CALIBRATE_ON_START=false
+CALIBRATION_INTERVAL_SEC=3600
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia kalibracji sensorów!"
+                    echo ""
+                    echo "Przywrócono parametry dla:"
+                    echo "  - EKG/EMG (wzmocnienie, filtry)"
+                    echo "  - GSR (reakcja skórna)"
+                    echo "  - Temperatura"
+                    echo "  - Akcelerometr"
+                else
+                    print_error "Nie udało się zapisać konfiguracji kalibracji."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            5)
+                # Przywracanie WSZYSTKICH ustawień
+                clear
+                echo -e "${RED}==============================================================================${NC}"
+                echo -e "${RED}     PRZYWRACANIE WSZYSTKICH USTAWIEŃ DO WARTOŚCI DOMYŚLNYCH                ${NC}"
+                echo -e "${RED}==============================================================================${NC}"
+                echo ""
+                echo -e "${RED}OSTRZEŻENIE:${NC} Ta operacja usunie wszystkie niestandardowe konfiguracje!"
+                echo ""
+                read -p "Czy jesteś ABSOLUTNIE pewien? (wpisz 'TAK' aby potwierdzić): " confirm
+                
+                if [[ "$confirm" != "TAK" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                # Usuwanie istniejących plików konfiguracyjnych
+                if [ -d "$config_dir" ]; then
+                    rm -rf "$config_dir"
+                fi
+                
+                # Przywracanie wszystkich ustawień poprzez wywołanie poprzednich funkcji
+                mkdir -p "$config_dir"
+                mkdir -p "$REPO_DIR/logs"
+                
+                # Serial config
+                cat > "$config_dir/serial.conf" << EOF
+# BioFeedback Serial Configuration
+# Przywrócono wszystkie ustawienia domyślne: $(date)
+
+BAUD_RATE=$default_serial_baud
+DATA_BITS=8
+PARITY=none
+STOP_BITS=1
+FLOW_CONTROL=none
+TIMEOUT_MS=1000
+RECONNECT_ATTEMPTS=3
+RECONNECT_DELAY_MS=500
+EOF
+                
+                # GUI config
+                cat > "$config_dir/gui.conf" << EOF
+# BioFeedback GUI Configuration
+
+LANGUAGE=$default_language
+WINDOW_WIDTH=1280
+WINDOW_HEIGHT=720
+THEME=default
+REFRESH_RATE_MS=100
+SHOW_GRID=true
+SHOW_LEGEND=true
+CHART_TYPE=line
+COLOR_SCHEME=default
+FONT_SIZE=12
+AUTO_SCALE=true
+EOF
+                
+                # Logging config
+                cat > "$config_dir/logging.conf" << EOF
+# BioFeedback Logging Configuration
+
+LOG_LEVEL=$default_log_level
+LOG_TO_FILE=true
+LOG_TO_CONSOLE=true
+LOG_DIRECTORY=$REPO_DIR/logs
+MAX_LOG_SIZE_MB=10
+MAX_LOG_FILES=5
+LOG_FORMAT=%(asctime)s - %(levelname)s - %(message)s
+LOG_DATE_FORMAT=%Y-%m-%d %H:%M:%S
+ENABLE_DEBUG=false
+ENABLE_TIMESTAMP=true
+EOF
+                
+                # Calibration config
+                cat > "$config_dir/calibration.conf" << EOF
+# BioFeedback Sensor Calibration Configuration
+
+ECG_GAIN=1000
+ECG_OFFSET=0
+ECG_FILTER_ENABLED=true
+ECG_LOW_CUTOFF_HZ=0.5
+ECG_HIGH_CUTOFF_HZ=100
+GSR_GAIN=1
+GSR_OFFSET=0
+GSR_FILTER_ENABLED=true
+TEMP_OFFSET=0
+TEMP_SCALE=1.0
+ACC_ENABLED=true
+ACC_RANGE=2
+ACC_FILTER_ENABLED=true
+AUTO_CALIBRATE_ON_START=false
+CALIBRATION_INTERVAL_SEC=3600
+EOF
+                
+                # User config file
+                cat > "$user_config_file" << EOF
+# BioFeedback User Configuration
+# Created: $(date)
+
+DEFAULT_LANGUAGE=$default_language
+LAST_USED_PORT=
+LAST_USED_BAUD=$default_serial_baud
+FAVORITE_PROFILES=
+EOF
+                
+                print_success "Przywrócono WSZYSTKIE ustawienia do wartości domyślnych!"
+                echo ""
+                echo "Przywrócone konfiguracje:"
+                echo "  ✓ Komunikacja szeregowa"
+                echo "  ✓ Interfejs użytkownika (GUI)"
+                echo "  ✓ Rejestracja danych (Logging)"
+                echo "  ✓ Kalibracja sensorów"
+                echo "  ✓ Konfiguracja użytkownika"
+                
+                wait_for_key
+                ;;
+                
+            6)
+                # Wykonywanie kopii zapasowej
+                clear
+                echo -e "${CYAN}--- Wykonywanie kopii zapasowej ustawień ---${NC}"
+                echo ""
+                
+                mkdir -p "$backup_dir"
+                local backup_timestamp=$(date +%Y%m%d_%H%M%S)
+                local backup_archive="$backup_dir/biofeedback_backup_$backup_timestamp.tar.gz"
+                
+                if [ -d "$config_dir" ] && [ "$(ls -A $config_dir 2>/dev/null)" ]; then
+                    tar -czf "$backup_archive" -C "$REPO_DIR" config
+                    if [ $? -eq 0 ]; then
+                        print_success "Wykonano kopię zapasową!"
+                        echo ""
+                        echo "Lokalizacja: $backup_archive"
+                        echo "Rozmiar: $(du -h "$backup_archive" | cut -f1)"
+                    else
+                        print_error "Nie udało się wykonać kopii zapasowej."
+                    fi
+                elif [ -f "$user_config_file" ]; then
+                    cp "$user_config_file" "$backup_dir/user_config_backup_$backup_timestamp"
+                    if [ $? -eq 0 ]; then
+                        print_success "Wykonano kopię zapasową konfiguracji użytkownika!"
+                        echo ""
+                        echo "Lokalizacja: $backup_dir/user_config_backup_$backup_timestamp"
+                    else
+                        print_error "Nie udało się wykonać kopii zapasowej."
+                    fi
+                else
+                    print_warning "Brak plików konfiguracyjnych do skopiowania."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            7)
+                # Przywracanie z kopii zapasowej
+                clear
+                echo -e "${CYAN}--- Przywracanie z kopii zapasowej ---${NC}"
+                echo ""
+                
+                if [ ! -d "$backup_dir" ] || [ -z "$(ls -A $backup_dir 2>/dev/null)" ]; then
+                    print_warning "Brak dostępnych kopii zapasowych w katalogu $backup_dir"
+                    wait_for_key
+                    continue
+                fi
+                
+                echo "Dostępne kopie zapasowe:"
+                echo ""
+                ls -lht "$backup_dir"/*.tar.gz 2>/dev/null | head -10
+                echo ""
+                
+                read -p "Podaj nazwę pliku kopii zapasowej (lub naciśnij Enter dla najnowszej): " backup_file
+                
+                if [ -z "$backup_file" ]; then
+                    backup_file=$(ls -t "$backup_dir"/*.tar.gz 2>/dev/null | head -1)
+                else
+                    backup_file="$backup_dir/$backup_file"
+                fi
+                
+                if [ ! -f "$backup_file" ]; then
+                    print_error "Nie znaleziono podanego pliku kopii zapasowej."
+                    wait_for_key
+                    continue
+                fi
+                
+                read -p "Czy przywrócić konfigurację z $backup_file? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                tar -xzf "$backup_file" -C "$REPO_DIR"
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono konfigurację z kopii zapasowej!"
+                    echo ""
+                    echo "Plik: $backup_file"
+                else
+                    print_error "Nie udało się przywrócić konfiguracji."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            8)
+                # Pokazywanie obecnych ustawień
+                clear
+                echo -e "${CYAN}--- Obecne ustawienia ---${NC}"
+                echo ""
+                
+                if [ -d "$config_dir" ] && [ "$(ls -A $config_dir 2>/dev/null)" ]; then
+                    echo -e "${BLUE}Pliki konfiguracyjne w $config_dir:${NC}"
+                    echo ""
+                    
+                    for conf_file in "$config_dir"/*.conf; do
+                        if [ -f "$conf_file" ]; then
+                            echo -e "${GREEN}=== $(basename "$conf_file") ===${NC}"
+                            grep -v "^#" "$conf_file" | grep -v "^$" | head -10
+                            echo ""
+                        fi
+                    done
+                else
+                    print_warning "Brak plików konfiguracyjnych w katalogu $config_dir"
+                fi
+                
+                if [ -f "$user_config_file" ]; then
+                    echo -e "${BLUE}Konfiguracja użytkownika ($user_config_file):${NC}"
+                    grep -v "^#" "$user_config_file" | grep -v "^$"
+                    echo ""
+                fi
+                
+                echo -e "${BLUE}Domyślne wartości:${NC}"
+                echo "  - Baud Rate: $default_serial_baud"
+                echo "  - Log Level: $default_log_level"
+                echo "  - Language: $default_language"
+                echo ""
+                
+                wait_for_key
+                ;;
+                
+            0)
+                return
+                ;;
+                
+            *)
+                print_error "Nieprawidłowa opcja."
+                sleep 1
+                ;;
+        esac
+    done
 }
 
 option_7_monitor() {
