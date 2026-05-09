@@ -744,7 +744,11 @@ update_config_value_sed() {
     esac
     
     # Prosta zamiana sed (działa dla prostych przypadków)
-    if sed -i "s/\"$key\": .*/\"$key\": $typed_value/" "$CONFIG_FILE"; then
+    # Escape special characters in the replacement value for sed
+    local escaped_value
+    escaped_value=$(printf '%s\n' "$typed_value" | sed 's/[&/\]/\\&/g')
+    # Use | as delimiter to avoid issues with / in values like /dev/ttyUSB0
+    if sed -i "s|\"$key\": .*|\"$key\": $escaped_value|" "$CONFIG_FILE"; then
         print_success "Zaktualizowano: $key = $typed_value"
         return 0
     else
