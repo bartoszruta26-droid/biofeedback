@@ -179,6 +179,7 @@ public:
     std::mutex readMutex;
     std::string lastError;
     bool verbose = true;
+    int32_t timestampOffset = 0;
 };
 
 SerialCommunication::SerialCommunication() : m_impl(std::make_unique<Impl>()) {
@@ -489,20 +490,8 @@ bool SerialCommunication::autoConnect(int maxAttempts) {
         std::cout << "[SerialComm] Arduino not found. Retry " << attempt << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
-    std::cerr << "[SerialComm] ERROR: Arduino not found. Continuing search..." << std::endl;
-    while (true) {
-        for (const auto& p : scanAvailablePorts()) {
-            if (connect(p, DEFAULT_BAUD_RATE)) {
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-                if (identifyArduino(2000).isConnected) {
-                    std::cout << "[SerialComm] FOUND Arduino!" << std::endl;
-                    return true;
-                }
-                disconnect();
-            }
-        }
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-    }
+    std::cerr << "[SerialComm] ERROR: Arduino not found after " << maxAttempts << " attempts." << std::endl;
+    return false;
 }
 
 ArduinoInfo SerialCommunication::getArduinoInfo() const { return m_impl->arduinoInfo; }
@@ -683,8 +672,27 @@ void SerialCommunication::resetCalibration() { m_impl->zeroOffset = 0.0; m_impl-
 uint32_t SerialCommunication::getCurrentTimestamp() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
-void SerialCommunication::syncTimestamp(uint32_t) {}
-int32_t SerialCommunication::getTimestampOffset() const { return 0; }
+
+void SerialCommunication::syncTimestamp(uint32_t arduinoTimestamp) {
+    if (!m_impl->isConnected || arduinoTimestamp == 0) {
+        m_impl->timestampOffset = 0;
+        return;
+    }
+    uint32_t hostTimestamp = getCurrentTimestamp();
+    m_impl->timestampOffset = static_cast<int32_t>(hostTimestamp - arduinoTimestamp);
+#if DEBUG_SERIAL_COMM
+    core::DebugManager::instance().sendDebugMessage(
+        QString("Timestamp sync: Host=%1, Arduino=%2, Offset=%3 ms")
+            .arg(hostTimestamp).arg(arduinoTimestamp).arg(m_impl->timestampOffset),
+        core::DebugLevel::DEBUG,
+        "SerialCommunication::syncTimestamp"
+    );
+#endif
+}
+
+int32_t SerialCommunication::getTimestampOffset() const { 
+    return m_impl->timestampOffset; 
+}
 
 std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
     if (!m_impl->isConnected) return "";
