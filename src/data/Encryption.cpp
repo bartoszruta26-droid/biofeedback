@@ -113,38 +113,237 @@ static const std::string base64_chars =
     "0123456789+/";
 
 // ============================================================================
-// IMPLEMENTACJA METOD KLASYPUBLICZNYCH
+// INICJALIZACJA ZMIENNYCH STATYCZNYCH KLASY ENCRYPTION
 // ============================================================================
 
+EncryptionTypes::EncryptionLogLevel Encryption::m_minimumLogLevel = EncryptionTypes::EncryptionLogLevel::INFO;
+bool Encryption::m_consoleOutputEnabled = true;
+EncryptionTypes::EncryptionStatistics Encryption::m_statistics;
+std::mutex Encryption::m_logMutex;
+std::function<void(const std::string&)> Encryption::m_errorCallback;
+std::function<void(const std::string&)> Encryption::m_criticalErrorCallback;
+
+// ============================================================================
+// IMPLEMENTACJA METOD STATYSTYCZNYCH I KONFIGURACYJNYCH
+// ============================================================================
+
+void Encryption::setMinimumLogLevel(EncryptionTypes::EncryptionLogLevel level) {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    m_minimumLogLevel = level;
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
+               "Poziom logowania ustawiony na: " + logLevelToString(level));
+}
+
+EncryptionTypes::EncryptionLogLevel Encryption::getMinimumLogLevel() {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    return m_minimumLogLevel;
+}
+
+void Encryption::setConsoleOutputEnabled(bool enabled) {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    m_consoleOutputEnabled = enabled;
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__,
+               "Wyjście na konsolę " + std::string(enabled ? "włączone" : "wyłączone"));
+}
+
+bool Encryption::isConsoleOutputEnabled() {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    return m_consoleOutputEnabled;
+}
+
+EncryptionTypes::EncryptionStatistics Encryption::getStatistics() {
+    // Tworzenie kopii statystyk z atomic load dla każdego pola
+    EncryptionTypes::EncryptionStatistics stats;
+    stats.encryptOperations.store(m_statistics.encryptOperations.load());
+    stats.decryptOperations.store(m_statistics.decryptOperations.load());
+    stats.keyGenerations.store(m_statistics.keyGenerations.load());
+    stats.base64EncodeOps.store(m_statistics.base64EncodeOps.load());
+    stats.base64DecodeOps.store(m_statistics.base64DecodeOps.load());
+    stats.xorOperations.store(m_statistics.xorOperations.load());
+    stats.validationErrors.store(m_statistics.validationErrors.load());
+    stats.memoryErrors.store(m_statistics.memoryErrors.load());
+    stats.otherErrors.store(m_statistics.otherErrors.load());
+    stats.totalBytesProcessed.store(m_statistics.totalBytesProcessed.load());
+    return stats;
+}
+
+
+std::string Encryption::getStatisticsSummary() {
+    std::stringstream ss;
+    ss << "=== Statystyki Encryption ===" << std::endl;
+    ss << "Operacje szyfrowania: " << m_statistics.encryptOperations.load() << std::endl;
+    ss << "Operacje deszyfrowania: " << m_statistics.decryptOperations.load() << std::endl;
+    ss << "Generowania kluczy: " << m_statistics.keyGenerations.load() << std::endl;
+    ss << "Kodowań Base64: " << m_statistics.base64EncodeOps.load() << std::endl;
+    ss << "Dekodowań Base64: " << m_statistics.base64DecodeOps.load() << std::endl;
+    ss << "Operacji XOR: " << m_statistics.xorOperations.load() << std::endl;
+    ss << "Błędów walidacji: " << m_statistics.validationErrors.load() << std::endl;
+    ss << "Błędów pamięci: " << m_statistics.memoryErrors.load() << std::endl;
+    ss << "Innych błędów: " << m_statistics.otherErrors.load() << std::endl;
+    ss << "Przetworzonych bajtów: " << m_statistics.totalBytesProcessed.load() << std::endl;
+    return ss.str();
+}
+
+void Encryption::setErrorCallback(std::function<void(const std::string&)> callback) {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    m_errorCallback = callback;
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, "Callback błędów zarejestrowany");
+}
+
+void Encryption::setCriticalErrorCallback(std::function<void(const std::string&)> callback) {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    m_criticalErrorCallback = callback;
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, "Callback błędów krytycznych zarejestrowany");
+}
+
+// ============================================================================
+// IMPLEMENTACJA METOD PRYWATNYCH - LOGOWANIE
+// ============================================================================
+
+void Encryption::logMessage(EncryptionTypes::EncryptionLogLevel level, 
+                           const std::string& function, 
+                           const std::string& message) {
+    // Sprawdzenie czy poziom jest wystarczający
+    if (level < m_minimumLogLevel) {
+        return;
+    }
+    
+    // Sprawdzenie czy wyjście na konsolę jest włączone
+    if (!m_consoleOutputEnabled) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    
+    std::stringstream ss;
+    ss << "[" << logLevelToString(level) << "][ENCRYPTION][" 
+       << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] "
+       << function << ": " << message << std::endl;
+    
+    if (level >= EncryptionTypes::EncryptionLogLevel::ERROR) {
+        std::cerr << ss.str();
+    } else {
+        std::cout << ss.str();
+    }
+    
+    // Wywołanie callbacka dla błędów krytycznych
+    if (level == EncryptionTypes::EncryptionLogLevel::CRITICAL && m_criticalErrorCallback) {
+        try {
+            m_criticalErrorCallback(message);
+        } catch (...) {
+            // Gentle code: ignorujemy błędy w callbacku
+        }
+    } else if (level >= EncryptionTypes::EncryptionLogLevel::ERROR && m_errorCallback) {
+        try {
+            m_errorCallback(message);
+        } catch (...) {
+            // Gentle code: ignorujemy błędy w callbacku
+        }
+    }
+}
+
+std::string Encryption::logLevelToString(EncryptionTypes::EncryptionLogLevel level) {
+    switch (level) {
+        case EncryptionTypes::EncryptionLogLevel::VERBOSE: return "VERBOSE";
+        case EncryptionTypes::EncryptionLogLevel::DEBUG: return "DEBUG";
+        case EncryptionTypes::EncryptionLogLevel::INFO: return "INFO";
+        case EncryptionTypes::EncryptionLogLevel::WARNING: return "WARNING";
+        case EncryptionTypes::EncryptionLogLevel::ERROR: return "ERROR";
+        case EncryptionTypes::EncryptionLogLevel::CRITICAL: return "CRITICAL";
+        default: return "UNKNOWN";
+    }
+}
+
+EncryptionTypes::EncryptionLogLevel Encryption::stringToLogLevel(const std::string& levelStr) {
+    if (levelStr == "VERBOSE") return EncryptionTypes::EncryptionLogLevel::VERBOSE;
+    if (levelStr == "DEBUG") return EncryptionTypes::EncryptionLogLevel::DEBUG;
+    if (levelStr == "INFO") return EncryptionTypes::EncryptionLogLevel::INFO;
+    if (levelStr == "WARNING") return EncryptionTypes::EncryptionLogLevel::WARNING;
+    if (levelStr == "ERROR") return EncryptionTypes::EncryptionLogLevel::ERROR;
+    if (levelStr == "CRITICAL") return EncryptionTypes::EncryptionLogLevel::CRITICAL;
+    throw std::invalid_argument("Nieznany poziom logowania: " + levelStr);
+}
+
+// Implementacja metod EncryptionStatistics
+std::string EncryptionTypes::EncryptionStatistics::toString() const {
+    std::stringstream ss;
+    ss << "Encrypt: " << encryptOperations.load() 
+       << ", Decrypt: " << decryptOperations.load()
+       << ", Keys: " << keyGenerations.load()
+       << ", B64Enc: " << base64EncodeOps.load()
+       << ", B64Dec: " << base64DecodeOps.load()
+       << ", XOR: " << xorOperations.load()
+       << ", ValErr: " << validationErrors.load()
+       << ", MemErr: " << memoryErrors.load()
+       << ", OthErr: " << otherErrors.load()
+       << ", Bytes: " << totalBytesProcessed.load();
+    return ss.str();
+}
+
+void EncryptionTypes::EncryptionStatistics::reset() {
+    encryptOperations.store(0);
+    decryptOperations.store(0);
+    keyGenerations.store(0);
+    base64EncodeOps.store(0);
+    base64DecodeOps.store(0);
+    xorOperations.store(0);
+    validationErrors.store(0);
+    memoryErrors.store(0);
+    otherErrors.store(0);
+    totalBytesProcessed.store(0);
+}
 std::string Encryption::encrypt(const std::string& data, const std::string& key) {
+    auto startTime = std::chrono::high_resolution_clock::now();
+    
     // Rozpoczęcie procesu szyfrowania
-    ENCRYPT_DEBUG(1, "Rozpoczynanie szyfrowania danych");
-    ENCRYPT_DEBUG(2, "Długość danych wejściowych: " << data.length() << " bajtów");
-    ENCRYPT_DEBUG(2, "Długość klucza: " << key.length() << " bajtów");
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
+               "Rozpoczynanie szyfrowania danych");
+    logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
+               "Długość danych wejściowych: " + std::to_string(data.length()) + " bajtów");
+    logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
+               "Długość klucza: " + std::to_string(key.length()) + " bajtów");
     
     // Walidacja parametrów wejściowych - gentle code: bezpieczne sprawdzenie
     try {
         if (key.empty()) {
-            ENCRYPT_ERROR("Próba szyfrowania z pustym kluczem - zgłaszanie wyjątku");
+            m_statistics.validationErrors.fetch_add(1);
+            logMessage(EncryptionTypes::EncryptionLogLevel::ERROR, __FUNCTION__, 
+                      "Próba szyfrowania z pustym kluczem - zgłaszanie wyjątku");
             throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
         }
         
         if (data.empty()) {
-            ENCRYPT_WARN("Szyfrowanie pustych danych - zwracanie pustego wyniku");
+            logMessage(EncryptionTypes::EncryptionLogLevel::WARNING, __FUNCTION__, 
+                      "Szyfrowanie pustych danych - zwracanie pustego wyniku");
             return "";  // Gentle code: zwracamy pusty string zamiast błędu
         }
         
         // Dodatkowa walidacja długości klucza (zbyt krótki klucz może być niebezpieczny)
-        if (key.length() < 4) {
-            ENCRYPT_WARN("Klucz jest bardzo krótki (" << key.length() 
-                      << " znaków). Zalecany klucz minimum 8 znaków.");
+        if (key.length() < MIN_KEY_LENGTH) {
+            logMessage(EncryptionTypes::EncryptionLogLevel::WARNING, __FUNCTION__, 
+                      "Klucz jest bardzo krótki (" + std::to_string(key.length()) 
+                      + " znaków). Zalecany klucz minimum " + std::to_string(MIN_KEY_LENGTH) + " znaków.");
+        }
+        
+        // Sprawdzenie maksymalnego rozmiaru danych
+        if (data.length() > MAX_DATA_SIZE) {
+            m_statistics.validationErrors.fetch_add(1);
+            logMessage(EncryptionTypes::EncryptionLogLevel::ERROR, __FUNCTION__,
+                      "Dane przekraczają maksymalny rozmiar (" + std::to_string(MAX_DATA_SIZE) + " bajtów)");
+            throw std::invalid_argument("Dane zbyt duże do zaszyfrowania");
         }
         
     } catch (const std::invalid_argument& e) {
-        ENCRYPT_ERROR("Błąd walidacji parametrów: " << e.what());
+        logMessage(EncryptionTypes::EncryptionLogLevel::ERROR, __FUNCTION__, 
+                  "Błąd walidacji parametrów: " + std::string(e.what()));
         throw;  // Propagacja wyjątku dalej
     } catch (const std::exception& e) {
-        ENCRYPT_ERROR("Nieoczekiwany błąd podczas walidacji: " << e.what());
+        m_statistics.otherErrors.fetch_add(1);
+        logMessage(EncryptionTypes::EncryptionLogLevel::CRITICAL, __FUNCTION__, 
+                  "Nieoczekiwany błąd podczas walidacji: " + std::string(e.what()));
         throw std::runtime_error("Krytyczny błąd walidacji parametrów szyfrowania");
     }
     
@@ -154,45 +353,58 @@ std::string Encryption::encrypt(const std::string& data, const std::string& key)
     
     try {
         // Konwersja danych i klucza do wektorów bajtów
-        ENCRYPT_DEBUG(3, "Konwersja danych do wektora bajtów");
+        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__, 
+                  "Konwersja danych do wektora bajtów");
         dataBytes.assign(data.begin(), data.end());
         
-        ENCRYPT_DEBUG(3, "Konwersja klucza do wektora bajtów");
+        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__, 
+                  "Konwersja klucza do wektora bajtów");
         keyBytes.assign(key.begin(), key.end());
         
-        #if DEBUG_XOR_OPERATIONS
-        ENCRYPT_DEBUG(2, "Liczba bajtów danych: " << dataBytes.size());
-        ENCRYPT_DEBUG(2, "Liczba bajtów klucza: " << keyBytes.size());
-        #endif
+        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
+                  "Liczba bajtów danych: " + std::to_string(dataBytes.size()));
+        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
+                  "Liczba bajtów klucza: " + std::to_string(keyBytes.size()));
         
         // Szyfrowanie XOR
-        ENCRYPT_DEBUG(2, "Wykonywanie szyfrowania XOR");
+        logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
+                  "Wykonywanie szyfrowania XOR");
         encryptedBytes = xorCipher(dataBytes, keyBytes);
         
-        #if DEBUG_XOR_OPERATIONS
-        ENCRYPT_DEBUG(3, "Szyfrowanie zakończone, wynik: " << encryptedBytes.size() << " bajtów");
-        #endif
+        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
+                  "Szyfrowanie zakończone, wynik: " + std::to_string(encryptedBytes.size()) + " bajtów");
         
         // Kodowanie Base64
-        ENCRYPT_DEBUG(2, "Kodowanie wyników do Base64");
+        logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
+                  "Kodowanie wyników do Base64");
         std::string result = base64Encode(encryptedBytes);
         
-        ENCRYPT_DEBUG(1, "Szyfrowanie zakończone sukcesem");
-        ENCRYPT_DEBUG(2, "Długość zaszyfrowanych danych: " << result.length() << " znaków");
+        auto endTime = std::chrono::high_resolution_clock::now();
+        double execTimeMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
+        
+        // Aktualizacja statystyk
+        m_statistics.encryptOperations.fetch_add(1);
+        m_statistics.totalBytesProcessed.fetch_add(data.length());
+        
+        logMessage(EncryptionTypes::EncryptionLogLevel::INFO, __FUNCTION__, 
+                  "Szyfrowanie zakończone sukcesem (czas: " + std::to_string(execTimeMs) + " ms)");
+        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
+                  "Długość zaszyfrowanych danych: " + std::to_string(result.length()) + " znaków");
         
         return result;
         
     } catch (const std::bad_alloc& e) {
-        // Błąd alokacji pamięci
-        ENCRYPT_ERROR("Błąd alokacji pamięci podczas szyfrowania: " << e.what());
+        m_statistics.memoryErrors.fetch_add(1);
+        logMessage(EncryptionTypes::EncryptionLogLevel::CRITICAL, __FUNCTION__, 
+                  "Błąd alokacji pamięci podczas szyfrowania: " + std::string(e.what()));
         throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji szyfrowania");
     } catch (const std::exception& e) {
-        // Ogólny błąd
-        ENCRYPT_ERROR("Nieoczekiwany błąd podczas szyfrowania: " << e.what());
+        m_statistics.otherErrors.fetch_add(1);
+        logMessage(EncryptionTypes::EncryptionLogLevel::CRITICAL, __FUNCTION__, 
+                  "Nieoczekiwany błąd podczas szyfrowania: " + std::string(e.what()));
         throw std::runtime_error("Krytyczny błąd podczas operacji szyfrowania");
     }
 }
-
 std::string Encryption::decrypt(const std::string& encryptedData, const std::string& key) {
     // Rozpoczęcie procesu deszyfrowania
     ENCRYPT_DEBUG(1, "Rozpoczynanie deszyfrowania danych");
