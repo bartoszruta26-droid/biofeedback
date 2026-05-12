@@ -11,16 +11,21 @@
  * - File existence checking and safe deletion
  * - Directory listing capabilities
  * - Import/export functionality
+ * - Comprehensive logging with configurable levels
+ * - Thread-safe operations with mutex protection
+ * - Detailed statistics tracking
  * 
  * ERROR HANDLING:
  * - All file operations are wrapped with error checking
  * - Encryption failures are caught and handled gracefully
  * - Invalid JSON data returns empty/default objects
- * - Detailed error logging via std::cerr
+ * - Detailed error logging via logMessage() method
+ * - Exception safety with try-catch blocks
  * 
  * THREAD SAFETY:
- * - Note: This class is NOT thread-safe by default
- * - External synchronization required for multi-threaded access
+ * - Log operations are protected by mutex
+ * - Statistics use atomic counters
+ * - External synchronization may still be required for complex operations
  * 
  * @section DEBUG_FLAGS Debug Flags
  * Enable verbose logging by setting DEBUG_DATA_MANAGER to true
@@ -38,6 +43,9 @@
 #include <stdexcept>
 #include <cstring>
 #include <cerrno>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
 
 // ============================================================================
 // DEBUG CONFIGURATION FLAGS
@@ -66,6 +74,23 @@ namespace {
 // ============================================================================
 // ANONYMOUS NAMESPACE - HELPER FUNCTIONS
 // ============================================================================
+
+/**
+ * @brief Gets current timestamp as formatted string
+ * @return Timestamp in format YYYY-MM-DD HH:MM:SS.mmm
+ */
+std::string getCurrentTimestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::ostringstream oss;
+    oss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S");
+    oss << '.' << std::setfill('0') << std::setw(3) << ms.count();
+    return oss.str();
+}
+
 
 /**
  * @brief Escapes special characters in JSON string values
@@ -211,6 +236,35 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
 
 } // anonymous namespace
 
+// ============================================================================
+// DataManagerStatistics IMPLEMENTATION
+// ============================================================================
+
+std::string DataManagerStatistics::getSummary() const {
+    std::ostringstream oss;
+    oss << "=== DataManager Statistics Summary ===" << std::endl;
+    oss << "Files Read:        " << filesRead.load() << std::endl;
+    oss << "Files Written:     " << filesWritten.load() << std::endl;
+    oss << "Encryption Ops:    " << encryptionOps.load() << std::endl;
+    oss << "Decryption Ops:    " << decryptionOps.load() << std::endl;
+    oss << "JSON Parse Ops:    " << jsonParseOps.load() << std::endl;
+    oss << "JSON Serialize Ops:" << jsonSerializeOps.load() << std::endl;
+    oss << "Errors:            " << errors.load() << std::endl;
+    oss << "Retries:           " << retries.load() << std::endl;
+    
+    size_t total = filesRead.load() + filesWritten.load() + encryptionOps.load() + 
+                   decryptionOps.load() + jsonParseOps.load() + jsonSerializeOps.load();
+    oss << "Total Operations:  " << total << std::endl;
+    
+    if (total > 0) {
+        double errorRate = (static_cast<double>(errors.load()) / total) * 100.0;
+        oss << "Error Rate:        " << std::fixed << std::setprecision(2) << errorRate << "%" << std::endl;
+    }
+    
+    oss << "===================================" << std::endl;
+    return oss.str();
+}
+
 // ==================== Implementacja PatientData ====================
 
 /**
@@ -219,6 +273,10 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
  * 
  * UWAGA: Wszystkie pola tekstowe są automatycznie escapowane
  * aby zapobiec błędom parsowania przy specjalnych znakach
+ * 
+ * ERROR HANDLING:
+ * - Wyjątki są łapane i logowane
+ * - W przypadku błędu zwracany jest pusty obiekt JSON "{}"
  */
 std::string PatientData::toJson() const {
     try {
@@ -238,17 +296,17 @@ std::string PatientData::toJson() const {
         
 #if DEBUG_DATA_MANAGER
         // Logowanie tylko rozmiaru danych, nie treści (dane wrażliwe)
-        std::cout << "[DATA_MANAGER] PatientData serialized to JSON (" 
+        std::cout << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [VERBOSE] PatientData serialized to JSON (" 
                   << json.str().size() << " bytes)" << std::endl;
 #endif
         
         return json.str();
     } catch (const std::exception& e) {
-        std::cerr << "[DATA_MANAGER] ERROR: Failed to serialize PatientData: " 
+        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Failed to serialize PatientData: " 
                   << e.what() << std::endl;
         return "{}"; // Return empty JSON object on error
     } catch (...) {
-        std::cerr << "[DATA_MANAGER] ERROR: Unknown exception during PatientData serialization" 
+        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [CRITICAL] Unknown exception during PatientData serialization" 
                   << std::endl;
         return "{}";
     }
@@ -269,7 +327,7 @@ PatientData PatientData::fromJson(const std::string& json) {
     
     if (json.empty()) {
 #if DEBUG_DATA_MANAGER
-        std::cout << "[DATA_MANAGER] WARNING: Empty JSON provided for PatientData parsing" 
+        std::cout << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [WARNING] Empty JSON provided for PatientData parsing" 
                   << std::endl;
 #endif
         return patient;
@@ -290,17 +348,17 @@ PatientData PatientData::fromJson(const std::string& json) {
         patient.medicalHistory = dm.extractStringValue(json, "medicalHistory");
         
 #if DEBUG_DATA_MANAGER
-        std::cout << "[DATA_MANAGER] PatientData parsed successfully. ID: " 
+        std::cout << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [DEBUG] PatientData parsed successfully. ID: " 
                   << (patient.id.empty() ? "<empty>" : patient.id) << std::endl;
 #endif
         
     } catch (const std::exception& e) {
-        std::cerr << "[DATA_MANAGER] ERROR: Exception during PatientData parsing: " 
+        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Exception during PatientData parsing: " 
                   << e.what() << std::endl;
         // Return empty patient object on error
         patient = PatientData();
     } catch (...) {
-        std::cerr << "[DATA_MANAGER] ERROR: Unknown exception during PatientData parsing" 
+        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [CRITICAL] Unknown exception during PatientData parsing" 
                   << std::endl;
         patient = PatientData();
     }
@@ -421,54 +479,249 @@ TrainingPlan TrainingPlan::fromJson(const std::string& json) {
 
 // ==================== Implementacja DataManager ====================
 
-DataManager::DataManager() : encryptionEnabled(false) {}
+/**
+ * @brief Konstruktor DataManager
+ * 
+ * Inicjalizuje wszystkie pola domyślnymi wartościami:
+ * - encryptionEnabled = false
+ * - minimumLogLevel = DEBUG
+ * - consoleOutputEnabled = true
+ */
+DataManager::DataManager() 
+    : encryptionKey()
+    , encryptionEnabled(false)
+    , minimumLogLevel(DataManagerLogLevel::DEBUG)
+    , consoleOutputEnabled(true)
+    , logMutex()
+    , statistics() 
+{
+    logMessage(DataManagerLogLevel::VERBOSE, "DataManager constructed", "DataManager::DataManager");
+}
 
-DataManager::~DataManager() {}
+/**
+ * @brief Destruktor DataManager
+ * 
+ * Zapewnia bezpieczne czyszczenie zasobów
+ */
+DataManager::~DataManager() {
+    logMessage(DataManagerLogLevel::VERBOSE, "DataManager destructed", "DataManager::~DataManager");
+}
+
+// ============================================================================
+// LOGGING CONFIGURATION METHODS
+// ============================================================================
+
+void DataManager::setMinimumLogLevel(DataManagerLogLevel level) {
+    std::lock_guard<std::mutex> lock(logMutex);
+    minimumLogLevel = level;
+    logMessage(DataManagerLogLevel::INFO, 
+               "Minimum log level set to " + logLevelToString(level), 
+               "DataManager::setMinimumLogLevel");
+}
+
+DataManagerLogLevel DataManager::getMinimumLogLevel() const {
+    std::lock_guard<std::mutex> lock(logMutex);
+    return minimumLogLevel;
+}
+
+void DataManager::setConsoleOutputEnabled(bool enabled) {
+    std::lock_guard<std::mutex> lock(logMutex);
+    consoleOutputEnabled = enabled;
+    logMessage(DataManagerLogLevel::INFO, 
+               "Console output " + std::string(enabled ? "enabled" : "disabled"), 
+               "DataManager::setConsoleOutputEnabled");
+}
+
+bool DataManager::isConsoleOutputEnabled() const {
+    std::lock_guard<std::mutex> lock(logMutex);
+    return consoleOutputEnabled;
+}
+
+// ============================================================================
+// STATISTICS METHODS
+// ============================================================================
+
+const DataManagerStatistics& DataManager::getStatistics() const {
+    return statistics;
+}
+
+void DataManager::resetStatistics() {
+    statistics.reset();
+    logMessage(DataManagerLogLevel::INFO, "Statistics reset", "DataManager::resetStatistics");
+}
+
+std::string DataManager::getStatisticsSummary() const {
+    return statistics.getSummary();
+}
+
+// ============================================================================
+// ENCRYPTION METHODS
+// ============================================================================
 
 void DataManager::setEncryptionKey(const std::string& key) {
+    std::lock_guard<std::mutex> lock(logMutex);
     encryptionKey = key;
     encryptionEnabled = !key.empty();
+    
+    if (encryptionEnabled) {
+        statistics.encryptionOps++;
+        logMessage(DataManagerLogLevel::INFO, "Encryption key set (" + 
+                   std::to_string(key.length()) + " chars)", 
+                   "DataManager::setEncryptionKey");
+    } else {
+        logMessage(DataManagerLogLevel::WARNING, "Empty encryption key provided", 
+                   "DataManager::setEncryptionKey");
+    }
 }
 
 void DataManager::clearEncryptionKey() {
+    std::lock_guard<std::mutex> lock(logMutex);
     encryptionKey.clear();
     encryptionEnabled = false;
+    logMessage(DataManagerLogLevel::INFO, "Encryption key cleared", 
+               "DataManager::clearEncryptionKey");
 }
 
 bool DataManager::isEncryptionEnabled() const {
     return encryptionEnabled;
 }
 
+// ============================================================================
+// PATIENT DATA METHODS
+// ============================================================================
+
 bool DataManager::savePatientData(const PatientData& patient, const std::string& filename, bool encrypt) {
-    std::string json = patient.toJson();
-    
-    if (encrypt && encryptionEnabled) {
-        try {
-            json = Encryption::encrypt(json, encryptionKey);
-        } catch (...) {
-            return false;
+    try {
+        logMessage(DataManagerLogLevel::DEBUG, 
+                   "Saving patient data to: " + filename + 
+                   (encrypt ? " [ENCRYPTED]" : ""), 
+                   "DataManager::savePatientData");
+        
+        std::string json = patient.toJson();
+        statistics.jsonSerializeOps++;
+        
+        if (encrypt && encryptionEnabled) {
+            try {
+                json = Encryption::encrypt(json, encryptionKey);
+                statistics.encryptionOps++;
+#if DEBUG_ENCRYPTION_OPS
+                logMessage(DataManagerLogLevel::DEBUG, 
+                           "Data encrypted successfully", 
+                           "DataManager::savePatientData");
+#endif
+            } catch (const std::exception& e) {
+                statistics.errors++;
+                logMessage(DataManagerLogLevel::ERROR, 
+                           "Encryption failed: " + std::string(e.what()), 
+                           "DataManager::savePatientData");
+                return false;
+            } catch (...) {
+                statistics.errors++;
+                logMessage(DataManagerLogLevel::CRITICAL, 
+                           "Unknown encryption error", 
+                           "DataManager::savePatientData");
+                return false;
+            }
         }
+        
+        bool result = writeFile(filename, json);
+        if (result) {
+            statistics.filesWritten++;
+            logMessage(DataManagerLogLevel::INFO, 
+                       "Patient data saved successfully: " + filename, 
+                       "DataManager::savePatientData");
+        } else {
+            statistics.errors++;
+            logMessage(DataManagerLogLevel::ERROR, 
+                       "Failed to save patient data: " + filename, 
+                       "DataManager::savePatientData");
+        }
+        return result;
+        
+    } catch (const std::exception& e) {
+        statistics.errors++;
+        logMessage(DataManagerLogLevel::ERROR, 
+                   "Exception in savePatientData: " + std::string(e.what()), 
+                   "DataManager::savePatientData");
+        return false;
+    } catch (...) {
+        statistics.errors++;
+        logMessage(DataManagerLogLevel::CRITICAL, 
+                   "Unknown exception in savePatientData", 
+                   "DataManager::savePatientData");
+        return false;
     }
-    
-    return writeFile(filename, json);
 }
 
 PatientData DataManager::loadPatientData(const std::string& filename, bool decrypt) {
-    std::string content = readFile(filename);
-    
-    if (content.empty()) {
-        return PatientData();
-    }
-    
-    if (decrypt && encryptionEnabled) {
-        try {
-            content = Encryption::decrypt(content, encryptionKey);
-        } catch (...) {
+    try {
+        logMessage(DataManagerLogLevel::DEBUG, 
+                   "Loading patient data from: " + filename + 
+                   (decrypt ? " [DECRYPT]" : ""), 
+                   "DataManager::loadPatientData");
+        
+        std::string content = readFile(filename);
+        
+        if (content.empty()) {
+            logMessage(DataManagerLogLevel::WARNING, 
+                       "Empty file or file not found: " + filename, 
+                       "DataManager::loadPatientData");
             return PatientData();
         }
+        
+        if (decrypt && encryptionEnabled) {
+            try {
+                content = Encryption::decrypt(content, encryptionKey);
+                statistics.decryptionOps++;
+#if DEBUG_ENCRYPTION_OPS
+                logMessage(DataManagerLogLevel::DEBUG, 
+                           "Data decrypted successfully", 
+                           "DataManager::loadPatientData");
+#endif
+            } catch (const std::exception& e) {
+                statistics.errors++;
+                logMessage(DataManagerLogLevel::ERROR, 
+                           "Decryption failed: " + std::string(e.what()), 
+                           "DataManager::loadPatientData");
+                return PatientData();
+            } catch (...) {
+                statistics.errors++;
+                logMessage(DataManagerLogLevel::CRITICAL, 
+                           "Unknown decryption error", 
+                           "DataManager::loadPatientData");
+                return PatientData();
+            }
+        }
+        
+        statistics.filesRead++;
+        PatientData patient = PatientData::fromJson(content);
+        statistics.jsonParseOps++;
+        
+        if (!patient.id.empty()) {
+            logMessage(DataManagerLogLevel::INFO, 
+                       "Patient data loaded successfully: " + filename, 
+                       "DataManager::loadPatientData");
+        } else {
+            logMessage(DataManagerLogLevel::WARNING, 
+                       "Loaded patient data has empty ID", 
+                       "DataManager::loadPatientData");
+        }
+        
+        return patient;
+        
+    } catch (const std::exception& e) {
+        statistics.errors++;
+        logMessage(DataManagerLogLevel::ERROR, 
+                   "Exception in loadPatientData: " + std::string(e.what()), 
+                   "DataManager::loadPatientData");
+        return PatientData();
+    } catch (...) {
+        statistics.errors++;
+        logMessage(DataManagerLogLevel::CRITICAL, 
+                   "Unknown exception in loadPatientData", 
+                   "DataManager::loadPatientData");
+        return PatientData();
     }
-    
-    return PatientData::fromJson(content);
 }
 
 bool DataManager::saveExercises(const std::vector<Exercise>& exercises, const std::string& filename, bool encrypt) {
@@ -645,24 +898,143 @@ std::string DataManager::importFromJson(const std::string& filename) {
 }
 
 std::string DataManager::readFile(const std::string& filename) const {
-    std::ifstream file(filename);
-    if (!file.is_open()) {
+    try {
+#if DEBUG_FILE_IO
+        logMessage(DataManagerLogLevel::DEBUG, 
+                   "Reading file: " + filename, 
+                   "DataManager::readFile");
+#endif
+        
+        // Check file size first to prevent memory issues
+        struct stat buffer;
+        if (stat(filename.c_str(), &buffer) == 0) {
+            if (static_cast<size_t>(buffer.st_size) > MAX_FILE_SIZE_BYTES) {
+                logMessage(DataManagerLogLevel::WARNING, 
+                           "File too large (>10MB): " + filename, 
+                           "DataManager::readFile");
+                return "";
+            }
+        }
+        
+        std::ifstream file(filename);
+        if (!file.is_open()) {
+            logMessage(DataManagerLogLevel::WARNING, 
+                       "Cannot open file for reading: " + filename, 
+                       "DataManager::readFile");
+            return "";
+        }
+        
+        std::ostringstream content;
+        content << file.rdbuf();
+        
+        if (file.bad()) {
+            logMessage(DataManagerLogLevel::ERROR, 
+                       "Error reading file: " + filename, 
+                       "DataManager::readFile");
+            return "";
+        }
+        
+#if DEBUG_FILE_IO
+        logMessage(DataManagerLogLevel::VERBOSE, 
+                   "File read successfully: " + filename + 
+                   " (" + std::to_string(content.str().length()) + " bytes)", 
+                   "DataManager::readFile");
+#endif
+        
+        return content.str();
+        
+    } catch (const std::exception& e) {
+        logMessage(DataManagerLogLevel::ERROR, 
+                   "Exception reading file " + filename + ": " + e.what(), 
+                   "DataManager::readFile");
+        return "";
+    } catch (...) {
+        logMessage(DataManagerLogLevel::CRITICAL, 
+                   "Unknown exception reading file: " + filename, 
+                   "DataManager::readFile");
         return "";
     }
-    
-    std::ostringstream content;
-    content << file.rdbuf();
-    return content.str();
 }
 
 bool DataManager::writeFile(const std::string& filename, const std::string& content) {
-    std::ofstream file(filename);
-    if (!file.is_open()) {
+    try {
+#if DEBUG_FILE_IO
+        logMessage(DataManagerLogLevel::DEBUG, 
+                   "Writing file: " + filename + 
+                   " (" + std::to_string(content.length()) + " bytes)", 
+                   "DataManager::writeFile");
+#endif
+        
+        int retryCount = 0;
+        while (retryCount < MAX_FILE_RETRY_COUNT) {
+            std::ofstream file(filename);
+            if (!file.is_open()) {
+                retryCount++;
+#if DEBUG_FILE_IO
+                logMessage(DataManagerLogLevel::WARNING, 
+                           "Cannot open file for writing (attempt " + 
+                           std::to_string(retryCount) + "/" + 
+                           std::to_string(MAX_FILE_RETRY_COUNT) + "): " + filename, 
+                           "DataManager::writeFile");
+#endif
+                if (retryCount < MAX_FILE_RETRY_COUNT) {
+                    statistics.retries++;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(FILE_RETRY_DELAY_MS));
+                    continue;
+                }
+                logMessage(DataManagerLogLevel::ERROR, 
+                           "Failed to open file after " + 
+                           std::to_string(MAX_FILE_RETRY_COUNT) + " attempts: " + filename, 
+                           "DataManager::writeFile");
+                return false;
+            }
+            
+            file << content;
+            
+            if (!file.good()) {
+                retryCount++;
+#if DEBUG_FILE_IO
+                logMessage(DataManagerLogLevel::WARNING, 
+                           "Error writing file (attempt " + 
+                           std::to_string(retryCount) + "/" + 
+                           std::to_string(MAX_FILE_RETRY_COUNT) + "): " + filename, 
+                           "DataManager::writeFile");
+#endif
+                if (retryCount < MAX_FILE_RETRY_COUNT) {
+                    statistics.retries++;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(FILE_RETRY_DELAY_MS));
+                    continue;
+                }
+                logMessage(DataManagerLogLevel::ERROR, 
+                           "Failed to write file after " + 
+                           std::to_string(MAX_FILE_RETRY_COUNT) + " attempts: " + filename, 
+                           "DataManager::writeFile");
+                return false;
+            }
+            
+            file.close();
+            
+#if DEBUG_FILE_IO
+            logMessage(DataManagerLogLevel::VERBOSE, 
+                       "File written successfully: " + filename, 
+                       "DataManager::writeFile");
+#endif
+            return true;
+        }
+        
+        return false;
+        
+    } catch (const std::exception& e) {
+        logMessage(DataManagerLogLevel::ERROR, 
+                   "Exception writing file " + filename + ": " + e.what(), 
+                   "DataManager::writeFile");
+        return false;
+    } catch (...) {
+        logMessage(DataManagerLogLevel::CRITICAL, 
+                   "Unknown exception writing file: " + filename, 
+                   "DataManager::writeFile");
         return false;
     }
-    
-    file << content;
-    return file.good();
 }
 
 std::string DataManager::extractStringValue(const std::string& json, const std::string& key) const {
@@ -791,3 +1163,59 @@ std::string DataManager::unescapeJsonString(const std::string& input) const {
     }
     return output;
 }
+
+// ============================================================================
+// LOGGING HELPER METHODS
+// ============================================================================
+
+void DataManager::logMessage(DataManagerLogLevel level, const std::string& message, 
+                             const std::string& source) const {
+    std::lock_guard<std::mutex> lock(logMutex);
+    
+    // Check if this message should be logged based on minimum level
+    if (level < minimumLogLevel) {
+        return;
+    }
+    
+    // Skip if console output is disabled
+    if (!consoleOutputEnabled) {
+        return;
+    }
+    
+    // Format the log message with timestamp and level
+    std::ostringstream oss;
+    oss << "[" << getCurrentTimestamp() << "] "
+        << "[" << source << "] "
+        << "[" << logLevelToString(level) << "] "
+        << message;
+    
+    // Output to appropriate stream based on level
+    if (level >= DataManagerLogLevel::ERROR) {
+        std::cerr << oss.str() << std::endl;
+    } else {
+        std::cout << oss.str() << std::endl;
+    }
+}
+
+std::string DataManager::logLevelToString(DataManagerLogLevel level) {
+    switch (level) {
+        case DataManagerLogLevel::VERBOSE:   return "VERBOSE";
+        case DataManagerLogLevel::DEBUG:     return "DEBUG";
+        case DataManagerLogLevel::INFO:      return "INFO";
+        case DataManagerLogLevel::WARNING:   return "WARNING";
+        case DataManagerLogLevel::ERROR:     return "ERROR";
+        case DataManagerLogLevel::CRITICAL:  return "CRITICAL";
+        default:                             return "UNKNOWN";
+    }
+}
+
+DataManagerLogLevel DataManager::stringToLogLevel(const std::string& level) {
+    if (level == "VERBOSE" || level == "verbose")   return DataManagerLogLevel::VERBOSE;
+    if (level == "DEBUG" || level == "debug")       return DataManagerLogLevel::DEBUG;
+    if (level == "INFO" || level == "info")         return DataManagerLogLevel::INFO;
+    if (level == "WARNING" || level == "warning")   return DataManagerLogLevel::WARNING;
+    if (level == "ERROR" || level == "error")       return DataManagerLogLevel::ERROR;
+    if (level == "CRITICAL" || level == "critical") return DataManagerLogLevel::CRITICAL;
+    return DataManagerLogLevel::INFO; // Default fallback
+}
+
