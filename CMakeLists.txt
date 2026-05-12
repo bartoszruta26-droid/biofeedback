@@ -21,6 +21,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 # Find dependencies
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Core)
 
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
@@ -35,6 +36,7 @@ target_include_directories(biofeedback_core
         ${CMAKE_SOURCE_DIR}/include
         ${CMAKE_SOURCE_DIR}/include/core
         ${CMAKE_SOURCE_DIR}/include/data
+        ${Qt5Core_INCLUDE_DIRS}
 )
 
 target_link_libraries(biofeedback_core
@@ -42,6 +44,7 @@ target_link_libraries(biofeedback_core
         OpenSSL::SSL
         OpenSSL::Crypto
         pthread
+        Qt5::Core
 )
 
 # Regression targets that can be built without Qt.

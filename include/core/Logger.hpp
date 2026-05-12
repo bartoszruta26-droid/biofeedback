@@ -45,6 +45,81 @@ struct LoggerStatistics {
     std::atomic<uint64_t> flushOperations{0};///< Number of flush operations performed
     
     /**
+     * @brief Default constructor
+     */
+    LoggerStatistics() = default;
+    
+    /**
+     * @brief Copy constructor - copies atomic values
+     */
+    LoggerStatistics(const LoggerStatistics& other) 
+        : verboseCount(other.verboseCount.load())
+        , debugCount(other.debugCount.load())
+        , infoCount(other.infoCount.load())
+        , warningCount(other.warningCount.load())
+        , errorCount(other.errorCount.load())
+        , criticalCount(other.criticalCount.load())
+        , totalMessages(other.totalMessages.load())
+        , rotationCount(other.rotationCount.load())
+        , writeErrors(other.writeErrors.load())
+        , flushOperations(other.flushOperations.load())
+    {}
+    
+    /**
+     * @brief Move constructor - moves atomic values
+     */
+    LoggerStatistics(LoggerStatistics&& other) noexcept
+        : verboseCount(other.verboseCount.load())
+        , debugCount(other.debugCount.load())
+        , infoCount(other.infoCount.load())
+        , warningCount(other.warningCount.load())
+        , errorCount(other.errorCount.load())
+        , criticalCount(other.criticalCount.load())
+        , totalMessages(other.totalMessages.load())
+        , rotationCount(other.rotationCount.load())
+        , writeErrors(other.writeErrors.load())
+        , flushOperations(other.flushOperations.load())
+    {}
+    
+    /**
+     * @brief Copy assignment operator - copies atomic values
+     */
+    LoggerStatistics& operator=(const LoggerStatistics& other) {
+        if (this != &other) {
+            verboseCount.store(other.verboseCount.load());
+            debugCount.store(other.debugCount.load());
+            infoCount.store(other.infoCount.load());
+            warningCount.store(other.warningCount.load());
+            errorCount.store(other.errorCount.load());
+            criticalCount.store(other.criticalCount.load());
+            totalMessages.store(other.totalMessages.load());
+            rotationCount.store(other.rotationCount.load());
+            writeErrors.store(other.writeErrors.load());
+            flushOperations.store(other.flushOperations.load());
+        }
+        return *this;
+    }
+    
+    /**
+     * @brief Move assignment operator - moves atomic values
+     */
+    LoggerStatistics& operator=(LoggerStatistics&& other) noexcept {
+        if (this != &other) {
+            verboseCount.store(other.verboseCount.load());
+            debugCount.store(other.debugCount.load());
+            infoCount.store(other.infoCount.load());
+            warningCount.store(other.warningCount.load());
+            errorCount.store(other.errorCount.load());
+            criticalCount.store(other.criticalCount.load());
+            totalMessages.store(other.totalMessages.load());
+            rotationCount.store(other.rotationCount.load());
+            writeErrors.store(other.writeErrors.load());
+            flushOperations.store(other.flushOperations.load());
+        }
+        return *this;
+    }
+    
+    /**
      * @brief Get a formatted summary of all statistics
      * @return std::string Formatted statistics summary
      */
@@ -365,8 +440,8 @@ private:
     size_t m_maxSizeBytes;                ///< Maximum file size before rotation
     int m_rotateCount;                    ///< Number of rotated files to keep
     bool m_consoleOutput;                 ///< Whether to output to console
-    LoggerStatistics m_statistics;        ///< Logging statistics
     std::map<std::string, LogCallback> m_callbacks;  ///< Registered callbacks
+    LoggerStatistics m_statistics;        ///< Logging statistics
     bool m_initialized;                   ///< Whether logger is properly initialized
 };
 
