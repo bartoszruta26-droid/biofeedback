@@ -13,13 +13,15 @@
 #include "core/ConfigManager.hpp"
 #include "core/Logger.hpp"
 #include "core/Authentication.hpp"
-#include "core/DebugManager.hpp"
 #include "data/DataManager.hpp"
 #include "gui/MainWindow.hpp"
 #include "gui/LoginDialog.hpp"
 #include "tab/PatientTab.hpp"
 #include "tab/MeasurementTab.hpp"
 #include "tab/OutlineTab.hpp"
+
+// Forward declaration for DebugManager (defined in core namespace)
+namespace core { class DebugManager; enum class DebugManagerLogLevel; }
 
 namespace biofeedback {
 
@@ -148,9 +150,9 @@ public:
     
     /**
      * @brief Get the Debug Manager object
-     * @return DebugManager& Reference to debug manager
+     * @return core::DebugManager& Reference to debug manager
      */
-    DebugManager& getDebugManager();
+    core::DebugManager& getDebugManager();
     
     /**
      * @brief Get current application state

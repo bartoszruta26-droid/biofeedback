@@ -276,9 +276,9 @@ Logger::Logger(Logger&& other) noexcept
     , m_maxSizeBytes(other.m_maxSizeBytes)
     , m_rotateCount(other.m_rotateCount)
     , m_consoleOutput(other.m_consoleOutput)
-    , m_initialized(other.m_initialized)
-    , m_statistics(std::move(other.m_statistics))
     , m_callbacks(std::move(other.m_callbacks))
+    , m_statistics(std::move(other.m_statistics))
+    , m_initialized(other.m_initialized)
 {
     std::lock_guard<std::mutex> lock(other.m_mutex);
     m_logFile = std::move(other.m_logFile);
@@ -294,16 +294,15 @@ Logger& Logger::operator=(Logger&& other) noexcept {
             m_logFile.close();
         }
         
-        m_config = other.m_config;
         m_logFile = std::move(other.m_logFile);
         m_minLevel = other.m_minLevel;
         m_logPath = std::move(other.m_logPath);
         m_maxSizeBytes = other.m_maxSizeBytes;
         m_rotateCount = other.m_rotateCount;
         m_consoleOutput = other.m_consoleOutput;
-        m_initialized = other.m_initialized;
-        m_statistics = std::move(other.m_statistics);
         m_callbacks = std::move(other.m_callbacks);
+        m_statistics = std::move(other.m_statistics);
+        m_initialized = other.m_initialized;
         
         other.m_initialized = false;
     }

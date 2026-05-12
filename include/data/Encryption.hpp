@@ -60,6 +60,40 @@ namespace EncryptionTypes {
          * @brief Resetuje wszystkie liczniki do zera
          */
         void reset();
+        
+        // Domyślny konstruktor
+        EncryptionStatistics() = default;
+        
+        // Konstruktor kopiujący dla atomic fields
+        EncryptionStatistics(const EncryptionStatistics& other)
+            : encryptOperations(other.encryptOperations.load())
+            , decryptOperations(other.decryptOperations.load())
+            , keyGenerations(other.keyGenerations.load())
+            , base64EncodeOps(other.base64EncodeOps.load())
+            , base64DecodeOps(other.base64DecodeOps.load())
+            , xorOperations(other.xorOperations.load())
+            , validationErrors(other.validationErrors.load())
+            , memoryErrors(other.memoryErrors.load())
+            , otherErrors(other.otherErrors.load())
+            , totalBytesProcessed(other.totalBytesProcessed.load())
+        {}
+        
+        // Operator przypisania dla atomic fields
+        EncryptionStatistics& operator=(const EncryptionStatistics& other) {
+            if (this != &other) {
+                encryptOperations.store(other.encryptOperations.load());
+                decryptOperations.store(other.decryptOperations.load());
+                keyGenerations.store(other.keyGenerations.load());
+                base64EncodeOps.store(other.base64EncodeOps.load());
+                base64DecodeOps.store(other.base64DecodeOps.load());
+                xorOperations.store(other.xorOperations.load());
+                validationErrors.store(other.validationErrors.load());
+                memoryErrors.store(other.memoryErrors.load());
+                otherErrors.store(other.otherErrors.load());
+                totalBytesProcessed.store(other.totalBytesProcessed.load());
+            }
+            return *this;
+        }
     };
 
     /**
