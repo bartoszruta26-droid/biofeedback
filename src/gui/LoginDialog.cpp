@@ -2,6 +2,8 @@
 #include <QApplication>
 #include <QStyle>
 #include <QFont>
+#include <QTimer>
+#include "core/DebugManager.hpp"
 
 namespace gui {
 
@@ -30,10 +32,22 @@ LoginDialog::LoginDialog(biofeedback::Authentication& auth, QWidget *parent)
     
     // Wczytaj użytkowników
     m_authentication.loadUsers();
+    
+    // Debug logging for initialization
+    core::DebugManager::instance().sendDebugMessage(
+        "LoginDialog initialized",
+        core::DebugLevel::DEBUG,
+        "LoginDialog::LoginDialog"
+    );
 }
 
 LoginDialog::~LoginDialog()
 {
+    core::DebugManager::instance().sendDebugMessage(
+        "LoginDialog destroyed",
+        core::DebugLevel::DEBUG,
+        "LoginDialog::~LoginDialog"
+    );
 }
 
 void LoginDialog::setupUI()
@@ -175,52 +189,113 @@ void LoginDialog::createConnections()
 
 void LoginDialog::onLoginButtonClicked()
 {
-    std::string username = m_usernameEdit->text().trimmed().toStdString();
-    std::string password = m_passwordEdit->text().toStdString();
-    
-    if (username.empty()) {
-        m_statusLabel->setText(tr("⚠ Nazwa użytkownika nie może być pusta"));
-        m_statusLabel->show();
-        m_usernameEdit->setFocus();
-        return;
-    }
-    
-    if (password.empty()) {
-        m_statusLabel->setText(tr("⚠ Hasło nie może być puste"));
-        m_statusLabel->show();
-        m_passwordEdit->setFocus();
-        return;
-    }
-    
-    // Blokada przycisków podczas logowania
-    m_loginButton->setEnabled(false);
-    m_cancelButton->setEnabled(false);
-    m_statusLabel->setText(tr("⏳ Logowanie..."));
-    m_statusLabel->setStyleSheet("color: #f39c12; font-size: 12px;");
-    m_statusLabel->show();
-    QApplication::processEvents();
-    
-    if (attemptLogin(username, password)) {
-        m_statusLabel->setText(tr("✓ Zalogowano pomyślnie!"));
-        m_statusLabel->setStyleSheet("color: #27ae60; font-size: 12px;");
-        m_loginSuccess = true;
-        m_username = QString::fromStdString(username);
-        m_role = QString::fromStdString(m_authentication.getCurrentUserRole());
+    try {
+        std::string username = m_usernameEdit->text().trimmed().toStdString();
+        std::string password = m_passwordEdit->text().toStdString();
         
-        // Krótka pauza przed zamknięciem
-        QTimer::singleShot(500, this, &QDialog::accept);
-    } else {
-        m_statusLabel->setText(tr("✗ Błędna nazwa użytkownika lub hasło"));
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Login attempt for user: %1").arg(QString::fromStdString(username)),
+            core::DebugLevel::INFO,
+            "LoginDialog::onLoginButtonClicked"
+        );
+        
+        if (username.empty()) {
+            m_statusLabel->setText(tr("⚠ Nazwa użytkownika nie może być pusta"));
+            m_statusLabel->show();
+            m_usernameEdit->setFocus();
+            
+            core::DebugManager::instance().sendDebugMessage(
+                "Login failed: empty username",
+                core::DebugLevel::WARNING,
+                "LoginDialog::onLoginButtonClicked"
+            );
+            return;
+        }
+        
+        if (password.empty()) {
+            m_statusLabel->setText(tr("⚠ Hasło nie może być puste"));
+            m_statusLabel->show();
+            m_passwordEdit->setFocus();
+            
+            core::DebugManager::instance().sendDebugMessage(
+                "Login failed: empty password",
+                core::DebugLevel::WARNING,
+                "LoginDialog::onLoginButtonClicked"
+            );
+            return;
+        }
+        
+        // Blokada przycisków podczas logowania
+        m_loginButton->setEnabled(false);
+        m_cancelButton->setEnabled(false);
+        m_statusLabel->setText(tr("⏳ Logowanie..."));
+        m_statusLabel->setStyleSheet("color: #f39c12; font-size: 12px;");
+        m_statusLabel->show();
+        QApplication::processEvents();
+        
+        if (attemptLogin(username, password)) {
+            m_statusLabel->setText(tr("✓ Zalogowano pomyślnie!"));
+            m_statusLabel->setStyleSheet("color: #27ae60; font-size: 12px;");
+            m_loginSuccess = true;
+            m_username = QString::fromStdString(username);
+            m_role = QString::fromStdString(m_authentication.getCurrentUserRole());
+            
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Login successful for user: %1, role: %2")
+                    .arg(m_username)
+                    .arg(m_role),
+                core::DebugLevel::INFO,
+                "LoginDialog::onLoginButtonClicked"
+            );
+            
+            // Krótka pauza przed zamknięciem
+            QTimer::singleShot(500, this, &QDialog::accept);
+        } else {
+            m_statusLabel->setText(tr("✗ Błędna nazwa użytkownika lub hasło"));
+            m_statusLabel->setStyleSheet("color: #e74c3c; font-size: 12px;");
+            m_passwordEdit->clear();
+            m_passwordEdit->setFocus();
+            m_loginButton->setEnabled(true);
+            m_cancelButton->setEnabled(true);
+            
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Login failed for user: %1 - invalid credentials").arg(QString::fromStdString(username)),
+                core::DebugLevel::WARNING,
+                "LoginDialog::onLoginButtonClicked"
+            );
+        }
+    } catch (const std::exception& e) {
+        m_statusLabel->setText(tr("✗ Wystąpił błąd podczas logowania"));
         m_statusLabel->setStyleSheet("color: #e74c3c; font-size: 12px;");
-        m_passwordEdit->clear();
-        m_passwordEdit->setFocus();
         m_loginButton->setEnabled(true);
         m_cancelButton->setEnabled(true);
+        
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Exception during login: %1").arg(e.what()),
+            core::DebugLevel::ERROR,
+            "LoginDialog::onLoginButtonClicked"
+        );
+    } catch (...) {
+        m_statusLabel->setText(tr("✗ Wystąpił nieznany błąd podczas logowania"));
+        m_statusLabel->setStyleSheet("color: #e74c3c; font-size: 12px;");
+        m_loginButton->setEnabled(true);
+        m_cancelButton->setEnabled(true);
+        
+        core::DebugManager::instance().sendDebugMessage(
+            "Unknown exception during login",
+            core::DebugLevel::ERROR,
+            "LoginDialog::onLoginButtonClicked"
+        );
     }
 }
 
 void LoginDialog::onCancelButtonClicked()
 {
+    core::DebugManager::instance().sendDebugMessage(
+        "Login cancelled by user",
+        core::DebugLevel::INFO,
+        "LoginDialog::onCancelButtonClicked"
+    );
     m_loginSuccess = false;
     reject();
 }
@@ -239,12 +314,54 @@ void LoginDialog::onPasswordTextChanged(const QString& text)
 
 bool LoginDialog::attemptLogin(const std::string& username, const std::string& password)
 {
-    return m_authentication.login(username, password);
+    try {
+        core::DebugManager::instance().sendDebugMessage(
+            "Attempting authentication via Authentication module",
+            core::DebugLevel::DEBUG,
+            "LoginDialog::attemptLogin"
+        );
+        bool result = m_authentication.login(username, password);
+        
+        if (result) {
+            core::DebugManager::instance().sendDebugMessage(
+                "Authentication successful",
+                core::DebugLevel::INFO,
+                "LoginDialog::attemptLogin"
+            );
+        } else {
+            core::DebugManager::instance().sendDebugMessage(
+                "Authentication failed - invalid credentials",
+                core::DebugLevel::WARNING,
+                "LoginDialog::attemptLogin"
+            );
+        }
+        
+        return result;
+    } catch (const std::exception& e) {
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Exception during authentication: %1").arg(e.what()),
+            core::DebugLevel::ERROR,
+            "LoginDialog::attemptLogin"
+        );
+        return false;
+    } catch (...) {
+        core::DebugManager::instance().sendDebugMessage(
+            "Unknown exception during authentication",
+            core::DebugLevel::ERROR,
+            "LoginDialog::attemptLogin"
+        );
+        return false;
+    }
 }
 
 void LoginDialog::closeEvent(QCloseEvent *event)
 {
     // Zapobiegaj zamknięciu okna przez X - wymuś użycie przycisku Anuluj
+    core::DebugManager::instance().sendDebugMessage(
+        "Login dialog closed via window close button",
+        core::DebugLevel::INFO,
+        "LoginDialog::closeEvent"
+    );
     m_loginSuccess = false;
     QDialog::closeEvent(event);
 }

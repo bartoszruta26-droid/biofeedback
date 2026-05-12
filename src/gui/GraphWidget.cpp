@@ -805,9 +805,6 @@ QRectF GraphWidget::plotArea() const
     return m_plotAreaCache;
 }
 
-
-QString GraphWidget::getRenderStats() const
-
 QString GraphWidget::getRenderStats() const
 {
     QMutexLocker locker(&m_statsMutex);
