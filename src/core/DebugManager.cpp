@@ -84,10 +84,15 @@ void DebugManager::sendDebugMessage(const QString& message, const QString& type)
     else if (type == "SERIAL") level = DebugLevel::DEBUG;
     else if (type == "ARDUINO") level = DebugLevel::DEBUG;
     
-    sendDebugMessage(message, level, type);
+    sendDebugMessage(message, level, QString(), type);
 }
 
 void DebugManager::sendDebugMessage(const QString& message, DebugLevel level, const QString& source)
+{
+    sendDebugMessage(message, level, source, levelToString(level));
+}
+
+void DebugManager::sendDebugMessage(const QString& message, DebugLevel level, const QString& source, const QString& type)
 {
     // Check minimum log level filter
     if (level < m_minimumLogLevel) {
@@ -99,7 +104,7 @@ void DebugManager::sendDebugMessage(const QString& message, DebugLevel level, co
     msg.message = message;
     msg.level = level;
     msg.source = source;
-    msg.type = levelToString(level);
+    msg.type = type;  // Preserve the original type string
     msg.timestamp = QDateTime::currentDateTime();
     msg.threadId = static_cast<int>(QThread::currentThreadId());
     
@@ -121,7 +126,7 @@ void DebugManager::setMinimumLogLevel(DebugLevel level)
 #endif
 }
 
-DebugManager::DebugLevel DebugManager::minimumLogLevel() const
+DebugLevel DebugManager::minimumLogLevel() const
 {
     QMutexLocker locker(&m_mutex);
     return m_minimumLogLevel;

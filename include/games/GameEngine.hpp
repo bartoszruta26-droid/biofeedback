@@ -4,7 +4,10 @@
 #include <QWidget>
 #include <QTimer>
 #include <QString>
+#include <QMutex>
+#include <atomic>
 #include <memory>
+#include "core/DebugManager.hpp"
 
 namespace games {
 
@@ -83,6 +86,17 @@ public:
      * @brief Resetuje stan gry do początkowego
      */
     virtual void reset();
+
+    /**
+     * @brief Pobiera statystyki gry jako string
+     * @return String zawierający statystyki (wynik, czas gry, błędy)
+     */
+    QString getGameStats() const;
+
+    /**
+     * @brief Resetuje liczniki statystyk
+     */
+    void resetGameStats();
 
 signals:
     /**

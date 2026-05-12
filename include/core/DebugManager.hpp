@@ -132,6 +132,18 @@ public:
     void sendDebugMessage(const QString& message, DebugLevel level, const QString& source = QString());
 
     /**
+     * @brief Wysyła wiadomość z określonym poziomem ważności i typem
+     * @param message Treść wiadomości
+     * @param level Poziom ważności (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+     * @param source Źródło wiadomości (nazwa modułu/funkcji)
+     * @param type Typ wiadomości (np. DATA, SERIAL, ARDUINO) - zachowywany oryginalny typ
+     * 
+     * Umożliwia precyzyjną kontrolę nad ważnością komunikatów
+     * i późniejsze filtrowanie w DebugTab z zachowaniem oryginalnego typu.
+     */
+    void sendDebugMessage(const QString& message, DebugLevel level, const QString& source, const QString& type);
+
+    /**
      * @brief Sprawdza czy callback jest zarejestrowany
      * @return true jeśli callback jest ustawiony
      * 

@@ -17,9 +17,13 @@
 #include <QFont>
 #include <QDateTime>
 #include <QTimer>
+#include <QMutex>
+#include <atomic>
 #include <cmath>
 #include <algorithm>
 #include <limits>
+#include <memory>
+#include "core/DebugManager.hpp"
 
 namespace gui {
 
@@ -147,6 +151,17 @@ public:
      */
     void setShowValues(bool enabled);
 
+    /**
+     * @brief Pobiera statystyki renderowania jako string
+     * @return String zawierający statystyki (liczba punktów, FPS, błędy)
+     */
+    QString getRenderStats() const;
+
+    /**
+     * @brief Resetuje liczniki statystyk
+     */
+    void resetRenderStats();
+
 public slots:
     /**
      * @brief Wymusza odświeżenie wykresu
@@ -232,6 +247,14 @@ private:
     // Cache obliczeń
     mutable QRectF m_plotAreaCache;
     mutable bool m_cacheValid;
+    
+    // Statystyki i debugowanie
+    mutable QMutex m_statsMutex;
+    std::atomic<int> m_renderCount;
+    std::atomic<int> m_errorCount;
+    std::atomic<int> m_invalidPointCount;
+    qint64 m_lastRenderTimeMs;
+    std::atomic<int> m_totalDataPointsAdded;
 };
 
 } // namespace gui

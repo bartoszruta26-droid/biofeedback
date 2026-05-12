@@ -2,8 +2,10 @@
 #include <QPainterPath>
 #include <QGradient>
 #include <QLinearGradient>
+#include <QElapsedTimer>
 #include <cmath>
 #include <iostream>
+#include <sstream>
 
 namespace gui {
 
@@ -27,6 +29,11 @@ GraphWidget::GraphWidget(QWidget *parent)
     , m_isPanning(false)
     , m_isHovering(false)
     , m_cacheValid(false)
+    , m_renderCount(0)
+    , m_errorCount(0)
+    , m_invalidPointCount(0)
+    , m_lastRenderTimeMs(0)
+    , m_totalDataPointsAdded(0)
 {
     setMinimumSize(400, 300);
     setMouseTracking(true);
@@ -35,6 +42,13 @@ GraphWidget::GraphWidget(QWidget *parent)
     QTimer* pruneTimer = new QTimer(this);
     connect(pruneTimer, &QTimer::timeout, this, &GraphWidget::pruneOldData);
     pruneTimer->start(50);
+    
+    // Debug logging for initialization
+    core::DebugManager::instance().sendDebugMessage(
+        "GraphWidget initialized", 
+        core::DebugLevel::DEBUG, 
+        "GraphWidget::GraphWidget"
+    );
 }
 
 GraphWidget::~GraphWidget()
@@ -46,11 +60,17 @@ void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
     try {
         // Validate input value - check for NaN or infinity
         if (std::isnan(value) || std::isinf(value)) {
-            std::cerr << "[GraphWidget] WARNING: Invalid data point value (NaN/Inf), skipping" << std::endl;
+            m_invalidPointCount++;
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Invalid data point value (NaN/Inf): %1").arg(value),
+                core::DebugLevel::WARNING,
+                "GraphWidget::addDataPoint"
+            );
             return;
         }
         
         m_dataPoints.append(DataPoint(timestamp, value));
+        m_totalDataPointsAdded++;
         
         if (m_autoScaleY) {
             calculateAutoScale();
@@ -59,9 +79,19 @@ void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
         m_cacheValid = false;
         update();
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget] ERROR in addDataPoint: " << e.what() << std::endl;
+        m_errorCount++;
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Exception in addDataPoint: %1").arg(e.what()),
+            core::DebugLevel::ERROR,
+            "GraphWidget::addDataPoint"
+        );
     } catch (...) {
-        std::cerr << "[GraphWidget] ERROR in addDataPoint: Unknown exception" << std::endl;
+        m_errorCount++;
+        core::DebugManager::instance().sendDebugMessage(
+            "Unknown exception in addDataPoint",
+            core::DebugLevel::ERROR,
+            "GraphWidget::addDataPoint"
+        );
     }
 }
 
@@ -773,6 +803,42 @@ QRectF GraphWidget::plotArea() const
     }
     
     return m_plotAreaCache;
+}
+
+
+QString GraphWidget::getRenderStats() const
+
+QString GraphWidget::getRenderStats() const
+{
+    QMutexLocker locker(&m_statsMutex);
+    
+    std::ostringstream oss;
+    oss << "=== GraphWidget Statistics ===" << std::endl;
+    oss << "Total data points added: " << m_totalDataPointsAdded.load() << std::endl;
+    oss << "Current data points: " << m_dataPoints.size() << std::endl;
+    oss << "Render count: " << m_renderCount.load() << std::endl;
+    oss << "Error count: " << m_errorCount.load() << std::endl;
+    oss << "Invalid point count: " << m_invalidPointCount.load() << std::endl;
+    oss << "Last render time: " << m_lastRenderTimeMs << " ms" << std::endl;
+    
+    return QString::fromStdString(oss.str());
+}
+
+void GraphWidget::resetRenderStats()
+{
+    QMutexLocker locker(&m_statsMutex);
+    
+    m_renderCount = 0;
+    m_errorCount = 0;
+    m_invalidPointCount = 0;
+    m_lastRenderTimeMs = 0;
+    m_totalDataPointsAdded = 0;
+    
+    core::DebugManager::instance().sendDebugMessage(
+        "GraphWidget statistics reset",
+        core::DebugLevel::INFO,
+        "GraphWidget::resetRenderStats"
+    );
 }
 
 } // namespace gui
