@@ -105,9 +105,38 @@ int main(int argc, char* argv[]) {
     
     // 5. Synchronizacja timestamp
     std::cout << "5. Synchronizacja timestamp..." << std::endl;
+    // Request timestamp from Arduino using TIME command
+    std::string timeResponse = comm.sendCommand("TIME", true);
     uint32_t arduinoTimestamp = 0;
-    comm.syncTimestamp(arduinoTimestamp);
-    std::cout << "Timestamp Arduino: " << arduinoTimestamp << " ms" << std::endl;
+    
+    // Parse timestamp from response (expected format: "TIME:<value>" or just numeric value)
+    size_t colonPos = timeResponse.find("TIME:");
+    if (colonPos != std::string::npos) {
+        try {
+            arduinoTimestamp = std::stoul(timeResponse.substr(colonPos + 5));
+        } catch (...) {
+            std::cout << "Nie udało się sparsować timestamp z odpowiedzi: " << timeResponse << std::endl;
+        }
+    } else {
+        // Try to parse as raw number if no prefix found
+        try {
+            // Find first digit in response
+            size_t firstDigit = timeResponse.find_first_of("0123456789");
+            if (firstDigit != std::string::npos) {
+                arduinoTimestamp = std::stoul(timeResponse.substr(firstDigit));
+            }
+        } catch (...) {
+            std::cout << "Nie udało się sparsować timestamp z odpowiedzi." << std::endl;
+        }
+    }
+    
+    if (arduinoTimestamp != 0) {
+        comm.syncTimestamp(arduinoTimestamp);
+        std::cout << "Timestamp Arduino: " << arduinoTimestamp << " ms" << std::endl;
+        std::cout << "Offset synchronizacji: " << comm.getTimestampOffset() << " ms" << std::endl;
+    } else {
+        std::cout << "Uwaga: Nie otrzymano valid timestamp z Arduino. Synchronizacja pominięta." << std::endl;
+    }
     std::cout << "Synchronizacja zakończona." << std::endl;
     printSeparator();
     
