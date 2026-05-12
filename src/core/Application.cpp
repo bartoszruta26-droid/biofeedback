@@ -132,16 +132,18 @@ bool Application::showLoginDialog()
     gui::LoginDialog loginDialog(*m_authentication);
     
     if (loginDialog.exec() == QDialog::Accepted && loginDialog.loginSuccess()) {
-        std::cout << "User logged in: " << loginDialog.getUsername().toStdString() 
+        // Security: Do not log raw username - use redacted form
+        std::string redactedUsername = "[REDACTED]";
+        std::cout << "User logged in: " << redactedUsername
                   << " (Role: " << loginDialog.getRole().toStdString() << ")" << std::endl;
-        m_logger->info(QString("User logged in: %1 (%2)")
-            .arg(loginDialog.getUsername())
+        
+        m_logger->info(QString("User logged in: [REDACTED] (%1)")
             .arg(loginDialog.getRole()).toStdString());
         
         // Log to debug terminal before starting data collection
         if (m_mainWindow && m_mainWindow->debugTerminal()) {
             m_mainWindow->addDebugMessage(
-                QString("User logged in: %1 (%2)").arg(loginDialog.getUsername()).arg(loginDialog.getRole()),
+                QString("User logged in: [REDACTED] (%1)").arg(loginDialog.getRole()),
                 "INFO"
             );
             m_mainWindow->addDebugMessage("Login successful. Data collection will start after clicking Widok->Rozpocznij", "INFO");

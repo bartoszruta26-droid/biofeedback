@@ -154,19 +154,36 @@ bool Encryption::isConsoleOutputEnabled() {
 EncryptionTypes::EncryptionStatistics Encryption::getStatistics() {
     // Tworzenie kopii statystyk z atomic load dla każdego pola
     EncryptionTypes::EncryptionStatistics stats;
-    stats.encryptOperations.store(m_statistics.encryptOperations.load());
-    stats.decryptOperations.store(m_statistics.decryptOperations.load());
-    stats.keyGenerations.store(m_statistics.keyGenerations.load());
-    stats.base64EncodeOps.store(m_statistics.base64EncodeOps.load());
-    stats.base64DecodeOps.store(m_statistics.base64DecodeOps.load());
-    stats.xorOperations.store(m_statistics.xorOperations.load());
-    stats.validationErrors.store(m_statistics.validationErrors.load());
-    stats.memoryErrors.store(m_statistics.memoryErrors.load());
-    stats.otherErrors.store(m_statistics.otherErrors.load());
-    stats.totalBytesProcessed.store(m_statistics.totalBytesProcessed.load());
+    stats.encryptOperations.store(m_statistics.encryptOperations.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.decryptOperations.store(m_statistics.decryptOperations.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.keyGenerations.store(m_statistics.keyGenerations.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.base64EncodeOps.store(m_statistics.base64EncodeOps.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.base64DecodeOps.store(m_statistics.base64DecodeOps.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.xorOperations.store(m_statistics.xorOperations.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.validationErrors.store(m_statistics.validationErrors.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.memoryErrors.store(m_statistics.memoryErrors.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.otherErrors.store(m_statistics.otherErrors.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    stats.totalBytesProcessed.store(m_statistics.totalBytesProcessed.load(std::memory_order_relaxed), std::memory_order_relaxed);
     return stats;
 }
 
+
+void Encryption::resetStatistics() {
+    std::lock_guard<std::mutex> lock(m_logMutex);
+    m_statistics.encryptOperations.store(0, std::memory_order_relaxed);
+    m_statistics.decryptOperations.store(0, std::memory_order_relaxed);
+    m_statistics.keyGenerations.store(0, std::memory_order_relaxed);
+    m_statistics.base64EncodeOps.store(0, std::memory_order_relaxed);
+    m_statistics.base64DecodeOps.store(0, std::memory_order_relaxed);
+    m_statistics.xorOperations.store(0, std::memory_order_relaxed);
+    m_statistics.validationErrors.store(0, std::memory_order_relaxed);
+    m_statistics.memoryErrors.store(0, std::memory_order_relaxed);
+    m_statistics.otherErrors.store(0, std::memory_order_relaxed);
+    m_statistics.totalBytesProcessed.store(0, std::memory_order_relaxed);
+#if DEBUG_ENCRYPTION
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, "Statystyki zresetowane");
+#endif
+}
 
 std::string Encryption::getStatisticsSummary() {
     std::stringstream ss;

@@ -193,8 +193,10 @@ void LoginDialog::onLoginButtonClicked()
         std::string username = m_usernameEdit->text().trimmed().toStdString();
         std::string password = m_passwordEdit->text().toStdString();
         
+        // Security: Do not log raw username - use redacted form or just indicate attempt
         core::DebugManager::instance().sendDebugMessage(
-            QString("Login attempt for user: %1").arg(QString::fromStdString(username)),
+            QString("Login attempt for user: [REDACTED] (length: %1)")
+                .arg(QString::number(username.length())),
             core::DebugLevel::INFO,
             "LoginDialog::onLoginButtonClicked"
         );
@@ -240,9 +242,9 @@ void LoginDialog::onLoginButtonClicked()
             m_username = QString::fromStdString(username);
             m_role = QString::fromStdString(m_authentication.getCurrentUserRole());
             
+            // Security: Do not log username even on success - only log role
             core::DebugManager::instance().sendDebugMessage(
-                QString("Login successful for user: %1, role: %2")
-                    .arg(m_username)
+                QString("Login successful for user: [REDACTED], role: %1")
                     .arg(m_role),
                 core::DebugLevel::INFO,
                 "LoginDialog::onLoginButtonClicked"
@@ -258,8 +260,9 @@ void LoginDialog::onLoginButtonClicked()
             m_loginButton->setEnabled(true);
             m_cancelButton->setEnabled(true);
             
+            // Security: Do not log username on failure - just indicate failed attempt
             core::DebugManager::instance().sendDebugMessage(
-                QString("Login failed for user: %1 - invalid credentials").arg(QString::fromStdString(username)),
+                "Login failed for user: [REDACTED] - invalid credentials",
                 core::DebugLevel::WARNING,
                 "LoginDialog::onLoginButtonClicked"
             );
