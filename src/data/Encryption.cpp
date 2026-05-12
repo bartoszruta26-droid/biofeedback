@@ -1,117 +1,562 @@
+/**
+ * @file Encryption.cpp
+ * @brief Implementacja klasy Encryption - szyfrowanie XOR z kodowaniem Base64
+ * 
+ * Ten plik zawiera implementację mechanizmów szyfrowania i deszyfrowania danych
+ * z wykorzystaniem algorytmu XOR oraz kodowania Base64. Kod zawiera rozbudowane
+ * mechanizmy debugowania, obsługi błędów, wyjątków oraz logowania operacji.
+ * 
+ * @author AI Assistant
+ * @date 2025
+ */
+
 #include "data/Encryption.hpp"
 #include <cstdlib>
 #include <stdexcept>
+#include <iostream>
+#include <sstream>
+#include <chrono>
+#include <iomanip>
+#include <algorithm>
 
-// Tabela kodowania Base64
+// ============================================================================
+// FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
+// ============================================================================
+#ifndef DEBUG_ENCRYPTION
+    #define DEBUG_ENCRYPTION 1          ///< Główna flaga debugowania enkrypcji
+#endif
+
+#ifndef DEBUG_XOR_OPERATIONS
+    #define DEBUG_XOR_OPERATIONS 1      ///< Flag dla operacji XOR
+#endif
+
+#ifndef DEBUG_BASE64_OPERATIONS
+    #define DEBUG_BASE64_OPERATIONS 1   ///< Flag dla operacji Base64
+#endif
+
+#ifndef DEBUG_KEY_GENERATION
+    #define DEBUG_KEY_GENERATION 1      ///< Flag dla generowania kluczy
+#endif
+
+#ifndef DEBUG_ERROR_HANDLING
+    #define DEBUG_ERROR_HANDLING 1      ///< Flag dla obsługi błędów
+#endif
+
+// ============================================================================
+// MAKRA POMOCNICZE DO LOGOWANIA I DEBUGOWANIA
+// ============================================================================
+
+/**
+ * @brief Makro do logowania komunikatów debugowych
+ * 
+ * Wyświetla komunikat tylko gdy odpowiednia flaga debugowania jest włączona.
+ * Format: [DEBUG][timestamp][function] message
+ */
+#define ENCRYPT_DEBUG(level, msg) \
+    do { \
+        if (DEBUG_ENCRYPTION && level <= DEBUG_ENCRYPTION) { \
+            auto now = std::chrono::system_clock::now(); \
+            auto time = std::chrono::system_clock::to_time_t(now); \
+            std::stringstream ss; \
+            ss << "[DEBUG][ENCRYPTION][" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] " \
+               << __FUNCTION__ << ": " << msg << std::endl; \
+            std::cerr << ss.str(); \
+        } \
+    } while(0)
+
+/**
+ * @brief Makro do logowania błędów
+ * 
+ * Zawsze wyświetla komunikaty błędów niezależnie od flag debugowania.
+ * Format: [ERROR][timestamp][function] message
+ */
+#define ENCRYPT_ERROR(msg) \
+    do { \
+        auto now = std::chrono::system_clock::now(); \
+        auto time = std::chrono::system_clock::to_time_t(now); \
+        std::stringstream ss; \
+        ss << "[ERROR][ENCRYPTION][" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] " \
+           << __FUNCTION__ << ": " << msg << std::endl; \
+        std::cerr << ss.str(); \
+    } while(0)
+
+/**
+ * @brief Makro do logowania ostrzeżeń
+ * 
+ * Wyświetla komunikaty ostrzeżeń dla niekrytycznych problemów.
+ */
+#define ENCRYPT_WARN(msg) \
+    do { \
+        if (DEBUG_ENCRYPTION) { \
+            auto now = std::chrono::system_clock::now(); \
+            auto time = std::chrono::system_clock::to_time_t(now); \
+            std::stringstream ss; \
+            ss << "[WARN][ENCRYPTION][" << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] " \
+               << __FUNCTION__ << ": " << msg << std::endl; \
+            std::cerr << ss.str(); \
+        } \
+    } while(0)
+
+// ============================================================================
+// STAŁE I ZMIENNE GLOBALNE
+// ============================================================================
+
+/**
+ * @brief Tabela kodowania Base64
+ * 
+ * Zawiera wszystkie znaki używane w kodowaniu Base64 w poprawnej kolejności.
+ * Jest to standardowa tabela zgodna z RFC 4648.
+ */
 static const std::string base64_chars = 
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
     "0123456789+/";
 
+// ============================================================================
+// IMPLEMENTACJA METOD KLASYPUBLICZNYCH
+// ============================================================================
+
 std::string Encryption::encrypt(const std::string& data, const std::string& key) {
-    if (key.empty()) {
-        throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
+    // Rozpoczęcie procesu szyfrowania
+    ENCRYPT_DEBUG(1, "Rozpoczynanie szyfrowania danych");
+    ENCRYPT_DEBUG(2, "Długość danych wejściowych: " << data.length() << " bajtów");
+    ENCRYPT_DEBUG(2, "Długość klucza: " << key.length() << " bajtów");
+    
+    // Walidacja parametrów wejściowych - gentle code: bezpieczne sprawdzenie
+    try {
+        if (key.empty()) {
+            ENCRYPT_ERROR("Próba szyfrowania z pustym kluczem - zgłaszanie wyjątku");
+            throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
+        }
+        
+        if (data.empty()) {
+            ENCRYPT_WARN("Szyfrowanie pustych danych - zwracanie pustego wyniku");
+            return "";  // Gentle code: zwracamy pusty string zamiast błędu
+        }
+        
+        // Dodatkowa walidacja długości klucza (zbyt krótki klucz może być niebezpieczny)
+        if (key.length() < 4) {
+            ENCRYPT_WARN("Klucz jest bardzo krótki (" << key.length() 
+                      << " znaków). Zalecany klucz minimum 8 znaków.");
+        }
+        
+    } catch (const std::invalid_argument& e) {
+        ENCRYPT_ERROR("Błąd walidacji parametrów: " << e.what());
+        throw;  // Propagacja wyjątku dalej
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas walidacji: " << e.what());
+        throw std::runtime_error("Krytyczny błąd walidacji parametrów szyfrowania");
     }
     
-    // Konwersja danych i klucza do wektorów bajtów
-    std::vector<uint8_t> dataBytes(data.begin(), data.end());
-    std::vector<uint8_t> keyBytes(key.begin(), key.end());
+    std::vector<uint8_t> dataBytes;
+    std::vector<uint8_t> keyBytes;
+    std::vector<uint8_t> encryptedBytes;
     
-    // Szyfrowanie XOR
-    std::vector<uint8_t> encryptedBytes = xorCipher(dataBytes, keyBytes);
-    
-    // Kodowanie Base64
-    return base64Encode(encryptedBytes);
+    try {
+        // Konwersja danych i klucza do wektorów bajtów
+        ENCRYPT_DEBUG(3, "Konwersja danych do wektora bajtów");
+        dataBytes.assign(data.begin(), data.end());
+        
+        ENCRYPT_DEBUG(3, "Konwersja klucza do wektora bajtów");
+        keyBytes.assign(key.begin(), key.end());
+        
+        #if DEBUG_XOR_OPERATIONS
+        ENCRYPT_DEBUG(2, "Liczba bajtów danych: " << dataBytes.size());
+        ENCRYPT_DEBUG(2, "Liczba bajtów klucza: " << keyBytes.size());
+        #endif
+        
+        // Szyfrowanie XOR
+        ENCRYPT_DEBUG(2, "Wykonywanie szyfrowania XOR");
+        encryptedBytes = xorCipher(dataBytes, keyBytes);
+        
+        #if DEBUG_XOR_OPERATIONS
+        ENCRYPT_DEBUG(3, "Szyfrowanie zakończone, wynik: " << encryptedBytes.size() << " bajtów");
+        #endif
+        
+        // Kodowanie Base64
+        ENCRYPT_DEBUG(2, "Kodowanie wyników do Base64");
+        std::string result = base64Encode(encryptedBytes);
+        
+        ENCRYPT_DEBUG(1, "Szyfrowanie zakończone sukcesem");
+        ENCRYPT_DEBUG(2, "Długość zaszyfrowanych danych: " << result.length() << " znaków");
+        
+        return result;
+        
+    } catch (const std::bad_alloc& e) {
+        // Błąd alokacji pamięci
+        ENCRYPT_ERROR("Błąd alokacji pamięci podczas szyfrowania: " << e.what());
+        throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji szyfrowania");
+    } catch (const std::exception& e) {
+        // Ogólny błąd
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas szyfrowania: " << e.what());
+        throw std::runtime_error("Krytyczny błąd podczas operacji szyfrowania");
+    }
 }
 
 std::string Encryption::decrypt(const std::string& encryptedData, const std::string& key) {
-    if (key.empty()) {
-        throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
+    // Rozpoczęcie procesu deszyfrowania
+    ENCRYPT_DEBUG(1, "Rozpoczynanie deszyfrowania danych");
+    ENCRYPT_DEBUG(2, "Długość zaszyfrowanych danych: " << encryptedData.length() << " znaków");
+    ENCRYPT_DEBUG(2, "Długość klucza: " << key.length() << " bajtów");
+    
+    // Walidacja parametrów wejściowych
+    try {
+        if (key.empty()) {
+            ENCRYPT_ERROR("Próba deszyfrowania z pustym kluczem - zgłaszanie wyjątku");
+            throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
+        }
+        
+        if (encryptedData.empty()) {
+            ENCRYPT_WARN("Deszyfrowanie pustych danych - zwracanie pustego wyniku");
+            return "";  // Gentle code: zwracamy pusty string zamiast błędu
+        }
+        
+        // Walidacja formatu Base64 (podstawowa)
+        if (encryptedData.length() % 4 != 0) {
+            ENCRYPT_WARN("Dane nie są poprawnie wyrównane dla Base64 (długość: " 
+                        << encryptedData.length() << "). Spróbuję kontynuować.");
+        }
+        
+    } catch (const std::invalid_argument& e) {
+        ENCRYPT_ERROR("Błąd walidacji parametrów: " << e.what());
+        throw;
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas walidacji: " << e.what());
+        throw std::runtime_error("Krytyczny błąd walidacji parametrów deszyfrowania");
     }
     
-    // Dekodowanie Base64
-    std::vector<uint8_t> encryptedBytes = base64Decode(encryptedData);
+    std::vector<uint8_t> encryptedBytes;
+    std::vector<uint8_t> keyBytes;
+    std::vector<uint8_t> decryptedBytes;
     
-    // Konwersja klucza do wektora bajtów
-    std::vector<uint8_t> keyBytes(key.begin(), key.end());
-    
-    // Deszyfrowanie XOR (ta sama operacja co szyfrowanie)
-    std::vector<uint8_t> decryptedBytes = xorCipher(encryptedBytes, keyBytes);
-    
-    // Konwersja do stringa
-    return std::string(decryptedBytes.begin(), decryptedBytes.end());
+    try {
+        // Dekodowanie Base64
+        ENCRYPT_DEBUG(2, "Dekodowanie danych z Base64");
+        encryptedBytes = base64Decode(encryptedData);
+        
+        #if DEBUG_BASE64_OPERATIONS
+        ENCRYPT_DEBUG(3, "Dekodowanie Base64 zakończone: " << encryptedBytes.size() << " bajtów");
+        #endif
+        
+        // Konwersja klucza do wektora bajtów
+        ENCRYPT_DEBUG(3, "Konwersja klucza do wektora bajtów");
+        keyBytes.assign(key.begin(), key.end());
+        
+        // Deszyfrowanie XOR (ta sama operacja co szyfrowanie)
+        ENCRYPT_DEBUG(2, "Wykonywanie deszyfrowania XOR");
+        decryptedBytes = xorCipher(encryptedBytes, keyBytes);
+        
+        #if DEBUG_XOR_OPERATIONS
+        ENCRYPT_DEBUG(3, "Deszyfrowanie zakończone: " << decryptedBytes.size() << " bajtów");
+        #endif
+        
+        // Konwersja do stringa
+        ENCRYPT_DEBUG(2, "Konwersja wyniku do stringa");
+        std::string result(decryptedBytes.begin(), decryptedBytes.end());
+        
+        ENCRYPT_DEBUG(1, "Deszyfrowanie zakończone sukcesem");
+        ENCRYPT_DEBUG(2, "Długość odszyfrowanych danych: " << result.length() << " znaków");
+        
+        return result;
+        
+    } catch (const std::invalid_argument& e) {
+        ENCRYPT_ERROR("Błąd niepoprawnych danych zaszyfrowanych: " << e.what());
+        throw std::invalid_argument("Niepoprawny format danych zaszyfrowanych");
+    } catch (const std::bad_alloc& e) {
+        ENCRYPT_ERROR("Błąd alokacji pamięci podczas deszyfrowania: " << e.what());
+        throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji deszyfrowania");
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas deszyfrowania: " << e.what());
+        throw std::runtime_error("Krytyczny błąd podczas operacji deszyfrowania");
+    }
 }
 
 std::string Encryption::generateKey(size_t length) {
-    std::string key;
-    key.reserve(length);
+    ENCRYPT_DEBUG(1, "Generowanie nowego klucza o długości: " << length << " znaków");
     
-    for (size_t i = 0; i < length; ++i) {
-        // Generowanie losowego znaku z zakresu ASCII drukowalnego
-        char randomChar = static_cast<char>(33 + (std::rand() % 93));
-        key += randomChar;
+    // Walidacja parametru length
+    try {
+        if (length == 0) {
+            ENCRYPT_WARN("Próba wygenerowania klucza o zerowej długości - ustawiam domyślną wartość 32");
+            length = 32;  // Gentle code: ustawienie rozsądnej wartości domyślnej
+        }
+        
+        if (length > 1024) {
+            ENCRYPT_WARN("Żądana długość klucza (" << length 
+                        << ") jest bardzo duża. Ograniczam do 1024 znaków.");
+            length = 1024;  // Gentle code: ograniczenie maksymalnej długości
+        }
+        
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Błąd podczas walidacji długości klucza: " << e.what());
+        throw std::runtime_error("Krytyczny błąd walidacji parametru długości klucza");
     }
     
-    return key;
+    std::string key;
+    
+    try {
+        key.reserve(length);  // Rezerwacja pamięci z wyprzedzeniem dla wydajności
+        
+        #if DEBUG_KEY_GENERATION
+        ENCRYPT_DEBUG(2, "Pamięć zarezerwowana dla klucza: " << key.capacity() << " znaków");
+        ENCRYPT_DEBUG(3, "Rozpoczynanie pętli generowania znaków");
+        #endif
+        
+        for (size_t i = 0; i < length; ++i) {
+            // Generowanie losowego znaku z zakresu ASCII drukowalnego (33-126)
+            // Zakres 93 znaków: od '!' (33) do '~' (126)
+            char randomChar = static_cast<char>(33 + (std::rand() % 93));
+            key += randomChar;
+            
+            #if DEBUG_KEY_GENERATION && DEBUG_ENCRYPTION >= 3
+            if (i < 10 || i % 100 == 0) {  // Loguj tylko pierwsze 10 i co 100 znak
+                ENCRYPT_DEBUG(3, "Wygenerowano znak #" << i << ": '" << randomChar 
+                            << "' (ASCII: " << static_cast<int>(randomChar) << ")");
+            }
+            #endif
+        }
+        
+        ENCRYPT_DEBUG(1, "Klucz wygenerowany pomyślnie");
+        ENCRYPT_DEBUG(2, "Rzeczywista długość klucza: " << key.length() << " znaków");
+        
+        // Ostrzeżenie jeśli rand() nie został zainicjalizowany (słaba losowość)
+        // Uwaga: użytkownik powinien wywołać srand() przed pierwszym użyciem
+        ENCRYPT_DEBUG(3, "Uwaga: Upewnij się, że srand() zostało wywołane przed użyciem tej funkcji");
+        
+        return key;
+        
+    } catch (const std::bad_alloc& e) {
+        ENCRYPT_ERROR("Błąd alokacji pamięci podczas generowania klucza: " << e.what());
+        throw std::runtime_error("Nie udało się zaalokować pamięci dla generowanego klucza");
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas generowania klucza: " << e.what());
+        throw std::runtime_error("Krytyczny błąd podczas generowania klucza");
+    }
 }
 
+// ============================================================================
+// IMPLEMENTACJA METOD PRYWATNYCH
+// ============================================================================
+
 std::string Encryption::base64Encode(const std::vector<uint8_t>& input) {
+    #if DEBUG_BASE64_OPERATIONS
+    ENCRYPT_DEBUG(2, "Rozpoczynanie kodowania Base64");
+    ENCRYPT_DEBUG(3, "Liczba bajtów wejściowych: " << input.size());
+    #endif
+    
+    // Walidacja danych wejściowych
+    if (input.empty()) {
+        ENCRYPT_DEBUG(3, "Puste dane wejściowe - zwracanie pustego stringa");
+        return "";  // Gentle code: puste dane -> pusty wynik
+    }
+    
     std::string encoded;
-    int val = 0;
-    int valb = -6;
     
-    for (uint8_t c : input) {
-        val = (val << 8) + c;
-        valb += 8;
-        while (valb >= 0) {
-            encoded.push_back(base64_chars[(val >> valb) & 0x3F]);
-            valb -= 6;
+    try {
+        // Rezerwacja pamięci z wyprzedzeniem (Base64 zwiększa rozmiar o ~33%)
+        encoded.reserve(((input.size() + 2) / 3) * 4);
+        
+        int val = 0;
+        int valb = -6;
+        
+        #if DEBUG_BASE64_OPERATIONS && DEBUG_ENCRYPTION >= 3
+        size_t charCount = 0;
+        #endif
+        
+        for (uint8_t c : input) {
+            val = (val << 8) + c;
+            valb += 8;
+            while (valb >= 0) {
+                encoded.push_back(base64_chars[(val >> valb) & 0x3F]);
+                valb -= 6;
+                #if DEBUG_BASE64_OPERATIONS && DEBUG_ENCRYPTION >= 3
+                charCount++;
+                #endif
+            }
         }
+        
+        if (valb > -6) {
+            encoded.push_back(base64_chars[((val << 8) >> (valb + 8)) & 0x3F]);
+            #if DEBUG_BASE64_OPERATIONS && DEBUG_ENCRYPTION >= 3
+            charCount++;
+            #endif
+        }
+        
+        // Dodawanie paddingu (znaki '=')
+        size_t paddingNeeded = (4 - (encoded.size() % 4)) % 4;
+        #if DEBUG_BASE64_OPERATIONS
+        ENCRYPT_DEBUG(3, "Dodawanie " << paddingNeeded << " znaków paddingu '='");
+        #endif
+        
+        while (encoded.size() % 4) {
+            encoded.push_back('=');
+        }
+        
+        #if DEBUG_BASE64_OPERATIONS && DEBUG_ENCRYPTION >= 3
+        size_t finalCharCount = charCount;
+        #endif
+        
+        #if DEBUG_BASE64_OPERATIONS
+        ENCRYPT_DEBUG(2, "Kodowanie Base64 zakończone");
+        ENCRYPT_DEBUG(3, "Liczba zakodowanych znaków: " << encoded.length());
+        #if DEBUG_ENCRYPTION >= 3
+        ENCRYPT_DEBUG(3, "Znaki danych: " << finalCharCount << ", Padding: " << paddingNeeded);
+        #endif
+        #endif
+        
+        return encoded;
+        
+    } catch (const std::bad_alloc& e) {
+        ENCRYPT_ERROR("Błąd alokacji pamięci podczas kodowania Base64: " << e.what());
+        throw std::runtime_error("Nie udało się zaalokować pamięci dla kodowania Base64");
+    } catch (const std::out_of_range& e) {
+        ENCRYPT_ERROR("Błąd indeksu podczas kodowania Base64: " << e.what());
+        throw std::runtime_error("Błąd indeksu przy dostępie do tabeli Base64");
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas kodowania Base64: " << e.what());
+        throw std::runtime_error("Krytyczny błąd podczas kodowania Base64");
     }
-    
-    if (valb > -6) {
-        encoded.push_back(base64_chars[((val << 8) >> (valb + 8)) & 0x3F]);
-    }
-    
-    // Dodawanie paddingu
-    while (encoded.size() % 4) {
-        encoded.push_back('=');
-    }
-    
-    return encoded;
 }
 
 std::vector<uint8_t> Encryption::base64Decode(const std::string& input) {
+    #if DEBUG_BASE64_OPERATIONS
+    ENCRYPT_DEBUG(2, "Rozpoczynanie dekodowania Base64");
+    ENCRYPT_DEBUG(3, "Długość danych wejściowych: " << input.length() << " znaków");
+    #endif
+    
+    // Walidacja danych wejściowych
+    if (input.empty()) {
+        ENCRYPT_DEBUG(3, "Puste dane wejściowe - zwracanie pustego wektora");
+        return std::vector<uint8_t>();  // Gentle code: puste dane -> pusty wektor
+    }
+    
     std::vector<uint8_t> decoded;
     std::vector<int> T(256, -1);
     
-    // Inicjalizacja tabeli dekodującej
-    for (int i = 0; i < 64; i++) {
-        T[base64_chars[i]] = i;
-    }
-    
-    int val = 0;
-    int valb = -8;
-    
-    for (char c : input) {
-        if (T[c] == -1) break; // Ignoruj znaki inne niż Base64 (w tym '=')
-        val = (val << 6) + T[c];
-        valb += 6;
-        if (valb >= 0) {
-            decoded.push_back(static_cast<uint8_t>((val >> valb) & 0xFF));
-            valb -= 8;
+    try {
+        // Inicjalizacja tabeli dekodującej
+        ENCRYPT_DEBUG(3, "Inicjalizacja tabeli dekodującej Base64");
+        for (int i = 0; i < 64; i++) {
+            T[base64_chars[i]] = i;
         }
+        
+        #if DEBUG_BASE64_OPERATIONS && DEBUG_ENCRYPTION >= 3
+        size_t byteCount = 0;
+        size_t ignoredChars = 0;
+        #endif
+        
+        int val = 0;
+        int valb = -8;
+        
+        for (char c : input) {
+            if (T[c] == -1) {
+                // Ignoruj znaki inne niż Base64 (w tym '=', spacje, nowe linie)
+                #if DEBUG_BASE64_OPERATIONS && DEBUG_ENCRYPTION >= 3
+                ignoredChars++;
+                #endif
+                continue;
+            }
+            
+            val = (val << 6) + T[c];
+            valb += 6;
+            if (valb >= 0) {
+                uint8_t decodedByte = static_cast<uint8_t>((val >> valb) & 0xFF);
+                decoded.push_back(decodedByte);
+                valb -= 8;
+                
+                #if DEBUG_BASE64_OPERATIONS && DEBUG_ENCRYPTION >= 3
+                byteCount++;
+                if (byteCount <= 10 || byteCount % 100 == 0) {
+                    ENCRYPT_DEBUG(3, "Zdekodowano bajt #" << (byteCount-1) 
+                                << ": 0x" << std::hex << static_cast<int>(decodedByte) << std::dec);
+                }
+                #endif
+            }
+        }
+        
+        #if DEBUG_BASE64_OPERATIONS
+        ENCRYPT_DEBUG(2, "Dekodowanie Base64 zakończone");
+        ENCRYPT_DEBUG(3, "Liczba zdekodowanych bajtów: " << decoded.size());
+        #if DEBUG_ENCRYPTION >= 3
+        ENCRYPT_DEBUG(3, "Zignorowane znaki: " << ignoredChars);
+        #endif
+        #endif
+        
+        return decoded;
+        
+    } catch (const std::bad_alloc& e) {
+        ENCRYPT_ERROR("Błąd alokacji pamięci podczas dekodowania Base64: " << e.what());
+        throw std::runtime_error("Nie udało się zaalokować pamięci dla dekodowania Base64");
+    } catch (const std::out_of_range& e) {
+        ENCRYPT_ERROR("Błąd indeksu podczas dekodowania Base64: " << e.what());
+        throw std::runtime_error("Błąd indeksu przy dostępie do tabeli dekodującej");
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas dekodowania Base64: " << e.what());
+        throw std::runtime_error("Krytyczny błąd podczas dekodowania Base64");
     }
-    
-    return decoded;
 }
 
 std::vector<uint8_t> Encryption::xorCipher(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
-    std::vector<uint8_t> result(data.size());
+    #if DEBUG_XOR_OPERATIONS
+    ENCRYPT_DEBUG(2, "Rozpoczynanie operacji XOR Cipher");
+    ENCRYPT_DEBUG(3, "Długość danych: " << data.size() << " bajtów");
+    ENCRYPT_DEBUG(3, "Długość klucza: " << key.size() << " bajtów");
+    #endif
     
-    for (size_t i = 0; i < data.size(); ++i) {
-        result[i] = data[i] ^ key[i % key.size()];
+    // Walidacja danych wejściowych
+    if (data.empty()) {
+        ENCRYPT_DEBUG(3, "Puste dane wejściowe - zwracanie pustego wektora");
+        return std::vector<uint8_t>();  // Gentle code: puste dane -> pusty wynik
     }
     
-    return result;
+    if (key.empty()) {
+        ENCRYPT_ERROR("Próba wykonania XOR z pustym kluczem");
+        throw std::invalid_argument("Klucz nie może być pusty w operacji XOR");
+    }
+    
+    std::vector<uint8_t> result;
+    
+    try {
+        // Rezerwacja pamięci z wyprzedzeniem
+        result.resize(data.size());
+        
+        #if DEBUG_XOR_OPERATIONS && DEBUG_ENCRYPTION >= 3
+        size_t loggedOps = 0;
+        #endif
+        
+        for (size_t i = 0; i < data.size(); ++i) {
+            // Operacja XOR z cyklicznym użyciem klucza
+            result[i] = data[i] ^ key[i % key.size()];
+            
+            #if DEBUG_XOR_OPERATIONS && DEBUG_ENCRYPTION >= 3
+            loggedOps++;
+            if (loggedOps <= 5 || loggedOps % 50 == 0) {
+                ENCRYPT_DEBUG(3, "XOR operacja #" << i 
+                            << ": data[0x" << std::hex << static_cast<int>(data[i]) << "]"
+                            << " ^ key[0x" << static_cast<int>(key[i % key.size()]) << "]"
+                            << " = 0x" << static_cast<int>(result[i]) << std::dec);
+            }
+            #endif
+        }
+        
+        #if DEBUG_XOR_OPERATIONS
+        ENCRYPT_DEBUG(2, "Operacja XOR Cipher zakończona");
+        ENCRYPT_DEBUG(3, "Liczba przetworzonych bajtów: " << result.size());
+        #if DEBUG_ENCRYPTION >= 3
+        ENCRYPT_DEBUG(3, "Liczba zalogowanych operacji: " << loggedOps);
+        #endif
+        #endif
+        
+        return result;
+        
+    } catch (const std::bad_alloc& e) {
+        ENCRYPT_ERROR("Błąd alokacji pamięci podczas operacji XOR: " << e.what());
+        throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji XOR");
+    } catch (const std::out_of_range& e) {
+        ENCRYPT_ERROR("Błąd indeksu podczas operacji XOR: " << e.what());
+        throw std::runtime_error("Błąd indeksu przy dostępie do danych/klucza");
+    } catch (const std::exception& e) {
+        ENCRYPT_ERROR("Nieoczekiwany błąd podczas operacji XOR: " << e.what());
+        throw std::runtime_error("Krytyczny błąd podczas operacji XOR Cipher");
+    }
 }

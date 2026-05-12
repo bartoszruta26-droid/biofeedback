@@ -1,15 +1,87 @@
+/**
+ * @file DataManager.cpp
+ * @brief Comprehensive data management system with encryption support
+ * 
+ * This module provides robust data persistence for medical biofeedback application.
+ * It handles patient records, exercises, training plans, and measurement results.
+ * 
+ * FEATURES:
+ * - JSON serialization/deserialization with proper escaping
+ * - Optional AES-style XOR encryption for sensitive data
+ * - File existence checking and safe deletion
+ * - Directory listing capabilities
+ * - Import/export functionality
+ * 
+ * ERROR HANDLING:
+ * - All file operations are wrapped with error checking
+ * - Encryption failures are caught and handled gracefully
+ * - Invalid JSON data returns empty/default objects
+ * - Detailed error logging via std::cerr
+ * 
+ * THREAD SAFETY:
+ * - Note: This class is NOT thread-safe by default
+ * - External synchronization required for multi-threaded access
+ * 
+ * @section DEBUG_FLAGS Debug Flags
+ * Enable verbose logging by setting DEBUG_DATA_MANAGER to true
+ */
+
 #include "data/DataManager.hpp"
 #include <algorithm>
 #include <cctype>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <cstdio>
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <stdexcept>
+#include <cstring>
+#include <cerrno>
+
+// ============================================================================
+// DEBUG CONFIGURATION FLAGS
+// ============================================================================
+
+/// Enable detailed debug logging for all data operations
+constexpr bool DEBUG_DATA_MANAGER = true;
+
+/// Enable verbose JSON parsing debug output
+constexpr bool DEBUG_JSON_PARSING = false;
+
+/// Enable encryption/decryption operation logging
+constexpr bool DEBUG_ENCRYPTION_OPS = true;
+
+/// Enable file I/O operation debugging
+constexpr bool DEBUG_FILE_IO = true;
+
+/// Maximum number of retry attempts for file operations
+constexpr int MAX_FILE_RETRY_COUNT = 3;
+
+/// Delay between retries in milliseconds
+constexpr int FILE_RETRY_DELAY_MS = 50;
 
 namespace {
 
+// ============================================================================
+// ANONYMOUS NAMESPACE - HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * @brief Escapes special characters in JSON string values
+ * @param input Raw string to escape
+ * @return Escaped string safe for JSON embedding
+ * 
+ * Handles all JSON special characters: quotes, backslashes, control chars
+ * Uses switch statement for optimal performance
+ */
 std::string escapeJsonStringValue(const std::string& input) {
+    if (input.empty()) {
+        return "";
+    }
+    
     std::string output;
-    output.reserve(input.size());
+    output.reserve(input.size() + 10); // Reserve extra space for escapes
 
     for (const char c : input) {
         switch (c) {
@@ -20,24 +92,48 @@ std::string escapeJsonStringValue(const std::string& input) {
             case '\n': output += "\\n"; break;
             case '\r': output += "\\r"; break;
             case '\t': output += "\\t"; break;
-            default: output += c; break;
+            default: 
+                // Only add printable ASCII characters
+                if (static_cast<unsigned char>(c) >= 32) {
+                    output += c;
+                } else {
+                    // Convert non-printable to Unicode escape
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "\\u%04x", static_cast<unsigned char>(c));
+                    output += buf;
+                }
+                break;
         }
     }
 
     return output;
 }
 
+/**
+ * @brief Finds the closing quote of a JSON string, handling escaped quotes
+ * @param text Full JSON text
+ * @param start Starting position (should be after opening quote)
+ * @return Position of closing quote, or std::string::npos if not found
+ * 
+ * Properly handles escaped quotes (\" and \\") by counting backslashes
+ */
 size_t findStringTerminator(const std::string& text, const size_t start) {
+    if (start >= text.size()) {
+        return std::string::npos;
+    }
+    
     for (size_t i = start; i < text.size(); ++i) {
         if (text[i] != '"') {
             continue;
         }
 
+        // Count preceding backslashes to determine if quote is escaped
         size_t backslashes = 0;
         for (size_t j = i; j > 0 && text[j - 1] == '\\'; --j) {
             ++backslashes;
         }
 
+        // Even number of backslashes means quote is not escaped
         if (backslashes % 2 == 0) {
             return i;
         }
@@ -46,8 +142,24 @@ size_t findStringTerminator(const std::string& text, const size_t start) {
     return std::string::npos;
 }
 
+/**
+ * @brief Splits JSON array into individual object strings
+ * @param arrayJson JSON array text
+ * @return Vector of individual JSON object strings
+ * 
+ * Handles nested objects and strings correctly by tracking depth
+ * and string state
+ */
 std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson) {
     std::vector<std::string> objects;
+    
+    if (arrayJson.empty()) {
+#if DEBUG_JSON_PARSING
+        std::cout << "[JSON_PARSER] Empty array JSON provided" << std::endl;
+#endif
+        return objects;
+    }
+    
     bool inString = false;
     int depth = 0;
     size_t objectStart = std::string::npos;
@@ -55,6 +167,7 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
     for (size_t i = 0; i < arrayJson.size(); ++i) {
         const char c = arrayJson[i];
 
+        // Handle string boundaries
         if (c == '"') {
             size_t backslashes = 0;
             for (size_t j = i; j > 0 && arrayJson[j - 1] == '\\'; --j) {
@@ -65,10 +178,12 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
             }
         }
 
+        // Skip content inside strings
         if (inString) {
             continue;
         }
 
+        // Track object depth
         if (c == '{') {
             if (depth == 0) {
                 objectStart = i;
@@ -77,50 +192,118 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
         } else if (c == '}') {
             --depth;
             if (depth == 0 && objectStart != std::string::npos) {
-                objects.push_back(arrayJson.substr(objectStart, i - objectStart + 1));
+                std::string obj = arrayJson.substr(objectStart, i - objectStart + 1);
+                objects.push_back(obj);
+#if DEBUG_JSON_PARSING
+                std::cout << "[JSON_PARSER] Extracted object #" << objects.size() 
+                          << " (" << obj.size() << " bytes)" << std::endl;
+#endif
                 objectStart = std::string::npos;
             }
         }
     }
 
+#if DEBUG_JSON_PARSING
+    std::cout << "[JSON_PARSER] Total objects extracted: " << objects.size() << std::endl;
+#endif
     return objects;
 }
 
-} // namespace
+} // anonymous namespace
 
 // ==================== Implementacja PatientData ====================
 
+/**
+ * @brief Konwertuje dane pacjenta do formatu JSON
+ * @return String z danymi w formacie JSON
+ * 
+ * UWAGA: Wszystkie pola tekstowe są automatycznie escapowane
+ * aby zapobiec błędom parsowania przy specjalnych znakach
+ */
 std::string PatientData::toJson() const {
-    std::ostringstream json;
-    json << "{\n";
-    json << "  \"id\": \"" << escapeJsonStringValue(id) << "\",\n";
-    json << "  \"firstName\": \"" << escapeJsonStringValue(firstName) << "\",\n";
-    json << "  \"lastName\": \"" << escapeJsonStringValue(lastName) << "\",\n";
-    json << "  \"pesel\": \"" << escapeJsonStringValue(pesel) << "\",\n";
-    json << "  \"birthDate\": \"" << escapeJsonStringValue(birthDate) << "\",\n";
-    json << "  \"gender\": \"" << escapeJsonStringValue(gender) << "\",\n";
-    json << "  \"phoneNumber\": \"" << escapeJsonStringValue(phoneNumber) << "\",\n";
-    json << "  \"email\": \"" << escapeJsonStringValue(email) << "\",\n";
-    json << "  \"address\": \"" << escapeJsonStringValue(address) << "\",\n";
-    json << "  \"medicalHistory\": \"" << escapeJsonStringValue(medicalHistory) << "\"\n";
-    json << "}";
-    return json.str();
+    try {
+        std::ostringstream json;
+        json << "{\n";
+        json << "  \"id\": \"" << escapeJsonStringValue(id) << "\",\n";
+        json << "  \"firstName\": \"" << escapeJsonStringValue(firstName) << "\",\n";
+        json << "  \"lastName\": \"" << escapeJsonStringValue(lastName) << "\",\n";
+        json << "  \"pesel\": \"" << escapeJsonStringValue(pesel) << "\",\n";
+        json << "  \"birthDate\": \"" << escapeJsonStringValue(birthDate) << "\",\n";
+        json << "  \"gender\": \"" << escapeJsonStringValue(gender) << "\",\n";
+        json << "  \"phoneNumber\": \"" << escapeJsonStringValue(phoneNumber) << "\",\n";
+        json << "  \"email\": \"" << escapeJsonStringValue(email) << "\",\n";
+        json << "  \"address\": \"" << escapeJsonStringValue(address) << "\",\n";
+        json << "  \"medicalHistory\": \"" << escapeJsonStringValue(medicalHistory) << "\"\n";
+        json << "}";
+        
+#if DEBUG_DATA_MANAGER
+        // Logowanie tylko rozmiaru danych, nie treści (dane wrażliwe)
+        std::cout << "[DATA_MANAGER] PatientData serialized to JSON (" 
+                  << json.str().size() << " bytes)" << std::endl;
+#endif
+        
+        return json.str();
+    } catch (const std::exception& e) {
+        std::cerr << "[DATA_MANAGER] ERROR: Failed to serialize PatientData: " 
+                  << e.what() << std::endl;
+        return "{}"; // Return empty JSON object on error
+    } catch (...) {
+        std::cerr << "[DATA_MANAGER] ERROR: Unknown exception during PatientData serialization" 
+                  << std::endl;
+        return "{}";
+    }
 }
 
+/**
+ * @brief Parsuje dane pacjenta z formatu JSON
+ * @param json String z danymi w formacie JSON
+ * @return Obiekt PatientData (pusty jeśli parsing nie powiedzie się)
+ * 
+ * ERROR HANDLING:
+ * - Nieprawidłowy JSON zwraca pusty obiekt PatientData
+ * - Brakujące pola są inicjalizowane domyślnymi wartościami
+ * - Błędy są logowane ale nie powodują wyjątków
+ */
 PatientData PatientData::fromJson(const std::string& json) {
     PatientData patient;
-    DataManager dm;
     
-    patient.id = dm.extractStringValue(json, "id");
-    patient.firstName = dm.extractStringValue(json, "firstName");
-    patient.lastName = dm.extractStringValue(json, "lastName");
-    patient.pesel = dm.extractStringValue(json, "pesel");
-    patient.birthDate = dm.extractStringValue(json, "birthDate");
-    patient.gender = dm.extractStringValue(json, "gender");
-    patient.phoneNumber = dm.extractStringValue(json, "phoneNumber");
-    patient.email = dm.extractStringValue(json, "email");
-    patient.address = dm.extractStringValue(json, "address");
-    patient.medicalHistory = dm.extractStringValue(json, "medicalHistory");
+    if (json.empty()) {
+#if DEBUG_DATA_MANAGER
+        std::cout << "[DATA_MANAGER] WARNING: Empty JSON provided for PatientData parsing" 
+                  << std::endl;
+#endif
+        return patient;
+    }
+    
+    try {
+        DataManager dm;
+        
+        patient.id = dm.extractStringValue(json, "id");
+        patient.firstName = dm.extractStringValue(json, "firstName");
+        patient.lastName = dm.extractStringValue(json, "lastName");
+        patient.pesel = dm.extractStringValue(json, "pesel");
+        patient.birthDate = dm.extractStringValue(json, "birthDate");
+        patient.gender = dm.extractStringValue(json, "gender");
+        patient.phoneNumber = dm.extractStringValue(json, "phoneNumber");
+        patient.email = dm.extractStringValue(json, "email");
+        patient.address = dm.extractStringValue(json, "address");
+        patient.medicalHistory = dm.extractStringValue(json, "medicalHistory");
+        
+#if DEBUG_DATA_MANAGER
+        std::cout << "[DATA_MANAGER] PatientData parsed successfully. ID: " 
+                  << (patient.id.empty() ? "<empty>" : patient.id) << std::endl;
+#endif
+        
+    } catch (const std::exception& e) {
+        std::cerr << "[DATA_MANAGER] ERROR: Exception during PatientData parsing: " 
+                  << e.what() << std::endl;
+        // Return empty patient object on error
+        patient = PatientData();
+    } catch (...) {
+        std::cerr << "[DATA_MANAGER] ERROR: Unknown exception during PatientData parsing" 
+                  << std::endl;
+        patient = PatientData();
+    }
     
     return patient;
 }
