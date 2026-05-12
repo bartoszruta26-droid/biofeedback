@@ -46,6 +46,7 @@
 #include <chrono>
 #include <iomanip>
 #include <ctime>
+#include <thread>
 
 // ============================================================================
 // DEBUG CONFIGURATION FLAGS
@@ -64,10 +65,10 @@ constexpr bool DEBUG_ENCRYPTION_OPS = true;
 constexpr bool DEBUG_FILE_IO = true;
 
 /// Maximum number of retry attempts for file operations
-constexpr int MAX_FILE_RETRY_COUNT = 3;
+// constexpr int MAX_FILE_RETRY_COUNT = 3;  // Defined in header
 
 /// Delay between retries in milliseconds
-constexpr int FILE_RETRY_DELAY_MS = 50;
+// constexpr int FILE_RETRY_DELAY_MS = 50;  // Defined in header
 
 namespace {
 

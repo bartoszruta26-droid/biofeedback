@@ -1,9 +1,22 @@
 /**
  * @file SerialCommunication.cpp
  * @brief Implementacja komunikacji szeregowej z Arduino NANO HX711
+ * 
+ * @section DEBUG_FEATURES Funkcje Debugowania
+ * - Szczegółowe logowanie operacji na portach szeregowych
+ * - Śledzenie stanu połączenia i aktywności
+ * - Monitorowanie błędów CRC i retry operations
+ * - Statystyki transmisji danych
+ * 
+ * @section ERROR_HANDLING Obsługa Błędów
+ * - Walidacja parametrów przed operacjami
+ * - Obsługa wyjątków podczas otwierania portu
+ * - Retry logic dla tymczasowych błędów
+ * - Graceful degradation przy utracie połączenia
  */
 
 #include "sensor/SerialCommunication.hpp"
+#include "core/DebugManager.hpp"
 #include <chrono>
 #include <cstring>
 #include <algorithm>
@@ -15,6 +28,30 @@
 #include <atomic>
 #include <climits>
 #include <cstdio>
+#include <stdexcept>
+#include <system_error>
+
+// ============================================================================
+// DEBUG FLAGS AND CONFIGURATION
+// ============================================================================
+
+/// Enable detailed debug logging for serial operations
+constexpr bool DEBUG_SERIAL_COMM = true;
+
+/// Enable verbose data packet debugging
+constexpr bool DEBUG_DATA_PACKETS = false;
+
+/// Enable connection state debugging
+constexpr bool DEBUG_CONNECTION = true;
+
+/// Enable CRC validation debugging
+constexpr bool DEBUG_CRC = false;
+
+/// Maximum number of connection retries
+constexpr int MAX_CONNECTION_RETRIES = 3;
+
+/// Delay between connection retries in milliseconds
+constexpr int CONNECTION_RETRY_DELAY_MS = 500;
 
 #define DEFAULT_BAUD_RATE 115200
 #define WATCHDOG_DEFAULT_TIMEOUT_MS 5000
@@ -32,22 +69,96 @@
 
 namespace sensor {
 
+// ============================================================================
+// HELPER FUNCTIONS - CRC CALCULATION
+// ============================================================================
+
 uint8_t SerialCommunication::calculateCRC8(const uint8_t* data, size_t length) {
-    uint8_t crc = 0xFF;
-    const uint8_t polynomial = 0x07;
-    for (size_t i = 0; i < length; ++i) {
-        crc ^= data[i];
-        for (uint8_t bit = 0; bit < 8; ++bit) {
-            if (crc & 0x80) crc = (crc << 1) ^ polynomial;
-            else crc <<= 1;
+    try {
+        if (data == nullptr || length == 0) {
+#if DEBUG_CRC
+            core::DebugManager::instance().sendDebugMessage(
+                "CRC calculation failed: null data or zero length",
+                core::DebugLevel::WARNING,
+                "SerialCommunication::calculateCRC8"
+            );
+#endif
+            return 0xFF;
         }
+        
+        uint8_t crc = 0xFF;
+        const uint8_t polynomial = 0x07;
+        for (size_t i = 0; i < length; ++i) {
+            crc ^= data[i];
+            for (uint8_t bit = 0; bit < 8; ++bit) {
+                if (crc & 0x80) crc = (crc << 1) ^ polynomial;
+                else crc <<= 1;
+            }
+        }
+        
+#if DEBUG_CRC
+        core::DebugManager::instance().sendDebugMessage(
+            QString("CRC8 calculated: 0x%1").arg(crc, 2, 16, QChar('0')),
+            core::DebugLevel::VERBOSE,
+            "SerialCommunication::calculateCRC8"
+        );
+#endif
+        return crc;
+    } catch (const std::exception& e) {
+        core::DebugManager::instance().sendDebugMessage(
+            QString("CRC calculation exception: %1").arg(e.what()),
+            core::DebugLevel::ERROR,
+            "SerialCommunication::calculateCRC8"
+        );
+        return 0xFF;
+    } catch (...) {
+        core::DebugManager::instance().sendDebugMessage(
+            "Unknown exception during CRC calculation",
+            core::DebugLevel::CRITICAL,
+            "SerialCommunication::calculateCRC8"
+        );
+        return 0xFF;
     }
-    return crc;
 }
 
 bool SerialCommunication::verifyCRC8(const uint8_t* data, size_t length) {
-    if (length < 1) return false;
-    return calculateCRC8(data, length - 1) == data[length - 1];
+    try {
+        if (length < 1) {
+#if DEBUG_CRC
+            core::DebugManager::instance().sendDebugMessage(
+                "CRC verification failed: data too short",
+                core::DebugLevel::WARNING,
+                "SerialCommunication::verifyCRC8"
+            );
+#endif
+            return false;
+        }
+        
+        bool isValid = calculateCRC8(data, length - 1) == data[length - 1];
+        
+#if DEBUG_CRC
+        core::DebugManager::instance().sendDebugMessage(
+            QString("CRC verification: %1").arg(isValid ? "PASSED" : "FAILED"),
+            core::DebugLevel::DEBUG,
+            "SerialCommunication::verifyCRC8"
+        );
+#endif
+        return isValid;
+    } catch (const std::exception& e) {
+        core::DebugManager::instance().sendDebugMessage(
+            QString("CRC verification exception: %1").arg(e.what()),
+            core::DebugLevel::ERROR,
+            "SerialCommunication::verifyCRC8"
+        );
+        return false;
+    } catch (...) {
+        core::DebugManager::instance().sendDebugMessage(
+            "Unknown exception during CRC verification",
+            core::DebugLevel::CRITICAL,
+            "SerialCommunication::verifyCRC8"
+        );
+        return false;
+    }
 }
 
 class SerialCommunication::Impl {
@@ -70,29 +181,105 @@ public:
     bool verbose = true;
 };
 
-SerialCommunication::SerialCommunication() : m_impl(std::make_unique<Impl>()) {}
-SerialCommunication::~SerialCommunication() { disconnect(); }
+SerialCommunication::SerialCommunication() : m_impl(std::make_unique<Impl>()) {
+#if DEBUG_SERIAL_COMM
+    core::DebugManager::instance().sendDebugMessage(
+        "SerialCommunication object created",
+        core::DebugLevel::DEBUG,
+        "SerialCommunication::SerialCommunication"
+    );
+#endif
+}
+
+SerialCommunication::~SerialCommunication() {
+#if DEBUG_SERIAL_COMM
+    core::DebugManager::instance().sendDebugMessage(
+        "SerialCommunication object destroyed",
+        core::DebugLevel::DEBUG,
+        "SerialCommunication::~SerialCommunication"
+    );
+#endif
+    disconnect();
+}
 
 std::vector<std::string> SerialCommunication::scanAvailablePorts() {
-    std::vector<std::string> ports;
-#ifdef _WIN32
-    for (int i = 1; i <= 256; ++i) {
-        std::stringstream ss; ss << "\\\\.\\" << "COM" << i;
-        HANDLE h = CreateFileA(ss.str().c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-        if (h != INVALID_HANDLE_VALUE) { ports.push_back("COM" + std::to_string(i)); CloseHandle(h); }
-    }
-#else
-    DIR* dir = opendir("/dev");
-    if (dir) {
-        struct dirent* e;
-        while ((e = readdir(dir))) {
-            std::string n = e->d_name;
-            if (n.find("ttyUSB")==0 || n.find("ttyACM")==0 || n.find("cu.usbserial")==0 || n.find("cu.usbmodem")==0)
-                ports.push_back("/dev/" + n);
-        }
-        closedir(dir);
-    }
+#if DEBUG_CONNECTION
+    core::DebugManager::instance().sendDebugMessage(
+        "Scanning for available serial ports...",
+        core::DebugLevel::INFO,
+        "SerialCommunication::scanAvailablePorts"
+    );
 #endif
+
+    std::vector<std::string> ports;
+    
+    try {
+#ifdef _WIN32
+        for (int i = 1; i <= 256; ++i) {
+            std::stringstream ss; ss << "\\\\.\\" << "COM" << i;
+            HANDLE h = CreateFileA(ss.str().c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+            if (h != INVALID_HANDLE_VALUE) { 
+                ports.push_back("COM" + std::to_string(i)); 
+                CloseHandle(h);
+#if DEBUG_CONNECTION
+                core::DebugManager::instance().sendDebugMessage(
+                    QString("Found port: %1").arg(QString::fromStdString("COM" + std::to_string(i))),
+                    core::DebugLevel::VERBOSE,
+                    "SerialCommunication::scanAvailablePorts"
+                );
+#endif
+            }
+        }
+#else
+        DIR* dir = opendir("/dev");
+        if (dir) {
+            struct dirent* e;
+            while ((e = readdir(dir))) {
+                std::string n = e->d_name;
+                if (n.find("ttyUSB")==0 || n.find("ttyACM")==0 || n.find("cu.usbserial")==0 || n.find("cu.usbmodem")==0) {
+                    std::string portPath = "/dev/" + n;
+                    ports.push_back(portPath);
+#if DEBUG_CONNECTION
+                    core::DebugManager::instance().sendDebugMessage(
+                        QString("Found port: %1").arg(QString::fromStdString(portPath)),
+                        core::DebugLevel::VERBOSE,
+                        "SerialCommunication::scanAvailablePorts"
+                    );
+#endif
+                }
+            }
+            closedir(dir);
+        } else {
+            core::DebugManager::instance().sendDebugMessage(
+                "Failed to open /dev directory for scanning",
+                core::DebugLevel::WARNING,
+                "SerialCommunication::scanAvailablePorts"
+            );
+        }
+#endif
+        
+#if DEBUG_CONNECTION
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Scan complete. Found %1 ports.").arg(ports.size()),
+            core::DebugLevel::INFO,
+            "SerialCommunication::scanAvailablePorts"
+        );
+#endif
+        
+    } catch (const std::exception& e) {
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Exception during port scanning: %1").arg(e.what()),
+            core::DebugLevel::ERROR,
+            "SerialCommunication::scanAvailablePorts"
+        );
+    } catch (...) {
+        core::DebugManager::instance().sendDebugMessage(
+            "Unknown exception during port scanning",
+            core::DebugLevel::CRITICAL,
+            "SerialCommunication::scanAvailablePorts"
+        );
+    }
+    
     return ports;
 }
 
@@ -101,39 +288,156 @@ bool SerialCommunication::connect(const SerialConfig& config) { return openPort(
 bool SerialCommunication::connect(const std::string& portName, int baudRate) { return openPort(portName, baudRate); }
 
 bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
-    if (m_impl->isConnected) disconnect();
-    m_impl->baudRate = baudRate;
-#ifdef _WIN32
-    HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-    if (h == INVALID_HANDLE_VALUE) { m_impl->lastError = "Cannot open " + portName; return false; }
-    DCB dcb{}; dcb.DCBlength = sizeof(DCB);
-    if (!GetCommState(h, &dcb)) { CloseHandle(h); return false; }
-    dcb.BaudRate = baudRate; dcb.ByteSize = 8; dcb.Parity = NOPARITY; dcb.StopBits = ONESTOPBIT;
-    if (!SetCommState(h, &dcb)) { CloseHandle(h); return false; }
-    COMMTIMEOUTS to{}; to.ReadIntervalTimeout = 50; to.ReadTotalTimeoutConstant = 50;
-    SetCommTimeouts(h, &to);
-    m_impl->portHandle = reinterpret_cast<int>(h);
-#else
-    int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
-    if (fd < 0) { m_impl->lastError = "Cannot open " + portName; return false; }
-    termios tty{};
-    if (tcgetattr(fd, &tty)) { close(fd); return false; }
-    speed_t spd = B115200;
-    switch(baudRate) { case 9600:spd=B9600;break; case 19200:spd=B19200;break; case 38400:spd=B38400;break; case 57600:spd=B57600;break; case 230400:spd=B230400;break; }
-    cfsetospeed(&tty, spd); cfsetispeed(&tty, spd);
-    tty.c_cflag |= (CREAD|CLOCAL|CS8); tty.c_cflag &= ~(PARENB|CSTOPB|CRTSCTS);
-    tty.c_lflag &= ~(ICANON|ECHO|ISIG); tty.c_oflag &= ~OPOST; tty.c_iflag &= ~(IXON|IXOFF);
-    tty.c_cc[VMIN] = 0; tty.c_cc[VTIME] = 10;
-    tcflush(fd, TCIFLUSH);
-    if (tcsetattr(fd, TCSANOW, &tty)) { close(fd); return false; }
-    int fl = fcntl(fd, F_GETFL); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
-    m_impl->portHandle = fd;
+    try {
+        // Walidacja parametrów wejściowych
+        if (portName.empty()) {
+            core::DebugManager::instance().sendDebugMessage(
+                "Cannot open port: empty port name provided",
+                core::DebugLevel::ERROR,
+                "SerialCommunication::openPort"
+            );
+            return false;
+        }
+        
+        // Walidacja baud rate
+        if (baudRate <= 0 || baudRate > 921600) {
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Invalid baud rate %1. Using default %2.").arg(baudRate).arg(DEFAULT_BAUD_RATE),
+                core::DebugLevel::WARNING,
+                "SerialCommunication::openPort"
+            );
+            baudRate = DEFAULT_BAUD_RATE;
+        }
+
+#if DEBUG_CONNECTION
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Opening port %1 with baud rate %2").arg(QString::fromStdString(portName)).arg(baudRate),
+            core::DebugLevel::INFO,
+            "SerialCommunication::openPort"
+        );
 #endif
-    m_impl->isConnected = true;
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    if (m_impl->verbose) std::cout << "[SerialComm] Connected to " << portName << std::endl;
-    return true;
+        
+        if (m_impl->isConnected) {
+#if DEBUG_CONNECTION
+            core::DebugManager::instance().sendDebugMessage(
+                "Disconnecting existing connection before opening new port",
+                core::DebugLevel::DEBUG,
+                "SerialCommunication::openPort"
+            );
+#endif
+            disconnect();
+        }
+        
+        m_impl->baudRate = baudRate;
+        
+#ifdef _WIN32
+        HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+        if (h == INVALID_HANDLE_VALUE) { 
+            m_impl->lastError = "Cannot open " + portName;
+            DWORD errorCode = GetLastError();
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Failed to open port %1. Windows error code: %2").arg(QString::fromStdString(portName)).arg(errorCode),
+                core::DebugLevel::ERROR,
+                "SerialCommunication::openPort"
+            );
+            return false; 
+        }
+        DCB dcb{}; dcb.DCBlength = sizeof(DCB);
+        if (!GetCommState(h, &dcb)) { 
+            CloseHandle(h);
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Failed to get port state for %1").arg(QString::fromStdString(portName)),
+                core::DebugLevel::ERROR,
+                "SerialCommunication::openPort"
+            );
+            return false; 
+        }
+        dcb.BaudRate = baudRate; dcb.ByteSize = 8; dcb.Parity = NOPARITY; dcb.StopBits = ONESTOPBIT;
+        if (!SetCommState(h, &dcb)) { 
+            CloseHandle(h);
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Failed to set port configuration for %1").arg(QString::fromStdString(portName)),
+                core::DebugLevel::ERROR,
+                "SerialCommunication::openPort"
+            );
+            return false; 
+        }
+        COMMTIMEOUTS to{}; to.ReadIntervalTimeout = 50; to.ReadTotalTimeoutConstant = 50;
+        SetCommTimeouts(h, &to);
+        m_impl->portHandle = reinterpret_cast<int>(h);
+#else
+        int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
+        if (fd < 0) { 
+            m_impl->lastError = "Cannot open " + portName;
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Failed to open port %1: %2").arg(QString::fromStdString(portName)).arg(strerror(errno)),
+                core::DebugLevel::ERROR,
+                "SerialCommunication::openPort"
+            );
+            return false; 
+        }
+        termios tty{};
+        if (tcgetattr(fd, &tty)) { 
+            close(fd);
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Failed to get terminal attributes for %1").arg(QString::fromStdString(portName)),
+                core::DebugLevel::ERROR,
+                "SerialCommunication::openPort"
+            );
+            return false; 
+        }
+        speed_t spd = B115200;
+        switch(baudRate) { case 9600:spd=B9600;break; case 19200:spd=B19200;break; case 38400:spd=B38400;break; case 57600:spd=B57600;break; case 230400:spd=B230400;break; }
+        cfsetospeed(&tty, spd); cfsetispeed(&tty, spd);
+        tty.c_cflag |= (CREAD|CLOCAL|CS8); tty.c_cflag &= ~(PARENB|CSTOPB|CRTSCTS);
+        tty.c_lflag &= ~(ICANON|ECHO|ISIG); tty.c_oflag &= ~OPOST; tty.c_iflag &= ~(IXON|IXOFF);
+        tty.c_cc[VMIN] = 0; tty.c_cc[VTIME] = 10;
+        tcflush(fd, TCIFLUSH);
+        if (tcsetattr(fd, TCSANOW, &tty)) { 
+            close(fd);
+            core::DebugManager::instance().sendDebugMessage(
+                QString("Failed to set terminal attributes for %1").arg(QString::fromStdString(portName)),
+                core::DebugLevel::ERROR,
+                "SerialCommunication::openPort"
+            );
+            return false; 
+        }
+        int fl = fcntl(fd, F_GETFL); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
+        m_impl->portHandle = fd;
+#endif
+        m_impl->isConnected = true;
+        m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        
+#if DEBUG_CONNECTION
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Successfully connected to %1 at %2 baud").arg(QString::fromStdString(portName)).arg(baudRate),
+            core::DebugLevel::INFO,
+            "SerialCommunication::openPort"
+        );
+#endif
+        
+        if (m_impl->verbose) {
+            std::cout << "[SerialComm] Connected to " << portName << " at " << baudRate << " baud" << std::endl;
+        }
+        
+        return true;
+        
+    } catch (const std::exception& e) {
+        core::DebugManager::instance().sendDebugMessage(
+            QString("Exception during port opening: %1").arg(e.what()),
+            core::DebugLevel::ERROR,
+            "SerialCommunication::openPort"
+        );
+        return false;
+    } catch (...) {
+        core::DebugManager::instance().sendDebugMessage(
+            "Unknown exception during port opening",
+            core::DebugLevel::CRITICAL,
+            "SerialCommunication::openPort"
+        );
+        return false;
+    }
 }
 
 void SerialCommunication::disconnect() {
