@@ -594,7 +594,8 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
 std::string UserData::toJson() const
 {
     #if DEBUG_USER_OPERATIONS
-    AUTH_DEBUG(3, "Konwersja UserData do JSON dla użytkownika: " << username);
+    // Security: Do not log raw username - use redacted form
+    AUTH_DEBUG(3, "Konwersja UserData do JSON dla użytkownika: [REDACTED] (length: " << username.length() << ")");
     #endif
     
     try {
@@ -651,8 +652,8 @@ UserData UserData::fromJson(const std::string& jsonText)
         user.encrypted = extractJsonBoolField(jsonText, "encrypted", false);
         
         #if DEBUG_USER_OPERATIONS
-        AUTH_DEBUG(3, "Parsowanie zakończone, username: " << user.username 
-                    << ", role: " << user.role);
+        // Security: Do not log raw username - use redacted form
+        AUTH_DEBUG(3, "Parsowanie zakończone, username: [REDACTED] (length: " << user.username.length() << "), role: " << user.role);
         #endif
         
         return user;
@@ -751,7 +752,8 @@ bool Authentication::loadUsers()
                     users.push_back(user);
                     loadedCount++;
                     #if DEBUG_USER_OPERATIONS
-                    AUTH_DEBUG(3, "Wczytano użytkownika: " << user.username);
+                    // Security: Do not log raw username - use redacted form
+                    AUTH_DEBUG(3, "Wczytano użytkownika: [REDACTED] (length: " << user.username.length() << ")");
                     #endif
                 } else {
                     #if DEBUG_USER_OPERATIONS
@@ -855,7 +857,8 @@ bool Authentication::saveUsers()
 UserData* Authentication::findUser(const std::string& username)
 {
     #if DEBUG_USER_OPERATIONS
-    AUTH_DEBUG(3, "Szukanie użytkownika: " << username);
+    // Security: Do not log raw username - use redacted form
+    AUTH_DEBUG(3, "Szukanie użytkownika: [REDACTED] (length: " << username.length() << ")");
     #endif
     
     // Walidacja wejścia - gentle code
@@ -868,14 +871,16 @@ UserData* Authentication::findUser(const std::string& username)
         for (auto& user : users) {
             if (user.username == username) {
                 #if DEBUG_USER_OPERATIONS
-                AUTH_DEBUG(3, "Znaleziono użytkownika: " << username);
+                // Security: Do not log found username - just indicate success
+                AUTH_DEBUG(3, "Znaleziono użytkownika: [REDACTED]");
                 #endif
                 return &user;
             }
         }
         
         #if DEBUG_USER_OPERATIONS
-        AUTH_DEBUG(3, "Nie znaleziono użytkownika: " << username);
+        // Security: Do not log which username was not found
+        AUTH_DEBUG(3, "Nie znaleziono użytkownika: [REDACTED]");
         #endif
         return nullptr;
         
@@ -999,11 +1004,13 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
                     encryptedCount++;
                     
                     #if DEBUG_PASSWORD_ENCRYPTION
-                    AUTH_DEBUG(2, "Zaszyfrowano hasło dla użytkownika: " << user.username);
+                    // Security: Do not log raw username - use redacted form
+                    AUTH_DEBUG(2, "Zaszyfrowano hasło dla użytkownika: [REDACTED] (length: " << user.username.length() << ")");
                     #endif
                 }
             } catch (const std::exception& e) {
-                AUTH_WARN("Błąd podczas szyfrowania hasła dla " << user.username << ": " << e.what());
+                // Security: Do not log raw username in error message
+                AUTH_WARN("Błąd podczas szyfrowania hasła dla użytkownika: [REDACTED]: " << e.what());
                 // Kontynuujemy z następnym użytkownikiem (gentle code)
             }
         }
@@ -1032,7 +1039,8 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
  */
 bool Authentication::login(const std::string& username, const std::string& password)
 {
-    AUTH_DEBUG(1, "Próba logowania użytkownika: " << username);
+    // Security: Do not log raw username - use redacted form with length only
+    AUTH_DEBUG(1, "Próba logowania użytkownika: [REDACTED] (length: " << username.length() << ")");
     
     // Walidacja parametrów - gentle code
     if (username.empty()) {
@@ -1047,7 +1055,8 @@ bool Authentication::login(const std::string& username, const std::string& passw
 
         if (user == nullptr) {
             currentUser = nullptr;
-            AUTH_DEBUG(2, "Nie znaleziono użytkownika: " << username);
+            // Security: Do not log the username that was not found
+            AUTH_DEBUG(2, "Nie znaleziono użytkownika: [REDACTED]");
             return false;
         }
 
@@ -1075,12 +1084,14 @@ bool Authentication::login(const std::string& username, const std::string& passw
 
         if (storedPassword == password) {
             currentUser = user;
-            AUTH_DEBUG(1, "Zalogowano użytkownika: " << username << " (rola: " << user->role << ")");
+            // Security: Log success without exposing username, only role
+            AUTH_DEBUG(1, "Zalogowano użytkownika: [REDACTED] (rola: " << user->role << ")");
             return true;
         }
 
         currentUser = nullptr;
-        AUTH_DEBUG(2, "Nieprawidłowe hasło dla użytkownika: " << username);
+        // Security: Do not reveal which username had invalid password
+        AUTH_DEBUG(2, "Nieprawidłowe hasło dla użytkownika: [REDACTED]");
         return false;
         
     } catch (const std::exception& e) {
