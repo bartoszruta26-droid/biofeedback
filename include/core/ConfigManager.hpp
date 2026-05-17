@@ -46,6 +46,44 @@ struct ConfigManagerStatistics {
     std::atomic<uint64_t> retryOperations{0};      ///< Number of retry operations performed
     
     /**
+     * @brief Default constructor - required for atomic members
+     */
+    ConfigManagerStatistics() = default;
+    
+    /**
+     * @brief Copy constructor - copies atomic values safely
+     */
+    ConfigManagerStatistics(const ConfigManagerStatistics& other)
+        : loadsSuccessful(other.loadsSuccessful.load())
+        , loadsFailed(other.loadsFailed.load())
+        , savesSuccessful(other.savesSuccessful.load())
+        , savesFailed(other.savesFailed.load())
+        , valuesRead(other.valuesRead.load())
+        , valuesWritten(other.valuesWritten.load())
+        , validationErrors(other.validationErrors.load())
+        , defaultValueUsed(other.defaultValueUsed.load())
+        , retryOperations(other.retryOperations.load())
+    {}
+    
+    /**
+     * @brief Copy assignment operator - copies atomic values safely
+     */
+    ConfigManagerStatistics& operator=(const ConfigManagerStatistics& other) {
+        if (this != &other) {
+            loadsSuccessful.store(other.loadsSuccessful.load());
+            loadsFailed.store(other.loadsFailed.load());
+            savesSuccessful.store(other.savesSuccessful.load());
+            savesFailed.store(other.savesFailed.load());
+            valuesRead.store(other.valuesRead.load());
+            valuesWritten.store(other.valuesWritten.load());
+            validationErrors.store(other.validationErrors.load());
+            defaultValueUsed.store(other.defaultValueUsed.load());
+            retryOperations.store(other.retryOperations.load());
+        }
+        return *this;
+    }
+    
+    /**
      * @brief Get summary of statistics as formatted string
      * @return std::string Formatted statistics summary
      */
