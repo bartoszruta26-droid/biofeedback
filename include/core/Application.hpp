@@ -20,8 +20,8 @@
 #include "tab/MeasurementTab.hpp"
 #include "tab/OutlineTab.hpp"
 
-// Forward declaration for DebugManager (defined in core namespace)
-namespace core { class DebugManager; enum class DebugManagerLogLevel; }
+// Include full DebugManager definition since we use it directly (not just forward declare)
+#include "core/DebugManager.hpp"
 
 namespace biofeedback {
 
@@ -258,7 +258,7 @@ private:
      * @param message Message to log
      * @param source Source component name
      */
-    void logMessage(DebugManagerLogLevel level, const std::string& message, const std::string& source = "") const;
+    void logMessage(core::DebugLevel level, const std::string& message, const std::string& source = "") const;
     
     /**
      * @brief Handle unhandled exception
