@@ -2,38 +2,34 @@
 # Compiled and build artifacts
 *.o
 *.obj
-*.exe
-*.dll
-*.so
-*.a
 *.out
+build/
+dist/
 
 # Dependencies
+node_modules/
 venv/
 .venv/
 __pycache__/
 .mypy_cache/
 .pytest_cache/
-node_modules/
-dist/
-build/
 target/
 .gradle/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
 
 # Logs and temp files
 *.log
 *.tmp
-*.swp
-*.swo
 
 # Environment
 .env
 .env.local
 *.env.*
-
-# Editors
-.vscode/
-.idea/
 
 # System files
 .DS_Store

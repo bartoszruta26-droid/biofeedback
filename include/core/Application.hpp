@@ -20,8 +20,8 @@
 #include "tab/MeasurementTab.hpp"
 #include "tab/OutlineTab.hpp"
 
-// Forward declaration for DebugManager (defined in core namespace)
-namespace core { class DebugManager; enum class DebugManagerLogLevel; }
+// Include full DebugManager definition since we use it directly (not just forward declare)
+#include "core/DebugManager.hpp"
 
 namespace biofeedback {
 
@@ -50,6 +50,27 @@ struct ApplicationStatistics {
     std::atomic<uint64_t> unhandledExceptions{0};  ///< Unhandled exceptions caught
     std::atomic<uint64_t> dataSamplesProcessed{0}; ///< Data samples processed
     std::atomic<uint64_t> uptimeSeconds{0};        ///< Total uptime in seconds
+    
+    /**
+     * @brief Default constructor
+     */
+    ApplicationStatistics() = default;
+    
+    /**
+     * @brief Copy constructor - safely copies atomic values
+     * @param other Other statistics to copy from
+     */
+    ApplicationStatistics(const ApplicationStatistics& other)
+        : startupCount(other.startupCount.load())
+        , shutdownCount(other.shutdownCount.load())
+        , loginAttempts(other.loginAttempts.load())
+        , loginSuccesses(other.loginSuccesses.load())
+        , loginFailures(other.loginFailures.load())
+        , initializationErrors(other.initializationErrors.load())
+        , unhandledExceptions(other.unhandledExceptions.load())
+        , dataSamplesProcessed(other.dataSamplesProcessed.load())
+        , uptimeSeconds(other.uptimeSeconds.load())
+    {}
     
     /**
      * @brief Get summary of statistics as formatted string
@@ -258,7 +279,7 @@ private:
      * @param message Message to log
      * @param source Source component name
      */
-    void logMessage(DebugManagerLogLevel level, const std::string& message, const std::string& source = "") const;
+    void logMessage(core::DebugLevel level, const std::string& message, const std::string& source = "") const;
     
     /**
      * @brief Handle unhandled exception
@@ -274,7 +295,8 @@ private:
     std::unique_ptr<gui::MainWindow> m_mainWindow;
     std::unique_ptr<DataManager> m_dataManager;
     std::unique_ptr<Authentication> m_authentication;
-    std::unique_ptr<DebugManager> m_debugManager;
+    
+    // Note: DebugManager is a singleton, we don't store it as unique_ptr
     
     // Tabs - using unique_ptr for proper memory management
     std::unique_ptr<tab::PatientTab> m_patientTab;
