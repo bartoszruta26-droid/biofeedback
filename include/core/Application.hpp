@@ -52,6 +52,27 @@ struct ApplicationStatistics {
     std::atomic<uint64_t> uptimeSeconds{0};        ///< Total uptime in seconds
     
     /**
+     * @brief Default constructor
+     */
+    ApplicationStatistics() = default;
+    
+    /**
+     * @brief Copy constructor - safely copies atomic values
+     * @param other Other statistics to copy from
+     */
+    ApplicationStatistics(const ApplicationStatistics& other)
+        : startupCount(other.startupCount.load())
+        , shutdownCount(other.shutdownCount.load())
+        , loginAttempts(other.loginAttempts.load())
+        , loginSuccesses(other.loginSuccesses.load())
+        , loginFailures(other.loginFailures.load())
+        , initializationErrors(other.initializationErrors.load())
+        , unhandledExceptions(other.unhandledExceptions.load())
+        , dataSamplesProcessed(other.dataSamplesProcessed.load())
+        , uptimeSeconds(other.uptimeSeconds.load())
+    {}
+    
+    /**
      * @brief Get summary of statistics as formatted string
      * @return std::string Formatted statistics summary
      */
@@ -274,7 +295,8 @@ private:
     std::unique_ptr<gui::MainWindow> m_mainWindow;
     std::unique_ptr<DataManager> m_dataManager;
     std::unique_ptr<Authentication> m_authentication;
-    std::unique_ptr<DebugManager> m_debugManager;
+    
+    // Note: DebugManager is a singleton, we don't store it as unique_ptr
     
     // Tabs - using unique_ptr for proper memory management
     std::unique_ptr<tab::PatientTab> m_patientTab;
