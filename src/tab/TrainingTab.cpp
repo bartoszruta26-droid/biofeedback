@@ -904,8 +904,14 @@ void TrainingTab::loadNextExercise()
     const auto& ex = m_exercisePlan[m_currentExerciseIndex];
     
     // Konfiguracja gry dla tego ćwiczenia
-    if (m_gameTypeCombo->currentData().toString() != ex.gameType) {
-        // TODO: Przełączenie typu gry
+    QString currentGameType = m_gameTypeCombo->currentData().toString();
+    if (currentGameType != ex.gameType) {
+        // Przełączenie typu gry
+        int index = m_gameTypeCombo->findData(ex.gameType);
+        if (index >= 0) {
+            m_gameTypeCombo->setCurrentIndex(index);
+        }
+        reconfigureGameForExercise(ex);
     }
     
     loadNextSeries();
@@ -988,7 +994,56 @@ void TrainingTab::calculateExerciseStats()
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
     stats.completedSeries = m_currentSeriesIndex;
     stats.completedReps = m_currentRepIndex;
-    // TODO: Obliczenie pełnych statystyk
+    
+    // Obliczenie pełnych statystyk ćwiczenia
+    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
+    
+    // Średnia siła szczytowa na powtórzenie
+    if (stats.peakForcePerRep.size() > 0) {
+        double totalPeakForce = 0.0;
+        for (double peakForce : stats.peakForcePerRep) {
+            totalPeakForce += peakForce;
+        }
+        stats.averagePeakForce = totalPeakForce / static_cast<double>(stats.peakForcePerRep.size());
+    } else {
+        stats.averagePeakForce = 0.0;
+    }
+    
+    // Maksymalna siła szczytowa
+    stats.maxPeakForce = 0.0;
+    for (double peakForce : stats.peakForcePerRep) {
+        if (peakForce > stats.maxPeakForce) {
+            stats.maxPeakForce = peakForce;
+        }
+    }
+    
+    // Minimalna siła szczytowa
+    if (!stats.peakForcePerRep.empty()) {
+        stats.minPeakForce = stats.peakForcePerRep[0];
+        for (double peakForce : stats.peakForcePerRep) {
+            if (peakForce < stats.minPeakForce) {
+                stats.minPeakForce = peakForce;
+            }
+        }
+    } else {
+        stats.minPeakForce = 0.0;
+    }
+    
+    // Czas trwania ćwiczenia
+    stats.duration = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - stats.startTime
+    ).count();
+    
+    // Współczynnik wykonania (procent ukończonych serii i powtórzeń)
+    if (ex.seriesCount > 0 && ex.repsPerSeries > 0) {
+        int totalExpectedReps = ex.seriesCount * ex.repsPerSeries;
+        int actualReps = stats.completedSeries * ex.repsPerSeries + stats.completedReps;
+        stats.completionRate = static_cast<double>(actualReps) / static_cast<double>(totalExpectedReps) * 100.0;
+    } else {
+        stats.completionRate = 0.0;
+    }
+    
+    stats.isCompleted = true;
 }
 
 void TrainingTab::startRestTimer()

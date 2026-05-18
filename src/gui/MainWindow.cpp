@@ -145,12 +145,8 @@ void MainWindow::setupDebugTerminal()
     addDebugMessage(QString("Application started at %1").arg(QDateTime::currentDateTime().toString()), "INFO");
     
     // Initialize debug terminals in tabs (they will use DebugManager)
-    if (m_trainingTab) {
-        m_trainingTab->setupDebugTerminal();
-    }
-    if (m_measurementTab) {
-        m_measurementTab->setupDebugTerminal();
-    }
+    // Note: setupDebugTerminal methods removed from TrainingTab and MeasurementTab
+    // Debug functionality is now centralized in DebugManager
 }
 
 void MainWindow::setupControlPanel()

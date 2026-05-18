@@ -11,6 +11,7 @@
  */
 
 #include "core/Authentication.hpp"
+#include "core/ConfigManager.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -20,6 +21,7 @@
 #include <iomanip>
 #include <stdexcept>
 #include <mutex>
+#include <cstdlib>
 
 // ============================================================================
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
@@ -916,9 +918,22 @@ std::string Authentication::encryptPassword(const std::string& password)
     
     try {
         if (encryptionKey.empty()) {
-            // Security: For medical-grade applications, encryption key must be set externally
-            AUTH_ERROR("CRITICAL: Encryption key not set. Cannot encrypt password without a valid key.");
-            throw std::runtime_error("Encryption key not set - cannot proceed with password encryption");
+            // Pobranie klucza z zmiennej środowiskowej lub ConfigManager
+            const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
+            if (envKey && std::string(envKey).length() >= 16) {
+                encryptionKey = std::string(envKey);
+                AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
+            } else {
+                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
+                auto& config = core::ConfigManager::instance();
+                encryptionKey = config.getEncryptionKey();
+                
+                if (encryptionKey.empty() || encryptionKey.length() < 16) {
+                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
+                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
+                }
+                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
+            }
         }
 
         std::string result = Encryption::encrypt(password, encryptionKey);
@@ -958,9 +973,22 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
     
     try {
         if (encryptionKey.empty()) {
-            // Security: For medical-grade applications, encryption key must be set externally
-            AUTH_ERROR("CRITICAL: Encryption key not set. Cannot decrypt password without a valid key.");
-            throw std::runtime_error("Encryption key not set - cannot proceed with password decryption");
+            // Pobranie klucza z zmiennej środowiskowej lub ConfigManager
+            const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
+            if (envKey && std::string(envKey).length() >= 16) {
+                encryptionKey = std::string(envKey);
+                AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
+            } else {
+                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
+                auto& config = core::ConfigManager::instance();
+                encryptionKey = config.getEncryptionKey();
+                
+                if (encryptionKey.empty() || encryptionKey.length() < 16) {
+                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
+                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
+                }
+                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
+            }
         }
 
         std::string result = Encryption::decrypt(encryptedPassword, encryptionKey);

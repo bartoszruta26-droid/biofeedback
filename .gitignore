@@ -2,6 +2,10 @@
 # Compiled and build artifacts
 *.o
 *.obj
+*.exe
+*.dll
+*.so
+*.a
 *.out
 build/
 dist/
@@ -9,20 +13,17 @@ dist/
 # Dependencies
 venv/
 .venv/
+node_modules/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-env.bak/
-venv.bak/
+.mypy_cache/
+.pytest_cache/
+target/
+.gradle/
 
 # Logs and temp files
 *.log
 *.tmp
 *.swp
-*.swo
 
 # Environment
 .env
@@ -32,10 +33,8 @@ venv.bak/
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
 
-# OS generated files
+# System files
 .DS_Store
 .DS_Store?
 ._*
