@@ -110,6 +110,8 @@ void Application::shutdown()
     }
     
     // Clean up resources in reverse order of creation
+    // Note: Tabs are now deleted by Qt's parent-child mechanism when MainWindow is destroyed,
+    // but we reset unique_ptrs to prevent double-delete and maintain valid state
     m_outlineTab.reset();
     m_measurementTab.reset();
     m_patientTab.reset();
@@ -153,9 +155,16 @@ bool Application::initialize()
         
         // Initialize authentication
         m_authentication = std::make_unique<Authentication>("config/users.json");
-        // Security: In production, use secure key management (e.g., environment variable or secure vault)
+        // Security: Require encryption key from environment variable for medical-grade security
         const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-        std::string encryptionKey = envKey ? envKey : "BiofeedbackApp2024SecureKey!";
+        if (!envKey || std::string(envKey).empty()) {
+            throw std::runtime_error(
+                "CRITICAL: BIOFEEDBACK_ENCRYPTION_KEY environment variable must be set. "
+                "For medical-grade security, encryption key must be provided externally "
+                "and never hardcoded in source code."
+            );
+        }
+        std::string encryptionKey = envKey;
         m_authentication->setEncryptionKey(encryptionKey);
         
         // Check if passwords need encryption
@@ -256,30 +265,31 @@ void Application::createMainWindow()
             throw std::runtime_error("Failed to create one or more tabs");
         }
         
+        // Store raw pointers for connections before adding to QTabWidget
+        // Note: QTabWidget will take parent ownership, but Application retains unique_ptr ownership
+        // This prevents use-after-free and allows proper cleanup in shutdown()
+        auto* patientTabPtr = m_patientTab.get();
+        auto* measurementTabPtr = m_measurementTab.get();
+        auto* outlineTabPtr = m_outlineTab.get();
+        
         // Get central widget from MainWindow and add tabs
         QTabWidget* centralWidget = qobject_cast<QTabWidget*>(m_mainWindow->centralWidget());
         if (centralWidget) {
-            centralWidget->addTab(m_patientTab.get(), "Pacjenci");
-            centralWidget->addTab(m_measurementTab.get(), "Pomiary");
-            centralWidget->addTab(m_outlineTab.get(), "Scenariusze");
-            
-            // Release ownership from unique_ptr since QTabWidget now owns the tabs
-            m_patientTab.release();
-            m_measurementTab.release();
-            m_outlineTab.release();
+            centralWidget->addTab(patientTabPtr, "Pacjenci");
+            centralWidget->addTab(measurementTabPtr, "Pomiary");
+            centralWidget->addTab(outlineTabPtr, "Scenariusze");
+            // DO NOT release() - Application retains ownership for proper cleanup
+            // Qt's parent-child mechanism will handle deletion when MainWindow is destroyed
+            // but we keep unique_ptr valid to prevent nullptr dereference in setupConnections()
         } else {
             // Fallback: create a new QTabWidget if central widget is not a QTabWidget
-            QTabWidget* tabWidget = new QTabWidget();
-            tabWidget->addTab(m_patientTab.get(), "Pacjenci");
-            tabWidget->addTab(m_measurementTab.get(), "Pomiary");
-            tabWidget->addTab(m_outlineTab.get(), "Scenariusze");
+            QTabWidget* tabWidget = new QTabWidget(m_mainWindow.get());
+            tabWidget->addTab(patientTabPtr, "Pacjenci");
+            tabWidget->addTab(measurementTabPtr, "Pomiary");
+            tabWidget->addTab(outlineTabPtr, "Scenariusze");
             
             m_mainWindow->setCentralWidget(tabWidget);
-            
-            // Release ownership
-            m_patientTab.release();
-            m_measurementTab.release();
-            m_outlineTab.release();
+            // DO NOT release() - same reasoning as above
         }
         
         if (m_logger) {

@@ -19,6 +19,7 @@
 #include <chrono>
 #include <iomanip>
 #include <stdexcept>
+#include <mutex>
 
 // ============================================================================
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
@@ -706,6 +707,8 @@ bool Authentication::loadUsers()
 {
     AUTH_DEBUG(1, "Rozpoczynanie wczytywania użytkowników z pliku");
     
+    std::lock_guard<std::mutex> lock(m_mutex);
+    
     try {
         currentUser = nullptr;
 
@@ -789,6 +792,9 @@ bool Authentication::loadUsers()
 bool Authentication::saveUsers()
 {
     AUTH_DEBUG(1, "Rozpoczynanie zapisywania użytkowników do pliku");
+    
+    std::lock_guard<std::mutex> lock(m_mutex);
+    
     AUTH_DEBUG(2, "Liczba użytkowników do zapisu: " << users.size());
     
     try {
@@ -910,9 +916,9 @@ std::string Authentication::encryptPassword(const std::string& password)
     
     try {
         if (encryptionKey.empty()) {
-            // Domyślny klucz jeśli nie ustawiono
-            AUTH_WARN("Używanie domyślnego klucza szyfrującego");
-            encryptionKey = "BiofeedbackApp2024SecureKey!";
+            // Security: For medical-grade applications, encryption key must be set externally
+            AUTH_ERROR("CRITICAL: Encryption key not set. Cannot encrypt password without a valid key.");
+            throw std::runtime_error("Encryption key not set - cannot proceed with password encryption");
         }
 
         std::string result = Encryption::encrypt(password, encryptionKey);
@@ -952,8 +958,9 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
     
     try {
         if (encryptionKey.empty()) {
-            AUTH_WARN("Używanie domyślnego klucza szyfrującego");
-            encryptionKey = "BiofeedbackApp2024SecureKey!";
+            // Security: For medical-grade applications, encryption key must be set externally
+            AUTH_ERROR("CRITICAL: Encryption key not set. Cannot decrypt password without a valid key.");
+            throw std::runtime_error("Encryption key not set - cannot proceed with password decryption");
         }
 
         std::string result = Encryption::decrypt(encryptedPassword, encryptionKey);
@@ -1050,6 +1057,8 @@ bool Authentication::login(const std::string& username, const std::string& passw
     
     // Uwaga: puste hasło może być dozwolone w niektórych systemach
     
+    std::lock_guard<std::mutex> lock(m_mutex);
+    
     try {
         UserData* user = findUser(username);
 
@@ -1108,6 +1117,7 @@ void Authentication::logout()
 {
     AUTH_DEBUG(1, "Wylogowywanie użytkownika");
     
+    std::lock_guard<std::mutex> lock(m_mutex);
     currentUser = nullptr;
     
     #if DEBUG_USER_OPERATIONS
@@ -1122,6 +1132,7 @@ void Authentication::logout()
  */
 bool Authentication::isLoggedIn() const
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     return currentUser != nullptr;
 }
 
@@ -1132,6 +1143,7 @@ bool Authentication::isLoggedIn() const
  */
 std::string Authentication::getCurrentUsername() const
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     if (currentUser) {
         return currentUser->username;
     }
@@ -1145,6 +1157,7 @@ std::string Authentication::getCurrentUsername() const
  */
 std::string Authentication::getCurrentUserRole() const
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     if (currentUser) {
         return currentUser->role;
     }
@@ -1159,6 +1172,8 @@ std::string Authentication::getCurrentUserRole() const
 void Authentication::setEncryptionKey(const std::string& key)
 {
     AUTH_DEBUG(2, "Ustawianie klucza szyfrującego");
+    
+    std::lock_guard<std::mutex> lock(m_mutex);
     
     // Walidacja parametru - gentle code
     if (key.empty()) {

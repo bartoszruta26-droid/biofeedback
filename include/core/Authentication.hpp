@@ -105,6 +105,7 @@ public:
     void setEncryptionKey(const std::string& key);
 
 private:
+    mutable std::mutex m_mutex;          ///< Mutex for thread-safe access to shared state
     std::string usersFilePath;
     std::vector<UserData> users;
     std::string encryptionKey;
