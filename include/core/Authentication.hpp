@@ -131,11 +131,6 @@ private:
      * @return Odszyfrowane hasło
      */
     std::string decryptPassword(const std::string& encryptedPassword);
-    
-    /**
-     * @brief Prosta implementacja extractStringValue dla parsera JSON
-     */
-    std::string extractStringValue(const std::string& jsonContent, const std::string& key) const;
 };
 
 } // namespace biofeedback
