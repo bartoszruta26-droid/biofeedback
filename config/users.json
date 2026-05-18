@@ -1,10 +1,16 @@
 {
-    "users": [
-        {
-  "username": "admin",
-  "password": "12345",
-  "role": "administrator",
-  "encrypted": false
-}
-    ]
+  "users": [
+    {
+      "username": "admin",
+      "password": "admin123",
+      "role": "administrator",
+      "encrypted": false
+    },
+    {
+      "username": "therapist",
+      "password": "therapist123",
+      "role": "therapist",
+      "encrypted": false
+    }
+  ]
 }

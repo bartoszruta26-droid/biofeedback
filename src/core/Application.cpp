@@ -155,6 +155,7 @@ bool Application::initialize()
         
         // Initialize authentication
         m_authentication = std::make_unique<Authentication>("config/users.json");
+        
         // Security: Require encryption key from environment variable for medical-grade security
         const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
         if (!envKey || std::string(envKey).empty()) {
@@ -165,6 +166,34 @@ bool Application::initialize()
             );
         }
         std::string encryptionKey = envKey;
+        
+        // P1: Validate encryption key strength for medical-grade security
+        if (encryptionKey.length() < 16) {
+            throw std::runtime_error(
+                "CRITICAL: Encryption key must be at least 16 characters long. "
+                "Current key length: " + std::to_string(encryptionKey.length()) + ". "
+                "For medical-grade security (IEC 62304), use a strong key with minimum 16 characters "
+                "including uppercase, lowercase, numbers and special characters."
+            );
+        }
+        
+        // Optional: Check for key complexity (recommendation, not enforcement)
+        bool hasUpper = false, hasLower = false, hasDigit = false, hasSpecial = false;
+        for (char c : encryptionKey) {
+            if (std::isupper(static_cast<unsigned char>(c))) hasUpper = true;
+            else if (std::islower(static_cast<unsigned char>(c))) hasLower = true;
+            else if (std::isdigit(static_cast<unsigned char>(c))) hasDigit = true;
+            else hasSpecial = true;
+        }
+        
+        int complexityScore = (hasUpper ? 1 : 0) + (hasLower ? 1 : 0) + (hasDigit ? 1 : 0) + (hasSpecial ? 1 : 0);
+        if (complexityScore < 3) {
+            m_logger->warning(
+                "WARNING: Encryption key has low complexity (score: " + std::to_string(complexityScore) + "/4). "
+                "For optimal security, use a key with uppercase, lowercase, digits and special characters."
+            );
+        }
+        
         m_authentication->setEncryptionKey(encryptionKey);
         
         // Check if passwords need encryption
