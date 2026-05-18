@@ -27,15 +27,16 @@ LoginDialog::LoginDialog(biofeedback::Authentication& auth, QWidget *parent)
     setupUI();
     createConnections();
     
-    // Ustaw domyślny klucz szyfrujący
-    m_authentication.setEncryptionKey("BiofeedbackApp2024SecureKey!");
+    // Security: DO NOT override encryption key - it must be set once during Application initialization
+    // The Authentication object should already have the correct encryption key from environment variable
+    // Hardcoding keys here breaks medical-grade security and causes production lockouts
     
     // Wczytaj użytkowników
     m_authentication.loadUsers();
     
     // Debug logging for initialization
     core::DebugManager::instance().sendDebugMessage(
-        "LoginDialog initialized",
+        "LoginDialog initialized (encryption key preserved from Application initialization)",
         core::DebugLevel::DEBUG,
         "LoginDialog::LoginDialog"
     );
