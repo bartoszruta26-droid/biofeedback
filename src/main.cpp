@@ -26,6 +26,8 @@
 #include <exception>
 #include <stdexcept>
 #include <system_error>
+#include <unistd.h>
+#include <cstring>
 
 // ============================================================================
 // GLOBAL DEBUG FLAGS AND CONFIGURATION
@@ -69,9 +71,8 @@ namespace {
     void signalHandler(int signum) {
         // Check for recursive signal (shutdown already in progress)
         if (g_shutdown_in_progress) {
-            std::cerr << "[SIGNAL] WARNING: Recursive signal " << signum 
-                      << " received during shutdown. Forcing immediate exit..." 
-                      << std::endl;
+            const char* msg = "[SIGNAL] WARNING: Recursive signal received during shutdown. Forcing immediate exit...\n";
+            write(STDERR_FILENO, msg, strlen(msg));
             _exit(signum);  // Use _exit instead of exit for signal safety
         }
         
@@ -79,48 +80,64 @@ namespace {
         g_shutdown_in_progress = 1;
         
 #if DEBUG_SIGNALS
-        std::cout << "\n[DEBUG] ========================================" << std::endl;
-        std::cout << "[DEBUG] SIGNAL HANDLER ACTIVATED" << std::endl;
-        std::cout << "[DEBUG] Signal number: " << signum << std::endl;
+        const char* header = "\n[DEBUG] ========================================\n";
+        const char* activated = "[DEBUG] SIGNAL HANDLER ACTIVATED\n";
+        const char* footer = "[DEBUG] ========================================\n";
+        
+        write(STDOUT_FILENO, header, strlen(header));
+        write(STDOUT_FILENO, activated, strlen(activated));
         
         // Provide human-readable signal name
         switch(signum) {
-            case SIGINT:
-                std::cout << "[DEBUG] Signal type: SIGINT (Keyboard Interrupt/Ctrl+C)" << std::endl;
+            case SIGINT: {
+                const char* sigint_msg = "[DEBUG] Signal type: SIGINT (Keyboard Interrupt/Ctrl+C)\n";
+                write(STDOUT_FILENO, sigint_msg, strlen(sigint_msg));
                 break;
-            case SIGTERM:
-                std::cout << "[DEBUG] Signal type: SIGTERM (Termination Request)" << std::endl;
+            }
+            case SIGTERM: {
+                const char* sigterm_msg = "[DEBUG] Signal type: SIGTERM (Termination Request)\n";
+                write(STDOUT_FILENO, sigterm_msg, strlen(sigterm_msg));
                 break;
+            }
 #ifdef SIGQUIT
-            case SIGQUIT:
-                std::cout << "[DEBUG] Signal type: SIGQUIT (Quit Request)" << std::endl;
+            case SIGQUIT: {
+                const char* sigquit_msg = "[DEBUG] Signal type: SIGQUIT (Quit Request)\n";
+                write(STDOUT_FILENO, sigquit_msg, strlen(sigquit_msg));
                 break;
+            }
 #endif
-            default:
-                std::cout << "[DEBUG] Signal type: Unknown/Other" << std::endl;
+            default: {
+                const char* unknown_msg = "[DEBUG] Signal type: Unknown/Other\n";
+                write(STDOUT_FILENO, unknown_msg, strlen(unknown_msg));
                 break;
+            }
         }
-        std::cout << "[DEBUG] Application state: " << (g_app ? "Initialized" : "Not Initialized") << std::endl;
-        std::cout << "[DEBUG] ========================================" << std::endl;
+        
+        const char* app_state = g_app ? "[DEBUG] Application state: Initialized\n" : "[DEBUG] Application state: Not Initialized\n";
+        write(STDOUT_FILENO, app_state, strlen(app_state));
+        write(STDOUT_FILENO, footer, strlen(footer));
 #endif
         
         try {
             if (g_app) {
-                std::cout << "\n[SIGNAL] Interrupt signal (" << signum << ") received. Initiating graceful shutdown..." 
-                          << std::endl;
+                const char* interrupt_msg = "\n[SIGNAL] Interrupt signal received. Initiating graceful shutdown...\n";
+                write(STDOUT_FILENO, interrupt_msg, strlen(interrupt_msg));
                 
                 // Attempt graceful shutdown through application
                 g_app->shutdown();
                 
-                std::cout << "[SIGNAL] Graceful shutdown completed successfully." << std::endl;
+                const char* success_msg = "[SIGNAL] Graceful shutdown completed successfully.\n";
+                write(STDOUT_FILENO, success_msg, strlen(success_msg));
             } else {
-                std::cerr << "[SIGNAL] ERROR: Application pointer is null. Cannot perform graceful shutdown." 
-                          << std::endl;
+                const char* error_msg = "[SIGNAL] ERROR: Application pointer is null. Cannot perform graceful shutdown.\n";
+                write(STDERR_FILENO, error_msg, strlen(error_msg));
             }
         } catch (const std::exception& e) {
-            std::cerr << "[SIGNAL] ERROR: Exception during signal handling: " << e.what() << std::endl;
+            const char* exception_msg = "[SIGNAL] ERROR: Exception during signal handling\n";
+            write(STDERR_FILENO, exception_msg, strlen(exception_msg));
         } catch (...) {
-            std::cerr << "[SIGNAL] ERROR: Unknown exception during signal handling" << std::endl;
+            const char* unknown_exception_msg = "[SIGNAL] ERROR: Unknown exception during signal handling\n";
+            write(STDERR_FILENO, unknown_exception_msg, strlen(unknown_exception_msg));
         }
         
         // Exit with appropriate code

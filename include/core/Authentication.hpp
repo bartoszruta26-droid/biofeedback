@@ -105,6 +105,7 @@ public:
     void setEncryptionKey(const std::string& key);
 
 private:
+    mutable std::mutex m_mutex;          ///< Mutex for thread-safe access to shared state
     std::string usersFilePath;
     std::vector<UserData> users;
     std::string encryptionKey;
@@ -130,11 +131,6 @@ private:
      * @return Odszyfrowane hasło
      */
     std::string decryptPassword(const std::string& encryptedPassword);
-    
-    /**
-     * @brief Prosta implementacja extractStringValue dla parsera JSON
-     */
-    std::string extractStringValue(const std::string& jsonContent, const std::string& key) const;
 };
 
 } // namespace biofeedback
