@@ -22,12 +22,15 @@ int main(){
   writeUsersJson();
   biofeedback::Authentication auth(kUsersFile);
   expect(auth.loadUsers(),"loadUsers");
+  expect(!auth.createUser("unauthorized","strong-password-2026","therapist"),"unauthenticated account creation rejected");
   expect(auth.login("admin","legacy-admin"),"legacy admin login");
   expect(auth.requiresPasswordChange(),"legacy admin must change password");
   expect(!auth.isLoggedIn(),"session blocked pending password change");
+  expect(!auth.changePassword("short"),"short password rejected");
   expect(auth.changePassword("new-admin-password-2026"),"admin password change");
   expect(auth.isLoggedIn(),"session after password change");
   expect(!auth.login("admin","wrong-password"),"wrong password rejected");
+  expect(!auth.login("admin","legacy-admin"),"legacy password rejected after migration");
   expect(auth.login("admin","new-admin-password-2026"),"PBKDF2 login");
   expect(auth.login("doctor\"x","legacy\"pass"),"escaped username legacy login");
   expect(auth.requiresPasswordChange(),"second account migration gate");
