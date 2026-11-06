@@ -169,6 +169,7 @@ bool Application::initialize()
         
         // Initialize data manager
         m_dataManager = std::make_unique<DataManager>();
+        m_dataManager->setEncryptionKey(encryptionKey);
         
         // Store debug manager pointer for later use (we don't own it)
         // m_debugManager is not used as unique_ptr anymore since DebugManager is a singleton
