@@ -1918,6 +1918,7 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
             }, Qt::QueuedConnection);
         });
         if (!m_serialPort->isConnected()) connectToArduinoAsync();
+        else m_serialPort->startAsyncReading();
     }
 }
 
