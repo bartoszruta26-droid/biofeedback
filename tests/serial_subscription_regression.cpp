@@ -234,6 +234,47 @@ int main() {
         return 1;
     }
 
+    // Concurrent external stop and disconnect must coordinate their join
+    // ownership. Neither call may return while the reader callback is active.
+    std::atomic<bool> lifecycleCallbackEntered{false};
+    std::atomic<bool> releaseLifecycleCallback{false};
+    const auto lifecycleId = serial.subscribeDataCallback(
+        [&](const sensor::SensorData& data) {
+            if (!data.isValid || data.value != 123456) return;
+            lifecycleCallbackEntered.store(true);
+            while (!releaseLifecycleCallback.load())
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        });
+    serial.startAsyncReading();
+    if (!lifecycleId ||
+        !waitUntil(lifecycleCallbackEntered, true, std::chrono::seconds(3))) {
+        std::cerr << "Lifecycle callback was not entered\\n";
+        releaseLifecycleCallback.store(true);
+        serial.stopAsyncReading();
+        serial.disconnect();
+        emulatorRunning = false;
+        emulator.join();
+        close(masterFd);
+        return 1;
+    }
+    std::thread concurrentStop([&]() { serial.stopAsyncReading(); });
+    std::thread concurrentDisconnect([&]() { serial.disconnect(); });
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    const bool bothLifecycleCallsWaited =
+        concurrentStop.joinable() && concurrentDisconnect.joinable();
+    releaseLifecycleCallback.store(true);
+    concurrentStop.join();
+    concurrentDisconnect.join();
+    if (lifecycleId) serial.unsubscribeDataCallback(lifecycleId);
+    if (!bothLifecycleCallsWaited || serial.isConnected()) {
+        std::cerr << "Concurrent stop/disconnect did not complete safely\\n";
+        emulatorRunning = false;
+        emulator.join();
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
     // Also exercise disconnect initiated from the reader callback itself.
     serial.disconnect();
     if (!serial.connect(slaveName, 115200)) {
