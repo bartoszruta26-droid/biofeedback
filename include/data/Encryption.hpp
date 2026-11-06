@@ -117,13 +117,13 @@ namespace EncryptionTypes {
 
 /**
  * @class Encryption
- * @brief Klasa zapewniająca podstawowe funkcje kryptograficzne
+ * @brief Klasa zapewniająca funkcje kryptograficzne AES-256-GCM
  * 
  * Klasa udostępnia statyczne metody do szyfrowania i deszyfrowania danych
  * przy użyciu algorytmu XOR z kodowaniem Base64. Zawiera zaawansowane
  * mechanizmy debugowania, obsługi błędów, logowania i statystyk.
  * 
- * @note Algorytm XOR jest prostym szyfrem i nie powinien być używany
+ * @note Starsze dane XOR nie są automatycznie odszyfrowywane; wymagają jawnej migracji. Nie należy używać
  * do zabezpieczania wrażliwych danych w środowisku produkcyjnym.
  * Do celów medycznych zalecane jest użycie AES lub innych certyfikowanych
  * algorytmów.
@@ -145,7 +145,7 @@ public:
     // ========================================================================
     
     /**
-     * @brief Szyfruje dane za pomocą klucza (XOR) i koduje Base64
+     * @brief Szyfruje dane AES-256-GCM i koduje wynik Base64 z prefiksem BFENC:v1
      * 
      * Metoda przeprowadza pełny proces szyfrowania:
      * 1. Walidacja parametrów wejściowych
@@ -167,7 +167,7 @@ public:
     static std::string encrypt(const std::string& data, const std::string& key);
     
     /**
-     * @brief Dekoduje Base64 i odszyfrowuje dane za pomocą klucza (XOR)
+     * @brief Weryfikuje tag i odszyfrowuje dane AES-256-GCM
      * 
      * Metoda przeprowadza pełny proces deszyfrowania:
      * 1. Walidacja parametrów wejściowych
