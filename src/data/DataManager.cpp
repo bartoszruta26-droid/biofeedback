@@ -7,7 +7,7 @@
  * 
  * FEATURES:
  * - JSON serialization/deserialization with proper escaping
- * - Optional AES-style XOR encryption for sensitive data
+ * - Mandatory AES-256-GCM encryption for patient-linked data
  * - File existence checking and safe deletion
  * - Directory listing capabilities
  * - Import/export functionality
