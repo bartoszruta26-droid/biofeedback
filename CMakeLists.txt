@@ -27,6 +27,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 add_library(biofeedback_core STATIC
     src/core/Logger.cpp
     src/core/Authentication.cpp
+    src/core/PasswordHasher.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
 )
@@ -72,6 +73,7 @@ if(Qt5_FOUND)
         src/core/Logger.cpp
         src/core/ConfigManager.cpp
         src/core/Authentication.cpp
+        src/core/PasswordHasher.cpp
         src/gui/MainWindow.cpp
         src/gui/LoginDialog.cpp
         src/gui/GraphWidget.cpp
@@ -97,6 +99,7 @@ if(Qt5_FOUND)
         include/core/Logger.hpp
         include/core/ConfigManager.hpp
         include/core/Authentication.hpp
+        include/core/PasswordHasher.hpp
         include/gui/MainWindow.hpp
         include/gui/LoginDialog.hpp
         include/gui/GraphWidget.hpp
