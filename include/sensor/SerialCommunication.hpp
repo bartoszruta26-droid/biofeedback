@@ -260,6 +260,7 @@ public:
      * @brief Ustawia punkt kalibracyjny
      * @param rawValue Surowa wartość z czujnika
      * @param knownValue Znana wartość wzorcowa w gramach
+     * @note Pomocnicza konwersja hosta; nie stosować ponownie do skalibrowanej ramki firmware.
      */
     void setCalibrationPoint(int32_t rawValue, double knownValue);
     
@@ -275,7 +276,8 @@ public:
     /**
      * @brief Konwertuje surową wartość na skalibrowaną
      * @param rawValue Surowa wartość
-     * @return Skalibrowana wartość
+     * @return Skalibrowana wartość w gramach; NaN przed ustawieniem kalibracji hosta
+     * @note Ramka binarna firmware zawiera już skalibrowaną wartość i nie korzysta z tej metody.
      */
     double convertToCalibrated(int32_t rawValue) const;
     
