@@ -383,8 +383,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
-    , m_showRawValues(false)  // Domyślnie używamy skalibrowanej siły
     , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
+    , m_showRawValues(false)  // Domyślnie używamy skalibrowanej siły
     , m_unitSelector(nullptr)
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
