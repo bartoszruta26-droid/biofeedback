@@ -29,6 +29,7 @@
 #include <climits>
 #include <cstdio>
 #include <stdexcept>
+#include <unordered_map>
 #include <system_error>
 
 // ============================================================================
@@ -173,6 +174,9 @@ public:
     bool isCalibrated = false;
     ArduinoInfo arduinoInfo;
     DataCallback dataCallback;
+    std::mutex callbackMutex;
+    std::unordered_map<SubscriptionId, DataCallback> dataSubscribers;
+    SubscriptionId nextSubscriptionId = 1;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
     std::thread asyncThread;
@@ -627,7 +631,24 @@ SensorData SerialCommunication::readData(int timeout) {
 }
 
 bool SerialCommunication::tryReadData(SensorData& data) { data = readData(100); return data.isValid; }
-void SerialCommunication::setDataCallback(DataCallback cb) { m_impl->dataCallback = cb; }
+void SerialCommunication::setDataCallback(DataCallback cb) {
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataCallback = std::move(cb);
+}
+
+SerialCommunication::SubscriptionId SerialCommunication::subscribeDataCallback(DataCallback callback) {
+    if (!callback) return 0;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    const SubscriptionId id = m_impl->nextSubscriptionId++;
+    m_impl->dataSubscribers.emplace(id, std::move(callback));
+    return id;
+}
+
+void SerialCommunication::unsubscribeDataCallback(SubscriptionId id) {
+    if (id == 0) return;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataSubscribers.erase(id);
+}
 void SerialCommunication::setConnectionCallback(ConnectionCallback cb) { m_impl->connectionCallback = cb; }
 
 void SerialCommunication::startAsyncReading() {
@@ -636,7 +657,23 @@ void SerialCommunication::startAsyncReading() {
     m_impl->asyncThread = std::thread([this]() {
         while (m_impl->asyncReading && m_impl->isConnected) {
             SensorData d = readData(100);
-            if (d.isValid && m_impl->dataCallback) m_impl->dataCallback(d);
+            if (d.isValid) {
+                DataCallback primaryCallback;
+                std::vector<DataCallback> subscribers;
+                {
+                    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+                    primaryCallback = m_impl->dataCallback;
+                    subscribers.reserve(m_impl->dataSubscribers.size());
+                    for (const auto& entry : m_impl->dataSubscribers) {
+                        subscribers.push_back(entry.second);
+                    }
+                }
+                // Wywołania odbiorców odbywają się poza blokadą rejestru.
+                if (primaryCallback) primaryCallback(d);
+                for (const auto& callback : subscribers) {
+                    if (callback) callback(d);
+                }
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
         }
     });
