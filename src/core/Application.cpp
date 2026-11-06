@@ -167,12 +167,6 @@ bool Application::initialize()
         std::string encryptionKey = envKey;
         m_authentication->setEncryptionKey(encryptionKey);
         
-        // Check if passwords need encryption
-        int encryptedCount = m_authentication->encryptPasswordsIfNeeded(encryptionKey);
-        if (encryptedCount > 0) {
-            m_logger->info(QString("Encrypted %1 user password(s)").arg(encryptedCount).toStdString());
-        }
-        
         // Initialize data manager
         m_dataManager = std::make_unique<DataManager>();
         
