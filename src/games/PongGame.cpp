@@ -161,7 +161,7 @@ void PongGame::onSensorDataReceived(const sensor::SensorData& data) {
         return;
     }
     
-    normalizeForceValue(data.calibratedValue);
+    normalizeForceValue(data.calibratedValue * 9.81 / 1000.0);
 }
 
 void PongGame::onConnectionStatusChanged(bool connected, const std::string& message) {
