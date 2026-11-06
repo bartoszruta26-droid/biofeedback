@@ -37,7 +37,7 @@ int main() {
         });
     const auto firstId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
-            if (data.isValid && data.value == 123456 && data.calibratedValue == 123456.0) ++firstSubscriberCalls;
+            if (data.isValid && data.value == 123456 && data.calibratedValue == 42.5) ++firstSubscriberCalls;
         });
     const auto secondId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
@@ -98,6 +98,7 @@ int main() {
         }
     });
 
+    serial.setCalibrationPoint(123456, 42.5);
     serial.startAsyncReading();
     const auto waitUntil = [](const auto& value, int minimum,
                               std::chrono::milliseconds timeout) {
