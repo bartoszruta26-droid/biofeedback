@@ -257,16 +257,24 @@ int main() {
         close(masterFd);
         return 1;
     }
-    std::thread concurrentStop([&]() { serial.stopAsyncReading(); });
-    std::thread concurrentDisconnect([&]() { serial.disconnect(); });
+    std::atomic<bool> stopReturned{false};
+    std::atomic<bool> disconnectReturned{false};
+    std::thread concurrentStop([&]() {
+        serial.stopAsyncReading();
+        stopReturned.store(true);
+    });
+    std::thread concurrentDisconnect([&]() {
+        serial.disconnect();
+        disconnectReturned.store(true);
+    });
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    const bool bothLifecycleCallsWaited =
-        concurrentStop.joinable() && concurrentDisconnect.joinable();
+    const bool bothLifecycleCallsWaited = !stopReturned.load() && !disconnectReturned.load();
     releaseLifecycleCallback.store(true);
     concurrentStop.join();
     concurrentDisconnect.join();
     if (lifecycleId) serial.unsubscribeDataCallback(lifecycleId);
-    if (!bothLifecycleCallsWaited || serial.isConnected()) {
+    if (!bothLifecycleCallsWaited || !stopReturned.load() ||
+        !disconnectReturned.load() || serial.isConnected()) {
         std::cerr << "Concurrent stop/disconnect did not complete safely\\n";
         emulatorRunning = false;
         emulator.join();
