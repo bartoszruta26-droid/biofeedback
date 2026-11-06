@@ -869,7 +869,10 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
     if (!m_isTraining || m_isPaused || m_inRestPeriod || !data.isValid) return;
 
-    const double force = data.calibratedValue;
+    // SerialCommunication przekazuje calibratedValue w gramach;
+    // plan treningowy i detektor powtórzeń operują w niutonach.
+    const double calibratedGrams = data.calibratedValue;
+    const double force = calibratedGrams * 9.81 / 1000.0;
     // CRC i flaga isValid potwierdzają ramkę, ale nie gwarantują, że
     // przeliczona wartość jest skończoną liczbą (np. błędny współczynnik kalibracji).
     if (!std::isfinite(force)) {
@@ -884,8 +887,9 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     const int sampleExerciseIndex = m_currentExerciseIndex;
     games::GameEngine* const sampleGame = m_currentGame;
 
-    const QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 N")
+    const QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 g | FORCE=%3 N")
         .arg(data.value)
+        .arg(calibratedGrams, 0, 'f', 2)
         .arg(force, 0, 'f', 2);
     addDebugMessage(arduinoDebug, "ARDUINO");
 
