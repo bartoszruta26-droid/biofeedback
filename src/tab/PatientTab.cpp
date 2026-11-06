@@ -228,14 +228,24 @@ void PatientTab::createConnections()
     
     connect(m_exportButton, &QPushButton::clicked, this, &PatientTab::exportPatients);
     connect(m_importButton, &QPushButton::clicked, this, &PatientTab::importPatients);
-    connect(m_refreshButton, &QPushButton::clicked, this, [this]() {
-        // Odświeżenie widoku (możliwe rozszerzenie w przyszłości)
-    });
+    connect(m_refreshButton, &QPushButton::clicked, this, &PatientTab::refreshTable);
     
     connect(m_patientTable, &QTableWidget::itemSelectionChanged, 
             this, &PatientTab::onSelectionChanged);
     connect(m_patientTable, &QTableWidget::cellDoubleClicked,
             this, &PatientTab::onTableRowDoubleClicked);
+}
+
+void PatientTab::refreshTable()
+{
+    if (!m_patientTable) return;
+
+    // The table is the current in-memory data source. Refresh its presentation
+    // without clearing rows or changing the selected patient's identity.
+    m_patientTable->resizeRowsToContents();
+    m_patientTable->resizeColumnsToContents();
+    m_patientTable->horizontalHeader()->setStretchLastSection(true);
+    m_patientTable->viewport()->update();
 }
 
 void PatientTab::fillGenderCombo(QComboBox* combo)
