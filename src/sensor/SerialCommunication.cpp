@@ -678,6 +678,7 @@ SensorData SerialCommunication::readData(int timeout) {
                     if (cp != std::string::npos) {
                         try {
                             data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
+                            data.hasRawValue = true;
                         } catch (...) {}
                     }
                     size_t tp = resp.find("TS:", rp);
