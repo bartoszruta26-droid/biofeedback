@@ -234,6 +234,7 @@ public:
     std::atomic<bool> asyncReading{false};
     std::mutex asyncThreadMutex;
     std::thread asyncThread;
+    std::mutex openMutex; // serializes concurrent openPort/connect attempts
     bool asyncStopping = false;       // guarded by asyncThreadMutex
     bool connectionClosing = false;  // blocks new readers while disconnect closes the port
     mutable std::mutex readMutex;
@@ -388,7 +389,15 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 #endif
             disconnect();
         }
-        
+
+        // Serialize the full open sequence. A second concurrent connect must
+        // not overwrite the handle or leak the descriptor created by the first.
+        std::lock_guard<std::mutex> openLock(m_impl->openMutex);
+        if (m_impl->isConnected.load()) {
+            std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+            return m_impl->portName == portName && m_impl->baudRate == baudRate;
+        }
+
         {
             std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
             m_impl->baudRate = baudRate;
