@@ -183,7 +183,7 @@ void ForcePlotWidget::setUnit(ForceUnit unit)
 QString ForcePlotWidget::getUnitLabel() const
 {
     switch (m_unit) {
-        case ForceUnit::Kilograms: return "kg";
+        case ForceUnit::Kilograms: return "kgf";
         case ForceUnit::Raw: return "ADC";
         default: return "N";
     }
@@ -1004,7 +1004,7 @@ void MeasurementTab::updateLiveDisplay(double force)
         switch (m_currentUnit) {
             case ForceUnit::Kilograms:
                 displayForce = force / 9.81;  // N -> kgf
-                unitLabel = "kg";
+                unitLabel = "kgf";
                 std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
                 break;
             case ForceUnit::Raw:
@@ -2076,7 +2076,7 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
     
     std::cout << "[MeasurementTab] Changed force unit to: " 
               << (unit == ForceUnit::Newtons ? "Newtons" : 
-                  unit == ForceUnit::Kilograms ? "Kilograms" : "Raw") 
+                  unit == ForceUnit::Kilograms ? "Kilogram-force (kgf)" : "Raw") 
               << std::endl;
 }
 
