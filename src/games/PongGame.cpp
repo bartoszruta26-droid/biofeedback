@@ -62,11 +62,7 @@ void PongGame::initialize() {
     
     // Jeśli mamy podłączonego seriala, ustaw callbacki
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
+        subscribeSensorData();
         
         m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
             QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
@@ -75,6 +71,16 @@ void PongGame::initialize() {
                                      Q_ARG(std::string, message));
         });
     }
+}
+
+void PongGame::subscribeSensorData() {
+    if (!m_serialPort) return;
+    if (m_dataSubscriptionId) m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+    m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, "onSensorDataReceived",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(sensor::SensorData, data));
+    });
 }
 
 void PongGame::setDifficultyLevel(int level) {
@@ -94,6 +100,10 @@ int PongGame::getDifficultyLevel() const {
 }
 
 void PongGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial) {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
@@ -101,6 +111,7 @@ void PongGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> 
     
     m_serialPort = serial;
     m_ownSerial = false;
+    if (m_serialPort) subscribeSensorData();
     
     if (m_serialPort && m_serialPort->isConnected()) {
         emit serialConnected();
@@ -108,6 +119,10 @@ void PongGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> 
 }
 
 void PongGame::disconnectSerial() {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
