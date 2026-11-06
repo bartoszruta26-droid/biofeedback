@@ -82,16 +82,12 @@ int main() {
             uint8_t frame[11] = {};
             const uint32_t timestamp = 1234;
             const int32_t value = 123456;
-            std::memcpy(frame, &timestamp, sizeof(timestamp));
-            std::memcpy(frame + 4, &value, sizeof(value));
-            frame[8] = sensor::SerialCommunication::calculateCRC8(frame, 8);
-            frame[9] = 0xAA;
+            frame[0] = 0xAA;
+            std::memcpy(frame + 1, &timestamp, sizeof(timestamp));
+            std::memcpy(frame + 5, &value, sizeof(value));
+            frame[9] = sensor::SerialCommunication::calculateCRC8(frame, 9);
             frame[10] = 0x55;
             (void)write(masterFd, frame, sizeof(frame));
-            // The current parser exits its read window when it sees this marker.
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            static constexpr char responseMarker[] = "[DATA_SENT]";
-            (void)write(masterFd, responseMarker, sizeof(responseMarker) - 1);
         }
     });
 
