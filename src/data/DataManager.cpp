@@ -47,6 +47,11 @@
 #include <iomanip>
 #include <ctime>
 #include <thread>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <cerrno>
+
 
 // ============================================================================
 // DEBUG CONFIGURATION FLAGS
@@ -959,81 +964,13 @@ std::string DataManager::readFile(const std::string& filename) const {
 
 bool DataManager::writeFile(const std::string& filename, const std::string& content) {
     try {
-#if DEBUG_FILE_IO
-        logMessage(DataManagerLogLevel::DEBUG, 
-                   "Writing file: " + filename + 
-                   " (" + std::to_string(content.length()) + " bytes)", 
-                   "DataManager::writeFile");
-#endif
-        
-        int retryCount = 0;
-        while (retryCount < MAX_FILE_RETRY_COUNT) {
-            std::ofstream file(filename);
-            if (!file.is_open()) {
-                retryCount++;
-#if DEBUG_FILE_IO
-                logMessage(DataManagerLogLevel::WARNING, 
-                           "Cannot open file for writing (attempt " + 
-                           std::to_string(retryCount) + "/" + 
-                           std::to_string(MAX_FILE_RETRY_COUNT) + "): " + filename, 
-                           "DataManager::writeFile");
-#endif
-                if (retryCount < MAX_FILE_RETRY_COUNT) {
-                    statistics.retries++;
-                    std::this_thread::sleep_for(std::chrono::milliseconds(FILE_RETRY_DELAY_MS));
-                    continue;
-                }
-                logMessage(DataManagerLogLevel::ERROR, 
-                           "Failed to open file after " + 
-                           std::to_string(MAX_FILE_RETRY_COUNT) + " attempts: " + filename, 
-                           "DataManager::writeFile");
-                return false;
-            }
-            
-            file << content;
-            
-            if (!file.good()) {
-                retryCount++;
-#if DEBUG_FILE_IO
-                logMessage(DataManagerLogLevel::WARNING, 
-                           "Error writing file (attempt " + 
-                           std::to_string(retryCount) + "/" + 
-                           std::to_string(MAX_FILE_RETRY_COUNT) + "): " + filename, 
-                           "DataManager::writeFile");
-#endif
-                if (retryCount < MAX_FILE_RETRY_COUNT) {
-                    statistics.retries++;
-                    std::this_thread::sleep_for(std::chrono::milliseconds(FILE_RETRY_DELAY_MS));
-                    continue;
-                }
-                logMessage(DataManagerLogLevel::ERROR, 
-                           "Failed to write file after " + 
-                           std::to_string(MAX_FILE_RETRY_COUNT) + " attempts: " + filename, 
-                           "DataManager::writeFile");
-                return false;
-            }
-            
-            file.close();
-            
-#if DEBUG_FILE_IO
-            logMessage(DataManagerLogLevel::VERBOSE, 
-                       "File written successfully: " + filename, 
-                       "DataManager::writeFile");
-#endif
-            return true;
+        if (!writeFileAtomically(filename, content)) {
+            logMessage(DataManagerLogLevel::ERROR, "Atomic file replacement failed", "DataManager::writeFile");
+            return false;
         }
-        
-        return false;
-        
+        return true;
     } catch (const std::exception& e) {
-        logMessage(DataManagerLogLevel::ERROR, 
-                   "Exception writing file " + filename + ": " + e.what(), 
-                   "DataManager::writeFile");
-        return false;
-    } catch (...) {
-        logMessage(DataManagerLogLevel::CRITICAL, 
-                   "Unknown exception writing file: " + filename, 
-                   "DataManager::writeFile");
+        logMessage(DataManagerLogLevel::ERROR, std::string("Atomic write exception: ") + e.what(), "DataManager::writeFile");
         return false;
     }
 }
