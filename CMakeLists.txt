@@ -30,6 +30,7 @@ add_library(biofeedback_core STATIC
     src/core/Authentication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
+    src/data/LegacyXorMigration.cpp
 )
 
 target_include_directories(biofeedback_core
@@ -65,6 +66,13 @@ add_test(NAME auth_regression COMMAND auth_regression)
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 add_test(NAME data_manager_regression COMMAND data_manager_regression)
+
+# Explicit, offline-only legacy migration utility and synthetic regression.
+add_executable(biofeedback_legacy_migrate src/tools/legacy_xor_migrate.cpp)
+target_link_libraries(biofeedback_legacy_migrate PRIVATE biofeedback_core)
+add_executable(legacy_xor_migration_regression tests/legacy_xor_migration_regression.cpp)
+target_link_libraries(legacy_xor_migration_regression PRIVATE biofeedback_core)
+add_test(NAME legacy_xor_migration_regression COMMAND legacy_xor_migration_regression)
 
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
