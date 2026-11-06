@@ -99,7 +99,7 @@ int main() {
     });
 
     serial.startAsyncReading();
-    const auto waitUntil = [](const std::atomic<int>& value, int minimum,
+    const auto waitUntil = [](const auto& value, int minimum,
                               std::chrono::milliseconds timeout) {
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (std::chrono::steady_clock::now() < deadline) {
@@ -114,6 +114,7 @@ int main() {
                               waitUntil(blockingCallbackEntered, true, std::chrono::seconds(1));
     if (!bothReceived) {
         std::cerr << "Both subscribers did not receive the same sample\n";
+        releaseBlockingCallback.store(true);
         emulatorRunning = false;
         serial.stopAsyncReading();
         emulator.join();
