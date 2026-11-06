@@ -7,7 +7,7 @@ int main() {
     if (cipher.rfind("BFENC:v1:", 0) != 0) return 1;
     if (Encryption::decrypt(cipher, key) != plain) return 2;
     bool wrongKey = false;
-    try { (void)Encryption::decrypt(cipher, "different-key"); } catch (...) { wrongKey = true; }
+    try { (void)Encryption::decrypt(cipher, std::string(32, 'x')); } catch (...) { wrongKey = true; }
     if (!wrongKey) return 3;
     std::string tampered = cipher;
     const auto pos = tampered.size() - 2;
