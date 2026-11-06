@@ -177,6 +177,7 @@ public:
     DataCallback dataCallback;
     std::mutex callbackMutex;
     std::unordered_map<SubscriptionId, DataCallback> dataSubscribers;
+    std::unordered_map<SubscriptionId, ConnectionCallback> connectionSubscribers;
     SubscriptionId nextSubscriptionId = 1;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
@@ -650,7 +651,24 @@ void SerialCommunication::unsubscribeDataCallback(SubscriptionId id) {
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
     m_impl->dataSubscribers.erase(id);
 }
-void SerialCommunication::setConnectionCallback(ConnectionCallback cb) { m_impl->connectionCallback = cb; }
+void SerialCommunication::setConnectionCallback(ConnectionCallback cb) {
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->connectionCallback = std::move(cb);
+}
+
+SerialCommunication::SubscriptionId SerialCommunication::subscribeConnectionCallback(ConnectionCallback callback) {
+    if (!callback) return 0;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    const SubscriptionId id = m_impl->nextSubscriptionId++;
+    m_impl->connectionSubscribers.emplace(id, std::move(callback));
+    return id;
+}
+
+void SerialCommunication::unsubscribeConnectionCallback(SubscriptionId id) {
+    if (id == 0) return;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->connectionSubscribers.erase(id);
+}
 
 void SerialCommunication::startAsyncReading() {
     if (m_impl->asyncReading) return;
