@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <mutex>
 #include "data/Encryption.hpp"
 #include "core/ConfigManager.hpp"
 
@@ -17,6 +18,7 @@ struct UserData {
     std::string password;
     std::string role;
     bool encrypted;
+    bool mustChangePassword{false};
     
     // Konwersja do JSON
     std::string toJson() const;
@@ -67,6 +69,9 @@ public:
      * @return true jeśli logowanie powiodło się
      */
     bool login(const std::string& username, const std::string& password);
+    bool requiresPasswordChange() const;
+    bool changePassword(const std::string& newPassword);
+    bool createUser(const std::string& username, const std::string& password, const std::string& role);
     
     /**
      * @brief Wylogowuje bieżącego użytkownika
@@ -109,7 +114,7 @@ private:
     std::string usersFilePath;
     std::vector<UserData> users;
     std::string encryptionKey;
-    UserData* currentUser;
+    UserData* currentUser{nullptr};
     
     /**
      * @brief Wyszukuje użytkownika po nazwie
