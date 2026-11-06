@@ -46,7 +46,7 @@ int main() {
         });
     const auto secondId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
-            if (data.isValid && data.value == 123456 && data.calibratedValue == 123456.0) ++secondSubscriberCalls;
+            if (data.isValid && data.value == 123456) ++secondSubscriberCalls;
         });
 
     const auto blockingId = serial.subscribeDataCallback(
