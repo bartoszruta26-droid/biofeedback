@@ -190,6 +190,17 @@ int main() {
         return 1;
     }
 
+    const auto commandTimeoutStart = std::chrono::steady_clock::now();
+    (void)serial.sendCommand("NO_RESPONSE", true, 100);
+    const auto commandTimeoutElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - commandTimeoutStart).count();
+    if (commandTimeoutElapsed > 500) {
+        std::cerr << "sendCommand timeout exceeded: " << commandTimeoutElapsed << " ms\n";
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
     serial.disconnect();
     close(masterFd);
 
