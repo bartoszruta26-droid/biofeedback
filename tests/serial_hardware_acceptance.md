@@ -98,7 +98,7 @@ Testy sprzętowe oznaczyć jako NIE WYKONANO, jeżeli nie przeprowadzono ich na 
 ## Dodatkowe testy po audycie cyklu życia i kalibracji
 
 ### Kalibracja i binarna ścieżka danych
-1. Ustaw dwa punkty kalibracyjne: zero oraz znaną wartość wzorcową.
+1. Ustaw dwa punkty kalibracyjne: zero oraz znaną masę wzorcową wyrażoną w gramach.
 2. Potwierdź, że próbka binarna z poprawnym CRC zachowuje wartość surową i otrzymuje wartość skalibrowaną zgodną ze współczynnikiem.
 3. Zmień kalibrację podczas bezczynności odczytu i sprawdź, czy kolejne próbki używają nowego współczynnika.
 4. Sprawdź, czy aplikacja nie interpretuje surowych zliczeń ADC jako gramów lub niutonów bez wykonanej kalibracji.
