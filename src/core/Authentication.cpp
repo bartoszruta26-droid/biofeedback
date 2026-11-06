@@ -925,8 +925,9 @@ std::string Authentication::encryptPassword(const std::string& password)
                 AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
             } else {
                 // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
+                ConfigManager config;
+                config.load("config/config.json", false);
+                encryptionKey = config.getString("encryption.key");
                 
                 if (encryptionKey.empty() || encryptionKey.length() < 16) {
                     AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
@@ -980,8 +981,9 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
                 AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
             } else {
                 // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
+                ConfigManager config;
+                config.load("config/config.json", false);
+                encryptionKey = config.getString("encryption.key");
                 
                 if (encryptionKey.empty() || encryptionKey.length() < 16) {
                     AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
