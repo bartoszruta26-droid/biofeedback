@@ -155,6 +155,7 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     bool m_ownSerial;  // Czy gra jest właścicielem obiektu SerialCommunication
     sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
+    sensor::SerialCommunication::SubscriptionId m_connectionSubscriptionId = 0;
     
 public:
     /**
