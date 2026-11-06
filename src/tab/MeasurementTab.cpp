@@ -1938,14 +1938,15 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     // Raw ADC is diagnostic data, never a force measurement. It must not enter
     // session buffers, statistics, graphs or exports with force units.
     if (m_showRawValues) {
-        if (data.hasRawValue && m_isMeasuring)
-            addDebugMessage("Tryb RAW jest diagnostyczny; próbka ADC nie została dodana do pomiaru siły.", "INFO");
+        if (data.hasRawValue && m_lblStatus)
+            m_lblStatus->setText(QString("Status: DIAGNOSTYKA RAW ADC (%1) — PRÓBKA NIE JEST SIŁĄ").arg(data.value));
         return;
     }
 
     if (!calibratedGramsAvailable) {
-        if (m_isMeasuring)
-            addDebugMessage("Pominięto próbkę: firmware nie potwierdził kalibracji w gramach.", "WARNING");
+        if (m_isMeasuring && m_lblStatus &&
+            m_lblStatus->text() != "Status: BRAK POTWIERDZONEJ KALIBRACJI W GRAMACH")
+            m_lblStatus->setText("Status: BRAK POTWIERDZONEJ KALIBRACJI W GRAMACH");
         return;
     }
 
