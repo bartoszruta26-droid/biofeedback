@@ -23,6 +23,7 @@
 #include <mutex>
 #include <cstdlib>
 #include <vector>
+#include <limits>
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
@@ -1077,6 +1078,7 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
                 ++hashedCount;
             }
             users = stagedUsers;
+            currentUser = nullptr;
         }
 
         if (hashedCount > 0 && !saveUsers()) {
