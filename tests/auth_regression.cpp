@@ -64,6 +64,25 @@ int main()
         expect(auth.getCurrentUsername() == "doctor\"x", "odczyt username z escapowanym cudzysłowem");
         expect(auth.login("brace-user", "token-with-}-inside"), "logowanie użytkownika z '}' w haśle powinno działać");
 
+        // Invalid key must fail closed without mutating user records.
+        expect(auth.encryptPasswordsIfNeeded("short") == 0,
+               "krótki klucz powinien przerwać migrację bez zapisu");
+        expect(auth.login("admin", "admin"),
+               "odrzucona migracja nie może zmienić istniejącego hasła");
+
+        const int migrated = auth.encryptPasswordsIfNeeded("biofeedback-test-key-2026");
+        expect(migrated == 3, "migracja powinna zaszyfrować wszystkie trzy hasła");
+        std::ifstream encryptedFile(kUsersFile);
+        const std::string encryptedJson((std::istreambuf_iterator<char>(encryptedFile)),
+                                        std::istreambuf_iterator<char>());
+        expect(encryptedJson.find("\\"encrypted\\": true") != std::string::npos,
+               "zapis powinien oznaczać hasła jako zaszyfrowane");
+        expect(encryptedJson.find("\\"password\\": \\"admin\\"") == std::string::npos,
+               "plik nie może zawierać jawnego hasła admin");
+        auth.logout();
+        expect(auth.login("admin", "admin"),
+               "logowanie po migracji haseł powinno działać");
+
         auth.logout();
         expect(auth.loadUsers(), "ponowne loadUsers() po logout powinno działać");
         expect(!auth.isLoggedIn(), "loadUsers powinno resetować sesję");
