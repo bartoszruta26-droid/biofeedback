@@ -22,6 +22,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(nlohmann_json REQUIRED)
 
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
@@ -46,6 +47,7 @@ target_link_libraries(biofeedback_core
         OpenSSL::Crypto
         pthread
         Qt5::Core
+        nlohmann_json::nlohmann_json
 )
 
 # Regression targets that can be built without Qt.
@@ -58,7 +60,6 @@ target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
 if(Qt5_FOUND)
-    find_package(nlohmann_json REQUIRED)
     pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
 
     # Qt5 MOC headers
