@@ -2,6 +2,8 @@
 #include "core/DebugManager.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QFileDialog>
+#include <QFile>
+#include <QMetaObject>
 #include <QTextStream>
 #include <QDateTime>
 #include <QFont>
