@@ -299,7 +299,7 @@ void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> 
     });
     m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
         QMetaObject::invokeMethod(this, [this, connected, message]() {
-            onConnectionStatusChanged(connected, message);
+            onConnectionStatusChanged(connected, QString::fromStdString(message));
         }, Qt::QueuedConnection);
     });
 
@@ -328,10 +328,9 @@ void DebugTab::registerAsDebugReceiver()
     auto debugCallback = [this](const QString& message, const QString& type) {
         // Wywołujemy addDebugMessage w głównym wątku GUI
         if (QThread::currentThread() != this->thread()) {
-            QMetaObject::invokeMethod(this, "addDebugMessage", 
-                                      Qt::QueuedConnection,
-                                      Q_ARG(QString, message), 
-                                      Q_ARG(QString, type));
+            QMetaObject::invokeMethod(this, [this, message, type]() {
+                addDebugMessage(message, type);
+            }, Qt::QueuedConnection);
         } else {
             addDebugMessage(message, type);
         }
@@ -370,7 +369,9 @@ void DebugTab::onConnectionStatusChanged(bool connected, const QString& message)
     m_hasArduinoConnection = connected;
     
     if (connected) {
-        m_currentPort = m_serialPort ? m_serialPort->getPortName() : "Unknown";
+        m_currentPort = m_serialPort
+            ? QString::fromStdString(m_serialPort->getPortName())
+            : QStringLiteral("Unknown");
         m_baudRate = m_serialPort ? m_serialPort->getBaudRate() : 0;
         
         m_lblPortName->setText(QString("Port: %1").arg(m_currentPort));
