@@ -232,18 +232,18 @@ public:
     
     // ==================== Zapis i odczyt danych pacjenta ====================
     /**
-     * @brief Zapisuje dane pacjenta do pliku
+     * @brief Zapisuje dane pacjenta wyłącznie w postaci AES-256-GCM
      * @param patient Dane pacjenta
      * @param filename Nazwa pliku
-     * @param encrypt Czy szyfrować dane (domyślnie false)
+     * @param encrypt Parametr zachowany dla zgodności; szyfrowanie jest zawsze wymuszone
      * @return true jeśli zapis pomyślny
      */
     bool savePatientData(const PatientData& patient, const std::string& filename, bool encrypt = false);
     
     /**
-     * @brief Wczytuje dane pacjenta z pliku
+     * @brief Wczytuje dane pacjenta po obowiązkowej weryfikacji AES-256-GCM
      * @param filename Nazwa pliku
-     * @param decrypt Czy odszyfrowywać dane (domyślnie false)
+     * @param decrypt Parametr zachowany dla zgodności; deszyfrowanie jest zawsze wymuszone
      * @return Dane pacjenta (puste jeśli błąd)
      */
     PatientData loadPatientData(const std::string& filename, bool decrypt = false);
@@ -324,7 +324,7 @@ public:
      */
     std::vector<std::string> listFiles(const std::string& directory = ".") const;
     
-    // ==================== Eksport/Import nieszyfrowany JSON ====================
+    // ==================== Eksport/Import uwierzytelnionego JSON ====================
     /**
      * @brief Eksportuje dane do pliku JSON
      * @param data Dane do zapisu
