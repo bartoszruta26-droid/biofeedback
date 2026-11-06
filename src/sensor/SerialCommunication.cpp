@@ -168,6 +168,7 @@ public:
     int portHandle = -1;
     bool isConnected = false;
     int baudRate = DEFAULT_BAUD_RATE;
+    std::string portName;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
     double zeroOffset = 0.0;
@@ -336,6 +337,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         }
         
         m_impl->baudRate = baudRate;
+        m_impl->portName = portName;
         
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -456,11 +458,13 @@ void SerialCommunication::disconnect() {
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
     m_impl->portHandle = -1; m_impl->isConnected = false;
+    m_impl->portName.clear();
     notifyConnectionCallbacks(false, "Serial connection closed");
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
-std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? "Unknown" : ""; }
+std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? m_impl->portName : std::string(); }
+int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
