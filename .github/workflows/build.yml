@@ -28,7 +28,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBIOFEEDBACK_BUILD_GUI=OFF
       - name: Build
-        run: cmake --build build --parallel 2 --target auth_regression data_manager_regression serial_subscription_regression
+        run: cmake --build build --parallel 2 --target auth_regression data_manager_regression rep_detector_regression serial_subscription_regression
       - name: Run regression tests
         run: ctest --test-dir build --output-on-failure
 
