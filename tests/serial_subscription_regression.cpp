@@ -29,6 +29,7 @@ int main() {
     std::atomic<int> firstSubscriberCalls{0};
     std::atomic<int> secondSubscriberCalls{0};
     std::atomic<bool> calibratedValueValid{false};
+    std::atomic<bool> rawFlagCorrect{false};
     std::atomic<bool> blockingCallbackEntered{false};
     std::atomic<bool> releaseBlockingCallback{false};
 
@@ -42,6 +43,7 @@ int main() {
             if (data.isValid && data.value == 123456) {
                 ++firstSubscriberCalls;
                 if (std::abs(data.calibratedValue - 123456.0) < 1e-6) calibratedValueValid.store(true);
+                if (!data.hasRawValue) rawFlagCorrect.store(true);
             }
         });
     const auto secondId = serial.subscribeDataCallback(
@@ -121,7 +123,8 @@ int main() {
 
     const bool bothReceived = waitUntil(firstSubscriberCalls, 1, std::chrono::seconds(5)) &&
                               waitUntil(secondSubscriberCalls, 1, std::chrono::seconds(1)) &&
-                              waitUntil(calibratedValueValid, true, std::chrono::seconds(1));
+                              waitUntil(calibratedValueValid, true, std::chrono::seconds(1)) &&
+                              waitUntil(rawFlagCorrect, true, std::chrono::seconds(1));
     if (!bothReceived) {
         std::cerr << "Serial sample check failed: first=" << firstSubscriberCalls.load()
                   << ", second=" << secondSubscriberCalls.load()
