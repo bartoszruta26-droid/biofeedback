@@ -37,11 +37,11 @@ int main() {
         });
     const auto firstId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
-            if (data.isValid && data.value == 123456) ++firstSubscriberCalls;
+            if (data.isValid && data.value == 123456 && data.calibratedValue == 123456.0) ++firstSubscriberCalls;
         });
     const auto secondId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
-            if (data.isValid && data.value == 123456) ++secondSubscriberCalls;
+            if (data.isValid && data.value == 123456 && data.calibratedValue == 123456.0) ++secondSubscriberCalls;
         });
 
     const auto blockingId = serial.subscribeDataCallback(
@@ -156,6 +156,18 @@ int main() {
     serial.stopAsyncReading();
     emulatorRunning = false;
     emulator.join();
+
+    const auto timeoutStart = std::chrono::steady_clock::now();
+    (void)serial.readData(100);
+    const auto timeoutElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - timeoutStart).count();
+    if (timeoutElapsed > 500) {
+        std::cerr << "readData(100) exceeded its timeout: " << timeoutElapsed << " ms\n";
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
     serial.disconnect();
     close(masterFd);
 
