@@ -992,6 +992,7 @@ bool Authentication::changePassword(const std::string& newPassword)
     std::unique_lock<std::mutex> lock(m_mutex);
     if (!currentUser) return false;
     UserData* user=currentUser;
+    if (PasswordHasher::verify(newPassword, user->password)) return false;
     const auto oldHash=user->password; const bool oldEncrypted=user->encrypted; const bool oldFlag=user->mustChangePassword;
     try {
         user->password=PasswordHasher::hash(newPassword); user->encrypted=true; user->mustChangePassword=false;
