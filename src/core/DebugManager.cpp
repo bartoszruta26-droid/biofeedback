@@ -106,7 +106,7 @@ void DebugManager::sendDebugMessage(const QString& message, DebugLevel level, co
     msg.source = source;
     msg.type = type;  // Preserve the original type string
     msg.timestamp = QDateTime::currentDateTime();
-    msg.threadId = static_cast<int>(QThread::currentThreadId());
+    msg.threadId = static_cast<int>(reinterpret_cast<quintptr>(QThread::currentThreadId()) & 0x7fffffffU);
     
     logMessageInternal(msg);
 }
