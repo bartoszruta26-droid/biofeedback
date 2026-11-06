@@ -50,7 +50,7 @@ public:
      */
     void addPatient(const QString& pesel, const QString& firstName, 
                    const QString& lastName, const QDate& birthDate, 
-                   const QString& gender);
+                   const QString& gender, const QString& notes = QString());
 
     /**
      * @brief Pobiera liczbę pacjentów
