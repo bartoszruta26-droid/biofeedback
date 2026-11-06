@@ -172,8 +172,10 @@ bool migrateLegacyXorFile(const std::string& sourcePath,
     std::string newCiphertext;
     try {
         newCiphertext = Encryption::encrypt(plaintext, aesKey);
-        const std::string verification = Encryption::decrypt(newCiphertext, aesKey);
-        if (verification != plaintext) {
+        std::string verification = Encryption::decrypt(newCiphertext, aesKey);
+        const bool plaintextMatches = (verification == plaintext);
+        OPENSSL_cleanse(verification.data(), verification.size());
+        if (!plaintextMatches) {
             OPENSSL_cleanse(plaintext.data(), plaintext.size());
             error = "Weryfikacja AES-GCM nie odtworzyła dokładnie danych wejściowych"; return false;
         }
@@ -202,8 +204,12 @@ bool migrateLegacyXorFile(const std::string& sourcePath,
     std::string outputCheck;
     if (!readRegularFile(destinationPath, outputCheck, error)) return false;
     try {
-        if (Encryption::decrypt(outputCheck, aesKey).size() != plainSize) {
-            error = "Kontrola rozmiaru danych wynikowych nie powiodła się"; return false;
+        std::string finalPlaintext = Encryption::decrypt(outputCheck, aesKey);
+        const bool finalValid = finalPlaintext.size() == plainSize &&
+                                sha256Hex(finalPlaintext) == expectedPlaintextSha256;
+        OPENSSL_cleanse(finalPlaintext.data(), finalPlaintext.size());
+        if (!finalValid) {
+            error = "Końcowa kontrola zawartości pliku wynikowego nie powiodła się"; return false;
         }
     } catch (const std::exception& ex) {
         error = std::string("Końcowa kontrola szyfrogramu nie powiodła się: ") + ex.what();
