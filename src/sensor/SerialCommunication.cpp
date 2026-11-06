@@ -212,7 +212,7 @@ bool SerialCommunication::verifyCRC8(const uint8_t* data, size_t length) {
 
 class SerialCommunication::Impl {
 public:
-    int portHandle = -1;
+    std::intptr_t portHandle = -1;
     std::atomic<bool> isConnected{false};
     int baudRate = DEFAULT_BAUD_RATE;
     std::string portName;
@@ -424,7 +424,10 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         }
         COMMTIMEOUTS to{}; to.ReadIntervalTimeout = 50; to.ReadTotalTimeoutConstant = 50;
         SetCommTimeouts(h, &to);
-        m_impl->portHandle = reinterpret_cast<int>(h);
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+            m_impl->portHandle = reinterpret_cast<std::intptr_t>(h);
+        }
 #else
         int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
         if (fd < 0) { 
@@ -511,7 +514,7 @@ void SerialCommunication::disconnect() {
         wasConnected = m_impl->isConnected.load();
         if (!wasConnected) return;
 #ifdef _WIN32
-        if (m_impl->portHandle > 0)
+        if (m_impl->portHandle != -1)
             CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
 #else
         if (m_impl->portHandle >= 0) close(m_impl->portHandle);
@@ -904,6 +907,7 @@ int32_t SerialCommunication::getTimestampOffset() const {
 std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse, int timeoutMs) {
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
+    if (!m_impl->isConnected.load()) return "";
     const std::string toSend = cmd + "\n";
 #ifdef _WIN32
     DWORD written = 0;
