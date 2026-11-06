@@ -46,9 +46,16 @@ DebugTab::DebugTab(QWidget *parent)
     registerAsDebugReceiver();
 }
 
-DebugTab::~DebugTab() override
+DebugTab::~DebugTab()
 {
-    // Odłącz callback przy niszczeniu
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
     core::DebugManager::instance().unregisterDebugCallback();
 }
 
@@ -270,18 +277,30 @@ bool DebugTab::exportLogsToFile(const QString& filename)
 
 void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
-    if (m_serialPort) {
-        // Połącz sygnały SerialCommunication z slotami DebugTab
-        connect(m_serialPort.get(), &sensor::SerialCommunication::sensorDataReady,
-                this, &DebugTab::onSensorDataReceived, Qt::QueuedConnection);
-        
-        connect(m_serialPort.get(), &sensor::SerialCommunication::connectionStatusChanged,
-                this, &DebugTab::onConnectionStatusChanged, Qt::QueuedConnection);
-        
-        addDebugMessage("Połączenie z SerialCommunication nawiązane", "SERIAL");
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
     }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
+
+    m_serialPort = std::move(serial);
+    if (!m_serialPort) return;
+
+    m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, [this, data]() {
+            onSensorDataReceived(data);
+        }, Qt::QueuedConnection);
+    });
+    m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
+        QMetaObject::invokeMethod(this, [this, connected, message]() {
+            onConnectionStatusChanged(connected, message);
+        }, Qt::QueuedConnection);
+    });
+
+    addDebugMessage("Połączenie z SerialCommunication nawiązane", "SERIAL");
 }
 
 bool DebugTab::isArduinoConnected() const
