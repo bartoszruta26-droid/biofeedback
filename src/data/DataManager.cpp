@@ -240,6 +240,36 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
     return objects;
 }
 
+bool writeFileAtomically(const std::string& path, const std::string& data)
+{
+    if (path.empty()) return false;
+    std::string pattern = path + ".tmp.XXXXXX";
+    std::vector<char> temp(pattern.begin(), pattern.end());
+    temp.push_back('\0');
+    const int fd = ::mkstemp(temp.data());
+    if (fd < 0) return false;
+    const std::string tempPath(temp.data());
+    bool ok = (::fchmod(fd, S_IRUSR | S_IWUSR) == 0);
+    std::size_t offset = 0;
+    while (ok && offset < data.size()) {
+        const ssize_t written = ::write(fd, data.data() + offset, data.size() - offset);
+        if (written < 0 && errno == EINTR) continue;
+        if (written <= 0) { ok = false; break; }
+        offset += static_cast<std::size_t>(written);
+    }
+    if (ok && ::fsync(fd) != 0) ok = false;
+    if (::close(fd) != 0) ok = false;
+    if (ok && ::rename(tempPath.c_str(), path.c_str()) != 0) ok = false;
+    if (ok) {
+        const auto slash = path.find_last_of('/');
+        const std::string directory = slash == std::string::npos ? "." : (slash == 0 ? "/" : path.substr(0, slash));
+        const int dirfd = ::open(directory.c_str(), O_RDONLY | O_DIRECTORY);
+        if (dirfd >= 0) { if (::fsync(dirfd) != 0) ok = false; ::close(dirfd); }
+    }
+    if (!ok) ::unlink(tempPath.c_str());
+    return ok;
+}
+
 } // anonymous namespace
 
 // ============================================================================
