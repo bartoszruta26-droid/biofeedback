@@ -1210,11 +1210,10 @@ void Authentication::setEncryptionKey(const std::string& key)
     
     std::lock_guard<std::mutex> lock(m_mutex);
     
-    // Walidacja parametru - gentle code
-    if (key.empty()) {
-        AUTH_WARN("Próba ustawienia pustego klucza szyfrującego");
+    if (key.size() < 16) {
+        throw std::invalid_argument("Klucz szyfrujący musi mieć co najmniej 16 znaków");
     }
-    
+
     encryptionKey = key;
     
     #if DEBUG_PASSWORD_ENCRYPTION
