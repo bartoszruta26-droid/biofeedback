@@ -121,7 +121,9 @@ private:
     
     // Konfiguracja Serial
     std::shared_ptr<sensor::SerialCommunication> m_serialPort; ///< Współdzielony wskaźnik do komunikacji
-    bool m_ownSerial;                                          ///< Czy gra jest właścicielem obiektu serial
+    bool m_ownSerial;
+    sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
+    void subscribeSensorData();                                          ///< Czy gra jest właścicielem obiektu serial
     
     // Stałe fizyczne/logiczne
     const float m_paddleWidth = 15.0f;
