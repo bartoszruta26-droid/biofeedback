@@ -5,8 +5,8 @@
 #include <string>
 
 int main(int argc, char** argv) {
-    if (argc != 4) {
-        std::cerr << "Użycie: biofeedback_legacy_migrate <źródło> <wynik_BFENC> <kopia_legacy>\n"
+    if (argc != 5) {
+        std::cerr << "Użycie: biofeedback_legacy_migrate <źródło> <wynik_BFENC> <kopia_legacy> <sha256_tekstu_jawnego>\n"
                   << "Wymagane zmienne środowiskowe: BIOFEEDBACK_LEGACY_XOR_KEY oraz BIOFEEDBACK_ENCRYPTION_KEY\n";
         return 2;
     }
@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     }
     LegacyXorMigrationResult result;
     std::string error;
-    if (!migrateLegacyXorFile(argv[1], argv[2], argv[3], oldKey, newKey, result, error)) {
+    if (!migrateLegacyXorFile(argv[1], argv[2], argv[3], oldKey, newKey, argv[4], result, error)) {
         std::cerr << "Migracja nie powiodła się: " << error << "\n";
         return 1;
     }
