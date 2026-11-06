@@ -92,7 +92,7 @@ public:
     std::string getCurrentUserRole() const;
     
     /**
-     * @brief Szyfruje hasła użytkowników które nie są zaszyfrowane
+     * @brief Migruje hasła w postaci jawnej do jednokierunkowych skrótów PBKDF2-HMAC-SHA256
      * @param encryptionKey Klucz szyfrujący
      * @return liczba zaszyfrowanych haseł
      */
@@ -119,9 +119,9 @@ private:
     UserData* findUser(const std::string& username);
     
     /**
-     * @brief Szyfruje pojedyncze hasło
+     * @brief Tworzy jednokierunkowy skrót PBKDF2-HMAC-SHA256 pojedynczego hasła
      * @param password Hasło do zaszyfrowania
-     * @return Zaszyfrowane hasło
+     * @return Skrót hasła (bez możliwości odszyfrowania)
      */
     std::string encryptPassword(const std::string& password);
     
