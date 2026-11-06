@@ -257,18 +257,26 @@ int main() {
         close(masterFd);
         return 1;
     }
+    std::atomic<bool> stopStarted{false};
+    std::atomic<bool> disconnectStarted{false};
     std::atomic<bool> stopReturned{false};
     std::atomic<bool> disconnectReturned{false};
     std::thread concurrentStop([&]() {
+        stopStarted.store(true);
         serial.stopAsyncReading();
         stopReturned.store(true);
     });
     std::thread concurrentDisconnect([&]() {
+        disconnectStarted.store(true);
         serial.disconnect();
         disconnectReturned.store(true);
     });
+    const bool bothLifecycleCallsStarted =
+        waitUntil(stopStarted, true, std::chrono::seconds(2)) &&
+        waitUntil(disconnectStarted, true, std::chrono::seconds(2));
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    const bool bothLifecycleCallsWaited = !stopReturned.load() && !disconnectReturned.load();
+    const bool bothLifecycleCallsWaited =
+        bothLifecycleCallsStarted && !stopReturned.load() && !disconnectReturned.load();
     releaseLifecycleCallback.store(true);
     concurrentStop.join();
     concurrentDisconnect.join();
