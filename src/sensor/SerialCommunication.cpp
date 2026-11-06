@@ -392,7 +392,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 
         // Serialize the full open sequence. A second concurrent connect must
         // not overwrite the handle or leak the descriptor created by the first.
-        std::lock_guard<std::mutex> openLock(m_impl->openMutex);
+        std::unique_lock<std::mutex> openLock(m_impl->openMutex);
         if (m_impl->isConnected.load()) {
             std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
             return m_impl->portName == portName && m_impl->baudRate == baudRate;
@@ -504,6 +504,9 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         if (m_impl->verbose) {
             std::cout << "[SerialComm] Connected to " << portName << " at " << baudRate << " baud" << std::endl;
         }
+        // User callbacks may themselves request a reconnect; release the
+        // open-serialization mutex before invoking external code.
+        openLock.unlock();
         notifyConnectionCallbacks(true, "Connected to " + portName);
         return true;
         
