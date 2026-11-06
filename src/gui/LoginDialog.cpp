@@ -3,6 +3,8 @@
 #include <QStyle>
 #include <QFont>
 #include <QTimer>
+#include <QInputDialog>
+#include <QMessageBox>
 #include "core/DebugManager.hpp"
 
 namespace gui {
@@ -236,6 +238,17 @@ void LoginDialog::onLoginButtonClicked()
         QApplication::processEvents();
         
         if (attemptLogin(username, password)) {
+            if (m_authentication.requiresPasswordChange()) {
+                bool accepted=false;
+                const QString first=QInputDialog::getText(this,tr("Wymagana zmiana hasła"),tr("Nowe hasło (minimum 12 znaków):"),QLineEdit::Password,QString(),&accepted);
+                if(!accepted){m_authentication.logout();m_loginButton->setEnabled(true);m_cancelButton->setEnabled(true);return;}
+                bool confirmed=false;
+                const QString second=QInputDialog::getText(this,tr("Potwierdzenie hasła"),tr("Powtórz nowe hasło:"),QLineEdit::Password,QString(),&confirmed);
+                if(!confirmed||first!=second||first.size()<12||!m_authentication.changePassword(first.toStdString())){
+                    m_authentication.logout();QMessageBox::warning(this,tr("Zmiana hasła"),tr("Zmiana hasła nie powiodła się. Wymagane jest hasło o długości co najmniej 12 znaków."));
+                    m_loginButton->setEnabled(true);m_cancelButton->setEnabled(true);return;
+                }
+            }
             m_statusLabel->setText(tr("✓ Zalogowano pomyślnie!"));
             m_statusLabel->setStyleSheet("color: #27ae60; font-size: 12px;");
             m_loginSuccess = true;
