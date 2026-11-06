@@ -636,53 +636,32 @@ SensorData SerialCommunication::readData(int timeout) {
         if (rd > 0) {
             for (int i = 0; i < rd; ++i) {
                 rawData.push_back(static_cast<uint8_t>(buf[i]));
-                
-                // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
-                // followed by end markers 0xAA 0x55
-                if (rawData.size() >= 11) {
-                    // Look for end marker pattern
-                    if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
-                        // Extract binary packet (9 bytes before end markers)
-                        if (rawData.size() >= 11) {
-                            size_t packetStart = rawData.size() - 11;
-                            
-                            // Safety check - ensure we have enough data
-                            if (packetStart + 9 <= rawData.size()) {
-                                // Copy data to local buffer to avoid vector reallocation issues
-                                uint8_t packet[9];
-                                for (size_t j = 0; j < 9; ++j) {
-                                    packet[j] = rawData[packetStart + j];
-                                }
-                                
-                                // Parse binary packet: timestamp(4) + value(4) + crc(1)
-                                uint32_t timestamp;
-                                int32_t value;
-                                uint8_t crc;
-                                
-                                std::memcpy(&timestamp, packet, 4);
-                                std::memcpy(&value, packet + 4, 4);
-                                crc = packet[8];
-                                
-                                // Verify CRC
-                                if (verifyCRC8(packet, 9)) {
-                                    data.timestamp = timestamp;
-                                    data.value = value;
-                                    // The binary protocol's Force Value is calibrated and
-                                    // filtered by firmware before transmission. Treat it as
-                                    // grams, matching the text FORCE:g response; do not
-                                    // apply the host calibration a second time.
-                                    data.calibratedValue = static_cast<double>(value);
-                                    data.crc = crc;
-                                    data.isValid = true;
-                                    gotBinaryData = true;
-                                }
-                            }
-                        }
-                        break;
-                    }
+
+                // Firmware frame: 0xAA | timestamp(4) | calibrated force(4) |
+                // CRC-8(1) | 0x55. CRC covers the first 9 bytes, including sync.
+                if (rawData.size() < 11) continue;
+
+                for (std::size_t packetStart = 0;
+                     packetStart + 11 <= rawData.size(); ++packetStart) {
+                    if (rawData[packetStart] != 0xAA ||
+                        rawData[packetStart + 10] != 0x55) continue;
+
+                    uint8_t packet[10];
+                    std::copy_n(rawData.begin() + static_cast<std::ptrdiff_t>(packetStart),
+                                10, packet);
+                    if (!verifyCRC8(packet, 10)) continue;
+
+                    std::memcpy(&data.timestamp, packet + 1, sizeof(data.timestamp));
+                    std::memcpy(&data.value, packet + 5, sizeof(data.value));
+                    data.calibratedValue = static_cast<double>(data.value);
+                    data.crc = packet[9];
+                    data.isValid = true;
+                    gotBinaryData = true;
+                    break;
                 }
+                if (gotBinaryData) break;
             }
-            
+
             // Also check for text response as fallback
             std::string resp(rawData.begin(), rawData.end());
             if (!gotBinaryData && resp.find("FORCE:") != std::string::npos) {
@@ -715,9 +694,8 @@ SensorData SerialCommunication::readData(int timeout) {
                 break;
             }
             
-            if (resp.find("[DATA_SENT]") != std::string::npos && gotBinaryData) {
-                break;
-            }
+            if (gotBinaryData) break;
+            if (resp.find("[DATA_SENT]") != std::string::npos && gotBinaryData) break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
