@@ -5,6 +5,7 @@
 #include <openssl/crypto.h>
 
 #include <cerrno>
+#include <cstdint>
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
@@ -80,7 +81,9 @@ bool writeExclusiveFile(const std::string& path, const std::string& data, std::s
         if (n <= 0) { error = "Błąd zapisu pliku"; ::close(fd); ::unlink(path.c_str()); return false; }
         offset += static_cast<std::size_t>(n);
     }
-    if (::fsync(fd) != 0 || ::close(fd) != 0) {
+    const int syncResult = ::fsync(fd);
+    const int closeResult = ::close(fd);
+    if (syncResult != 0 || closeResult != 0) {
         error = "Nie udało się utrwalić pliku na dysku"; ::unlink(path.c_str()); return false;
     }
     return true;
