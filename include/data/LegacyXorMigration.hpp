@@ -18,5 +18,6 @@ bool migrateLegacyXorFile(const std::string& sourcePath,
                           const std::string& backupPath,
                           const std::string& legacyXorKey,
                           const std::string& aesKey,
+                          const std::string& expectedPlaintextSha256,
                           LegacyXorMigrationResult& result,
                           std::string& error);
