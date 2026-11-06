@@ -53,6 +53,14 @@ int main() {
         return 1;
     }
 
+    if (serial.getPortName() != slaveName || serial.getBaudRate() != 115200) {
+        std::cerr << "Serial connection metadata mismatch: port="
+                  << serial.getPortName() << ", baud=" << serial.getBaudRate() << "\n";
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
     std::atomic<bool> emulatorRunning{true};
     std::thread emulator([&]() {
         while (emulatorRunning.load()) {
