@@ -1,5 +1,4 @@
 #include "core/Authentication.hpp"
-
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -7,73 +6,40 @@
 #include <string>
 
 namespace {
-
-const char* kUsersFile = "/tmp/biofeedback_auth_regression_users.json";
-
-void writeUsersJson()
-{
-    std::ofstream out(kUsersFile);
-    out << "{\n"
-           "  \"users\": [\n"
-           "    {\n"
-           "      \"username\": \"admin\",\n"
-           "      \"password\": \"admin\",\n"
-           "      \"role\": \"administrator\",\n"
-           "      \"encrypted\": false\n"
-           "    },\n"
-           "    {\n"
-           "      \"username\": \"doctor\\\"x\",\n"
-           "      \"password\": \"p\\\\a\\\"ss\",\n"
-           "      \"role\": \"therapist\",\n"
-           "      \"encrypted\": false\n"
-           "    },\n"
-           "    {\n"
-           "      \"username\": \"brace-user\",\n"
-           "      \"password\": \"token-with-}-inside\",\n"
-           "      \"role\": \"tester\",\n"
-           "      \"encrypted\": false\n"
-           "    }\n"
-           "  ]\n"
-           "}\n";
+const char* kUsersFile="/tmp/biofeedback_auth_regression_users.json";
+void expect(bool ok,const std::string& message){if(!ok)throw std::runtime_error(message);}
+void writeUsersJson(){
+ std::ofstream out(kUsersFile);
+ out << "{\n  \"users\": [\n"
+ " {\"username\":\"admin\",\"password\":\"legacy-admin\",\"role\":\"administrator\",\"encrypted\":false},\n"
+ " {\"username\":\"doctor\\\"x\",\"password\":\"legacy\\\"pass\",\"role\":\"therapist\",\"encrypted\":false},\n"
+ " {\"username\":\"brace-user\",\"password\":\"token-with-}-inside\",\"role\":\"tester\",\"encrypted\":false}\n"
+ " ]\n}\n";
 }
-
-void expect(bool condition, const std::string& message)
-{
-    if (!condition) {
-        throw std::runtime_error(message);
-    }
 }
-
-} // namespace
-
-int main()
-{
-    try {
-        writeUsersJson();
-
-        biofeedback::Authentication auth(kUsersFile);
-        expect(auth.loadUsers(), "loadUsers() powinno się udać");
-
-        expect(auth.login("admin", "admin"), "pierwsze logowanie admin/admin powinno się udać");
-        expect(auth.isLoggedIn(), "po udanym logowaniu user powinien być zalogowany");
-
-        expect(!auth.login("admin", "zle_haslo"), "logowanie ze złym hasłem powinno się nie udać");
-        expect(!auth.isLoggedIn(), "po nieudanym logowaniu sesja powinna zostać wyczyszczona");
-
-        expect(auth.login("doctor\"x", "p\\a\"ss"), "logowanie użytkownika z escapowanymi znakami powinno działać");
-        expect(auth.getCurrentUsername() == "doctor\"x", "odczyt username z escapowanym cudzysłowem");
-        expect(auth.login("brace-user", "token-with-}-inside"), "logowanie użytkownika z '}' w haśle powinno działać");
-
-        auth.logout();
-        expect(auth.loadUsers(), "ponowne loadUsers() po logout powinno działać");
-        expect(!auth.isLoggedIn(), "loadUsers powinno resetować sesję");
-
-        std::remove(kUsersFile);
-        std::cout << "OK: auth_regression" << std::endl;
-        return 0;
-    } catch (const std::exception& ex) {
-        std::cerr << "FAIL: " << ex.what() << std::endl;
-        std::remove(kUsersFile);
-        return 1;
-    }
+int main(){
+ try{
+  writeUsersJson();
+  biofeedback::Authentication auth(kUsersFile);
+  expect(auth.loadUsers(),"loadUsers");
+  expect(auth.login("admin","legacy-admin"),"legacy admin login");
+  expect(auth.requiresPasswordChange(),"legacy admin must change password");
+  expect(!auth.isLoggedIn(),"session blocked pending password change");
+  expect(auth.changePassword("new-admin-password-2026"),"admin password change");
+  expect(auth.isLoggedIn(),"session after password change");
+  expect(!auth.login("admin","wrong-password"),"wrong password rejected");
+  expect(auth.login("admin","new-admin-password-2026"),"PBKDF2 login");
+  expect(auth.login("doctor\"x","legacy\"pass"),"escaped username legacy login");
+  expect(auth.requiresPasswordChange(),"second account migration gate");
+  expect(auth.changePassword("new-doctor-password-2026"),"second password change");
+  expect(auth.login("brace-user","token-with-}-inside"),"brace legacy login");
+  expect(auth.changePassword("new-brace-password-2026"),"third password change");
+  expect(auth.createUser("new-user","a-strong-password-2026","therapist"),"secure account creation");
+  expect(!auth.createUser("new-user","another-strong-password","therapist"),"duplicate user rejected");
+  auth.logout();
+  expect(auth.loadUsers(),"reload migrated accounts");
+  expect(auth.login("new-user","a-strong-password-2026"),"new account PBKDF2 login");
+  std::remove(kUsersFile);
+  std::cout<<"OK: auth_regression\n"; return 0;
+ }catch(const std::exception& e){std::cerr<<"FAIL: "<<e.what()<<"\n";std::remove(kUsersFile);return 1;}
 }
