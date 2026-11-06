@@ -873,7 +873,8 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     // exclusively when firmware explicitly identifies calibrated grams.
     if (data.calibrationStatus != sensor::CalibrationStatus::Calibrated ||
         data.unit != sensor::MeasurementUnit::Grams) {
-        addDebugMessage("Pominięto próbkę treningową: jednostka lub stan kalibracji firmware jest niepotwierdzony.", "WARNING");
+        // Reject the sample silently here; this callback may run at sensor
+        // frequency, so logging every rejected frame would flood the UI log.
         return;
     }
 
