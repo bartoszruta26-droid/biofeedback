@@ -160,6 +160,7 @@ public slots:
 private slots:
     void onSelectionChanged();
     void onTableRowDoubleClicked(int row, int column);
+    void refreshTable();
 
 private:
     void setupUI();
