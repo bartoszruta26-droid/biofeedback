@@ -39,6 +39,19 @@ void writeUsersJson(const char* path)
            "}\n";
 }
 
+void writeFlaggedPlaintextJson(const char* path)
+{
+    std::ofstream out(path);
+    out << "{\n"
+           "  \"users\": [{\n"
+           "    \"username\": \"legacy-flagged\",\n"
+           "    \"password\": \"old-secret\",\n"
+           "    \"role\": \"tester\",\n"
+           "    \"encrypted\": true\n"
+           "  }]\n"
+           "}\n";
+}
+
 void expect(bool condition, const std::string& message)
 {
     if (!condition) throw std::runtime_error(message);
@@ -97,6 +110,16 @@ int main()
         expect(legacyAuth.login("admin", "admin"), "logowanie legacy powinno zadziałać");
         expect(readAll(kLegacyUsersFile).find(R"("password": "pbkdf2_sha256$600000$)") != std::string::npos,
                "udane logowanie legacy musi trwale podnieść hasło do PBKDF2");
+
+        // The former fail-open migration could set encrypted=true while
+        // retaining plaintext. A successful exact match must upgrade it too.
+        writeFlaggedPlaintextJson(kLegacyUsersFile);
+        biofeedback::Authentication flaggedLegacyAuth(kLegacyUsersFile);
+        expect(flaggedLegacyAuth.loadUsers(), "wczytanie starego rekordu z błędną flagą powinno się udać");
+        expect(flaggedLegacyAuth.login("legacy-flagged", "old-secret"),
+               "stary rekord plaintext z encrypted=true powinien zostać zmigrowany");
+        expect(readAll(kLegacyUsersFile).find(R"("password": "pbkdf2_sha256$600000$)") != std::string::npos,
+               "rekord plaintext z błędną flagą musi zostać zapisany jako PBKDF2");
 
         std::remove(kUsersFile);
         std::remove(kLegacyUsersFile);
