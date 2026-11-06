@@ -498,6 +498,10 @@ void MarioGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication>
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
     }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
@@ -531,7 +535,11 @@ void MarioGame::setupSensorListening()
         }, Qt::QueuedConnection);
     });
     
-    m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
+    if (m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
+    m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
         QMetaObject::invokeMethod(this, [this, connected, message]() {
             if (!connected) {
                 // Można wyświetlić komunikat o utracie połączenia
@@ -547,6 +555,10 @@ void MarioGame::cleanupSensorConnection()
     if (m_serialPort && m_dataSubscriptionId) {
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
+    }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
     }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
