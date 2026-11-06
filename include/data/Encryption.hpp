@@ -44,7 +44,7 @@ namespace EncryptionTypes {
         std::atomic<uint64_t> keyGenerations{0};         ///< Liczba generowań kluczy
         std::atomic<uint64_t> base64EncodeOps{0};        ///< Liczba kodowań Base64
         std::atomic<uint64_t> base64DecodeOps{0};        ///< Liczba dekodowań Base64
-        std::atomic<uint64_t> xorOperations{0};          ///< Liczba operacji XOR
+        std::atomic<uint64_t> xorOperations{0};          ///< Historyczny licznik; nowy kod nie wykonuje XOR
         std::atomic<uint64_t> validationErrors{0};       ///< Liczba błędów walidacji
         std::atomic<uint64_t> memoryErrors{0};           ///< Liczba błędów alokacji pamięci
         std::atomic<uint64_t> otherErrors{0};            ///< Liczba innych błędów
@@ -120,13 +120,11 @@ namespace EncryptionTypes {
  * @brief Klasa zapewniająca funkcje kryptograficzne AES-256-GCM
  * 
  * Klasa udostępnia statyczne metody do szyfrowania i deszyfrowania danych
- * przy użyciu algorytmu XOR z kodowaniem Base64. Zawiera zaawansowane
+ * przy użyciu uwierzytelnionego szyfrowania AES-256-GCM. Zawiera zaawansowane
  * mechanizmy debugowania, obsługi błędów, logowania i statystyk.
  * 
- * @note Starsze dane XOR nie są automatycznie odszyfrowywane; wymagają jawnej migracji. Nie należy używać
- * do zabezpieczania wrażliwych danych w środowisku produkcyjnym.
- * Do celów medycznych zalecane jest użycie AES lub innych certyfikowanych
- * algorytmów.
+ * @note Starsze szyfrogramy XOR nie są automatycznie odszyfrowywane; wymagają jawnej migracji.
+ * @note Klucz wejściowy powinien być losowym, tajnym materiałem o wysokiej entropii.
  * 
  * @threadsafe Tak, wszystkie metody są thread-safe
  */
@@ -171,10 +169,9 @@ public:
      * 
      * Metoda przeprowadza pełny proces deszyfrowania:
      * 1. Walidacja parametrów wejściowych
-     * 2. Dekodowanie Base64 do wektora bajtów
-     * 3. Deszyfrowanie XOR z użyciem podanego klucza
-     * 4. Konwersja wyniku do stringa
-     * 5. Logowanie operacji i aktualizacja statystyk
+     * 2. Dekodowanie wersjonowanego payloadu Base64
+     * 3. Weryfikacja tagu uwierzytelniającego AES-GCM
+     * 4. Deszyfrowanie i konwersja wyniku do stringa
      * 
      * @param encryptedData Dane zaszyfrowane w formacie Base64
      * @param key Klucz szyfrujący (ten sam co użyty do szyfrowania)
