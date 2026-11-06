@@ -5,6 +5,7 @@
 #include <QTextStream>
 #include <QDateTime>
 #include <QFont>
+#include <utility>
 #include <QScrollBar>
 #include <QMessageBox>
 #include <QThread>
