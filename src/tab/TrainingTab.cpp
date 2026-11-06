@@ -169,7 +169,7 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_gameBox(nullptr)
     , m_currentGame(nullptr)
     , m_currentGameType()
-    , m_repInProgress(false)
+    , m_repDetector()
     , m_restForNextExercise(false)
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
@@ -184,7 +184,6 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_restTimeRemaining(0)
     , m_inRestPeriod(false)
     , m_currentForce(0.0)
-    , m_peakForceInRep(0.0)
     , m_serialPort(nullptr)
 {
     setupUI();
@@ -513,7 +512,7 @@ void TrainingTab::startTraining()
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
-    m_repInProgress = false;
+    m_repDetector.reset();
     m_restForNextExercise = false;
 
     // Inicjalizacja pierwszego ćwiczenia i sprawdzenie, czy istnieje obsługiwana gra.
@@ -544,7 +543,7 @@ void TrainingTab::stopTraining()
     m_isPaused = false;
     m_inRestPeriod = false;
     m_restForNextExercise = false;
-    m_repInProgress = false;
+    m_repDetector.reset();
     
     // Zatrzymanie gry jeśli aktywna
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -907,16 +906,9 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     // Histereza: rozpoczęcie powtórzenia przy 80% celu i zakończenie
     // po zejściu do 40%. Przejście stanu następuje po obsłużeniu próbki
     // przez grę przypisaną do ćwiczenia, z którego próbka pochodzi.
-    if (target > 0.0 && sampleExerciseIndex == m_currentExerciseIndex) {
-        if (!m_repInProgress && force >= target * 0.80) {
-            m_repInProgress = true;
-            m_peakForceInRep = force;
-        } else if (m_repInProgress) {
-            m_peakForceInRep = qMax(m_peakForceInRep, force);
-            if (force <= target * 0.40) {
-                completeCurrentRepetition();
-            }
-        }
+    if (target > 0.0 && sampleExerciseIndex == m_currentExerciseIndex &&
+        m_repDetector.update(force, target)) {
+        completeCurrentRepetition(m_repDetector.peakForce());
     }
 }
 
@@ -1024,8 +1016,7 @@ void TrainingTab::loadNextSeries()
     if (m_currentSeriesIndex >= exercise.seriesCount) return;
 
     m_currentRepIndex = 0;
-    m_peakForceInRep = 0.0;
-    m_repInProgress = false;
+    m_repDetector.reset();
 
     if (m_currentGame) {
         m_currentGame->reset();
@@ -1034,19 +1025,18 @@ void TrainingTab::loadNextSeries()
     updateProgressWidgets();
 }
 
-void TrainingTab::completeCurrentRepetition()
+void TrainingTab::completeCurrentRepetition(double peakForce)
 {
-    if (!m_repInProgress || m_currentExerciseIndex < 0 ||
+    if (m_currentExerciseIndex < 0 ||
         m_currentExerciseIndex >= m_exercisePlan.size() ||
         m_currentExerciseIndex >= m_exerciseStats.size()) return;
 
     const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-    m_repInProgress = false;
 
-    stats.maxPeakForce = qMax(stats.maxPeakForce, m_peakForceInRep);
+    stats.maxPeakForce = qMax(stats.maxPeakForce, peakForce);
     const int previousCount = stats.completedReps;
-    stats.avgPeakForce = (stats.avgPeakForce * previousCount + m_peakForceInRep) /
+    stats.avgPeakForce = (stats.avgPeakForce * previousCount + peakForce) /
                          static_cast<double>(previousCount + 1);
     stats.completedReps++;
 
@@ -1092,7 +1082,6 @@ void TrainingTab::completeCurrentRepetition()
             loadNextSeries();
         }
     } else {
-        m_peakForceInRep = 0.0;
         updateProgressWidgets();
     }
 }
