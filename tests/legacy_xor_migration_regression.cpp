@@ -16,6 +16,13 @@ std::string readAll(const std::string& p) {
     std::ifstream f(p, std::ios::binary);
     return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 }
+std::string sha256Hex(const std::string& data) {
+    unsigned char digest[EVP_MAX_MD_SIZE]{}; unsigned int n=0;
+    if(EVP_Digest(data.data(),data.size(),digest,&n,EVP_sha256(),nullptr)!=1 || n!=32) throw std::runtime_error("sha256");
+    static const char* hex="0123456789abcdef"; std::string out;
+    for(unsigned int i=0;i<n;++i){out+=hex[digest[i]>>4];out+=hex[digest[i]&15];}
+    return out;
+}
 std::string legacyEncode(const std::string& plain, const std::string& key) {
     std::vector<unsigned char> bytes(plain.size());
     for (std::size_t i=0;i<plain.size();++i) bytes[i]=static_cast<unsigned char>(plain[i]) ^ static_cast<unsigned char>(key[i%key.size()]);
@@ -32,18 +39,21 @@ int main() {
         const std::string aesKey="regression-key-material-32-bytes";
         const std::string plain="{\"patientId\":\"synthetic-001\",\"note\":\"test-only\"}";
         const std::string legacy=legacyEncode(plain,oldKey);
+        LegacyXorMigrationResult wrongKeyResult; std::string wrongKeyError;
+        expect(!migrateLegacyXorFile(src,base+".wrong",base+".wrongbak","wrong-xor-key",aesKey,sha256Hex(plain),wrongKeyResult,wrongKeyError),
+               "wrong legacy key must fail independent plaintext hash check");
         { std::ofstream f(src,std::ios::binary); f<<legacy; }
         LegacyXorMigrationResult result; std::string error;
-        expect(migrateLegacyXorFile(src,dst,bak,oldKey,aesKey,result,error), "migration failed: "+error);
+        expect(migrateLegacyXorFile(src,dst,bak,oldKey,aesKey,sha256Hex(plain),result,error), "migration failed: "+error);
         expect(readAll(src)==legacy, "source was modified");
         expect(readAll(bak)==legacy, "backup differs from source");
         expect(Encryption::decrypt(readAll(dst),aesKey)==plain, "AES-GCM plaintext mismatch");
 
         LegacyXorMigrationResult second; error.clear();
-        expect(!migrateLegacyXorFile(src,dst,bak,oldKey,aesKey,second,error), "existing output must not be overwritten");
+        expect(!migrateLegacyXorFile(src,dst,bak,oldKey,aesKey,sha256Hex(plain),second,error), "existing output must not be overwritten");
         const std::string corrupt=base+".corrupt";
         { std::ofstream f(corrupt); f<<"%%%"; }
-        expect(!migrateLegacyXorFile(corrupt,base+".badout",base+".badbak",oldKey,aesKey,second,error),
+        expect(!migrateLegacyXorFile(corrupt,base+".badout",base+".badbak",oldKey,aesKey,sha256Hex(plain),second,error),
                "invalid Base64 must be rejected");
         std::remove(corrupt.c_str()); std::remove((base+".badout").c_str()); std::remove((base+".badbak").c_str());
         std::remove(src.c_str()); std::remove(dst.c_str()); std::remove(bak.c_str());
