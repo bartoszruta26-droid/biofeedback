@@ -6,9 +6,10 @@ To narzędzie jest jednorazowym, ręcznie uruchamianym migratorem poza ścieżk�
 
 ## Interfejs
 
-Program `biofeedback_legacy_migrate <źródło> <wynik_BFENC> <kopia_legacy>` wymaga:
+Program `biofeedback_legacy_migrate <źródło> <wynik_BFENC> <kopia_legacy> <sha256_tekstu_jawnego>` wymaga:
 - `BIOFEEDBACK_LEGACY_XOR_KEY` — dokładny stary klucz w postaci bajtów tekstu;
-- `BIOFEEDBACK_ENCRYPTION_KEY` — nowy tajny materiał kluczowy, minimum 32 bajty.
+- `BIOFEEDBACK_ENCRYPTION_KEY` — nowy tajny materiał kluczowy, minimum 32 bajty;
+- niezależnie ustalony SHA-256 tekstu jawnego (64 małe znaki hex), przekazany jako ostatni argument.
 
 Klucze są pobierane ze środowiska, nie z argumentów procesu. Nie należy wpisywać ich do powłoki w sposób pozostawiający historię poleceń. W systemie docelowym należy użyć bezpiecznego menedżera sekretów lub kontrolowanego mechanizmu uruchomieniowego.
 
@@ -37,6 +38,6 @@ Klucze są pobierane ze środowiska, nie z argumentów procesu. Nie należy wpis
 
 ## Ograniczenia
 
-Migrator nie rozpoznaje automatycznie schematów JSON ani nie potwierdza poprawności domenowej dokumentacji pacjenta. Nie ustala, czy wybrany stary klucz jest właściwy na podstawie tagu uwierzytelniającego — XOR/Base64 nie zapewnia uwierzytelnienia. Weryfikacja kryptograficzna AES-GCM potwierdza nowy plik względem nowego klucza, ale poprawność starego tekstu jawnego wymaga walidacji semantycznej i porównania z wiarygodnym źródłem.
+Migrator nie rozpoznaje automatycznie schematów JSON ani nie potwierdza poprawności domenowej dokumentacji pacjenta. XOR/Base64 nie zapewnia uwierzytelnienia, dlatego sam round-trip AES-GCM nie dowodzi poprawności starego klucza. Migrator wymaga niezależnego SHA-256 tekstu jawnego, uzyskanego z wiarygodnej kopii lub zatwierdzonego źródła. Bez tego kontrola nie przejdzie. Dodatkowo wymagana jest walidacja semantyczna rekordów.
 
 Nie uruchamiać na rzeczywistych danych pacjentów przed niezależnym przeglądem kodu, próbą odtworzenia kopii i walidacją na kopii rzeczywistych danych.
