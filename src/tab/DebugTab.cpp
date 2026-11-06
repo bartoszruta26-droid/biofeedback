@@ -442,8 +442,18 @@ void DebugTab::updateConnectionStatus(bool connected)
         // Aktualizuj ostatnie dane
         if (m_lastSensorData.isValid) {
             m_lblLastDataTime->setText(QString("Ostatnie dane: %1").arg(m_lastDataTime.toString("HH:mm:ss")));
-            m_lblRawValue->setText(QString("Wartość surowa: %1").arg(m_lastSensorData.value));
-            m_lblCalibratedValue->setText(QString("Wartość skalibrowana: %.2f N").arg(m_lastSensorData.calibratedValue));
+            m_lblRawValue->setText(m_lastSensorData.hasRawValue
+                ? QString("Wartość surowa ADC: %1").arg(m_lastSensorData.value)
+                : QStringLiteral("Wartość surowa ADC: niedostępna"));
+            if (std::isfinite(m_lastSensorData.calibratedValue)) {
+                const double forceN = m_lastSensorData.calibratedValue * 9.81 / 1000.0;
+                m_lblCalibratedValue->setText(
+                    QString("Skalibrowana siła: %1 g (%2 N)")
+                        .arg(m_lastSensorData.calibratedValue, 0, 'f', 2)
+                        .arg(forceN, 0, 'f', 2));
+            } else {
+                m_lblCalibratedValue->setText("Skalibrowana siła: brak kalibracji");
+            }
         }
     } else {
         m_lblConnectionStatus->setText(tr("🔴 Rozłączony"));
