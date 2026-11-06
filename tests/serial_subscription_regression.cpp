@@ -28,7 +28,7 @@ int main() {
     std::atomic<int> disconnectedEvents{0};
     std::atomic<int> firstSubscriberCalls{0};
     std::atomic<int> secondSubscriberCalls{0};
-    std::atomic<bool> calibratedValueValid{false};
+    std::atomic<bool> unknownUnitAndCalibrationCorrect{false};
     std::atomic<bool> rawFlagCorrect{false};
     std::atomic<bool> blockingCallbackEntered{false};
     std::atomic<bool> releaseBlockingCallback{false};
@@ -42,7 +42,10 @@ int main() {
         [&](const sensor::SensorData& data) {
             if (data.isValid && data.value == 123456) {
                 ++firstSubscriberCalls;
-                if (std::abs(data.calibratedValue - 123456.0) < 1e-6) calibratedValueValid.store(true);
+                if (std::isnan(data.calibratedValue) &&
+                    data.unit == sensor::MeasurementUnit::Unknown &&
+                    data.calibrationStatus == sensor::CalibrationStatus::Unknown)
+                    unknownUnitAndCalibrationCorrect.store(true);
                 if (!data.hasRawValue) rawFlagCorrect.store(true);
             }
         });
@@ -126,13 +129,13 @@ int main() {
 
     const bool bothReceived = waitUntil(firstSubscriberCalls, 1, std::chrono::seconds(5)) &&
                               waitUntil(secondSubscriberCalls, 1, std::chrono::seconds(1)) &&
-                              waitUntil(calibratedValueValid, true, std::chrono::seconds(1)) &&
+                              waitUntil(unknownUnitAndCalibrationCorrect, true, std::chrono::seconds(1)) &&
                               waitUntil(rawFlagCorrect, true, std::chrono::seconds(1));
     if (!bothReceived) {
         std::cerr << "Serial sample check failed: first=" << firstSubscriberCalls.load()
                   << ", second=" << secondSubscriberCalls.load()
                   << ", callbackEntered=" << blockingCallbackEntered.load()
-                  << ", calibrated=" << calibratedValueValid.load() << "\\n";
+                  << ", unknownUnitAndCalibration=" << unknownUnitAndCalibrationCorrect.load() << "\\n";
         releaseBlockingCallback.store(true);
         emulatorRunning = false;
         serial.stopAsyncReading();
