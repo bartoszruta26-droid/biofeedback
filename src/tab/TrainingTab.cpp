@@ -866,9 +866,9 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     m_currentForce = force;
     
     // Dodaj dane z Arduino do terminala debugowania
-    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
+    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 N")
         .arg(data.value)
-        .arg(data.calibratedValue);
+        .arg(data.calibratedValue, 0, 'f', 2);
     addDebugMessage(arduinoDebug, "ARDUINO");
     
     // Powtórzenie: rozpoczęcie przy 80% siły docelowej, zakończenie
