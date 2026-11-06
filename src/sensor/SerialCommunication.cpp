@@ -962,6 +962,13 @@ void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
 bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight) {
     if (!m_impl->isConnected || rawSpan == rawZero ||
         !std::isfinite(knownWeight) || knownWeight <= 0.0) return false;
+
+    // A new calibration attempt invalidates the previous firmware confirmation.
+    // Only a fresh explicit acknowledgement may restore the Calibrated state.
+    {
+        std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+        m_impl->firmwareCalibrationConfirmed = false;
+    }
     const std::string response = sendCommand("CAL:" + std::to_string(knownWeight), true);
     if (response.find("Calibrated!") == std::string::npos) return false;
 
