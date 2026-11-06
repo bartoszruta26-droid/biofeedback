@@ -8,6 +8,7 @@
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "core/DebugManager.hpp"
 #include <QApplication>
 #include <QSettings>
 #include <QDateTime>
@@ -168,7 +169,10 @@ void MainWindow::setupControlPanel()
 
 void MainWindow::addDebugMessage(const QString& message, const QString& type)
 {
-    if (!m_debugTerminal) return;
+    if (!m_debugTerminal) {
+        core::DebugManager::instance().sendDebugMessage(message, type);
+        return;
+    }
     
     QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
     QString coloredMessage;
@@ -203,6 +207,10 @@ void MainWindow::addDebugMessage(const QString& message, const QString& type)
 
 void MainWindow::clearDebugTerminal()
 {
+    if (m_debugTab) {
+        m_debugTab->clearTerminal();
+        return;
+    }
     if (m_debugTerminal) {
         m_debugTerminal->clear();
         addDebugMessage("Debug terminal cleared", "INFO");
