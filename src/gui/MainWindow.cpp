@@ -7,6 +7,9 @@
 #include "tab/DebugTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
+#include "games/PongGame.hpp"
+#include "games/FlappyBirdGame.hpp"
+#include "games/MarioGame.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
 #include <QApplication>
@@ -402,6 +405,30 @@ void MainWindow::createConnections()
     
     connect(m_outlineTab, &tab::OutlineTab::gameFinished,
             this, &MainWindow::onGameFinished);
+
+    // TrainingTab requests a game by stable type ID. The widget is parented
+    // to TrainingTab, which owns its lifetime; the Outline game path remains separate.
+    connect(m_trainingTab, &tab::TrainingTab::gameTypeRequested, this,
+            [this](const QString& gameType) {
+        if (!m_trainingTab) return;
+
+        games::GameEngine* game = nullptr;
+        if (gameType == "pong") {
+            game = new games::PongGame(m_trainingTab);
+        } else if (gameType == "flappy") {
+            game = new games::FlappyBirdGame(m_trainingTab);
+        } else if (gameType == "mario") {
+            game = new games::MarioGame(m_trainingTab);
+        } else if (gameType == "sin" || gameType == "sin_game") {
+            game = new games::SinGame(m_trainingTab);
+        }
+
+        if (!game) {
+            addDebugMessage(QString("Nieobsługiwany typ gry treningowej: %1").arg(gameType), "ERROR");
+            return;
+        }
+        m_trainingTab->setGameEngine(game, gameType);
+    });
     
     // GraphWidget is now managed by MeasurementTab - no need for tab change handling here
 }
