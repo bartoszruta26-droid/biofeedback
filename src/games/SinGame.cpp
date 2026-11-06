@@ -45,15 +45,6 @@ void SinGame::initialize() {
         subscribeSensorData();
         subscribeConnectionStatus();
     }
-        subscribeSensorData();
-        
-        m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
-            QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(bool, connected),
-                                     Q_ARG(std::string, message));
-        });
-    }
 }
 
 void SinGame::subscribeSensorData() {
@@ -102,6 +93,10 @@ void SinGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> s
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
     }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
     // Rozłącz poprzednie jeśli istnieje i byliśmy właścicielem
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
@@ -124,10 +119,6 @@ void SinGame::disconnectSerial() {
     if (m_serialPort && m_dataSubscriptionId) {
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
-    }
-    if (m_serialPort && m_connectionSubscriptionId) {
-        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
-        m_connectionSubscriptionId = 0;
     }
     if (m_serialPort && m_connectionSubscriptionId) {
         m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
