@@ -239,10 +239,6 @@ private:
     void reconfigureGameForExercise(const TrainingExercise& exercise);
     void completeCurrentRepetition();
     void loadNextSeries();
-    void loadNextRep();
-    void checkExerciseCompletion();
-    void calculateExerciseStats();
-    void startRestTimer();
     void updateRestDisplay();
     
     // Komponenty UI
