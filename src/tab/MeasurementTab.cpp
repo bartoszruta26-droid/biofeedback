@@ -1936,9 +1936,9 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         m_lastSensorData = data;
         
         // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
-        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2f g")
+        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 g")
             .arg(data.value)
-            .arg(data.calibratedValue);
+            .arg(data.calibratedValue, 0, 'f', 2);
         addDebugMessage(arduinoDebug, "ARDUINO");
         
         if (m_isMeasuring) {
