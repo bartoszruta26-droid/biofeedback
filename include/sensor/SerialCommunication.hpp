@@ -122,6 +122,7 @@ public:
      * @return Nazwa portu lub pusty string jeśli niepołączony
      */
     std::string getPortName() const;
+    int getBaudRate() const;
 
     // ==================== Identyfikacja ====================
     
