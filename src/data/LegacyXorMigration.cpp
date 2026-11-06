@@ -6,6 +6,7 @@
 
 #include <cerrno>
 #include <cstdint>
+#include <cstdlib>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
