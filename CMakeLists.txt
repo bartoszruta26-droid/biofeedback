@@ -67,7 +67,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         tests/serial_subscription_regression.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
+        include/core/DebugManager.hpp
     )
+    set_target_properties(serial_subscription_regression PROPERTIES AUTOMOC ON)
     target_include_directories(serial_subscription_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
     target_link_libraries(serial_subscription_regression PRIVATE Qt5::Core pthread util)
 endif()
