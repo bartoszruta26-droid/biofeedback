@@ -165,7 +165,6 @@ bool Application::initialize()
             );
         }
         std::string encryptionKey = envKey;
-        m_authentication->setEncryptionKey(encryptionKey);
         
         // Initialize data manager
         m_dataManager = std::make_unique<DataManager>();
