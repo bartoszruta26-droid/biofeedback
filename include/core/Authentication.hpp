@@ -7,8 +7,6 @@
 #include <sstream>
 #include <iostream>
 #include <mutex>
-#include "data/Encryption.hpp"
-#include "core/ConfigManager.hpp"
 
 namespace biofeedback {
 
@@ -103,17 +101,12 @@ public:
      */
     int encryptPasswordsIfNeeded(const std::string& encryptionKey);
     
-    /**
-     * @brief Ustawia klucz szyfrujący
-     * @param key Klucz szyfrujący
-     */
-    void setEncryptionKey(const std::string& key);
+
 
 private:
     mutable std::mutex m_mutex;          ///< Mutex for thread-safe access to shared state
     std::string usersFilePath;
     std::vector<UserData> users;
-    std::string encryptionKey;
     UserData* currentUser{nullptr};
     
     /**
