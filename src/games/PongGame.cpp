@@ -64,15 +64,6 @@ void PongGame::initialize() {
         subscribeSensorData();
         subscribeConnectionStatus();
     }
-        subscribeSensorData();
-        
-        m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
-            QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(bool, connected),
-                                     Q_ARG(std::string, message));
-        });
-    }
 }
 
 void PongGame::subscribeSensorData() {
