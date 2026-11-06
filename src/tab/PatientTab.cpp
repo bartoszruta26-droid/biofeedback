@@ -267,6 +267,7 @@ void PatientTab::createConnections()
         m_birthDateEdit->setDate(QDate::currentDate().addYears(-18));
         m_genderCombo->setCurrentIndex(0);
         m_isEditMode = false;
+        m_addButton->setText(tr("Dodaj"));
         m_addButton->setEnabled(true);
     });
     
@@ -482,9 +483,10 @@ bool PatientTab::importFromCSV(const QString& filename)
 
 void PatientTab::openAddPatientDialog()
 {
-    m_isEditMode = false;
-    m_addButton->setText(tr("Dodaj"));
-    
+    // Ten sam przycisk zapisuje nowy rekord albo zatwierdza edycję.
+    // Nie resetujemy m_isEditMode: stan ustawia editSelectedPatient()
+    // i pozostaje aktywny do chwili zapisania lub wyczyszczenia formularza.
+
     // Walidacja danych
     QString pesel = m_peselEdit->text().trimmed();
     QString firstName = m_firstNameEdit->text().trimmed();
