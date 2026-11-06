@@ -93,14 +93,14 @@ public:
     
     /**
      * @brief Migruje hasła w postaci jawnej do jednokierunkowych skrótów PBKDF2-HMAC-SHA256
-     * @param encryptionKey Klucz szyfrujący
-     * @return liczba zaszyfrowanych haseł
+     * @param encryptionKey Klucz legacy XOR, potrzebny wyłącznie do odczytu starych rekordów
+     * @return liczba haseł zapisanych jako skróty PBKDF2
      */
     int encryptPasswordsIfNeeded(const std::string& encryptionKey);
     
     /**
-     * @brief Ustawia klucz szyfrujący
-     * @param key Klucz szyfrujący
+     * @brief Ustawia klucz zgodności dla starych rekordów XOR
+     * @param key Klucz legacy (co najmniej 16 znaków)
      */
     void setEncryptionKey(const std::string& key);
 
