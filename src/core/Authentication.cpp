@@ -23,6 +23,10 @@
 #include <stdexcept>
 #include <mutex>
 #include <cstdlib>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <cerrno>
 
 // ============================================================================
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
@@ -584,6 +588,19 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
     }
 }
 
+bool writeUsersAtomically(const std::string& path,const std::string& content)
+{
+    if(path.empty())return false;
+    std::string temp=path+".tmp.XXXXXX";std::vector<char> n(temp.begin(),temp.end());n.push_back('\\0');
+    int fd=::mkstemp(n.data());if(fd<0)return false;const std::string tmp(n.data());
+    bool ok=(::fchmod(fd,S_IRUSR|S_IWUSR)==0);std::size_t pos=0;
+    while(ok&&pos<content.size()){ssize_t w=::write(fd,content.data()+pos,content.size()-pos);if(w<0&&errno==EINTR)continue;if(w<=0){ok=false;break;}pos+=static_cast<std::size_t>(w);}
+    if(ok&&::fsync(fd)!=0)ok=false;if(::close(fd)!=0)ok=false;
+    if(ok&&::rename(tmp.c_str(),path.c_str())!=0)ok=false;
+    if(ok){auto slash=path.find_last_of('/');std::string dir=slash==std::string::npos?".":(slash==0?"/":path.substr(0,slash));int d=::open(dir.c_str(),O_RDONLY|O_DIRECTORY);if(d>=0){if(::fsync(d)!=0)ok=false;::close(d);}}
+    if(!ok)::unlink(tmp.c_str());return ok;
+}
+
 } // namespace
 
 // ============================================================================
@@ -796,65 +813,19 @@ bool Authentication::loadUsers()
  */
 bool Authentication::saveUsers()
 {
-    AUTH_DEBUG(1, "Rozpoczynanie zapisywania użytkowników do pliku");
-    
     std::lock_guard<std::mutex> lock(m_mutex);
-    
-    AUTH_DEBUG(2, "Liczba użytkowników do zapisu: " << users.size());
-    
+    if (usersFilePath.empty()) return false;
     try {
-        // Sprawdzenie czy ścieżka nie jest pusta
-        if (usersFilePath.empty()) {
-            AUTH_ERROR("Pusta ścieżka do pliku użytkowników");
-            return false;
+        std::ostringstream output;
+        output << "{\\n    \\"users\\": [\\n";
+        for (std::size_t i=0;i<users.size();++i) {
+            output << "        " << users[i].toJson();
+            if (i+1<users.size()) output << ",";
+            output << "\\n";
         }
-
-        std::ofstream file(usersFilePath);
-        if (!file.is_open()) {
-            AUTH_ERROR("Nie można zapisać do pliku użytkowników: " << usersFilePath);
-            return false;
-        }
-        
-        #if DEBUG_FILE_OPERATIONS
-        AUTH_DEBUG(2, "Plik otwarty do zapisu: " << usersFilePath);
-        #endif
-
-        file << "{\n    \"users\": [\n";
-
-        for (size_t i = 0; i < users.size(); ++i) {
-            try {
-                file << "        " << users[i].toJson();
-                if (i < users.size() - 1) {
-                    file << ",";
-                }
-                file << "\n";
-            } catch (const std::exception& e) {
-                AUTH_WARN("Błąd podczas zapisywania użytkownika #" << i << ": " << e.what());
-                // Kontynuujemy z następnym użytkownikiem (gentle code)
-            }
-        }
-
-        file << "    ]\n}\n";
-        
-        if (!file.good()) {
-            AUTH_ERROR("Błąd podczas zapisywania do pliku");
-            file.close();
-            return false;
-        }
-        
-        file.close();
-
-        AUTH_DEBUG(1, "Zapisano " << users.size() << " użytkowników");
-        return true;
-        
-    } catch (const std::ios_base::failure& e) {
-        AUTH_ERROR("Błąd I/O podczas zapisywania pliku: " << e.what());
-        return false;
-    } catch (const std::bad_alloc& e) {
-        AUTH_ERROR("Błąd alokacji pamięci podczas zapisywania użytkowników: " << e.what());
-        return false;
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas zapisywania użytkowników: " << e.what());
+        output << "    ]\\n}\\n";
+        return writeUsersAtomically(usersFilePath, output.str());
+    } catch (...) {
         return false;
     }
 }
