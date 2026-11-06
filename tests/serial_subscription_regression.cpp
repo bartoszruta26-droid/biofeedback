@@ -72,6 +72,7 @@ int main() {
 
     std::atomic<bool> emulatorRunning{true};
     std::thread emulator([&]() {
+        int responseCount = 0;
         while (emulatorRunning.load()) {
             pollfd pfd{masterFd, POLLIN, 0};
             const int ready = poll(&pfd, 1, 100);
@@ -89,6 +90,8 @@ int main() {
             std::memcpy(frame + 5, &value, sizeof(value));
             frame[9] = sensor::SerialCommunication::calculateCRC8(frame, 9);
             frame[10] = 0x55;
+            // First response has a deliberately corrupted CRC; parser must skip it.
+            if (responseCount++ == 0) frame[9] ^= 0xFF;
             (void)write(masterFd, frame, sizeof(frame));
         }
     });
