@@ -56,11 +56,7 @@ void FlappyBirdGame::initialize() {
     
     // Jeśli mamy podłączonego seriala, ustaw callbacki
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
+        subscribeSensorData();
         
         m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
             QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
@@ -69,6 +65,16 @@ void FlappyBirdGame::initialize() {
                                      Q_ARG(std::string, message));
         });
     }
+}
+
+void FlappyBirdGame::subscribeSensorData() {
+    if (!m_serialPort) return;
+    if (m_dataSubscriptionId) m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+    m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, "onSensorDataReceived",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(sensor::SensorData, data));
+    });
 }
 
 void FlappyBirdGame::setDifficultyLevel(int level) {
@@ -136,6 +142,10 @@ float FlappyBirdGame::getGameSpeed() const {
 }
 
 void FlappyBirdGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial) {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
@@ -143,6 +153,7 @@ void FlappyBirdGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
     
     m_serialPort = serial;
     m_ownSerial = false;
+    if (m_serialPort) subscribeSensorData();
     
     if (m_serialPort && m_serialPort->isConnected()) {
         emit serialConnected();
@@ -150,6 +161,10 @@ void FlappyBirdGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
 }
 
 void FlappyBirdGame::disconnectSerial() {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
