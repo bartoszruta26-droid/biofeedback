@@ -157,7 +157,7 @@ bool PongGame::isSerialConnected() const {
 }
 
 void PongGame::onSensorDataReceived(const sensor::SensorData& data) {
-    if (!data.isValid) {
+    if (!data.isValid || !std::isfinite(data.calibratedValue)) {
         return;
     }
     
