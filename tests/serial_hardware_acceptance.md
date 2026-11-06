@@ -102,8 +102,9 @@ Protokół binarny zgodny z dokumentacją firmware ma 11 bajtów:
 `0xAA | timestamp[4] | forceValue[4] | CRC-8[1] | 0x55`.
 CRC-8 obejmuje bajty 0–8, łącznie z bajtem synchronizacyjnym. Pole `forceValue` jest wynikiem kalibracji i filtracji wykonanej w firmware; aplikacja nie skaluje go ponownie.
 1. Wykonaj tare i kalibrację firmware'u dwoma punktami: zero oraz znana masa wzorcowa wyrażona w gramach.
-2. Potwierdź, że pole Force Value w ramce binarnej jest już skalibrowane i filtrowane przez firmware; parser zachowuje tę wartość bez ponownego skalowania.
-3. Porównaj wartość z ramki binarnej z odpowiedzią tekstową FORCE:g dla tego samego obciążenia.
+2. Dla obecnej ramki 11-bajtowej potwierdź, że host oznacza jednostkę i stan kalibracji jako UNKNOWN; poprawna CRC nie może dopuścić próbki do obliczeń siły ani treningu.
+3. Przed użyciem binarnej wartości w treningu wymagaj wersjonowanego kontraktu firmware określającego jednostkę oraz jawny status kalibracji; porównaj wynik z masami wzorcowymi i niezależnym przyrządem.
+4. Jeżeli używany jest tekstowy format FORCE:<wartość>g, potwierdź odpowiedź na polecenie CAL i sprawdź, że dopiero po potwierdzeniu próbki mają status Calibrated oraz jednostkę Grams.
 4. Osobno sprawdź pomocniczą konwersję hosta `setCalibrationPoint()/convertToCalibrated()` dla źródeł, które rzeczywiście dostarczają surowe ADC.
 5. Potwierdź, że konfiguracja protokołu jawnie rozróżnia dane surowe i skalibrowane, aby uniknąć podwójnej kalibracji lub interpretacji ADC jako gramów.
 
