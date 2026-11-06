@@ -41,12 +41,10 @@ void SinGame::initialize() {
     m_phase = 0.0;
     m_isHit = false;
     
-    // Jeśli mamy podłączonego seriala, upewnijmy się że callbacki są ustawione
     if (m_serialPort) {
-        if (m_connectionSubscriptionId) {
-            m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
-            m_connectionSubscriptionId = 0;
-        }
+        subscribeSensorData();
+        subscribeConnectionStatus();
+    }
         subscribeSensorData();
         
         m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
@@ -65,6 +63,20 @@ void SinGame::subscribeSensorData() {
         QMetaObject::invokeMethod(this, "onSensorDataReceived",
                                   Qt::QueuedConnection,
                                   Q_ARG(sensor::SensorData, data));
+    });
+}
+
+void SinGame::subscribeConnectionStatus() {
+    if (!m_serialPort) return;
+    if (m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
+    m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
+        QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
+                                  Qt::QueuedConnection,
+                                  Q_ARG(bool, connected),
+                                  Q_ARG(std::string, message));
     });
 }
 
@@ -98,7 +110,10 @@ void SinGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> s
     
     m_serialPort = serial;
     m_ownSerial = false; // Nie jesteśmy właścicielem, tylko użytkownikiem
-    if (m_serialPort) subscribeSensorData();
+    if (m_serialPort) {
+        subscribeSensorData();
+        subscribeConnectionStatus();
+    }
     
     if (m_serialPort && m_serialPort->isConnected()) {
         emit serialConnected();
@@ -109,6 +124,10 @@ void SinGame::disconnectSerial() {
     if (m_serialPort && m_dataSubscriptionId) {
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
+    }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
     }
     if (m_serialPort && m_connectionSubscriptionId) {
         m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
