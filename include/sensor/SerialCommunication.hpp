@@ -6,6 +6,7 @@
 #include <chrono>
 #include <functional>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <map>
 
@@ -15,17 +16,32 @@
 namespace sensor {
 
 /**
- * @brief Struktura reprezentująca dane z czujnika
+ * Status kalibracji i jednostka są niezależne od poprawności ramki/CRC.
+ * UNKNOWN oznacza, że firmware nie przekazał wiarygodnej informacji.
+ */
+enum class CalibrationStatus { Unknown, NotCalibrated, Calibrated, Error };
+enum class MeasurementUnit { Unknown, RawAdcCounts, Grams, Newtons };
+
+/**
+ * @brief Struktura reprezentująca dane z czujnika.
+ * isValid oznacza wyłącznie poprawność ramki/protokołu, nie kalibrację.
  */
 struct SensorData {
     uint32_t timestamp;      ///< Timestamp w milisekundach
-    int32_t value;           ///< Wartość z ramki; binarna jest już skalibrowana
-    bool hasRawValue;        ///< Czy value zawiera surowe ADC
-    double calibratedValue;  ///< Wartość po kalibracji, w gramach
+    int32_t value;           ///< Pole surowe/transportowe; interpretować zgodnie z hasRawValue i unit
+    bool hasRawValue;        ///< Czy value zawiera surowe zliczenia ADC
+    double calibratedValue;  ///< Wartość skalibrowana; NaN, jeśli niepotwierdzona
+    MeasurementUnit unit;    ///< Jednostka calibratedValue
+    CalibrationStatus calibrationStatus; ///< Stan kalibracji zgłoszony/potwierdzony przez firmware
     uint8_t crc;             ///< Suma kontrolna CRC
-    bool isValid;            ///< Flagi poprawności danych
-    
-    SensorData() : timestamp(0), value(0), hasRawValue(false), calibratedValue(0.0), crc(0), isValid(false) {}
+    bool isValid;            ///< Poprawność ramki, niezależnie od kalibracji
+
+    SensorData()
+        : timestamp(0), value(0), hasRawValue(false),
+          calibratedValue(std::numeric_limits<double>::quiet_NaN()),
+          unit(MeasurementUnit::Unknown),
+          calibrationStatus(CalibrationStatus::Unknown),
+          crc(0), isValid(false) {}
 };
 
 /**
