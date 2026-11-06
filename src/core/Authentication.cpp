@@ -902,7 +902,7 @@ UserData* Authentication::findUser(const std::string& username)
  * @brief Szyfruje hasło za pomocą klucza
  * 
  * @param password Hasło do zaszyfrowania
- * @return Zaszyfrowane hasło lub oryginalne jeśli błąd
+ * @return Zaszyfrowane hasło; przy błędzie zgłasza wyjątek (fail-closed)
  */
 std::string Authentication::encryptPassword(const std::string& password)
 {
@@ -926,7 +926,9 @@ std::string Authentication::encryptPassword(const std::string& password)
             } else {
                 // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
                 ConfigManager config;
-                config.load("config/config.json", false);
+                if (!config.load("config/config.json", false)) {
+                    throw std::runtime_error("Nie można wczytać konfiguracji klucza szyfrującego");
+                }
                 encryptionKey = config.getString("encryption.key");
                 
                 if (encryptionKey.empty() || encryptionKey.length() < 16) {
@@ -950,7 +952,7 @@ std::string Authentication::encryptPassword(const std::string& password)
         return password;  // Gentle code: zwracamy oryginał
     } catch (const std::exception& e) {
         AUTH_ERROR("Błąd szyfrowania hasła: " << e.what());
-        return password;  // Gentle code: zwracamy oryginał zamiast rzucać wyjątek
+        throw std::runtime_error("Szyfrowanie hasła nie powiodło się");
     }
 }
 
@@ -982,7 +984,9 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
             } else {
                 // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
                 ConfigManager config;
-                config.load("config/config.json", false);
+                if (!config.load("config/config.json", false)) {
+                    throw std::runtime_error("Nie można wczytać konfiguracji klucza szyfrującego");
+                }
                 encryptionKey = config.getString("encryption.key");
                 
                 if (encryptionKey.empty() || encryptionKey.length() < 16) {
@@ -1018,52 +1022,53 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
  */
 int Authentication::encryptPasswordsIfNeeded(const std::string& key)
 {
-    AUTH_DEBUG(1, "Rozpoczynanie szyfrowania haseł");
-    
-    // Walidacja parametru
-    if (key.empty()) {
-        AUTH_ERROR("Klucz szyfrujący jest pusty");
+    if (key.size() < 16) {
+        AUTH_ERROR("Klucz szyfrujący musi mieć co najmniej 16 znaków");
         return 0;
     }
-    
+
+    std::vector<UserData> originalUsers;
+    std::vector<UserData> stagedUsers;
+    std::string previousKey;
     int encryptedCount = 0;
-    
+
     try {
-        encryptionKey = key;
-        AUTH_DEBUG(2, "Ustawiono klucz szyfrujący");
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            originalUsers = users;
+            stagedUsers = users;
+            previousKey = encryptionKey;
+            encryptionKey = key;
 
-        for (auto& user : users) {
-            try {
-                if (!user.encrypted && !user.password.empty()) {
-                    // Zaszyfruj hasło
-                    user.password = encryptPassword(user.password);
-                    user.encrypted = true;
-                    encryptedCount++;
-                    
-                    #if DEBUG_PASSWORD_ENCRYPTION
-                    // Security: Do not log raw username - use redacted form
-                    AUTH_DEBUG(2, "Zaszyfrowano hasło dla użytkownika: [REDACTED] (length: " << user.username.length() << ")");
-                    #endif
+            for (auto& user : stagedUsers) {
+                if (user.encrypted || user.password.empty()) continue;
+                // encryptPassword throws on every failure. Never mark plaintext as encrypted.
+                user.password = encryptPassword(user.password);
+                if (user.password.empty()) {
+                    throw std::runtime_error("Szyfrowanie zwróciło pusty wynik");
                 }
-            } catch (const std::exception& e) {
-                // Security: Do not log raw username in error message
-                AUTH_WARN("Błąd podczas szyfrowania hasła dla użytkownika: [REDACTED]: " << e.what());
-                // Kontynuujemy z następnym użytkownikiem (gentle code)
+                user.encrypted = true;
+                ++encryptedCount;
             }
+
+            users = stagedUsers;
         }
 
-        // Zapisz zaktualizowane dane
-        if (encryptedCount > 0) {
-            AUTH_DEBUG(2, "Zapisywanie zaktualizowanych danych użytkowników");
-            saveUsers();
+        if (encryptedCount > 0 && !saveUsers()) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            users = std::move(originalUsers);
+            encryptionKey = std::move(previousKey);
+            AUTH_ERROR("Nie udało się trwale zapisać zaszyfrowanych haseł; przywrócono stan pamięci");
+            return 0;
         }
 
-        AUTH_DEBUG(1, "Zaszyfrowano " << encryptedCount << " haseł");
         return encryptedCount;
-        
     } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas szyfrowania haseł: " << e.what());
-        return encryptedCount;  // Zwracamy to co udało się zrobić
+        std::lock_guard<std::mutex> lock(m_mutex);
+        users = std::move(originalUsers);
+        encryptionKey = std::move(previousKey);
+        AUTH_ERROR("Migracja haseł przerwana; nie zapisano częściowego wyniku: " << e.what());
+        return 0;
     }
 }
 
