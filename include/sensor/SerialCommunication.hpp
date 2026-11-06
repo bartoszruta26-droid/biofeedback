@@ -176,6 +176,8 @@ public:
     /** Rejestruje niezależnego odbiorcę próbek. */
     SubscriptionId subscribeDataCallback(DataCallback callback);
     void unsubscribeDataCallback(SubscriptionId id);
+    SubscriptionId subscribeConnectionCallback(ConnectionCallback callback);
+    void unsubscribeConnectionCallback(SubscriptionId id);
     
     /**
      * @brief Rejestruje callback dla zmian statusu połączenia
