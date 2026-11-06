@@ -11,6 +11,7 @@ This change set introduces password hashing, authenticated encryption, atomic pe
 - Password verification uses constant-time digest comparison.
 - A legacy plaintext account is migrated on its first successful login. The migrated account is marked \`mustChangePassword\`; the GUI blocks completion of login until a new password of at least 12 characters is chosen and persisted.
 - New account creation is restricted to an authenticated administrator and requires a password of at least 12 characters.
+- The forced password change rejects reuse of the compromised legacy password.
 - Legacy reversible XOR-encrypted password records are rejected. There is no automatic XOR fallback.
 - \`config/users.json\` is not modified by this code change alone. The first successful legacy login writes the PBKDF2 migration atomically.
 
@@ -40,4 +41,4 @@ This change set introduces password hashing, authenticated encryption, atomic pe
 
 Regression tests were added for PBKDF2 hashing/verification, legacy account migration and forced password change, account creation, AES-GCM round-trip, wrong-key rejection, tag tampering, legacy-format rejection, fail-closed patient writes, encrypted exercise results and training plans, encrypted JSON export/import, and an RLIMIT_FSIZE-induced partial-write failure that verifies preservation of the previous destination.
 
-The tests have not yet been executed in this change session. CI is configured to build the core regression targets and run CTest. Hardware, penetration, crash-injection and filesystem-specific durability testing remain outstanding.
+GitHub Actions passed on code head `412357e39d960e22d9d34e758fc0cd5a32e8e3dd`: the `LoginDialog.cpp` compile-only target and all four CTest suites (`encryption_regression`, `password_hasher_regression`, `auth_regression`, `data_manager_regression`) built and passed. The complete Qt GUI executable was not built because the CI environment does not install Qt Charts; the changed login-dialog translation unit was compiled independently. Hardware, penetration, process-crash and filesystem-specific durability testing remain outstanding.
