@@ -988,8 +988,9 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
  */
 int Authentication::encryptPasswordsIfNeeded(const std::string& key)
 {
-    (void)key; // Password hashes do not use an application encryption key.
-    std::lock_guard<std::mutex> lock(m_mutex);
+    (void)key;
+    std::unique_lock<std::mutex> lock(m_mutex);
+    const auto previous = users;
     int migrated = 0;
     try {
         for (auto& user : users) {
@@ -1000,11 +1001,19 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
                 ++migrated;
             }
         }
-        if (migrated > 0) {
-            // Save outside this lock in the next explicit migration operation.
-        }
-        return migrated;
-    } catch (...) { return migrated; }
+        if (migrated == 0) return 0;
+        lock.unlock();
+        if (saveUsers()) return migrated;
+        lock.lock();
+        users = previous;
+        currentUser = nullptr;
+        return 0;
+    } catch (...) {
+        if (!lock.owns_lock()) lock.lock();
+        users = previous;
+        currentUser = nullptr;
+        return 0;
+    }
 }
 
 /**
@@ -1095,7 +1104,12 @@ bool Authentication::createUser(const std::string& username,const std::string& p
 {
     if(username.empty()||password.size()<12||role.empty())return false;
     UserData user{}; user.username=username; user.password=PasswordHasher::hash(password); user.role=role; user.encrypted=true; user.mustChangePassword=false;
-    { std::lock_guard<std::mutex> lock(m_mutex); if(findUser(username))return false; users.push_back(user); }
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if(!currentUser || currentUser->mustChangePassword || currentUser->role!="administrator")return false;
+        if(findUser(username))return false;
+        users.push_back(user);
+    }
     if(saveUsers())return true;
     std::lock_guard<std::mutex> lock(m_mutex);
     users.erase(std::remove_if(users.begin(),users.end(),[&](const UserData& u){return u.username==username;}),users.end());
