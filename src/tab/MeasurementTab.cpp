@@ -1936,7 +1936,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         m_lastSensorData = data;
         
         // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
-        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
+        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2f g")
             .arg(data.value)
             .arg(data.calibratedValue);
         addDebugMessage(arduinoDebug, "ARDUINO");
@@ -2054,8 +2054,8 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 {
     switch (targetUnit) {
         case ForceUnit::Kilograms:
-            // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
-            return newtons * 1000.0 / 9.81;  // zwraca w kg
+            // 1 kgf = 9.81 N.
+            return newtons / 9.81;  // kgf
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
             return newtons;
