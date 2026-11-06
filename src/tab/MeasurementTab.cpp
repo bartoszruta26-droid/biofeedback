@@ -500,13 +500,13 @@ void MeasurementTab::setupUI()
         m_showRawValues = checked;
         if (checked) {
             m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
-            m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+            m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
         } else {
             m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
             m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
         }
     });
-    m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
     m_btnReset->setMinimumHeight(35);
@@ -794,7 +794,7 @@ void MeasurementTab::stopMeasurement()
     
     // Odblokuj przycisk zmiany trybu Raw/Calibrated po zatrzymaniu pomiaru
     if (m_btnToggleRaw) {
-        m_btnToggleRaw->setEnabled(true);
+        m_btnToggleRaw->setEnabled(m_lastSensorData.hasRawValue);
         // Przywróć odpowiedni kolor w zależności od stanu
         if (m_showRawValues) {
             m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
@@ -988,7 +988,7 @@ void MeasurementTab::updateLiveDisplay(double force)
     if (!m_showRawValues) {
         switch (m_currentUnit) {
             case ForceUnit::Kilograms:
-                displayForce = force * 1000.0 / 9.81;  // N -> kg
+                displayForce = force / 9.81;  // N -> kgf
                 unitLabel = "kg";
                 std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
                 break;
@@ -1889,57 +1889,41 @@ bool MeasurementTab::isArduinoConnected() const
 
 void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
-    std::cout << "[DEBUG] onSensorDataReceived: data.isValid=" << data.isValid 
-              << " m_isMeasuring=" << m_isMeasuring << std::endl;
-    
-    if (data.isValid) {
-        if (m_isMeasuring && !m_showRawValues && !std::isfinite(data.calibratedValue)) {
-            addDebugMessage("Pominięto próbkę: czujnik nie ma aktywnej kalibracji.", "WARNING");
-            return;
-        }
-        m_lastSensorData = data;
-        
-        // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
-        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2")
-            .arg(data.value)
-            .arg(std::isfinite(data.calibratedValue)
-                     ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
-                     : QStringLiteral("N/A (brak kalibracji)"));
-        addDebugMessage(arduinoDebug, "ARDUINO");
-        
-        if (m_isMeasuring) {
-            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-            
-            std::cout << "[DEBUG] onSensorDataReceived: showRawValues=" << m_showRawValues 
-                      << " currentUnit=" << static_cast<int>(m_currentUnit) 
-                      << " valueToUse(before conversion)=" << valueToUse << std::endl;
-            
-            // Jeśli nie używamy wartości surowej, przelicz na wybraną jednostkę
-            if (!m_showRawValues && m_currentUnit != ForceUnit::Newtons) {
-                // calibratedValue jest w gramach, przelicz na Newtony najpierw
-                double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
-                valueToUse = convertForce(forceInNewtons, m_currentUnit);
-                std::cout << "[DEBUG] onSensorDataReceived: Converted to unit, valueToUse=" << valueToUse << std::endl;
-            } else if (m_showRawValues) {
-                // Wartość surowa - nie przeliczaj
-                valueToUse = static_cast<double>(data.value);
-                std::cout << "[DEBUG] onSensorDataReceived: Using raw value=" << valueToUse << std::endl;
-            } else {
-                // calibratedValue jest w gramach, przelicz na Newtony
-                valueToUse = data.calibratedValue * 9.81 / 1000.0;
-                std::cout << "[DEBUG] onSensorDataReceived: Converted to Newtons, valueToUse=" << valueToUse << std::endl;
-            }
-            
-            std::cout << "[DEBUG] onSensorDataReceived: Calling readSingleSample with value=" << valueToUse << std::endl;
-            readSingleSample(valueToUse);
-        } else {
-            std::cout << "[DEBUG] onSensorDataReceived: Not measuring, ignoring data" << std::endl;
-        }
-    } else {
-        std::cout << "[DEBUG] onSensorDataReceived: Received invalid data" << std::endl;
-        addDebugMessage("Otrzymano nieprawidłowe dane z Arduino", "WARNING");
+    if (!data.isValid) return;
+
+    m_lastSensorData = data;
+
+    // The documented binary firmware frame contains calibrated force, not raw ADC.
+    // Automatically leave raw mode if the current protocol cannot supply raw counts.
+    if (!data.hasRawValue && m_showRawValues && m_btnToggleRaw)
+        m_btnToggleRaw->setChecked(false);
+    if (m_btnToggleRaw && !m_isMeasuring)
+        m_btnToggleRaw->setEnabled(data.hasRawValue);
+
+    if (!m_showRawValues && !std::isfinite(data.calibratedValue)) {
+        if (m_isMeasuring)
+            addDebugMessage("Pominięto próbkę: brak prawidłowej kalibracji siły.", "WARNING");
+        return;
     }
+
+    const QString frameValue = data.hasRawValue
+        ? QString("RAW=%1").arg(data.value)
+        : QString("FORCE=%1 g").arg(data.calibratedValue, 0, 'f', 2);
+    const QString arduinoDebug = QString("%1 | CALIBRATED=%2")
+        .arg(frameValue)
+        .arg(std::isfinite(data.calibratedValue)
+                 ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
+                 : QStringLiteral("N/A"));
+    addDebugMessage(arduinoDebug, "ARDUINO");
+
+    if (!m_isMeasuring) return;
+
+    const double valueToUse = m_showRawValues
+        ? static_cast<double>(data.value)
+        : data.calibratedValue * 9.81 / 1000.0;
+
+    if (!std::isfinite(valueToUse)) return;
+    readSingleSample(valueToUse);
 }
 
 void MeasurementTab::connectToArduinoAsync()
@@ -2073,7 +2057,7 @@ void MeasurementTab::updateUnitDisplay()
         double displayForce = currentForce;
         
         if (!m_showRawValues && m_currentUnit == ForceUnit::Kilograms) {
-            displayForce = currentForce * 1000.0 / 9.81;
+            displayForce = currentForce / 9.81;
         }
         
         m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
