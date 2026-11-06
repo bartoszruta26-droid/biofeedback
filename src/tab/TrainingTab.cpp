@@ -861,49 +861,51 @@ void TrainingTab::onTimerTick()
 void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
     if (!m_isTraining || m_isPaused || m_inRestPeriod || !data.isValid) return;
-    
-    double force = data.calibratedValue;
+
+    const double force = data.calibratedValue;
     m_currentForce = force;
-    
-    // Dodaj dane z Arduino do terminala debugowania
-    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 N")
+
+    // Próbka należy do stanu ćwiczenia i gry istniejącego w chwili jej
+    // odebrania. Najpierw aktualizujemy bieżącą grę i wskazania, a dopiero
+    // potem oceniamy powtórzenie, które może synchronicznie zmienić ćwiczenie.
+    const int sampleExerciseIndex = m_currentExerciseIndex;
+    games::GameEngine* const sampleGame = m_currentGame;
+
+    const QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 N")
         .arg(data.value)
-        .arg(data.calibratedValue, 0, 'f', 2);
+        .arg(force, 0, 'f', 2);
     addDebugMessage(arduinoDebug, "ARDUINO");
-    
-    // Powtórzenie: rozpoczęcie przy 80% siły docelowej, zakończenie
-    // po spadku poniżej 40%. Histereza ogranicza wielokrotne zliczanie drgań.
-    const double target = (!m_exercisePlan.isEmpty() &&
-                           m_currentExerciseIndex >= 0 &&
-                           m_currentExerciseIndex < m_exercisePlan.size())
-        ? m_exercisePlan[m_currentExerciseIndex].targetForce : 0.0;
-    if (target > 0.0) {
+
+    if (sampleGame && sampleGame->isRunning() && !sampleGame->isPaused()) {
+        sampleGame->handleSensorInput(force);
+    }
+
+    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 1));
+    m_progressWidget->setCurrentForce(force);
+
+    const double target = (sampleExerciseIndex >= 0 &&
+                           sampleExerciseIndex < m_exercisePlan.size())
+        ? m_exercisePlan[sampleExerciseIndex].targetForce : 0.0;
+    const int barValue = target > 0.0
+        ? static_cast<int>((force / target) * 100.0) : 0;
+    m_forceBar->setValue(qBound(0, barValue, 100));
+
+    emit newForceSample(force);
+
+    // Histereza: rozpoczęcie powtórzenia przy 80% celu i zakończenie
+    // po zejściu do 40%. Przejście stanu następuje po obsłużeniu próbki
+    // przez grę przypisaną do ćwiczenia, z którego próbka pochodzi.
+    if (target > 0.0 && sampleExerciseIndex == m_currentExerciseIndex) {
         if (!m_repInProgress && force >= target * 0.80) {
             m_repInProgress = true;
             m_peakForceInRep = force;
         } else if (m_repInProgress) {
             m_peakForceInRep = qMax(m_peakForceInRep, force);
-            if (force <= target * 0.40) completeCurrentRepetition();
+            if (force <= target * 0.40) {
+                completeCurrentRepetition();
+            }
         }
     }
-    
-    // Aktualizacja UI
-    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 1));
-    m_progressWidget->setCurrentForce(force);
-    
-    double targetForce = 0.0;
-    if (!m_exercisePlan.isEmpty() && m_currentExerciseIndex < m_exercisePlan.size()) {
-        targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
-    }
-    int barValue = targetForce > 0 ? static_cast<int>((force / targetForce) * 100) : 0;
-    m_forceBar->setValue(qBound(0, barValue, 100));
-    
-    // Przekazanie danych do gry
-    if (m_currentGame && m_currentGame->isRunning() && !m_currentGame->isPaused()) {
-        m_currentGame->handleSensorInput(force);
-    }
-    
-    emit newForceSample(force);
 }
 
 void TrainingTab::onGameEnded(int score)
