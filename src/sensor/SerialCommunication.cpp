@@ -652,7 +652,11 @@ SensorData SerialCommunication::readData(int timeout) {
 
                     std::memcpy(&data.timestamp, packet + 1, sizeof(data.timestamp));
                     std::memcpy(&data.value, packet + 5, sizeof(data.value));
-                    data.calibratedValue = static_cast<double>(data.value);
+                    // Legacy binary frame carries no machine-readable unit or
+                    // calibration-state field. CRC validates transport only.
+                    data.calibratedValue = std::numeric_limits<double>::quiet_NaN();
+                    data.unit = MeasurementUnit::Unknown;
+                    data.calibrationStatus = CalibrationStatus::Unknown;
                     data.crc = packet[9];
                     data.isValid = true;
                     gotBinaryData = true;
@@ -693,11 +697,13 @@ SensorData SerialCommunication::readData(int timeout) {
                             }
                         }
                     }
+                    data.unit = MeasurementUnit::Grams;
+                    data.calibrationStatus = CalibrationStatus::Calibrated;
                     data.isValid = true;
                     break;
                 }
             }
-            
+
             if (gotBinaryData) break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
