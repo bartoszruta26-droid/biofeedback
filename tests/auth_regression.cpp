@@ -27,6 +27,7 @@ int main(){
   expect(auth.requiresPasswordChange(),"legacy admin must change password");
   expect(!auth.isLoggedIn(),"session blocked pending password change");
   expect(!auth.changePassword("short"),"short password rejected");
+  expect(!auth.changePassword("legacy-admin"),"compromised legacy password cannot be reused");
   expect(auth.changePassword("new-admin-password-2026"),"admin password change");
   expect(auth.isLoggedIn(),"session after password change");
   expect(!auth.login("admin","wrong-password"),"wrong password rejected");
