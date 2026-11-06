@@ -860,7 +860,7 @@ void TrainingTab::onTimerTick()
 
 void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
-    if (!m_isTraining || m_isPaused || !data.isValid) return;
+    if (!m_isTraining || m_isPaused || m_inRestPeriod || !data.isValid) return;
     
     double force = data.calibratedValue;
     m_currentForce = force;
@@ -899,7 +899,7 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     m_forceBar->setValue(qBound(0, barValue, 100));
     
     // Przekazanie danych do gry
-    if (m_currentGame && m_currentGame->isRunning()) {
+    if (m_currentGame && m_currentGame->isRunning() && !m_currentGame->isPaused()) {
         m_currentGame->handleSensorInput(force);
     }
     
