@@ -2011,6 +2011,10 @@ void MeasurementTab::connectToArduinoAsync()
                 }
 
                 const auto info = serial->identifyArduino(2000);
+                if (!m_connectionSearchActive.load()) {
+                    serial->disconnect();
+                    return;
+                }
                 if (info.isConnected) {
                     serial->startAsyncReading();
                     m_connectionSearchActive.store(false);
