@@ -108,6 +108,10 @@ int main() {
         expect(loadedPatient.address == patient.address, "patient.address z backslash");
         expect(loadedPatient.medicalHistory == patient.medicalHistory, "patient.medicalHistory z newline");
 
+        const std::string exportPayload = "{\\"record\\":\\"protected\\"}";
+        expect(dm.exportToJson(exportPayload, kResultsFile), "szyfrowany eksport JSON");
+        expect(dm.importFromJson(kResultsFile) == exportPayload, "odszyfrowany import JSON");
+
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
         std::remove(kPatientFile);
