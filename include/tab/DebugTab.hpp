@@ -6,6 +6,9 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QColor>
 #include <QTextEdit>
 #include <QGroupBox>
 #include <QTimer>
