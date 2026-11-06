@@ -171,7 +171,7 @@ endif()
 find_package(Qt5 QUIET COMPONENTS Core Widgets)
 if(Qt5Core_FOUND AND Qt5Widgets_FOUND)
     add_library(login_dialog_compile OBJECT src/gui/LoginDialog.cpp)
-    target_include_directories(login_dialog_compile PRIVATE \${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(login_dialog_compile PRIVATE ${CMAKE_SOURCE_DIR}/include)
     target_link_libraries(login_dialog_compile PRIVATE Qt5::Core Qt5::Widgets)
 endif()
 
