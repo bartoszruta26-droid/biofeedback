@@ -21,6 +21,7 @@
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
+#include "tab/RepDetector.hpp"
 
 namespace tab {
 
@@ -237,7 +238,7 @@ private:
     void updateProgressWidgets();
     void loadNextExercise();
     void reconfigureGameForExercise(const TrainingExercise& exercise);
-    void completeCurrentRepetition();
+    void completeCurrentRepetition(double peakForce);
     void loadNextSeries();
     void updateRestDisplay();
     
@@ -279,7 +280,7 @@ private:
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
     QString m_currentGameType;
-    bool m_repInProgress;
+    training::RepDetector m_repDetector;
     bool m_restForNextExercise;
     
     // Tabela statystyk
@@ -304,7 +305,6 @@ private:
     bool m_inRestPeriod;
     
     double m_currentForce;
-    double m_peakForceInRep;
     
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
