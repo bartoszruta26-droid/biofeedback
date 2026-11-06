@@ -38,6 +38,6 @@ This change set introduces password hashing, authenticated encryption, atomic pe
 
 ## Verification status
 
-Regression tests were added for PBKDF2 hashing/verification, legacy account migration and forced password change, account creation, AES-GCM round-trip, wrong-key rejection, tag tampering, legacy-format rejection, fail-closed patient writes and encrypted JSON export/import.
+Regression tests were added for PBKDF2 hashing/verification, legacy account migration and forced password change, account creation, AES-GCM round-trip, wrong-key rejection, tag tampering, legacy-format rejection, fail-closed patient writes, encrypted exercise results and training plans, encrypted JSON export/import, and an RLIMIT_FSIZE-induced partial-write failure that verifies preservation of the previous destination.
 
 The tests have not yet been executed in this change session. CI is configured to build the core regression targets and run CTest. Hardware, penetration, crash-injection and filesystem-specific durability testing remain outstanding.
