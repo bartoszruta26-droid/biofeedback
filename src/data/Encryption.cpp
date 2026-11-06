@@ -131,9 +131,11 @@ std::function<void(const std::string&)> Encryption::m_criticalErrorCallback;
 // ============================================================================
 
 void Encryption::setMinimumLogLevel(EncryptionTypes::EncryptionLogLevel level) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_minimumLogLevel = level;
-    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_minimumLogLevel = level;
+    }
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__,
                "Poziom logowania ustawiony na: " + logLevelToString(level));
 }
 
@@ -143,8 +145,10 @@ EncryptionTypes::EncryptionLogLevel Encryption::getMinimumLogLevel() {
 }
 
 void Encryption::setConsoleOutputEnabled(bool enabled) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_consoleOutputEnabled = enabled;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_consoleOutputEnabled = enabled;
+    }
     logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__,
                "Wyjście na konsolę " + std::string(enabled ? "włączone" : "wyłączone"));
 }
@@ -205,14 +209,18 @@ std::string Encryption::getStatisticsSummary() {
 }
 
 void Encryption::setErrorCallback(std::function<void(const std::string&)> callback) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_errorCallback = callback;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_errorCallback = std::move(callback);
+    }
     logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, "Callback błędów zarejestrowany");
 }
 
 void Encryption::setCriticalErrorCallback(std::function<void(const std::string&)> callback) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_criticalErrorCallback = callback;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_criticalErrorCallback = std::move(callback);
+    }
     logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, "Callback błędów krytycznych zarejestrowany");
 }
 
@@ -220,48 +228,41 @@ void Encryption::setCriticalErrorCallback(std::function<void(const std::string&)
 // IMPLEMENTACJA METOD PRYWATNYCH - LOGOWANIE
 // ============================================================================
 
-void Encryption::logMessage(EncryptionTypes::EncryptionLogLevel level, 
-                           const std::string& function, 
+void Encryption::logMessage(EncryptionTypes::EncryptionLogLevel level,
+                           const std::string& function,
                            const std::string& message) {
-    // Sprawdzenie czy poziom jest wystarczający
-    if (level < m_minimumLogLevel) {
-        return;
+    std::function<void(const std::string&)> errorCallback;
+    std::function<void(const std::string&)> criticalCallback;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        if (level < m_minimumLogLevel || !m_consoleOutputEnabled) return;
+        errorCallback = m_errorCallback;
+        criticalCallback = m_criticalErrorCallback;
     }
-    
-    // Sprawdzenie czy wyjście na konsolę jest włączone
-    if (!m_consoleOutputEnabled) {
-        return;
-    }
-    
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    
+
     auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    
+    const auto time = std::chrono::system_clock::to_time_t(now);
+    std::tm localTime{};
+#if defined(_WIN32)
+    localtime_s(&localTime, &time);
+#else
+    localtime_r(&time, &localTime);
+#endif
     std::stringstream ss;
-    ss << "[" << logLevelToString(level) << "][ENCRYPTION][" 
-       << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] "
+    ss << "[" << logLevelToString(level) << "][ENCRYPTION]["
+       << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << "] "
        << function << ": " << message << std::endl;
-    
-    if (level >= EncryptionTypes::EncryptionLogLevel::ERROR) {
-        std::cerr << ss.str();
-    } else {
-        std::cout << ss.str();
-    }
-    
-    // Wywołanie callbacka dla błędów krytycznych
-    if (level == EncryptionTypes::EncryptionLogLevel::CRITICAL && m_criticalErrorCallback) {
-        try {
-            m_criticalErrorCallback(message);
-        } catch (...) {
-            // Gentle code: ignorujemy błędy w callbacku
-        }
-    } else if (level >= EncryptionTypes::EncryptionLogLevel::ERROR && m_errorCallback) {
-        try {
-            m_errorCallback(message);
-        } catch (...) {
-            // Gentle code: ignorujemy błędy w callbacku
-        }
+    if (level >= EncryptionTypes::EncryptionLogLevel::ERROR) std::cerr << ss.str();
+    else std::cout << ss.str();
+
+    // User callbacks are deliberately invoked outside the logging mutex.
+    try {
+        if (level == EncryptionTypes::EncryptionLogLevel::CRITICAL && criticalCallback)
+            criticalCallback(message);
+        else if (level >= EncryptionTypes::EncryptionLogLevel::ERROR && errorCallback)
+            errorCallback(message);
+    } catch (...) {
+        // Logging must not propagate callback exceptions.
     }
 }
 
