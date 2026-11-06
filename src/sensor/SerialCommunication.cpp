@@ -608,16 +608,24 @@ SensorData SerialCommunication::readData(int timeout) {
     auto start = std::chrono::steady_clock::now();
     bool gotBinaryData = false;
     
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::steady_clock::now() - start).count() < std::max(0, timeout)) {
-        int rd = 0;
-#ifdef _WIN32
-        DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
-#else
+    while (true) {
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::steady_clock::now() - start).count();
         const int remaining = std::max(0, timeout - static_cast<int>(elapsed));
         if (remaining == 0) break;
+        int rd = 0;
+#ifdef _WIN32
+        COMMTIMEOUTS timeouts{};
+        if (GetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts)) {
+            timeouts.ReadIntervalTimeout = MAXDWORD;
+            timeouts.ReadTotalTimeoutMultiplier = 0;
+            timeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(remaining);
+            SetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts);
+        }
+        DWORD dw = 0;
+        if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr))
+            rd = static_cast<int>(dw);
+#else
         pollfd descriptor{static_cast<int>(m_impl->portHandle), POLLIN, 0};
         const int ready = poll(&descriptor, 1, remaining);
         if (ready < 0 && errno == EINTR) continue;
@@ -954,11 +962,18 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
         if (remaining == 0) break;
         int bytesRead = 0;
 #ifdef _WIN32
+        COMMTIMEOUTS timeouts{};
+        if (GetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts)) {
+            timeouts.ReadIntervalTimeout = MAXDWORD;
+            timeouts.ReadTotalTimeoutMultiplier = 0;
+            timeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(remaining);
+            SetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts);
+        }
         DWORD count = 0;
         if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buffer, 255, &count, nullptr))
             bytesRead = static_cast<int>(count);
 #else
-        pollfd descriptor{m_impl->portHandle, POLLIN, 0};
+        pollfd descriptor{static_cast<int>(m_impl->portHandle), POLLIN, 0};
         const int ready = poll(&descriptor, 1, remaining);
         if (ready < 0 && errno == EINTR) continue;
         if (ready <= 0 || !(descriptor.revents & (POLLIN | POLLHUP))) break;
