@@ -418,6 +418,10 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     // Qt automatycznie czyści widgety z parentem
 }
 
@@ -1898,11 +1902,13 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
 
 void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    m_serialPort = std::move(serial);
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback przychodzi z wątku odczytu szeregowego -
-            // przekaż dane bezpiecznie do wątku GUI.
+        m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
             QMetaObject::invokeMethod(this, [this, data]() {
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
