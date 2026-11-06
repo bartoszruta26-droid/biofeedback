@@ -219,6 +219,36 @@ int main() {
         return 1;
     }
 
+    // Also exercise disconnect initiated from the reader callback itself.
+    serial.disconnect();
+    if (!serial.connect(slaveName, 115200)) {
+        std::cerr << "Serial reconnect before callback-disconnect test failed\\n";
+        emulatorRunning = false;
+        emulator.join();
+        close(masterFd);
+        return 1;
+    }
+    std::atomic<bool> selfDisconnectReturned{false};
+    const auto selfDisconnectId = serial.subscribeDataCallback(
+        [&](const sensor::SensorData& data) {
+            if (!data.isValid || data.value != 123456) return;
+            serial.disconnect();
+            selfDisconnectReturned.store(true);
+        });
+    serial.startAsyncReading();
+    const bool callbackCanDisconnect =
+        selfDisconnectId && waitUntil(selfDisconnectReturned, true, std::chrono::seconds(3));
+    // The reader callback cannot join itself; the caller thread reaps it here.
+    serial.disconnect();
+    if (selfDisconnectId) serial.unsubscribeDataCallback(selfDisconnectId);
+    if (!callbackCanDisconnect) {
+        std::cerr << "Reader callback could not request a non-deadlocking disconnect\\n";
+        emulatorRunning = false;
+        emulator.join();
+        close(masterFd);
+        return 1;
+    }
+
     emulatorRunning = false;
     emulator.join();
 
