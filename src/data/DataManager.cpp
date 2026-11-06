@@ -605,16 +605,16 @@ void DataManager::setEncryptionKey(const std::string& key) {
     {
         std::lock_guard<std::mutex> lock(logMutex);
         if (!encryptionKey.empty()) OPENSSL_cleanse(encryptionKey.data(), encryptionKey.size());
-        encryptionKey = key;
-        encryptionEnabled = !key.empty();
+        encryptionKey = key.size() >= 32 ? key : std::string();
+        encryptionEnabled = !encryptionKey.empty();
     }
-    if (!key.empty()) {
+    if (key.size() >= 32) {
         statistics.encryptionOps++;
         logMessage(DataManagerLogLevel::INFO,
                    "Encryption key set (" + std::to_string(key.size()) + " chars)",
                    "DataManager::setEncryptionKey");
     } else {
-        logMessage(DataManagerLogLevel::WARNING, "Empty encryption key provided",
+        logMessage(DataManagerLogLevel::WARNING, "Encryption key missing or shorter than 32 bytes",
                    "DataManager::setEncryptionKey");
     }
 }
