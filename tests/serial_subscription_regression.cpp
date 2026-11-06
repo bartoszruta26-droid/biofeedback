@@ -49,15 +49,7 @@ int main() {
             if (data.isValid && data.value == 123456) ++secondSubscriberCalls;
         });
 
-    const auto blockingId = serial.subscribeDataCallback(
-        [&](const sensor::SensorData& data) {
-            if (!data.isValid || data.value != 123456) return;
-            blockingCallbackEntered.store(true);
-            while (!releaseBlockingCallback.load())
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        });
-
-    if (!connectionId || !firstId || !secondId || !blockingId) {
+    if (!connectionId || !firstId || !secondId) {
         std::cerr << "Subscription registration failed\n";
         close(masterFd);
         return 1;
@@ -117,13 +109,33 @@ int main() {
 
     const bool bothReceived = waitUntil(firstSubscriberCalls, 1, std::chrono::seconds(5)) &&
                               waitUntil(secondSubscriberCalls, 1, std::chrono::seconds(1)) &&
-                              waitUntil(blockingCallbackEntered, true, std::chrono::seconds(1)) &&
                               waitUntil(calibratedValueValid, true, std::chrono::seconds(1));
     if (!bothReceived) {
         std::cerr << "Serial sample check failed: first=" << firstSubscriberCalls.load()
                   << ", second=" << secondSubscriberCalls.load()
                   << ", callbackEntered=" << blockingCallbackEntered.load()
                   << ", calibrated=" << calibratedValueValid.load() << "\\n";
+        releaseBlockingCallback.store(true);
+        emulatorRunning = false;
+        serial.stopAsyncReading();
+        emulator.join();
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
+    // Register the blocking callback only after normal subscribers have
+    // demonstrated delivery; unordered callback order must not starve them.
+    const auto blockingId = serial.subscribeDataCallback(
+        [&](const sensor::SensorData& data) {
+            if (!data.isValid || data.value != 123456) return;
+            blockingCallbackEntered.store(true);
+            while (!releaseBlockingCallback.load())
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        });
+    if (!blockingId ||
+        !waitUntil(blockingCallbackEntered, true, std::chrono::seconds(2))) {
+        std::cerr << "Blocking callback was not entered\n";
         releaseBlockingCallback.store(true);
         emulatorRunning = false;
         serial.stopAsyncReading();
