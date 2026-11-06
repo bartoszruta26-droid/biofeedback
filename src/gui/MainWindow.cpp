@@ -424,6 +424,7 @@ void MainWindow::createConnections()
         }
 
         if (!game) {
+            m_trainingTab->setGameEngine(nullptr, gameType);
             addDebugMessage(QString("Nieobsługiwany typ gry treningowej: %1").arg(gameType), "ERROR");
             return;
         }
