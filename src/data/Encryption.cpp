@@ -324,12 +324,20 @@ std::string Encryption::encrypt(const std::string& data, const std::string& key)
         throw std::invalid_argument("Dane przekraczają dopuszczalny rozmiar");
     unsigned char aesKey[32]{};
     unsigned int keyLen=0;
-    if(EVP_Digest(key.data(),key.size(),aesKey,&keyLen,EVP_sha256(),nullptr)!=1||keyLen!=32)
+    if(EVP_Digest(key.data(),key.size(),aesKey,&keyLen,EVP_sha256(),nullptr)!=1||keyLen!=32) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
         throw std::runtime_error("Nie udało się wyprowadzić klucza AES-256");
+    }
     unsigned char nonce[12]{}, tag[16]{};
-    if(RAND_bytes(nonce,sizeof(nonce))!=1)throw std::runtime_error("CSPRNG nie wygenerował nonce");
+    if(RAND_bytes(nonce,sizeof(nonce))!=1) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
+        throw std::runtime_error("CSPRNG nie wygenerował nonce");
+    }
     EVP_CIPHER_CTX* ctx=EVP_CIPHER_CTX_new();
-    if(!ctx)throw std::runtime_error("Nie można utworzyć kontekstu AES-GCM");
+    if(!ctx) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
+        throw std::runtime_error("Nie można utworzyć kontekstu AES-GCM");
+    }
     std::vector<unsigned char> ciphertext(data.size()+16);
     int outLen=0,total=0;
     bool ok=EVP_EncryptInit_ex(ctx,EVP_aes_256_gcm(),nullptr,nullptr,nullptr)==1 &&
@@ -373,8 +381,10 @@ std::string Encryption::decrypt(const std::string& encryptedData, const std::str
     if(encoded.size()>1&&encoded[encoded.size()-2]=='=')--payloadLen;
     if(payloadLen<28||payloadLen>MAX_DATA_SIZE+28)throw std::invalid_argument("Nieprawidłowa długość szyfrogramu");
     unsigned char aesKey[32]{}; unsigned int keyLen=0;
-    if(EVP_Digest(key.data(),key.size(),aesKey,&keyLen,EVP_sha256(),nullptr)!=1||keyLen!=32)
+    if(EVP_Digest(key.data(),key.size(),aesKey,&keyLen,EVP_sha256(),nullptr)!=1||keyLen!=32) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
         throw std::runtime_error("Nie udało się wyprowadzić klucza AES-256");
+    }
     const unsigned char* nonce=payload.data();
     const unsigned char* tag=payload.data()+12;
     const unsigned char* cipher=payload.data()+28;
