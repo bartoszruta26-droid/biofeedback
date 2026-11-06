@@ -230,6 +230,7 @@ public:
     SubscriptionId nextSubscriptionId = 1;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
+    std::mutex asyncThreadMutex;
     std::thread asyncThread;
     mutable std::mutex readMutex;
     std::string lastError;
@@ -507,9 +508,18 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 }
 
 void SerialCommunication::disconnect() {
-    stopAsyncReading();
     bool wasConnected = false;
     {
+        // Lock order: asyncThreadMutex -> readMutex. This prevents a new reader
+        // from starting between the stop/join phase and closing the port.
+        std::unique_lock<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        m_impl->asyncReading.store(false);
+        if (m_impl->asyncThread.joinable()) {
+            if (m_impl->asyncThread.get_id() == std::this_thread::get_id())
+                return; // A reader callback must request disconnect from another thread.
+            m_impl->asyncThread.join();
+        }
+
         std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
         wasConnected = m_impl->isConnected.load();
         if (!wasConnected) return;
@@ -517,7 +527,7 @@ void SerialCommunication::disconnect() {
         if (m_impl->portHandle != -1)
             CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
 #else
-        if (m_impl->portHandle >= 0) close(m_impl->portHandle);
+        if (m_impl->portHandle >= 0) close(static_cast<int>(m_impl->portHandle));
 #endif
         m_impl->portHandle = -1;
         m_impl->isConnected.store(false);
@@ -525,7 +535,6 @@ void SerialCommunication::disconnect() {
     }
     notifyConnectionCallbacks(false, "Serial connection closed");
 }
-
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
 std::string SerialCommunication::getPortName() const {
     std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
@@ -790,29 +799,30 @@ void SerialCommunication::unsubscribeConnectionCallback(SubscriptionId id) {
 }
 
 void SerialCommunication::startAsyncReading() {
-    if (m_impl->asyncReading) return;
-    m_impl->asyncReading = true;
+    std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+    if (!m_impl->isConnected.load() || m_impl->asyncReading.load()) return;
+    if (m_impl->asyncThread.joinable()) m_impl->asyncThread.join();
+
+    m_impl->asyncReading.store(true);
     m_impl->asyncThread = std::thread([this]() {
-        while (m_impl->asyncReading && m_impl->isConnected) {
-            SensorData d = readData(100);
-            if (d.isValid) {
+        while (m_impl->asyncReading.load() && m_impl->isConnected.load()) {
+            SensorData data = readData(100);
+            if (data.isValid) {
                 DataCallback primaryCallback;
                 std::vector<std::shared_ptr<CallbackSlot<DataCallback>>> subscribers;
                 {
                     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
                     primaryCallback = m_impl->dataCallback;
                     subscribers.reserve(m_impl->dataSubscribers.size());
-                    for (const auto& entry : m_impl->dataSubscribers) {
+                    for (const auto& entry : m_impl->dataSubscribers)
                         subscribers.push_back(entry.second);
-                    }
                 }
-                // Wywołania odbiorców odbywają się poza blokadą rejestru.
                 if (primaryCallback) {
-                    try { primaryCallback(d); } catch (...) {}
+                    try { primaryCallback(data); } catch (...) {}
                 }
                 for (const auto& slot : subscribers)
                     invokeSubscription(slot, [&](const DataCallback& callback) {
-                        if (callback) callback(d);
+                        if (callback) callback(data);
                     });
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
@@ -821,8 +831,11 @@ void SerialCommunication::startAsyncReading() {
 }
 
 void SerialCommunication::stopAsyncReading() {
-    m_impl->asyncReading = false;
-    if (m_impl->asyncThread.joinable()) m_impl->asyncThread.join();
+    std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+    m_impl->asyncReading.store(false);
+    if (m_impl->asyncThread.joinable() &&
+        m_impl->asyncThread.get_id() != std::this_thread::get_id())
+        m_impl->asyncThread.join();
 }
 
 void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) { m_impl->watchdogTimeoutMs = enabled ? timeoutMs : INT_MAX; }
