@@ -338,11 +338,13 @@ Firmware Arduino implementuje binarny protokół komunikacyjny zoptymalizowany p
 |--------|---------|------|------|
 | 0 | 1 bajt | Sync Byte | 0xAA (synchronization marker) |
 | 1–4 | 4 bajty | Timestamp | Czas w milisekundach (uint32_t, little-endian) |
-| 5–8 | 4 bajty | Force Value | Wartość siły po filtracji (int32_t, little-endian) |
+| 5–8 | 4 bajty | Force Value | Wartość całkowita po filtracji (int32_t, little-endian); jednostka i stan kalibracji nie są kodowane |
 | 9 | 1 bajt | CRC-8 | Suma kontrolna CRC-8 (polynomial 0x07) |
 | 10 | 1 bajt | End Marker | 0x55 (frame end delimiter) |
 
 **Łączny rozmiar ramki:** 11 bajtów.
+
+**Ograniczenie kontraktu:** ramka 11-bajtowa nie zawiera identyfikatora jednostki ani flagi kalibracji. Komentarz firmware'u „calibrated force” nie definiuje, czy pole jest wyrażone w gramach, kilogramach-siły czy niutonach. Odbiornik musi zatem traktować jednostkę i stan kalibracji jako UNKNOWN; poprawne CRC potwierdza wyłącznie integralność transmisji. Takiej próbki nie wolno używać do obliczeń siły, treningu ani statystyk. Przed dopuszczeniem tego formatu do pomiarów należy rozszerzyć protokół o wersję, jednostkę i jawny stan kalibracji albo uzgodnić i przetestować jednoznaczny kontrakt firmware–host.
 
 Przy częstotliwości próbkowania 80 Hz, przepustowość łącza wynosi:
 $$80 \text{ packets/s} \times 11 \text{ bytes/packet} \times 8 \text{ bits/byte} = 7040 \text{ bps}$$
