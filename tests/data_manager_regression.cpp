@@ -22,6 +22,10 @@ void expect(bool condition, const std::string& message) {
 
 int main() {
     try {
+        DataManager noKey;
+        PatientData deniedPatient; deniedPatient.id = "denied";
+        expect(!noKey.savePatientData(deniedPatient, kPatientFile, false), "patient write without key must fail closed");
+
         DataManager dm;
         dm.setEncryptionKey("regression-key-material");
 
