@@ -869,8 +869,15 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
     if (!m_isTraining || m_isPaused || m_inRestPeriod || !data.isValid) return;
 
-    // SerialCommunication przekazuje calibratedValue w gramach;
-    // plan treningowy i detektor powtórzeń operują w niutonach.
+    // CRC confirms transport integrity only. Training accepts force samples
+    // exclusively when firmware explicitly identifies calibrated grams.
+    if (data.calibrationStatus != sensor::CalibrationStatus::Calibrated ||
+        data.unit != sensor::MeasurementUnit::Grams) {
+        addDebugMessage("Pominięto próbkę treningową: jednostka lub stan kalibracji firmware jest niepotwierdzony.", "WARNING");
+        return;
+    }
+
+    // Plan treningowy i detektor powtórzeń operują w niutonach.
     const double calibratedGrams = data.calibratedValue;
     const double force = calibratedGrams * 9.81 / 1000.0;
     // CRC i flaga isValid potwierdzają ramkę, ale nie gwarantują, że
