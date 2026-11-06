@@ -32,6 +32,10 @@
 #include <unordered_map>
 #include <utility>
 #include <system_error>
+#include <condition_variable>
+#ifndef _WIN32
+#include <poll.h>
+#endif
 
 // ============================================================================
 // DEBUG FLAGS AND CONFIGURATION
@@ -70,6 +74,48 @@ constexpr int CONNECTION_RETRY_DELAY_MS = 500;
 #endif
 
 namespace sensor {
+
+namespace {
+thread_local const void* activeSubscriptionCallback = nullptr;
+
+template <typename Callback>
+struct CallbackSlot {
+    explicit CallbackSlot(Callback value) : callback(std::move(value)) {}
+    std::mutex mutex;
+    std::condition_variable idle;
+    bool active = true;
+    std::size_t inFlight = 0;
+    Callback callback;
+};
+
+template <typename Slot, typename Invoke>
+void invokeSubscription(const std::shared_ptr<Slot>& slot, Invoke invoke)
+{
+    {
+        std::lock_guard<std::mutex> lock(slot->mutex);
+        if (!slot->active) return;
+        ++slot->inFlight;
+    }
+    const void* previous = activeSubscriptionCallback;
+    activeSubscriptionCallback = slot.get();
+    try { invoke(slot->callback); } catch (...) {}
+    activeSubscriptionCallback = previous;
+    {
+        std::lock_guard<std::mutex> lock(slot->mutex);
+        if (--slot->inFlight == 0) slot->idle.notify_all();
+    }
+}
+
+template <typename Slot>
+void deactivateSubscription(const std::shared_ptr<Slot>& slot)
+{
+    if (!slot) return;
+    std::unique_lock<std::mutex> lock(slot->mutex);
+    slot->active = false;
+    if (activeSubscriptionCallback != slot.get())
+        slot->idle.wait(lock, [&slot]() { return slot->inFlight == 0; });
+}
+} // namespace
 
 // ============================================================================
 // HELPER FUNCTIONS - CRC CALCULATION
@@ -177,8 +223,8 @@ public:
     ArduinoInfo arduinoInfo;
     DataCallback dataCallback;
     std::mutex callbackMutex;
-    std::unordered_map<SubscriptionId, DataCallback> dataSubscribers;
-    std::unordered_map<SubscriptionId, ConnectionCallback> connectionSubscribers;
+    std::unordered_map<SubscriptionId, std::shared_ptr<CallbackSlot<DataCallback>>> dataSubscribers;
+    std::unordered_map<SubscriptionId, std::shared_ptr<CallbackSlot<ConnectionCallback>>> connectionSubscribers;
     SubscriptionId nextSubscriptionId = 1;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
@@ -529,12 +575,20 @@ SensorData SerialCommunication::readData(int timeout) {
     bool gotBinaryData = false;
     
     while (std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::steady_clock::now() - start).count() < 2000) {
+           std::chrono::steady_clock::now() - start).count() < std::max(0, timeout)) {
         int rd = 0;
 #ifdef _WIN32
         DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
 #else
-        rd = read(m_impl->portHandle, buf, 255);
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count();
+        const int remaining = std::max(0, timeout - static_cast<int>(elapsed));
+        if (remaining == 0) break;
+        pollfd descriptor{m_impl->portHandle, POLLIN, 0};
+        const int ready = poll(&descriptor, 1, remaining);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready <= 0 || !(descriptor.revents & (POLLIN | POLLHUP))) break;
+        rd = static_cast<int>(read(m_impl->portHandle, buf, 255));
 #endif
         if (rd > 0) {
             for (int i = 0; i < rd; ++i) {
@@ -570,6 +624,7 @@ SensorData SerialCommunication::readData(int timeout) {
                                 if (verifyCRC8(packet, 9)) {
                                     data.timestamp = timestamp;
                                     data.value = value;
+                                    data.calibratedValue = convertToCalibrated(value);
                                     data.crc = crc;
                                     data.isValid = true;
                                     gotBinaryData = true;
@@ -647,18 +702,25 @@ SerialCommunication::SubscriptionId SerialCommunication::subscribeDataCallback(D
     if (!callback) return 0;
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
     const SubscriptionId id = m_impl->nextSubscriptionId++;
-    m_impl->dataSubscribers.emplace(id, std::move(callback));
+    m_impl->dataSubscribers.emplace(id, std::make_shared<CallbackSlot<DataCallback>>(std::move(callback)));
     return id;
 }
 
 void SerialCommunication::unsubscribeDataCallback(SubscriptionId id) {
     if (id == 0) return;
-    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
-    m_impl->dataSubscribers.erase(id);
+    std::shared_ptr<CallbackSlot<DataCallback>> slot;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        const auto it = m_impl->dataSubscribers.find(id);
+        if (it == m_impl->dataSubscribers.end()) return;
+        slot = it->second;
+        m_impl->dataSubscribers.erase(it);
+    }
+    deactivateSubscription(slot);
 }
 void SerialCommunication::notifyConnectionCallbacks(bool connected, const std::string& message) {
     ConnectionCallback primaryCallback;
-    std::vector<ConnectionCallback> subscribers;
+    std::vector<std::shared_ptr<CallbackSlot<ConnectionCallback>>> subscribers;
     {
         std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
         primaryCallback = m_impl->connectionCallback;
@@ -670,10 +732,10 @@ void SerialCommunication::notifyConnectionCallbacks(bool connected, const std::s
     if (primaryCallback) {
         try { primaryCallback(connected, message); } catch (...) {}
     }
-    for (const auto& callback : subscribers) {
-        if (!callback) continue;
-        try { callback(connected, message); } catch (...) {}
-    }
+    for (const auto& slot : subscribers)
+        invokeSubscription(slot, [&](const ConnectionCallback& callback) {
+            if (callback) callback(connected, message);
+        });
 }
 
 void SerialCommunication::setConnectionCallback(ConnectionCallback cb) {
@@ -685,14 +747,21 @@ SerialCommunication::SubscriptionId SerialCommunication::subscribeConnectionCall
     if (!callback) return 0;
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
     const SubscriptionId id = m_impl->nextSubscriptionId++;
-    m_impl->connectionSubscribers.emplace(id, std::move(callback));
+    m_impl->connectionSubscribers.emplace(id, std::make_shared<CallbackSlot<ConnectionCallback>>(std::move(callback)));
     return id;
 }
 
 void SerialCommunication::unsubscribeConnectionCallback(SubscriptionId id) {
     if (id == 0) return;
-    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
-    m_impl->connectionSubscribers.erase(id);
+    std::shared_ptr<CallbackSlot<ConnectionCallback>> slot;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        const auto it = m_impl->connectionSubscribers.find(id);
+        if (it == m_impl->connectionSubscribers.end()) return;
+        slot = it->second;
+        m_impl->connectionSubscribers.erase(it);
+    }
+    deactivateSubscription(slot);
 }
 
 void SerialCommunication::startAsyncReading() {
@@ -703,7 +772,7 @@ void SerialCommunication::startAsyncReading() {
             SensorData d = readData(100);
             if (d.isValid) {
                 DataCallback primaryCallback;
-                std::vector<DataCallback> subscribers;
+                std::vector<std::shared_ptr<CallbackSlot<DataCallback>>> subscribers;
                 {
                     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
                     primaryCallback = m_impl->dataCallback;
@@ -716,10 +785,10 @@ void SerialCommunication::startAsyncReading() {
                 if (primaryCallback) {
                     try { primaryCallback(d); } catch (...) {}
                 }
-                for (const auto& callback : subscribers) {
-                    if (!callback) continue;
-                    try { callback(d); } catch (...) {}
-                }
+                for (const auto& slot : subscribers)
+                    invokeSubscription(slot, [&](const DataCallback& callback) {
+                        if (callback) callback(d);
+                    });
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
         }
