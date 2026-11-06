@@ -448,7 +448,8 @@ void TrainingTab::addExercise(const TrainingExercise& exercise)
 
 void TrainingTab::removeExercise(int index)
 {
-    if (index < 0 || index >= m_exercisePlan.size()) return;
+    // Zmiana planu w trakcie sesji unieważniłaby indeksy i statystyki.
+    if (m_isTraining || index < 0 || index >= m_exercisePlan.size()) return;
     
     m_exercisePlan.removeAt(index);
     m_exerciseStats.removeAt(index);
@@ -458,6 +459,7 @@ void TrainingTab::removeExercise(int index)
 
 void TrainingTab::clearPlan()
 {
+    if (m_isTraining) return;
     m_exercisePlan.clear();
     m_exerciseStats.clear();
     m_exerciseSelector->clear();
@@ -474,7 +476,7 @@ QVector<TrainingExercise> TrainingTab::getExercisePlan() const
 
 void TrainingTab::setCurrentExerciseIndex(int index)
 {
-    if (index >= 0 && index < m_exercisePlan.size()) {
+    if (!m_isTraining && index >= 0 && index < m_exercisePlan.size()) {
         m_currentExerciseIndex = index;
         m_exerciseSelector->setCurrentIndex(index);
         updateDisplay();
@@ -488,9 +490,12 @@ void TrainingTab::startTraining()
         return;
     }
     for (const TrainingExercise& exercise : m_exercisePlan) {
-        if (exercise.targetForce <= 0.0 || exercise.seriesCount <= 0 || exercise.repsPerSeries <= 0) {
+        const bool supportedGame = m_gameTypeCombo->findData(exercise.gameType) >= 0;
+        if (!std::isfinite(exercise.targetForce) || exercise.targetForce <= 0.0 ||
+            !std::isfinite(exercise.restTime) || exercise.restTime < 0.0 ||
+            exercise.seriesCount <= 0 || exercise.repsPerSeries <= 0 || !supportedGame) {
             QMessageBox::warning(this, tr("Nieprawidłowy plan"),
-                tr("Każde ćwiczenie musi mieć dodatnią siłę docelową, liczbę serii i liczbę powtórzeń."));
+                tr("Każde ćwiczenie musi mieć dodatnią siłę celu, dodatnią liczbę serii i powtórzeń, nieujemny odpoczynek oraz obsługiwany typ gry."));
             return;
         }
     }
@@ -1067,7 +1072,9 @@ void TrainingTab::completeCurrentRepetition()
                 return;
             }
             m_restForNextExercise = true;
-            m_restTimeRemaining = 120;
+            // Czas odpoczynku po ćwiczeniu pochodzi z jego konfiguracji,
+            // tak samo jak odpoczynek pomiędzy seriami.
+            m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
         } else {
             m_restForNextExercise = false;
             m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
