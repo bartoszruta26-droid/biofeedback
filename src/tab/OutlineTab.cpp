@@ -938,6 +938,9 @@ void OutlineTab::onSensorDataReceived(const sensor::SensorData& data)
     // aktywnej gry tej sesji. Wartość skalibrowana jest wyrażona w gramach.
     if (m_isSessionActive && !m_isPaused && m_currentGame &&
         m_currentGame->isRunning() && !m_currentGame->isPaused() &&
+        data.isValid &&
+        data.calibrationStatus == sensor::CalibrationStatus::Calibrated &&
+        data.unit == sensor::MeasurementUnit::Grams &&
         std::isfinite(data.calibratedValue)) {
         const double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
         m_currentGame->handleSensorInput(forceInNewtons);
