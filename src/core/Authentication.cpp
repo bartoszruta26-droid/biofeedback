@@ -1006,15 +1006,18 @@ bool Authentication::changePassword(const std::string& newPassword)
 bool Authentication::createUser(const std::string& username,const std::string& password,const std::string& role)
 {
     if(username.empty()||password.size()<12||role.empty())return false;
-    UserData user{};
-    user.username=username; user.password=PasswordHasher::hash(password);
-    user.role=role; user.encrypted=true; user.mustChangePassword=false;
     std::string actor;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         if(!currentUser || currentUser->mustChangePassword || currentUser->role!="administrator")return false;
         if(findUser(username))return false;
         actor=currentUser->username;
+        UserData user{};
+        user.username=username;
+        user.password=PasswordHasher::hash(password);
+        user.role=role;
+        user.encrypted=true;
+        user.mustChangePassword=false;
         users.push_back(user);
         currentUser=findUser(actor); // vector growth may invalidate the previous pointer.
     }
