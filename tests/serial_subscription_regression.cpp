@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <thread>
@@ -37,7 +38,7 @@ int main() {
         });
     const auto firstId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
-            if (data.isValid && data.value == 123456 && data.calibratedValue == 42.5) ++firstSubscriberCalls;
+            if (data.isValid && data.value == 123456 && std::abs(data.calibratedValue - 42.5) < 1e-6) ++firstSubscriberCalls;
         });
     const auto secondId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
