@@ -8,6 +8,7 @@
 #include <QFont>
 #include <QColor>
 #include <QStackedWidget>
+#include <cmath>
 
 namespace tab {
 
@@ -863,6 +864,12 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     if (!m_isTraining || m_isPaused || m_inRestPeriod || !data.isValid) return;
 
     const double force = data.calibratedValue;
+    // CRC i flaga isValid potwierdzają ramkę, ale nie gwarantują, że
+    // przeliczona wartość jest skończoną liczbą (np. błędny współczynnik kalibracji).
+    if (!std::isfinite(force)) {
+        addDebugMessage("Pominięto próbkę: nieprawidłowa wartość skalibrowanej siły.", "WARNING");
+        return;
+    }
     m_currentForce = force;
 
     // Próbka należy do stanu ćwiczenia i gry istniejącego w chwili jej
