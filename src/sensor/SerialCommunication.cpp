@@ -618,7 +618,7 @@ SensorData SerialCommunication::readData(int timeout) {
             std::chrono::steady_clock::now() - start).count();
         const int remaining = std::max(0, timeout - static_cast<int>(elapsed));
         if (remaining == 0) break;
-        pollfd descriptor{m_impl->portHandle, POLLIN, 0};
+        pollfd descriptor{static_cast<int>(m_impl->portHandle), POLLIN, 0};
         const int ready = poll(&descriptor, 1, remaining);
         if (ready < 0 && errno == EINTR) continue;
         if (ready <= 0 || !(descriptor.revents & (POLLIN | POLLHUP))) break;
