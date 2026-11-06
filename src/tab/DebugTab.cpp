@@ -225,14 +225,24 @@ void DebugTab::addDebugMessage(const QString& message, const QString& type)
 
 void DebugTab::clearTerminal()
 {
-    std::lock_guard<std::mutex> lock(m_messageMutex);
-    
-    if (m_debugTerminal) {
+    // This slot is invoked by the GUI thread. Do not hold m_messageMutex
+    // while calling addDebugMessage(): that method acquires the same
+    // non-recursive mutex and would deadlock.
+    if (!m_debugTerminal) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_messageMutex);
         m_debugTerminal->clear();
         m_messageCount = 0;
-        m_lblMessageCount->setText("Wiadomości: 0");
-        addDebugMessage("Terminal wyczyszczony", "INFO");
+        if (m_lblMessageCount) {
+            m_lblMessageCount->setText("Wiadomości: 0");
+        }
     }
+
+    // Log after releasing the mutex; addDebugMessage() acquires it itself.
+    addDebugMessage("Terminal wyczyszczony", "INFO");
 }
 
 bool DebugTab::exportLogsToFile(const QString& filename)
