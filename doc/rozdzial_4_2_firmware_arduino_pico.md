@@ -1319,7 +1319,7 @@ Rozdział 4.2 przedstawił kompleksową architekturę firmware'u dla mikrokontro
 
 4. **Protokół komunikacyjny z integralnością danych:** Opracowanie binarnego protokołu UART z ramką 11-bajtową (Arduino) lub 14-bajtową (Pico), zawierającą synchronizację (0xAA), timestamp 32-bit, wartość siły 32-bit, sumę kontrolną CRC-8 i marker końca (0x55). Protokół osiąga 0% packet loss przy prędkości 115200 baud i wykorzystuje jedynie 6.1% dostępnego pasma, pozostawiając margines na komendy sterujące.
 
-5. **Mechanizmy synchronizacji czasowej:** Implementacja uproszczonego protokołu NTP-like do synchronizacji zegarów mikrokontrolerów z Raspberry Pi, osiągającego dokładność ±0.8 ms (średnio) i ±2.3 ms (95 percentyl). Synchronizacja wykonywana jest co 60 sekund, kompensując dryft kwarców rzędu 50 ppm. Dodatkowo, firmware Pico timestampuje każdą próbkę z rozdzielczością mikrosekund, umożliwiając późniejszą interpolację i korekcję jitteru.
+5. **Mechanizmy synchronizacji czasowej:** Opisano uproszczony protokół NTP-like do synchronizacji zegarów mikrokontrolerów z Raspberry Pi. Timestamp w aktualnie obsługiwanej ramce Arduino jest wyrażony w milisekundach. Wariant Pico z rozdzielczością mikrosekund pozostaje propozycją wymagającą osobnego, wersjonowanego parsera hosta; nie jest zgodny z bieżącym odbiornikiem 11-bajtowym.
 
 6. **Bezpieczeństwo i niezawodność:** Wdrożenie mechanizmów watchdog timer (2s timeout dla Arduino, hardware watchdog dla Pico), detekcji brownout (reset przy VCC < 2.7 V), monitorowania napięcia zasilania poprzez pomiar wewnętrznego referencyjnego napięcia 1.1 V oraz procedur auto-resetu HX711 po wykryciu timeoutu komunikacji. Firmware Pico dodatkowo monitoruje temperaturę rdzenia i ostrzega przy przekroczeniu 60°C.
 
