@@ -597,137 +597,29 @@ bool DataManager::isEncryptionEnabled() const {
 // ============================================================================
 
 bool DataManager::savePatientData(const PatientData& patient, const std::string& filename, bool encrypt) {
+    (void)encrypt;
+    if (!encryptionEnabled || encryptionKey.empty()) { ++statistics.errors; return false; }
     try {
-        logMessage(DataManagerLogLevel::DEBUG, 
-                   "Saving patient data to: " + filename + 
-                   (encrypt ? " [ENCRYPTED]" : ""), 
-                   "DataManager::savePatientData");
-        
-        std::string json = patient.toJson();
-        statistics.jsonSerializeOps++;
-        
-        if (encrypt && encryptionEnabled) {
-            try {
-                json = Encryption::encrypt(json, encryptionKey);
-                statistics.encryptionOps++;
-#if DEBUG_ENCRYPTION_OPS
-                logMessage(DataManagerLogLevel::DEBUG, 
-                           "Data encrypted successfully", 
-                           "DataManager::savePatientData");
-#endif
-            } catch (const std::exception& e) {
-                statistics.errors++;
-                logMessage(DataManagerLogLevel::ERROR, 
-                           "Encryption failed: " + std::string(e.what()), 
-                           "DataManager::savePatientData");
-                return false;
-            } catch (...) {
-                statistics.errors++;
-                logMessage(DataManagerLogLevel::CRITICAL, 
-                           "Unknown encryption error", 
-                           "DataManager::savePatientData");
-                return false;
-            }
-        }
-        
-        bool result = writeFile(filename, json);
-        if (result) {
-            statistics.filesWritten++;
-            logMessage(DataManagerLogLevel::INFO, 
-                       "Patient data saved successfully: " + filename, 
-                       "DataManager::savePatientData");
-        } else {
-            statistics.errors++;
-            logMessage(DataManagerLogLevel::ERROR, 
-                       "Failed to save patient data: " + filename, 
-                       "DataManager::savePatientData");
-        }
-        return result;
-        
-    } catch (const std::exception& e) {
-        statistics.errors++;
-        logMessage(DataManagerLogLevel::ERROR, 
-                   "Exception in savePatientData: " + std::string(e.what()), 
-                   "DataManager::savePatientData");
-        return false;
-    } catch (...) {
-        statistics.errors++;
-        logMessage(DataManagerLogLevel::CRITICAL, 
-                   "Unknown exception in savePatientData", 
-                   "DataManager::savePatientData");
-        return false;
-    }
+        const std::string ciphertext = Encryption::encrypt(patient.toJson(), encryptionKey);
+        const bool ok = writeFile(filename, ciphertext);
+        if (ok) { ++statistics.filesWritten; ++statistics.encryptionOps; ++statistics.jsonSerializeOps; }
+        else ++statistics.errors;
+        return ok;
+    } catch (...) { ++statistics.errors; return false; }
 }
 
 PatientData DataManager::loadPatientData(const std::string& filename, bool decrypt) {
+    (void)decrypt;
+    if (!encryptionEnabled || encryptionKey.empty()) { ++statistics.errors; return PatientData(); }
     try {
-        logMessage(DataManagerLogLevel::DEBUG, 
-                   "Loading patient data from: " + filename + 
-                   (decrypt ? " [DECRYPT]" : ""), 
-                   "DataManager::loadPatientData");
-        
-        std::string content = readFile(filename);
-        
-        if (content.empty()) {
-            logMessage(DataManagerLogLevel::WARNING, 
-                       "Empty file or file not found: " + filename, 
-                       "DataManager::loadPatientData");
-            return PatientData();
-        }
-        
-        if (decrypt && encryptionEnabled) {
-            try {
-                content = Encryption::decrypt(content, encryptionKey);
-                statistics.decryptionOps++;
-#if DEBUG_ENCRYPTION_OPS
-                logMessage(DataManagerLogLevel::DEBUG, 
-                           "Data decrypted successfully", 
-                           "DataManager::loadPatientData");
-#endif
-            } catch (const std::exception& e) {
-                statistics.errors++;
-                logMessage(DataManagerLogLevel::ERROR, 
-                           "Decryption failed: " + std::string(e.what()), 
-                           "DataManager::loadPatientData");
-                return PatientData();
-            } catch (...) {
-                statistics.errors++;
-                logMessage(DataManagerLogLevel::CRITICAL, 
-                           "Unknown decryption error", 
-                           "DataManager::loadPatientData");
-                return PatientData();
-            }
-        }
-        
-        statistics.filesRead++;
-        PatientData patient = PatientData::fromJson(content);
-        statistics.jsonParseOps++;
-        
-        if (!patient.id.empty()) {
-            logMessage(DataManagerLogLevel::INFO, 
-                       "Patient data loaded successfully: " + filename, 
-                       "DataManager::loadPatientData");
-        } else {
-            logMessage(DataManagerLogLevel::WARNING, 
-                       "Loaded patient data has empty ID", 
-                       "DataManager::loadPatientData");
-        }
-        
+        const std::string ciphertext = readFile(filename);
+        if (ciphertext.empty()) return PatientData();
+        const std::string plaintext = Encryption::decrypt(ciphertext, encryptionKey);
+        PatientData patient = PatientData::fromJson(plaintext);
+        if (patient.id.empty()) { ++statistics.errors; return PatientData(); }
+        ++statistics.filesRead; ++statistics.decryptionOps; ++statistics.jsonParseOps;
         return patient;
-        
-    } catch (const std::exception& e) {
-        statistics.errors++;
-        logMessage(DataManagerLogLevel::ERROR, 
-                   "Exception in loadPatientData: " + std::string(e.what()), 
-                   "DataManager::loadPatientData");
-        return PatientData();
-    } catch (...) {
-        statistics.errors++;
-        logMessage(DataManagerLogLevel::CRITICAL, 
-                   "Unknown exception in loadPatientData", 
-                   "DataManager::loadPatientData");
-        return PatientData();
-    }
+    } catch (...) { ++statistics.errors; return PatientData(); }
 }
 
 bool DataManager::saveExercises(const std::vector<Exercise>& exercises, const std::string& filename, bool encrypt) {
@@ -896,11 +788,15 @@ std::vector<std::string> DataManager::listFiles(const std::string& directory) co
 }
 
 bool DataManager::exportToJson(const std::string& data, const std::string& filename) {
-    return writeFile(filename, data);
+    if (!encryptionEnabled || encryptionKey.empty()) return false;
+    try { return writeFile(filename, Encryption::encrypt(data, encryptionKey)); }
+    catch (...) { ++statistics.errors; return false; }
 }
 
 std::string DataManager::importFromJson(const std::string& filename) {
-    return readFile(filename);
+    if (!encryptionEnabled || encryptionKey.empty()) return "";
+    try { const std::string value=readFile(filename); return value.empty() ? "" : Encryption::decrypt(value, encryptionKey); }
+    catch (...) { ++statistics.errors; return ""; }
 }
 
 std::string DataManager::readFile(const std::string& filename) const {
