@@ -930,6 +930,8 @@ Firmware Pico implementuje ten sam podstawowy protokół binarny co Arduino Nano
 
 **Łączny rozmiar:** 14 bajtów vs 11 bajtów dla Arduino.
 
+**Status zgodności z hostem:** 14-bajtowa ramka rozszerzona oraz opisany niżej eksperymentalny wariant z timestampem w mikrosekundach nie są obsługiwane przez bieżący parser aplikacji. Host przyjmuje obecnie wyłącznie ramkę 11-bajtową, w której timestamp jest wyrażony w milisekundach. Nie wolno wysyłać formatu 14- ani 12-bajtowego do tej wersji aplikacji ani interpretować mikrosekund jako milisekund. Przed wdrożeniem Pico wymagane jest uzgodnienie jednego formatu, jego wersjonowanie oraz jawne określenie jednostki timestampu i wartości pomiarowej.
+
 ---
 
 ## 4.2.4. Synchronizacja czasowa między mikrokontrolerami a Raspberry Pi
@@ -1038,7 +1040,7 @@ Testy laboratoryjne przeprowadzone z użyciem oscyloskopu cyfrowego (pomiar czas
 
 ### 4.2.4.3. Korekcja jitteru próbkowania
 
-Mimo zastosowania hardware'owych timerów, rzeczywiste odstępy między próbkami mogą wykazywać niewielki jitter (±50–100 µs) spowodowany niedokładnością kwarcu lub interferencjami. Firmware Pico implementuje mechanizm **timestampowania każdej próbki** z rozdzielczością mikrosekund, co pozwala Raspberry Pi na późniejszą interpolację i rekonstrukcję równomiernego sygnału.
+Mimo zastosowania hardware'owych timerów, rzeczywiste odstępy między próbkami mogą wykazywać niewielki jitter (±50–100 µs) spowodowany niedokładnością kwarcu lub interferencjami. Poniższy przykład z timestampem w mikrosekundach jest wariantem projektowym, a nie formatem zgodnym z bieżącym parserem hosta. W obecnej wersji aplikacji timestamp ramki 11-bajtowej jest interpretowany wyłącznie jako milisekundy.
 
 ```cpp
 // Pico firmware: include microsecond-resolution timestamp
