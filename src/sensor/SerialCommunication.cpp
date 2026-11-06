@@ -667,7 +667,11 @@ SensorData SerialCommunication::readData(int timeout) {
                                 if (verifyCRC8(packet, 9)) {
                                     data.timestamp = timestamp;
                                     data.value = value;
-                                    data.calibratedValue = convertToCalibrated(value);
+                                    // The binary protocol's Force Value is calibrated and
+                                    // filtered by firmware before transmission. Treat it as
+                                    // grams, matching the text FORCE:g response; do not
+                                    // apply the host calibration a second time.
+                                    data.calibratedValue = static_cast<double>(value);
                                     data.crc = crc;
                                     data.isValid = true;
                                     gotBinaryData = true;
