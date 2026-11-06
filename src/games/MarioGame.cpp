@@ -531,7 +531,8 @@ void MarioGame::setupSensorListening()
     }
     m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
         QMetaObject::invokeMethod(this, [this, data]() {
-            if (data.isValid) handleSensorInput(data.calibratedValue);
+            if (data.isValid && std::isfinite(data.calibratedValue))
+                handleSensorInput(data.calibratedValue * 9.81 / 1000.0);
         }, Qt::QueuedConnection);
     });
     
