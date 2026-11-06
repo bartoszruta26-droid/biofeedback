@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
