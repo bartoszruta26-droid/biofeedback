@@ -6,6 +6,7 @@
 #include <QMetaObject>
 #include <QTextStream>
 #include <QDateTime>
+#include <cmath>
 #include <QFont>
 #include <utility>
 #include <QScrollBar>
@@ -350,9 +351,11 @@ void DebugTab::onSensorDataReceived(const sensor::SensorData& data)
         updateConnectionStatus(true);
         
         // Dodaj wiadomość do terminala z danymi z Arduino
-        QString arduinoMsg = QString("RAW=%1 | CALIBRATED=%2 g | Timestamp=%3")
+        QString arduinoMsg = QString("RAW=%1 | CALIBRATED=%2 | Timestamp=%3")
             .arg(data.value)
-            .arg(data.calibratedValue, 0, 'f', 2)
+            .arg(std::isfinite(data.calibratedValue)
+                     ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
+                     : QStringLiteral("N/A (brak kalibracji)"))
             .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"));
         
         addDebugMessage(arduinoMsg, "ARDUINO");
