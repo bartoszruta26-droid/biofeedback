@@ -49,15 +49,18 @@ target_link_libraries(biofeedback_core
 )
 
 # Regression targets that can be built without Qt.
+enable_testing()
 add_executable(password_hasher_regression tests/password_hasher_regression.cpp)
 target_link_libraries(password_hasher_regression PRIVATE biofeedback_core)
 add_test(NAME password_hasher_regression COMMAND password_hasher_regression)
 
 add_executable(auth_regression tests/auth_regression.cpp)
 target_link_libraries(auth_regression PRIVATE biofeedback_core)
+add_test(NAME auth_regression COMMAND auth_regression)
 
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
+add_test(NAME data_manager_regression COMMAND data_manager_regression)
 
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
