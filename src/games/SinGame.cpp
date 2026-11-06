@@ -146,7 +146,7 @@ void SinGame::onSensorDataReceived(const sensor::SensorData& data) {
     }
     
     // Użyj skalibrowanej wartości z sensora
-    normalizeForceValue(data.calibratedValue);
+    normalizeForceValue(data.calibratedValue * 9.81 / 1000.0);
 }
 
 void SinGame::onConnectionStatusChanged(bool connected, const std::string& message) {
