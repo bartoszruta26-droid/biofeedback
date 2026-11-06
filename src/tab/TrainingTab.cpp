@@ -171,6 +171,7 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_lblRestTimer(nullptr)
     , m_gameBox(nullptr)
     , m_currentGame(nullptr)
+    , m_currentGameType()
     , m_repInProgress(false)
     , m_restForNextExercise(false)
     , m_statsBox(nullptr)
@@ -497,16 +498,26 @@ void TrainingTab::startTraining()
         }
     }
     
+    // Każde uruchomienie rozpoczyna nową sesję statystyczną.
+    for (int i = 0; i < m_exerciseStats.size(); ++i) {
+        ExerciseStats fresh;
+        fresh.exerciseName = m_exercisePlan[i].name;
+        m_exerciseStats[i] = fresh;
+    }
+
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
-    
-    // Inicjalizacja pierwszego ćwiczenia
+    m_repInProgress = false;
+    m_restForNextExercise = false;
+
+    // Inicjalizacja pierwszego ćwiczenia i sprawdzenie, czy istnieje obsługiwana gra.
     loadNextExercise();
-    
+    if (!m_isTraining) return;
+
     // Uruchomienie timera
     m_timer->start();
     
@@ -860,7 +871,7 @@ void TrainingTab::onTimerTick()
 
 void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
-    if (!m_isTraining || m_isPaused) return;
+    if (!m_isTraining || m_isPaused || !data.isValid) return;
     
     double force = data.calibratedValue;
     m_currentForce = force;
@@ -972,6 +983,12 @@ void TrainingTab::loadNextExercise()
 
     if (!m_currentGame || m_currentGameType != ex.gameType) {
         reconfigureGameForExercise(ex);
+    }
+    if (!m_currentGame) {
+        addDebugMessage(QString("Nie można rozpocząć ćwiczenia „%1”: brak obsługiwanej gry „%2”.")
+                            .arg(ex.name, ex.gameType), "ERROR");
+        stopTraining();
+        return;
     }
 
     loadNextSeries();
