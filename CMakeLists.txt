@@ -57,9 +57,22 @@ target_link_libraries(auth_regression PRIVATE biofeedback_core)
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 
-# Build GUI app only when Qt5 development packages are available.
+# Build GUI app only when requested and Qt5 development packages are available.
+option(BIOFEEDBACK_BUILD_GUI "Build the Qt desktop application" ON)
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
-if(Qt5_FOUND)
+
+# Real serial callback fan-out regression test (Linux PTY emulator).
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(serial_subscription_regression
+        tests/serial_subscription_regression.cpp
+        src/sensor/SerialCommunication.cpp
+        src/core/DebugManager.cpp
+    )
+    target_include_directories(serial_subscription_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(serial_subscription_regression PRIVATE Qt5::Core pthread util)
+endif()
+
+if(BIOFEEDBACK_BUILD_GUI AND Qt5_FOUND)
     pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
 
     # Qt5 MOC headers
@@ -155,17 +168,6 @@ if(Qt5_FOUND)
         Qt5::Charts
     )
 
-    # POSIX pseudo-terminal regression test for the real serial parser and
-    # callback fan-out. The test emulates Arduino without changing the protocol.
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        add_executable(serial_subscription_regression
-            tests/serial_subscription_regression.cpp
-            src/sensor/SerialCommunication.cpp
-            src/core/DebugManager.cpp
-        )
-        target_include_directories(serial_subscription_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-        target_link_libraries(serial_subscription_regression PRIVATE Qt5::Core pthread util)
-    endif()
 else()
     message(WARNING "Qt5 not found - GUI target '${PROJECT_NAME}' will not be built. Core/regression targets remain available.")
 endif()
