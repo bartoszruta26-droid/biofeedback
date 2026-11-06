@@ -706,88 +706,51 @@ std::vector<Exercise> DataManager::loadExercises(const std::string& filename, bo
 }
 
 bool DataManager::saveExerciseResults(const std::vector<ExerciseResult>& results, const std::string& filename, bool encrypt) {
-    std::ostringstream json;
-    json << "[\n";
-    
-    for (size_t i = 0; i < results.size(); ++i) {
-        json << "  " << results[i].toJson();
-        if (i < results.size() - 1) {
-            json << ",";
+    (void)encrypt;
+    if (!encryptionEnabled || encryptionKey.empty()) return false;
+    try {
+        std::ostringstream json; json << "[\n";
+        for (std::size_t i=0;i<results.size();++i) {
+            json << "  " << results[i].toJson();
+            if (i+1<results.size()) json << ",";
+            json << "\n";
         }
-        json << "\n";
-    }
-    
-    json << "]";
-    
-    std::string content = json.str();
-    
-    if (encrypt && encryptionEnabled) {
-        try {
-            content = Encryption::encrypt(content, encryptionKey);
-        } catch (...) {
-            return false;
-        }
-    }
-    
-    return writeFile(filename, content);
+        json << "]";
+        return writeFile(filename, Encryption::encrypt(json.str(), encryptionKey));
+    } catch (...) { ++statistics.errors; return false; }
 }
 
 std::vector<ExerciseResult> DataManager::loadExerciseResults(const std::string& filename, bool decrypt) {
+    (void)decrypt;
     std::vector<ExerciseResult> results;
-    std::string content = readFile(filename);
-    
-    if (content.empty()) {
-        return results;
-    }
-    
-    if (decrypt && encryptionEnabled) {
-        try {
-            content = Encryption::decrypt(content, encryptionKey);
-        } catch (...) {
-            return results;
+    if (!encryptionEnabled || encryptionKey.empty()) return results;
+    try {
+        const std::string encrypted=readFile(filename);
+        if (encrypted.empty()) return results;
+        const std::string content=Encryption::decrypt(encrypted, encryptionKey);
+        for (const auto& objectJson : splitJsonObjectsFromArray(content)) {
+            ExerciseResult result=ExerciseResult::fromJson(objectJson);
+            if(!result.id.empty()||!result.exerciseId.empty()||!result.patientId.empty())results.push_back(result);
         }
-    }
-    
-    for (const auto& objectJson : splitJsonObjectsFromArray(content)) {
-        ExerciseResult result = ExerciseResult::fromJson(objectJson);
-        if (!result.id.empty() || !result.exerciseId.empty() || !result.patientId.empty()) {
-            results.push_back(result);
-        }
-    }
-    
+    } catch (...) { ++statistics.errors; results.clear(); }
     return results;
 }
 
 bool DataManager::saveTrainingPlan(const TrainingPlan& plan, const std::string& filename, bool encrypt) {
-    std::string json = plan.toJson();
-    
-    if (encrypt && encryptionEnabled) {
-        try {
-            json = Encryption::encrypt(json, encryptionKey);
-        } catch (...) {
-            return false;
-        }
-    }
-    
-    return writeFile(filename, json);
+    (void)encrypt;
+    if (!encryptionEnabled || encryptionKey.empty()) return false;
+    try { return writeFile(filename, Encryption::encrypt(plan.toJson(), encryptionKey)); }
+    catch (...) { ++statistics.errors; return false; }
 }
 
 TrainingPlan DataManager::loadTrainingPlan(const std::string& filename, bool decrypt) {
-    std::string content = readFile(filename);
-    
-    if (content.empty()) {
-        return TrainingPlan();
-    }
-    
-    if (decrypt && encryptionEnabled) {
-        try {
-            content = Encryption::decrypt(content, encryptionKey);
-        } catch (...) {
-            return TrainingPlan();
-        }
-    }
-    
-    return TrainingPlan::fromJson(content);
+    (void)decrypt;
+    if (!encryptionEnabled || encryptionKey.empty()) return TrainingPlan();
+    try {
+        const std::string encrypted=readFile(filename);
+        if(encrypted.empty())return TrainingPlan();
+        return TrainingPlan::fromJson(Encryption::decrypt(encrypted,encryptionKey));
+    } catch (...) { ++statistics.errors; return TrainingPlan(); }
 }
 
 bool DataManager::fileExists(const std::string& filename) const {
