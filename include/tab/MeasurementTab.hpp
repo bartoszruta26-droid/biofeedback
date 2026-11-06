@@ -305,7 +305,6 @@ private:
     void ensureCurrentSeriesInitialized();
     void ensureSessionClockStarted();
     void setupUI();
-    void setupDebugTerminal();
     void updateLiveDisplay(double force);
     void detectRepetitions();
     void calculateRepetitionStats();
