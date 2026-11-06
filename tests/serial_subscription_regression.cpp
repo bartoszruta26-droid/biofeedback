@@ -73,6 +73,10 @@ int main() {
             frame[9] = 0xAA;
             frame[10] = 0x55;
             (void)write(masterFd, frame, sizeof(frame));
+            // The current parser exits its read window when it sees this marker.
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            static constexpr char responseMarker[] = "[DATA_SENT]";
+            (void)write(masterFd, responseMarker, sizeof(responseMarker) - 1);
         }
     });
 
