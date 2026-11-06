@@ -95,6 +95,12 @@ int main() {
         }
     });
 
+    if (std::isfinite(serial.convertToCalibrated(123456))) {
+        std::cerr << "Uncalibrated ADC value was exposed as calibrated data\n";
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
     serial.setCalibrationPoint(123456, 42.5);
     serial.startAsyncReading();
     const auto waitUntil = [](const auto& value, int minimum,
