@@ -382,14 +382,15 @@ std::string Encryption::decrypt(const std::string& encryptedData, const std::str
     bool ok=EVP_DecryptInit_ex(ctx,EVP_aes_256_gcm(),nullptr,nullptr,nullptr)==1 &&
         EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_SET_IVLEN,12,nullptr)==1 &&
         EVP_DecryptInit_ex(ctx,nullptr,nullptr,aesKey,nonce)==1 &&
-        EVP_DecryptUpdate(ctx,reinterpret_cast<unsigned char*>(&plaintext[0]),&outLen,cipher,static_cast<int>(cipherLen))==1;
+        EVP_DecryptUpdate(ctx,plainBuffer.data(),&outLen,cipher,static_cast<int>(cipherLen))==1;
     total=outLen;
     if(ok)ok=EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_SET_TAG,16,const_cast<unsigned char*>(tag))==1;
-    if(ok)ok=EVP_DecryptFinal_ex(ctx,reinterpret_cast<unsigned char*>(&plaintext[0])+total,&outLen)==1;
+    if(ok)ok=EVP_DecryptFinal_ex(ctx,plainBuffer.data()+total,&outLen)==1;
     total+=outLen;
     EVP_CIPHER_CTX_free(ctx); OPENSSL_cleanse(aesKey,sizeof(aesKey));
-    if(!ok){OPENSSL_cleanse(plaintext.data(),plaintext.size());throw std::runtime_error("Weryfikacja tagu AES-256-GCM nie powiodła się");}
-    plaintext.resize(static_cast<std::size_t>(total));
+    if(!ok){OPENSSL_cleanse(plainBuffer.data(),plainBuffer.size());throw std::runtime_error("Weryfikacja tagu AES-256-GCM nie powiodła się");}
+    std::string plaintext(reinterpret_cast<const char*>(plainBuffer.data()),static_cast<std::size_t>(total));
+    OPENSSL_cleanse(plainBuffer.data(),plainBuffer.size());
     m_statistics.decryptOperations.fetch_add(1);
     m_statistics.totalBytesProcessed.fetch_add(plaintext.size());
     return plaintext;
