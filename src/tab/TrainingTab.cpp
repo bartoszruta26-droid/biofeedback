@@ -594,9 +594,9 @@ void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunicatio
 
     if (m_serialPort) {
         m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, "onSensorDataReceived",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
+            QMetaObject::invokeMethod(this, [this, data]() {
+                onSensorDataReceived(data);
+            }, Qt::QueuedConnection);
         });
     }
 }
