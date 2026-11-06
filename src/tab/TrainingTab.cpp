@@ -925,6 +925,19 @@ void TrainingTab::loadNextExercise()
     loadNextSeries();
 }
 
+void TrainingTab::reconfigureGameForExercise(const TrainingExercise& exercise)
+{
+    // TrainingTab nie jest właścicielem fabryk gier ani ich cyklu życia.
+    // MainWindow / warstwa prezentacji musi dostarczyć właściwy GameEngine.
+    if (m_currentGame && m_currentGame->isRunning()) {
+        m_currentGame->stop();
+    }
+    addDebugMessage(
+        QString("Ćwiczenie „%1” wymaga gry „%2”. Oczekiwanie na przypisanie silnika gry przez warstwę główną.")
+            .arg(exercise.name, exercise.gameType),
+        "WARNING");
+}
+
 void TrainingTab::loadNextSeries()
 {
     const auto& ex = m_exercisePlan[m_currentExerciseIndex];
@@ -999,59 +1012,25 @@ void TrainingTab::checkExerciseCompletion()
 
 void TrainingTab::calculateExerciseStats()
 {
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exerciseStats.size() ||
+        m_currentExerciseIndex >= m_exercisePlan.size()) {
+        return;
+    }
+
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-    stats.completedSeries = m_currentSeriesIndex;
-    stats.completedReps = m_currentRepIndex;
-    
-    // Obliczenie pełnych statystyk ćwiczenia
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    // Średnia siła szczytowa na powtórzenie
-    if (stats.peakForcePerRep.size() > 0) {
-        double totalPeakForce = 0.0;
-        for (double peakForce : stats.peakForcePerRep) {
-            totalPeakForce += peakForce;
-        }
-        stats.averagePeakForce = totalPeakForce / static_cast<double>(stats.peakForcePerRep.size());
-    } else {
-        stats.averagePeakForce = 0.0;
-    }
-    
-    // Maksymalna siła szczytowa
-    stats.maxPeakForce = 0.0;
-    for (double peakForce : stats.peakForcePerRep) {
-        if (peakForce > stats.maxPeakForce) {
-            stats.maxPeakForce = peakForce;
-        }
-    }
-    
-    // Minimalna siła szczytowa
-    if (!stats.peakForcePerRep.empty()) {
-        stats.minPeakForce = stats.peakForcePerRep[0];
-        for (double peakForce : stats.peakForcePerRep) {
-            if (peakForce < stats.minPeakForce) {
-                stats.minPeakForce = peakForce;
-            }
-        }
-    } else {
-        stats.minPeakForce = 0.0;
-    }
-    
-    // Czas trwania ćwiczenia
-    stats.duration = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - stats.startTime
-    ).count();
-    
-    // Współczynnik wykonania (procent ukończonych serii i powtórzeń)
-    if (ex.seriesCount > 0 && ex.repsPerSeries > 0) {
-        int totalExpectedReps = ex.seriesCount * ex.repsPerSeries;
-        int actualReps = stats.completedSeries * ex.repsPerSeries + stats.completedReps;
-        stats.completionRate = static_cast<double>(actualReps) / static_cast<double>(totalExpectedReps) * 100.0;
-    } else {
-        stats.completionRate = 0.0;
-    }
-    
-    stats.isCompleted = true;
+    const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
+
+    stats.completedSeries = qBound(0, m_currentSeriesIndex, exercise.seriesCount);
+    stats.completedReps = qBound(0, m_currentRepIndex, exercise.repsPerSeries);
+
+    // Statystyki pozostają oparte wyłącznie na próbkach rzeczywiście zebranych.
+    // Zapis szczytu pojedynczego powtórzenia wymaga wiarygodnego sygnału końca
+    // powtórzenia; obecny protokół sensora takiego znacznika nie dostarcza.
+    stats.maxPeakForce = qMax(stats.maxPeakForce, m_peakForceInRep);
+    stats.avgPeakForce = stats.completedReps > 0
+        ? stats.avgPeakForce
+        : 0.0;
+    stats.isCompleted = stats.completedSeries >= exercise.seriesCount;
 }
 
 void TrainingTab::startRestTimer()
