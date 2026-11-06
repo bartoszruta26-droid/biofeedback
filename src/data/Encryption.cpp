@@ -1,9 +1,9 @@
 /**
  * @file Encryption.cpp
- * @brief Implementacja klasy Encryption - szyfrowanie XOR z kodowaniem Base64
+ * @brief Implementacja klasy Encryption - szyfrowanie uwierzytelnione AES-256-GCM
  * 
  * Ten plik zawiera implementację mechanizmów szyfrowania i deszyfrowania danych
- * z wykorzystaniem algorytmu XOR oraz kodowania Base64. Kod zawiera rozbudowane
+ * z wykorzystaniem AES-256-GCM oraz kodowania Base64. Kod zawiera rozbudowane
  * mechanizmy debugowania, obsługi błędów, wyjątków oraz logowania operacji.
  * 
  * @author AI Assistant
@@ -11,7 +11,6 @@
  */
 
 #include "data/Encryption.hpp"
-#include <cstdlib>
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
@@ -575,67 +574,3 @@ std::vector<uint8_t> Encryption::base64Decode(const std::string& input) {
     }
 }
 
-std::vector<uint8_t> Encryption::xorCipher(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
-    #if DEBUG_XOR_OPERATIONS
-    ENCRYPT_DEBUG(2, "Rozpoczynanie operacji XOR Cipher");
-    ENCRYPT_DEBUG(3, "Długość danych: " << data.size() << " bajtów");
-    ENCRYPT_DEBUG(3, "Długość klucza: " << key.size() << " bajtów");
-    #endif
-    
-    // Walidacja danych wejściowych
-    if (data.empty()) {
-        ENCRYPT_DEBUG(3, "Puste dane wejściowe - zwracanie pustego wektora");
-        return std::vector<uint8_t>();  // Gentle code: puste dane -> pusty wynik
-    }
-    
-    if (key.empty()) {
-        ENCRYPT_ERROR("Próba wykonania XOR z pustym kluczem");
-        throw std::invalid_argument("Klucz nie może być pusty w operacji XOR");
-    }
-    
-    std::vector<uint8_t> result;
-    
-    try {
-        // Rezerwacja pamięci z wyprzedzeniem
-        result.resize(data.size());
-        
-        #if DEBUG_XOR_OPERATIONS && DEBUG_ENCRYPTION >= 3
-        size_t loggedOps = 0;
-        #endif
-        
-        for (size_t i = 0; i < data.size(); ++i) {
-            // Operacja XOR z cyklicznym użyciem klucza
-            result[i] = data[i] ^ key[i % key.size()];
-            
-            #if DEBUG_XOR_OPERATIONS && DEBUG_ENCRYPTION >= 3
-            loggedOps++;
-            if (loggedOps <= 5 || loggedOps % 50 == 0) {
-                ENCRYPT_DEBUG(3, "XOR operacja #" << i 
-                            << ": data[0x" << std::hex << static_cast<int>(data[i]) << "]"
-                            << " ^ key[0x" << static_cast<int>(key[i % key.size()]) << "]"
-                            << " = 0x" << static_cast<int>(result[i]) << std::dec);
-            }
-            #endif
-        }
-        
-        #if DEBUG_XOR_OPERATIONS
-        ENCRYPT_DEBUG(2, "Operacja XOR Cipher zakończona");
-        ENCRYPT_DEBUG(3, "Liczba przetworzonych bajtów: " << result.size());
-        #if DEBUG_ENCRYPTION >= 3
-        ENCRYPT_DEBUG(3, "Liczba zalogowanych operacji: " << loggedOps);
-        #endif
-        #endif
-        
-        return result;
-        
-    } catch (const std::bad_alloc& e) {
-        ENCRYPT_ERROR("Błąd alokacji pamięci podczas operacji XOR: " << e.what());
-        throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji XOR");
-    } catch (const std::out_of_range& e) {
-        ENCRYPT_ERROR("Błąd indeksu podczas operacji XOR: " << e.what());
-        throw std::runtime_error("Błąd indeksu przy dostępie do danych/klucza");
-    } catch (const std::exception& e) {
-        ENCRYPT_ERROR("Nieoczekiwany błąd podczas operacji XOR: " << e.what());
-        throw std::runtime_error("Krytyczny błąd podczas operacji XOR Cipher");
-    }
-}
