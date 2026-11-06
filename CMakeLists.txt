@@ -57,6 +57,9 @@ target_link_libraries(auth_regression PRIVATE biofeedback_core)
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 
+add_executable(rep_detector_regression tests/rep_detector_regression.cpp)
+target_include_directories(rep_detector_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+
 # Build GUI app only when requested and Qt5 development packages are available.
 option(BIOFEEDBACK_BUILD_GUI "Build the Qt desktop application" ON)
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
