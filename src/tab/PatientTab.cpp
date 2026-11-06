@@ -6,6 +6,47 @@
 
 namespace tab {
 
+namespace {
+
+QStringList parseCsvLine(const QString& line)
+{
+    QStringList fields;
+    QString field;
+    bool inQuotes = false;
+    const QChar quote(34);
+    const QChar comma(44);
+
+    for (int i = 0; i < line.size(); ++i) {
+        const QChar ch = line.at(i);
+        if (ch == quote) {
+            if (inQuotes && i + 1 < line.size() && line.at(i + 1) == quote) {
+                field += quote;
+                ++i;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (ch == comma && !inQuotes) {
+            fields.append(field);
+            field.clear();
+        } else {
+            field += ch;
+        }
+    }
+
+    fields.append(field);
+    return fields;
+}
+
+QString escapeCsvField(QString value)
+{
+    const QChar quote(34);
+    value.replace(QString(quote), QString(quote) + QString(quote));
+    return quote + value + quote;
+}
+
+} // namespace
+
+
 PatientTab::PatientTab(QWidget *parent)
     : QWidget(parent)
     , m_centralWidget(nullptr)
@@ -294,7 +335,7 @@ int PatientTab::findPatientByPesel(const QString& pesel)
 
 void PatientTab::addPatient(const QString& pesel, const QString& firstName,
                            const QString& lastName, const QDate& birthDate,
-                           const QString& gender)
+                           const QString& gender, const QString& notes)
 {
     // Sprawdzenie czy PESEL już istnieje
     int existingRow = findPatientByPesel(pesel);
@@ -317,6 +358,7 @@ void PatientTab::addPatient(const QString& pesel, const QString& firstName,
     m_patientTable->setItem(row, 2, new QTableWidgetItem(lastName));
     m_patientTable->setItem(row, 3, new QTableWidgetItem(birthDate.toString("yyyy-MM-dd")));
     m_patientTable->setItem(row, 4, new QTableWidgetItem(gender));
+    m_patientTable->setItem(row, 5, new QTableWidgetItem(notes));
     
     if (m_isEditMode) {
         emit patientUpdated(row);
@@ -379,11 +421,14 @@ bool PatientTab::exportToCSV(const QString& filename)
         QString notes = m_patientTable->item(row, 5) ? 
                        m_patientTable->item(row, 5)->text() : "";
         
-        // Escapowanie przecinków w danych
-        notes.replace("\"", "\"\"");
-        
-        out << pesel << "," << firstName << "," << lastName << ","
-            << birthDate << "," << gender << ",\"" << notes << "\"\n";
+        const QStringList fields = {
+            pesel, firstName, lastName, birthDate, gender, notes
+        };
+        for (int i = 0; i < fields.size(); ++i) {
+            if (i > 0) out << ",";
+            out << escapeCsvField(fields[i]);
+        }
+        out << "\n";
     }
     
     file.close();
@@ -411,7 +456,7 @@ bool PatientTab::importFromCSV(const QString& filename)
             continue;
         
         // Proste parsowanie CSV (zakłada brak przecinków w polach)
-        QStringList fields = line.split(',');
+        QStringList fields = parseCsvLine(line);
         
         if (fields.size() >= 5) {
             QString pesel = fields[0].trimmed();
@@ -421,7 +466,8 @@ bool PatientTab::importFromCSV(const QString& filename)
             QString gender = fields[4].trimmed();
             
             if (!pesel.isEmpty() && !firstName.isEmpty() && !lastName.isEmpty()) {
-                addPatient(pesel, firstName, lastName, birthDate, gender);
+                const QString notes = fields.size() > 5 ? fields[5] : QString();
+                addPatient(pesel, firstName, lastName, birthDate, gender, notes);
                 importedCount++;
             }
         }
@@ -468,7 +514,7 @@ void PatientTab::openAddPatientDialog()
         return;
     }
     
-    addPatient(pesel, firstName, lastName, birthDate, gender);
+    addPatient(pesel, firstName, lastName, birthDate, gender, m_notesEdit->toPlainText());
 }
 
 void PatientTab::editSelectedPatient()
