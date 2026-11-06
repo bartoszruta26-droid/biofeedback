@@ -18,6 +18,7 @@
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <algorithm>
 #include <fstream>
@@ -832,7 +833,7 @@ bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double kno
 
     std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
     m_impl->zeroOffset = static_cast<double>(rawZero);
-    m_impl->scaleFactor = knownWeight / static_cast<double>(rawSpan - rawZero);
+    m_impl->scaleFactor = knownWeight / (static_cast<double>(rawSpan) - static_cast<double>(rawZero));
     m_impl->isCalibrated = true;
     return true;
 }
