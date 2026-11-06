@@ -517,7 +517,7 @@ int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
     if (!m_impl->isConnected) return info;
-    std::string resp = sendCommand("ID", true);
+    std::string resp = sendCommand("ID", true, timeout);
     if (resp.find("DEVICE:") != std::string::npos) {
         std::istringstream iss(resp); std::string line;
         while (std::getline(iss, line)) {
@@ -812,7 +812,7 @@ int SerialCommunication::getTimeSinceLastActivity() const {
 }
 
 double SerialCommunication::tare(int samples) {
-    Q_UNUSED(samples);
+    (void)samples;
     if (m_impl->isConnected) sendCommand("TARE", true);
     std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
     m_impl->zeroOffset = 0.0;
@@ -881,31 +881,55 @@ int32_t SerialCommunication::getTimestampOffset() const {
     return m_impl->timestampOffset; 
 }
 
-std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
+std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse, int timeoutMs) {
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
-    std::string toSend = cmd + "\n";
+    const std::string toSend = cmd + "\n";
 #ifdef _WIN32
-    DWORD w; WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), toSend.c_str(), toSend.size(), &w, nullptr);
+    DWORD written = 0;
+    if (!WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), toSend.c_str(),
+                   static_cast<DWORD>(toSend.size()), &written, nullptr) ||
+        written != toSend.size()) return "";
 #else
-    write(m_impl->portHandle, toSend.c_str(), toSend.size());
+    if (write(m_impl->portHandle, toSend.c_str(), toSend.size()) !=
+        static_cast<ssize_t>(toSend.size())) return "";
 #endif
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
-    if (!waitForResponse) return "";
-    std::string resp; char buf[256];
-    auto start = std::chrono::steady_clock::now();
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() < 2000) {
-        int rd = 0;
+    if (!waitForResponse || timeoutMs <= 0) return "";
+
+    std::string response;
+    char buffer[256];
+    const auto start = std::chrono::steady_clock::now();
+    while (true) {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count();
+        const int remaining = std::max(0, timeoutMs - static_cast<int>(elapsed));
+        if (remaining == 0) break;
+        int bytesRead = 0;
 #ifdef _WIN32
-        DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
+        DWORD count = 0;
+        if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buffer, 255, &count, nullptr))
+            bytesRead = static_cast<int>(count);
 #else
-        rd = read(m_impl->portHandle, buf, 255);
+        pollfd descriptor{m_impl->portHandle, POLLIN, 0};
+        const int ready = poll(&descriptor, 1, remaining);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready <= 0 || !(descriptor.revents & (POLLIN | POLLHUP))) break;
+        bytesRead = static_cast<int>(read(m_impl->portHandle, buffer, 255));
 #endif
-        if (rd > 0) { buf[rd] = 0; resp += buf; if (resp.find("[DATA_SENT]")!=std::string::npos || resp.find("OK")!=std::string::npos || resp.find("FORCE:")!=std::string::npos) break; }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if (bytesRead > 0) {
+            buffer[bytesRead] = 0;
+            response.append(buffer, static_cast<std::size_t>(bytesRead));
+            if (response.find("[DATA_SENT]") != std::string::npos ||
+                response.find("OK") != std::string::npos ||
+                response.find("FORCE:") != std::string::npos ||
+                response.find("DEVICE:") != std::string::npos ||
+                response.find("Calibrated!") != std::string::npos) break;
+        }
     }
-    if (m_impl->verbose && !resp.empty()) std::cout << "[SerialComm] " << resp << std::endl;
-    return resp;
+    if (m_impl->verbose && !response.empty())
+        std::cout << "[SerialComm] " << response << std::endl;
+    return response;
 }
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
