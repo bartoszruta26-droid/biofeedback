@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <climits>
 #include <openssl/evp.h>
+#include <openssl/crypto.h>
 #include <openssl/rand.h>
 
 // ============================================================================
@@ -346,7 +347,7 @@ std::string Encryption::encrypt(const std::string& data, const std::string& key)
     payload.insert(payload.end(),tag,tag+sizeof(tag));
     payload.insert(payload.end(),ciphertext.begin(),ciphertext.begin()+total);
     if(payload.size()>static_cast<std::size_t>(INT_MAX))throw std::runtime_error("Wynik szyfrowania jest zbyt duży");
-    std::string encoded(4*((payload.size()+2)/3),'\\0');
+    std::string encoded(4*((payload.size()+2)/3),'\0');
     const int n=EVP_EncodeBlock(reinterpret_cast<unsigned char*>(&encoded[0]),payload.data(),static_cast<int>(payload.size()));
     if(n<0)throw std::runtime_error("Kodowanie Base64 nie powiodło się");
     encoded.resize(static_cast<std::size_t>(n));
@@ -378,7 +379,8 @@ std::string Encryption::decrypt(const std::string& encryptedData, const std::str
     const std::size_t cipherLen=payloadLen-28;
     EVP_CIPHER_CTX* ctx=EVP_CIPHER_CTX_new();
     if(!ctx){OPENSSL_cleanse(aesKey,sizeof(aesKey));throw std::runtime_error("Nie można utworzyć kontekstu AES-GCM");}
-    std::string plaintext(cipherLen,'\\0'); int outLen=0,total=0;
+    std::vector<unsigned char> plainBuffer(cipherLen+16);
+    int outLen=0,total=0;
     bool ok=EVP_DecryptInit_ex(ctx,EVP_aes_256_gcm(),nullptr,nullptr,nullptr)==1 &&
         EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_SET_IVLEN,12,nullptr)==1 &&
         EVP_DecryptInit_ex(ctx,nullptr,nullptr,aesKey,nonce)==1 &&
@@ -387,7 +389,8 @@ std::string Encryption::decrypt(const std::string& encryptedData, const std::str
     if(ok)ok=EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_SET_TAG,16,const_cast<unsigned char*>(tag))==1;
     if(ok)ok=EVP_DecryptFinal_ex(ctx,plainBuffer.data()+total,&outLen)==1;
     total+=outLen;
-    EVP_CIPHER_CTX_free(ctx); OPENSSL_cleanse(aesKey,sizeof(aesKey));
+    EVP_CIPHER_CTX_free(ctx);
+    OPENSSL_cleanse(aesKey,sizeof(aesKey));
     if(!ok){OPENSSL_cleanse(plainBuffer.data(),plainBuffer.size());throw std::runtime_error("Weryfikacja tagu AES-256-GCM nie powiodła się");}
     std::string plaintext(reinterpret_cast<const char*>(plainBuffer.data()),static_cast<std::size_t>(total));
     OPENSSL_cleanse(plainBuffer.data(),plainBuffer.size());
