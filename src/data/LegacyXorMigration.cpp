@@ -80,7 +80,7 @@ bool writeExclusiveFile(const std::string& path, const std::string& data, std::s
     // fails rather than replacing an existing destination.
     std::string temporary = path + ".tmp.XXXXXX";
     std::vector<char> name(temporary.begin(), temporary.end());
-    name.push_back('\\0');
+    name.push_back('\0');
     const int fd = ::mkstemp(name.data());
     if (fd < 0) { error = "Nie można utworzyć pliku tymczasowego: " + std::string(std::strerror(errno)); return false; }
     const std::string tempPath(name.data());
