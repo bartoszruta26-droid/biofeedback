@@ -32,7 +32,7 @@ This change set introduces password hashing, authenticated encryption, atomic pe
 
 ## Patient records and JSON export
 
-- Patient save/load always use AES-GCM; the legacy boolean arguments cannot disable encryption.
+- Patient records, patient-linked exercise results and training plans always use AES-GCM; legacy boolean arguments cannot disable encryption.
 - Patient reads without an encryption key or with plaintext/legacy data fail closed.
 - JSON export/import now encrypts and authenticates the payload and requires the configured key.
 
