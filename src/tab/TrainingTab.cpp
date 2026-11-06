@@ -537,6 +537,8 @@ void TrainingTab::stopTraining()
     m_isTraining = false;
     m_isPaused = false;
     m_inRestPeriod = false;
+    m_restForNextExercise = false;
+    m_repInProgress = false;
     
     // Zatrzymanie gry jeśli aktywna
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -1063,6 +1065,7 @@ void TrainingTab::completeCurrentRepetition()
 
         m_inRestPeriod = m_restTimeRemaining > 0;
         if (m_inRestPeriod) {
+            if (m_currentGame && m_currentGame->isRunning()) m_currentGame->pause();
             m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
             if (!m_isPaused) m_restTimer->start();
         } else if (m_restForNextExercise) {
