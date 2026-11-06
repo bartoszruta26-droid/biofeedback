@@ -171,6 +171,8 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_lblRestTimer(nullptr)
     , m_gameBox(nullptr)
     , m_currentGame(nullptr)
+    , m_repInProgress(false)
+    , m_restForNextExercise(false)
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
     , m_timer(nullptr)
@@ -256,6 +258,7 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Pong", "pong");
     m_gameTypeCombo->addItem("Flappy Bird", "flappy");
     m_gameTypeCombo->addItem("Mario", "mario");
+    m_gameTypeCombo->addItem("Sinus", "sin");
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_gameTypeCombo);
@@ -424,7 +427,12 @@ void TrainingTab::setupUI()
             m_restTimer->stop();
             m_inRestPeriod = false;
             m_lblRestTimer->setText("");
-            loadNextSeries();
+            if (m_restForNextExercise) {
+                m_restForNextExercise = false;
+                loadNextExercise();
+            } else {
+                loadNextSeries();
+            }
         }
     });
 }
@@ -601,40 +609,61 @@ void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunicatio
     }
 }
 
-void TrainingTab::setGameEngine(games::GameEngine* game)
+void TrainingTab::setGameEngine(games::GameEngine* game, const QString& gameType)
 {
-    m_currentGame = game;
-    
-    if (m_currentGame) {
-        // Podłączenie sygnałów gry
-        connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
-        connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
-        connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
-        
-        // Jeśli mamy SerialCommunication, podłącz go do gry
-        if (m_serialPort) {
-            // Spróbuj rzutować na konkretny typ gry i podłącz SerialCommunication
-            auto pongGame = dynamic_cast<games::PongGame*>(m_currentGame);
-            if (pongGame) {
-                pongGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto flappyGame = dynamic_cast<games::FlappyBirdGame*>(m_currentGame);
-            if (flappyGame) {
-                flappyGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto marioGame = dynamic_cast<games::MarioGame*>(m_currentGame);
-            if (marioGame) {
-                marioGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto sinGame = dynamic_cast<games::SinGame*>(m_currentGame);
-            if (sinGame) {
-                sinGame->setSerialConnection(m_serialPort);
-            }
-        }
+    if (m_currentGame == game) {
+        m_currentGameType = gameType;
+        return;
     }
+
+    if (m_currentGame) {
+        if (m_currentGame->isRunning()) m_currentGame->stop();
+        m_mainLayout->removeWidget(m_currentGame);
+        m_currentGame->hide();
+        m_currentGame->deleteLater();
+        m_currentGame = nullptr;
+    }
+
+    m_currentGame = game;
+    m_currentGameType = gameType;
+
+    if (!m_currentGame) return;
+
+    m_currentGame->setParent(m_gameBox);
+    m_currentGame->setMinimumHeight(300);
+    m_currentGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    auto* gameLayout = qobject_cast<QVBoxLayout*>(m_gameBox->layout());
+    if (gameLayout) {
+        while (QLayoutItem* item = gameLayout->takeAt(0)) {
+            if (QWidget* widget = item->widget()) {
+                widget->hide();
+                widget->deleteLater();
+            }
+            delete item;
+        }
+        gameLayout->addWidget(m_currentGame);
+    }
+
+    connect(m_currentGame, &games::GameEngine::gameEnded,
+            this, &TrainingTab::onGameEnded, Qt::UniqueConnection);
+    connect(m_currentGame, &games::GameEngine::gameStarted,
+            this, &TrainingTab::onGameStarted, Qt::UniqueConnection);
+    connect(m_currentGame, &games::GameEngine::scoreChanged,
+            this, &TrainingTab::onScoreChanged, Qt::UniqueConnection);
+
+    if (m_serialPort) {
+        if (auto* gameWidget = dynamic_cast<games::PongGame*>(m_currentGame))
+            gameWidget->setSerialConnection(m_serialPort);
+        if (auto* gameWidget = dynamic_cast<games::FlappyBirdGame*>(m_currentGame))
+            gameWidget->setSerialConnection(m_serialPort);
+        if (auto* gameWidget = dynamic_cast<games::MarioGame*>(m_currentGame))
+            gameWidget->setSerialConnection(m_serialPort);
+        if (auto* gameWidget = dynamic_cast<games::SinGame*>(m_currentGame))
+            gameWidget->setSerialConnection(m_serialPort);
+    }
+
+    m_currentGame->show();
 }
 
 QVector<ExerciseStats> TrainingTab::getTrainingStats() const
@@ -827,9 +856,20 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
         .arg(data.calibratedValue);
     addDebugMessage(arduinoDebug, "ARDUINO");
     
-    // Śledzenie siły szczytowej w powtórzeniu
-    if (force > m_peakForceInRep) {
-        m_peakForceInRep = force;
+    // Powtórzenie: rozpoczęcie przy 80% siły docelowej, zakończenie
+    // po spadku poniżej 40%. Histereza ogranicza wielokrotne zliczanie drgań.
+    const double target = (!m_exercisePlan.isEmpty() &&
+                           m_currentExerciseIndex >= 0 &&
+                           m_currentExerciseIndex < m_exercisePlan.size())
+        ? m_exercisePlan[m_currentExerciseIndex].targetForce : 0.0;
+    if (target > 0.0) {
+        if (!m_repInProgress && force >= target * 0.80) {
+            m_repInProgress = true;
+            m_peakForceInRep = force;
+        } else if (m_repInProgress) {
+            m_peakForceInRep = qMax(m_peakForceInRep, force);
+            if (force <= target * 0.40) completeCurrentRepetition();
+        }
     }
     
     // Aktualizacja UI
@@ -851,10 +891,10 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     emit newForceSample(force);
 }
 
-void TrainingTab::onGameEnded(int /*score*/)
+void TrainingTab::onGameEnded(int score)
 {
-    // Gra zakończona - można zarejestrować wynik
-    calculateExerciseStats();
+    addDebugMessage(QString("Gra zakończona. Wynik: %1. Trening oczekuje na dalsze próbki sensora.")
+                        .arg(score), "INFO");
 }
 
 void TrainingTab::onGameStarted()
@@ -911,56 +951,101 @@ void TrainingTab::loadNextExercise()
     
     const auto& ex = m_exercisePlan[m_currentExerciseIndex];
     
-    // Konfiguracja gry dla tego ćwiczenia
-    QString currentGameType = m_gameTypeCombo->currentData().toString();
-    if (currentGameType != ex.gameType) {
-        // Przełączenie typu gry
-        int index = m_gameTypeCombo->findData(ex.gameType);
-        if (index >= 0) {
-            m_gameTypeCombo->setCurrentIndex(index);
-        }
+    // Ustaw wybór w konfiguracji i zażądaj właściwej gry od MainWindow.
+    const int gameIndex = m_gameTypeCombo->findData(ex.gameType);
+    if (gameIndex >= 0) m_gameTypeCombo->setCurrentIndex(gameIndex);
+
+    if (!m_currentGame || m_currentGameType != ex.gameType) {
         reconfigureGameForExercise(ex);
     }
-    
+
     loadNextSeries();
 }
 
 void TrainingTab::reconfigureGameForExercise(const TrainingExercise& exercise)
 {
-    // TrainingTab nie jest właścicielem fabryk gier ani ich cyklu życia.
-    // MainWindow / warstwa prezentacji musi dostarczyć właściwy GameEngine.
-    if (m_currentGame && m_currentGame->isRunning()) {
-        m_currentGame->stop();
-    }
-    addDebugMessage(
-        QString("Ćwiczenie „%1” wymaga gry „%2”. Oczekiwanie na przypisanie silnika gry przez warstwę główną.")
-            .arg(exercise.name, exercise.gameType),
-        "WARNING");
+    if (m_currentGame && m_currentGame->isRunning()) m_currentGame->stop();
+    addDebugMessage(QString("Przygotowanie gry „%1” dla ćwiczenia „%2”.")
+                        .arg(exercise.gameType, exercise.name), "INFO");
+    emit gameTypeRequested(exercise.gameType);
 }
 
 void TrainingTab::loadNextSeries()
 {
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    if (m_currentSeriesIndex >= ex.seriesCount) {
-        // Seria zakończona, następne ćwiczenie
-        m_currentExerciseIndex++;
-        loadNextExercise();
-        return;
-    }
-    
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) return;
+    const auto& exercise = m_exercisePlan[m_currentExerciseIndex];
+
+    if (m_currentSeriesIndex >= exercise.seriesCount) return;
+
     m_currentRepIndex = 0;
-    m_peakForceInRep = 0;
-    
-    // Start gry dla tej serii
+    m_peakForceInRep = 0.0;
+    m_repInProgress = false;
+
     if (m_currentGame) {
         m_currentGame->reset();
         m_currentGame->start();
     }
-    
     updateProgressWidgets();
 }
 
+void TrainingTab::completeCurrentRepetition()
+{
+    if (!m_repInProgress || m_currentExerciseIndex < 0 ||
+        m_currentExerciseIndex >= m_exercisePlan.size() ||
+        m_currentExerciseIndex >= m_exerciseStats.size()) return;
+
+    const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
+    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    m_repInProgress = false;
+
+    stats.maxPeakForce = qMax(stats.maxPeakForce, m_peakForceInRep);
+    const int previousCount = stats.completedReps;
+    stats.avgPeakForce = (stats.avgPeakForce * previousCount + m_peakForceInRep) /
+                         static_cast<double>(previousCount + 1);
+    stats.completedReps++;
+
+    const int completedRepIndex = m_currentRepIndex;
+    emit repetitionCompleted(m_currentExerciseIndex, m_currentSeriesIndex, completedRepIndex);
+    m_currentRepIndex++;
+
+    if (m_currentRepIndex >= exercise.repsPerSeries) {
+        const int completedSeriesIndex = m_currentSeriesIndex;
+        m_currentSeriesIndex++;
+        stats.completedSeries = m_currentSeriesIndex;
+        m_currentRepIndex = 0;
+        emit seriesCompleted(m_currentExerciseIndex, completedSeriesIndex);
+
+        if (m_currentSeriesIndex >= exercise.seriesCount) {
+            stats.isCompleted = true;
+            emit exerciseCompleted(m_currentExerciseIndex, stats);
+            ++m_currentExerciseIndex;
+            if (m_currentExerciseIndex >= m_exercisePlan.size()) {
+                stopTraining();
+                emit trainingFinished(m_exerciseStats);
+                return;
+            }
+            m_restForNextExercise = true;
+            m_restTimeRemaining = 120;
+        } else {
+            m_restForNextExercise = false;
+            m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
+        }
+
+        m_inRestPeriod = m_restTimeRemaining > 0;
+        if (m_inRestPeriod) {
+            m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
+            if (!m_isPaused) m_restTimer->start();
+        } else if (m_restForNextExercise) {
+            m_restForNextExercise = false;
+            loadNextExercise();
+        } else {
+            loadNextSeries();
+        }
+    } else {
+        m_peakForceInRep = 0.0;
+        updateProgressWidgets();
+    }
+}
 void TrainingTab::loadNextRep()
 {
     const auto& ex = m_exercisePlan[m_currentExerciseIndex];
@@ -1021,15 +1106,6 @@ void TrainingTab::calculateExerciseStats()
     const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
 
     stats.completedSeries = qBound(0, m_currentSeriesIndex, exercise.seriesCount);
-    stats.completedReps = qBound(0, m_currentRepIndex, exercise.repsPerSeries);
-
-    // Statystyki pozostają oparte wyłącznie na próbkach rzeczywiście zebranych.
-    // Zapis szczytu pojedynczego powtórzenia wymaga wiarygodnego sygnału końca
-    // powtórzenia; obecny protokół sensora takiego znacznika nie dostarcza.
-    stats.maxPeakForce = qMax(stats.maxPeakForce, m_peakForceInRep);
-    stats.avgPeakForce = stats.completedReps > 0
-        ? stats.avgPeakForce
-        : 0.0;
     stats.isCompleted = stats.completedSeries >= exercise.seriesCount;
 }
 
