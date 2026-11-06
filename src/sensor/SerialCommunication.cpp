@@ -77,7 +77,7 @@ constexpr int CONNECTION_RETRY_DELAY_MS = 500;
 namespace sensor {
 
 namespace {
-thread_local const void* activeSubscriptionCallback = nullptr;
+thread_local std::vector<const void*> activeSubscriptionCallbacks;
 
 template <typename Callback>
 struct CallbackSlot {
@@ -97,10 +97,9 @@ void invokeSubscription(const std::shared_ptr<Slot>& slot, Invoke invoke)
         if (!slot->active) return;
         ++slot->inFlight;
     }
-    const void* previous = activeSubscriptionCallback;
-    activeSubscriptionCallback = slot.get();
+    activeSubscriptionCallbacks.push_back(slot.get());
     try { invoke(slot->callback); } catch (...) {}
-    activeSubscriptionCallback = previous;
+    activeSubscriptionCallbacks.pop_back();
     {
         std::lock_guard<std::mutex> lock(slot->mutex);
         if (--slot->inFlight == 0) slot->idle.notify_all();
@@ -113,7 +112,7 @@ void deactivateSubscription(const std::shared_ptr<Slot>& slot)
     if (!slot) return;
     std::unique_lock<std::mutex> lock(slot->mutex);
     slot->active = false;
-    if (activeSubscriptionCallback != slot.get())
+    if (std::find(activeSubscriptionCallbacks.begin(), activeSubscriptionCallbacks.end(), slot.get()) == activeSubscriptionCallbacks.end())
         slot->idle.wait(lock, [&slot]() { return slot->inFlight == 0; });
 }
 } // namespace
