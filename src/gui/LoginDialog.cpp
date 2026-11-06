@@ -29,9 +29,6 @@ LoginDialog::LoginDialog(biofeedback::Authentication& auth, QWidget *parent)
     setupUI();
     createConnections();
     
-    // Ustaw domyślny klucz szyfrujący
-    m_authentication.setEncryptionKey("BiofeedbackApp2024SecureKey!");
-    
     // Wczytaj użytkowników
     m_authentication.loadUsers();
     
