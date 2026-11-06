@@ -75,33 +75,41 @@ bool strictBase64Decode(const std::string& input, std::vector<unsigned char>& ou
 }
 
 bool writeExclusiveFile(const std::string& path, const std::string& data, std::string& error) {
-    const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0600);
-    if (fd < 0) { error = "Nie można utworzyć pliku (musi jeszcze nie istnieć): " + std::string(std::strerror(errno)); return false; }
+    // Stage in the destination directory, then publish with link(2), which
+    // fails rather than replacing an existing destination.
+    std::string temporary = path + ".tmp.XXXXXX";
+    std::vector<char> name(temporary.begin(), temporary.end());
+    name.push_back('\\0');
+    const int fd = ::mkstemp(name.data());
+    if (fd < 0) { error = "Nie można utworzyć pliku tymczasowego: " + std::string(std::strerror(errno)); return false; }
+    const std::string tempPath(name.data());
+    bool ok = (::fchmod(fd, 0600) == 0);
     std::size_t offset = 0;
-    while (offset < data.size()) {
+    while (ok && offset < data.size()) {
         const ssize_t n = ::write(fd, data.data()+offset, data.size()-offset);
         if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) { error = "Błąd zapisu pliku"; ::close(fd); ::unlink(path.c_str()); return false; }
+        if (n <= 0) { ok = false; break; }
         offset += static_cast<std::size_t>(n);
     }
-    const int syncResult = ::fsync(fd);
+    if (ok && ::fsync(fd) != 0) ok = false;
     const int closeResult = ::close(fd);
-    if (syncResult != 0 || closeResult != 0) {
-        error = "Nie udało się utrwalić pliku na dysku"; ::unlink(path.c_str()); return false;
+    if (!ok || closeResult != 0) {
+        error = "Nie udało się zapisać i utrwalić pliku tymczasowego";
+        ::unlink(tempPath.c_str());
+        return false;
+    }
+    if (::link(tempPath.c_str(), path.c_str()) != 0) {
+        error = "Nie można opublikować pliku wynikowego bez nadpisania: " + std::string(std::strerror(errno));
+        ::unlink(tempPath.c_str());
+        return false;
+    }
+    if (::unlink(tempPath.c_str()) != 0) {
+        error = "Plik został opublikowany, ale nie udało się usunąć nazwy tymczasowej";
+        return false;
     }
     return true;
 }
 
-std::string sha256Hex(const std::string& data) {
-    unsigned char digest[EVP_MAX_MD_SIZE]{};
-    unsigned int length = 0;
-    if (EVP_Digest(data.data(), data.size(), digest, &length, EVP_sha256(), nullptr) != 1 || length != 32)
-        throw std::runtime_error("Nie można obliczyć SHA-256 danych jawnych");
-    std::ostringstream out; out << std::hex << std::setfill('0');
-    for (unsigned int i=0; i<length; ++i) out << std::setw(2) << static_cast<unsigned int>(digest[i]);
-    OPENSSL_cleanse(digest, sizeof(digest));
-    return out.str();
-}
 bool syncParentDirectory(const std::string& path) {
     const auto slash = path.find_last_of('/');
     const std::string dir = slash == std::string::npos ? "." : (slash == 0 ? "/" : path.substr(0, slash));
