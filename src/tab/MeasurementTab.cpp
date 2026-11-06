@@ -398,12 +398,9 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     m_btnSaveJSON = nullptr;
     m_btnLoadJSON = nullptr;
     
-    // Inicjalizacja połączenia szeregowego
-    m_serialPort = std::make_shared<sensor::SerialCommunication>();
+    // Wspólne połączenie jest wstrzykiwane przez MainWindow.
+    // Nie twórz osobnego portu ani wątku przed ustawieniem właściciela połączenia.
     m_lastSensorData = sensor::SensorData();
-    
-    // Próba automatycznego podłączenia do Arduino w tle
-    connectToArduinoAsync();
     
     // MeasurementTab nie posiada własnego terminala debugowego.
     // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
@@ -419,6 +416,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
+    m_connectionSearchActive.store(false);
+    if (m_connectionThread.joinable()) m_connectionThread.join();
     if (m_serialPort && m_dataSubscriptionId) {
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
@@ -1903,6 +1902,10 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
 
 void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
+    // Zatrzymaj poprzednie wyszukiwanie przed podmianą współdzielonego portu.
+    m_connectionSearchActive.store(false);
+    if (m_connectionThread.joinable()) m_connectionThread.join();
+
     if (m_serialPort && m_dataSubscriptionId) {
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
@@ -1914,6 +1917,7 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
         });
+        if (!m_serialPort->isConnected()) connectToArduinoAsync();
     }
 }
 
@@ -1973,69 +1977,68 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 
 void MeasurementTab::connectToArduinoAsync()
 {
-    // Uruchomienie wątku do automatycznego łączenia z Arduino
-    std::thread([this]() {
+    if (!m_serialPort || m_connectionSearchActive.exchange(true)) return;
+    if (m_connectionThread.joinable()) m_connectionThread.join();
+
+    const auto serial = m_serialPort;
+    m_connectionThread = std::thread([this, serial]() {
         std::cout << "[MeasurementTab] Searching for Arduino Nano with HX711..." << std::endl;
-        
-        bool connected = false;
         int retryCount = 0;
-        
-        while (!connected) {
-            auto ports = sensor::SerialCommunication::scanAvailablePorts();
-            
-            if (ports.empty()) {
-                if (retryCount % 10 == 0) {
-                    std::cerr << "[MeasurementTab] No serial ports found. Check USB connection." << std::endl;
+
+        while (m_connectionSearchActive.load() && !serial->isConnected()) {
+            const auto ports = sensor::SerialCommunication::scanAvailablePorts();
+            for (const auto& port : ports) {
+                if (!m_connectionSearchActive.load()) break;
+
+                sensor::SerialConfig config;
+                config.portName = port;
+                config.baudRate = 115200;
+                config.dataBits = 8;
+                config.parity = 'N';
+                config.stopBits = 1.0f;
+                config.timeout = 1000;
+
+                if (!serial->connect(config)) continue;
+
+                // Daj urządzeniu czas na restart po otwarciu portu.
+                for (int waited = 0; waited < 1500 && m_connectionSearchActive.load(); waited += 50)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+                if (!m_connectionSearchActive.load()) {
+                    serial->disconnect();
+                    break;
                 }
-            } else {
-                for (const auto& port : ports) {
-                    std::cout << "[MeasurementTab] Trying port: " << port << std::endl;
-                    
-                    sensor::SerialConfig config;
-                    config.portName = port;
-                    config.baudRate = 115200;
-                    config.dataBits = 8;
-                    config.parity = 'N';
-                    config.stopBits = 1.0f;
-                    config.timeout = 1000;
-                    
-                    if (m_serialPort->connect(config)) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-                        
-                        auto info = m_serialPort->identifyArduino(2000);
-                        if (info.isConnected) {
-                            std::cout << "[MeasurementTab] FOUND Arduino Nano on " << port << std::endl;
-                            std::cout << "[MeasurementTab] Device: " << info.deviceName << std::endl;
-                            std::cout << "[MeasurementTab] Firmware: " << info.firmwareVersion << std::endl;
-                            
-                            m_hasArduinoConnection = true;
-                            connected = true;
-                            
-                            // Emituj sygnał w głównym wątku
-                            QMetaObject::invokeMethod(this, [this, info]() {
-                                m_lblStatus->setText("Status: ARDUINO PODŁĄCZONE");
-                                m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
-                                emit arduinoConnectionStatus(true, QString("Wykryto Arduino: %1").arg(QString::fromStdString(info.deviceName)));
-                            }, Qt::QueuedConnection);
-                            
-                            break;
-                        } else {
-                            m_serialPort->disconnect();
+
+                const auto info = serial->identifyArduino(2000);
+                if (info.isConnected) {
+                    serial->startAsyncReading();
+                    m_connectionSearchActive.store(false);
+                    QMetaObject::invokeMethod(this, [this, info]() {
+                        m_hasArduinoConnection = true;
+                        if (m_lblStatus) {
+                            m_lblStatus->setText("Status: ARDUINO PODŁĄCZONE");
+                            m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
                         }
-                    }
+                        emit arduinoConnectionStatus(
+                            true, QString("Wykryto Arduino: %1")
+                                      .arg(QString::fromStdString(info.deviceName)));
+                    }, Qt::QueuedConnection);
+                    std::cout << "[MeasurementTab] FOUND Arduino Nano on " << port << std::endl;
+                    return;
                 }
+
+                serial->disconnect();
             }
-            
-            if (!connected) {
-                retryCount++;
-                if (retryCount % 5 == 0) {
-                    std::cerr << "[MeasurementTab] Arduino not found. Retrying... (" << retryCount << ")" << std::endl;
-                    std::cerr << "[MeasurementTab] Please connect Arduino Nano with HX711 to USB port." << std::endl;
-                }
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-            }
+
+            if (!m_connectionSearchActive.load()) break;
+            ++retryCount;
+            if (retryCount % 5 == 0)
+                std::cerr << "[MeasurementTab] Arduino not found. Retrying... (" << retryCount << ")" << std::endl;
+            for (int waited = 0; waited < 2000 && m_connectionSearchActive.load(); waited += 50)
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
-    }).detach();
+        m_connectionSearchActive.store(false);
+    });
 }
 
 // ============================================================================
