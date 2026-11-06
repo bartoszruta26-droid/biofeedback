@@ -69,7 +69,7 @@ struct TrainingExercise {
     bool isCompleted;             // Czy ćwiczenie zakończone
     
     TrainingExercise() : seriesCount(3), repsPerSeries(8), targetForce(50.0),
-                         restTime(60.0), isCompleted(false) {}
+                         restTime(60.0), gameType("pong"), isCompleted(false) {}
 };
 
 /**
