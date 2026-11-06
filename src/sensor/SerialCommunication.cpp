@@ -427,7 +427,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         if (m_impl->verbose) {
             std::cout << "[SerialComm] Connected to " << portName << " at " << baudRate << " baud" << std::endl;
         }
-        
+        notifyConnectionCallbacks(true, "Connected to " + portName);
         return true;
         
     } catch (const std::exception& e) {
@@ -456,6 +456,7 @@ void SerialCommunication::disconnect() {
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
     m_impl->portHandle = -1; m_impl->isConnected = false;
+    notifyConnectionCallbacks(false, "Serial connection closed");
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
@@ -651,6 +652,26 @@ void SerialCommunication::unsubscribeDataCallback(SubscriptionId id) {
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
     m_impl->dataSubscribers.erase(id);
 }
+void SerialCommunication::notifyConnectionCallbacks(bool connected, const std::string& message) {
+    ConnectionCallback primaryCallback;
+    std::vector<ConnectionCallback> subscribers;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        primaryCallback = m_impl->connectionCallback;
+        subscribers.reserve(m_impl->connectionSubscribers.size());
+        for (const auto& entry : m_impl->connectionSubscribers) {
+            subscribers.push_back(entry.second);
+        }
+    }
+    if (primaryCallback) {
+        try { primaryCallback(connected, message); } catch (...) {}
+    }
+    for (const auto& callback : subscribers) {
+        if (!callback) continue;
+        try { callback(connected, message); } catch (...) {}
+    }
+}
+
 void SerialCommunication::setConnectionCallback(ConnectionCallback cb) {
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
     m_impl->connectionCallback = std::move(cb);
