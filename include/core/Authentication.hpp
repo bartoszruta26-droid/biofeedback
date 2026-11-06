@@ -123,19 +123,6 @@ private:
      */
     UserData* findUser(const std::string& username);
     
-    /**
-     * @brief Szyfruje pojedyncze hasło
-     * @param password Hasło do zaszyfrowania
-     * @return Zaszyfrowane hasło
-     */
-    std::string encryptPassword(const std::string& password);
-    
-    /**
-     * @brief Deszyfruje pojedyncze hasło
-     * @param encryptedPassword Zaszyfrowane hasło
-     * @return Odszyfrowane hasło
-     */
-    std::string decryptPassword(const std::string& encryptedPassword);
 };
 
 } // namespace biofeedback
