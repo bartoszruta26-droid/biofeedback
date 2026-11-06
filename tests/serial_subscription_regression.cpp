@@ -196,7 +196,29 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     const bool firstDetached = firstSubscriberCalls.load() == firstAfterUnsubscribe;
 
+    // A reader callback may request its own stop. This must return without
+    // attempting to join the current thread or holding the lifecycle mutex.
+    std::atomic<bool> selfStopReturned{false};
+    const auto selfStopId = serial.subscribeDataCallback(
+        [&](const sensor::SensorData& data) {
+            if (!data.isValid || data.value != 123456) return;
+            serial.stopAsyncReading();
+            selfStopReturned.store(true);
+        });
+    const bool callbackCanStopReader =
+        selfStopId && waitUntil(selfStopReturned, true, std::chrono::seconds(3));
+    // Reap the thread from the test thread after its callback requested stop.
     serial.stopAsyncReading();
+    if (selfStopId) serial.unsubscribeDataCallback(selfStopId);
+    if (!callbackCanStopReader) {
+        std::cerr << "Reader callback could not request a non-deadlocking stop\\n";
+        emulatorRunning = false;
+        emulator.join();
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
     emulatorRunning = false;
     emulator.join();
 
