@@ -140,6 +140,8 @@ private:
     
     // Dane
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
+    sensor::SerialCommunication::SubscriptionId m_connectionSubscriptionId = 0;
     sensor::SensorData m_lastSensorData;
     bool m_hasArduinoConnection;
     bool m_autoScroll;
