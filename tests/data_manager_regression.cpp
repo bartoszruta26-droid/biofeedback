@@ -5,12 +5,16 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <csignal>
+#include <sys/resource.h>
 
 namespace {
 
 const char* kExercisesFile = "/tmp/biofeedback_dm_exercises.json";
 const char* kResultsFile = "/tmp/biofeedback_dm_results.json";
 const char* kPatientFile = "/tmp/biofeedback_dm_patient.json";
+const char* kAtomicFailureFile = "/tmp/biofeedback_dm_atomic_failure.dat";
 
 void expect(bool condition, const std::string& message) {
     if (!condition) {
@@ -125,12 +129,36 @@ int main() {
         expect(dm.exportToJson(exportPayload, kResultsFile), "szyfrowany eksport JSON");
         expect(dm.importFromJson(kResultsFile) == exportPayload, "odszyfrowany import JSON");
 
+
+        // Force a partial write to the temporary file. The existing destination
+        // must remain unchanged because rename is reached only after full write+fsync.
+        {
+            std::ofstream original(kAtomicFailureFile, std::ios::binary);
+            original << "original-content";
+        }
+        struct rlimit previousLimit{};
+        expect(::getrlimit(RLIMIT_FSIZE, &previousLimit) == 0, "getrlimit RLIMIT_FSIZE");
+        struct rlimit limited = previousLimit;
+        limited.rlim_cur = 1;
+        const auto previousHandler = std::signal(SIGXFSZ, SIG_IGN);
+        expect(::setrlimit(RLIMIT_FSIZE, &limited) == 0, "setrlimit partial-write injection");
+        const bool interruptedWrite = dm.exportToJson("payload-longer-than-one-byte", kAtomicFailureFile);
+        const int restoreResult = ::setrlimit(RLIMIT_FSIZE, &previousLimit);
+        std::signal(SIGXFSZ, previousHandler);
+        expect(restoreResult == 0, "restore RLIMIT_FSIZE");
+        expect(!interruptedWrite, "partial atomic write must fail");
+        std::ifstream preserved(kAtomicFailureFile, std::ios::binary);
+        std::string preservedContent((std::istreambuf_iterator<char>(preserved)), std::istreambuf_iterator<char>());
+        expect(preservedContent == "original-content", "previous destination must survive partial write");
+
+        std::remove(kAtomicFailureFile);
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
         std::remove(kPatientFile);
         std::cout << "OK: data_manager_regression" << std::endl;
         return 0;
     } catch (const std::exception& ex) {
+        std::remove(kAtomicFailureFile);
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
         std::remove(kPatientFile);
