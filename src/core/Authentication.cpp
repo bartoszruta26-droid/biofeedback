@@ -3,7 +3,7 @@
  * @brief Implementacja systemu autentykacji użytkowników
  * 
  * Ten plik zawiera implementację mechanizmów autentykacji, zarządzania użytkownikami
- * oraz szyfrowania haseł. Kod zawiera rozbudowane mechanizmy debugowania, obsługi 
+ * oraz jednokierunkowego haszowania haseł. Kod zawiera rozbudowane mechanizmy debugowania, obsługi 
  * błędów, wyjątków oraz logowania operacji.
  * 
  * @author AI Assistant
@@ -990,10 +990,10 @@ UserData* Authentication::findUser(const std::string& username)
 }
 
 /**
- * @brief Szyfruje hasło za pomocą klucza
+ * @brief Tworzy jednokierunkowy skrót PBKDF2-HMAC-SHA256
  * 
- * @param password Hasło do zaszyfrowania
- * @return Zaszyfrowane hasło; przy błędzie zgłasza wyjątek (fail-closed)
+ * @param password Hasło wejściowe
+ * @return Skrót hasła; przy błędzie zgłasza wyjątek (fail-closed)
  */
 std::string Authentication::encryptPassword(const std::string& password)
 {
@@ -1001,9 +1001,9 @@ std::string Authentication::encryptPassword(const std::string& password)
 }
 
 /**
- * @brief Deszyfruje hasło za pomocą klucza
+ * @brief Odczytuje wyłącznie stare rekordy XOR/Base64 (zgodność wsteczna)
  * 
- * @param encryptedPassword Zaszyfrowane hasło
+ * @param encryptedPassword Stary rekord XOR/Base64
  * @return Odszyfrowane hasło lub pusty string jeśli błąd
  */
 std::string Authentication::decryptPassword(const std::string& encryptedPassword)
@@ -1059,10 +1059,10 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
 }
 
 /**
- * @brief Szyfruje hasła wszystkich nieszyfrowanych użytkowników
+ * @brief Migruje jawne hasła do skrótów PBKDF2
  * 
- * @param key Klucz szyfrujący
- * @return Liczba zaszyfrowanych haseł
+ * @param key Klucz legacy potrzebny wyłącznie do migracji starych rekordów
+ * @return Liczba haseł zapisanych jako skróty PBKDF2
  */
 int Authentication::encryptPasswordsIfNeeded(const std::string& key)
 {
