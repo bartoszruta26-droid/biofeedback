@@ -695,7 +695,6 @@ SensorData SerialCommunication::readData(int timeout) {
             }
             
             if (gotBinaryData) break;
-            if (resp.find("[DATA_SENT]") != std::string::npos && gotBinaryData) break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
