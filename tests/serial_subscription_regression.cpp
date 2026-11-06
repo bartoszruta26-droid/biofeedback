@@ -97,6 +97,8 @@ int main() {
 
     if (std::isfinite(serial.convertToCalibrated(123456))) {
         std::cerr << "Uncalibrated ADC value was exposed as calibrated data\n";
+        emulatorRunning = false;
+        emulator.join();
         serial.disconnect();
         close(masterFd);
         return 1;
