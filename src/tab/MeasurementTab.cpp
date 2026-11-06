@@ -498,14 +498,28 @@ void MeasurementTab::setupUI()
     m_btnToggleRaw->setMinimumHeight(35);
     m_btnToggleRaw->setFont(QFont("Arial", 9));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
+        if (checked && !m_lastSensorData.hasRawValue) {
+            const QSignalBlocker blocker(m_btnToggleRaw);
+            m_btnToggleRaw->setChecked(false);
+            checked = false;
+        }
         m_showRawValues = checked;
         if (checked) {
+            m_currentUnit = ForceUnit::Raw;
             m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
             m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
         } else {
+            if (m_currentUnit == ForceUnit::Raw) m_currentUnit = ForceUnit::Newtons;
             m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
             m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
         }
+        if (m_unitSelector) {
+            const QSignalBlocker blocker(m_unitSelector);
+            m_unitSelector->setCurrentIndex(
+                m_unitSelector->findData(static_cast<int>(m_currentUnit)));
+        }
+        if (m_forcePlot) m_forcePlot->setUnit(m_currentUnit);
+        updateUnitDisplay();
     });
     m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
     
