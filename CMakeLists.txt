@@ -152,6 +152,18 @@ if(Qt5_FOUND)
         Qt5::Widgets
         Qt5::Charts
     )
+
+    # POSIX pseudo-terminal regression test for the real serial parser and
+    # callback fan-out. The test emulates Arduino without changing the protocol.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        add_executable(serial_subscription_regression
+            tests/serial_subscription_regression.cpp
+            src/sensor/SerialCommunication.cpp
+            src/core/DebugManager.cpp
+        )
+        target_include_directories(serial_subscription_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+        target_link_libraries(serial_subscription_regression PRIVATE Qt5::Core pthread util)
+    endif()
 else()
     message(WARNING "Qt5 not found - GUI target '${PROJECT_NAME}' will not be built. Core/regression targets remain available.")
 endif()
