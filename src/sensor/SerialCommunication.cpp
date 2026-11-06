@@ -836,11 +836,12 @@ void SerialCommunication::startAsyncReading() {
     }
 
     // Reap a completed reader outside the control mutex.
-    if (staleReader.joinable()) staleReader.join();
+    const bool reapedStaleReader = staleReader.joinable();
+    if (reapedStaleReader) staleReader.join();
 
     {
         std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
-        if (staleReader.joinable()) m_impl->asyncStopping = false;
+        if (reapedStaleReader) m_impl->asyncStopping = false;
         if (!m_impl->isConnected.load() || m_impl->asyncReading.load() ||
             m_impl->connectionClosing || m_impl->asyncStopping) return;
 
