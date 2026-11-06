@@ -350,7 +350,7 @@ void DebugTab::onSensorDataReceived(const sensor::SensorData& data)
         updateConnectionStatus(true);
         
         // Dodaj wiadomość do terminala z danymi z Arduino
-        QString arduinoMsg = QString("RAW=%1 | CALIBRATED=%.2fN | Timestamp=%2")
+        QString arduinoMsg = QString("RAW=%1 | CALIBRATED=%.2f g | Timestamp=%2")
             .arg(data.value)
             .arg(data.calibratedValue)
             .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"));
