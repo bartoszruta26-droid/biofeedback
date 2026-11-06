@@ -370,7 +370,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_statsTable(nullptr)
     , m_rawBox(nullptr)
     , m_rawTable(nullptr)
-    , m_timer(nullptr)
     , m_isMeasuring(false)
     , m_currentSeries(1)
     , m_currentRepInSeries(0)
@@ -384,7 +383,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
-    , m_showRawValues(true)  // Domyślnie pokazujemy wartości surowe (Value z Arduino)
+    , m_showRawValues(false)  // Domyślnie używamy skalibrowanej siły
     , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
     , m_unitSelector(nullptr)
     , m_trendsBox(nullptr)
@@ -405,10 +404,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // MeasurementTab nie posiada własnego terminala debugowego.
     // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
     // który przekazuje je do centralnej zakładki DebugTab.
-    
-    m_timer = new QTimer(this);
-    m_timer->setInterval(10);  // 10 ms = 100 Hz
-    connect(m_timer, &QTimer::timeout, this, &MeasurementTab::onTimerTick);
     
     setupUI();
     setupTrendsUI();
@@ -495,9 +490,9 @@ void MeasurementTab::setupUI()
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
     // Przełącznik trybu Raw/Calibrated - zablokowany podczas aktywnej sesji
-    m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
+    m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI SKALIBROWANE", this);
     m_btnToggleRaw->setCheckable(true);
-    m_btnToggleRaw->setChecked(true);  // Domyślnie włączone (wartości surowe)
+    m_btnToggleRaw->setChecked(false);  // Binarny firmware przekazuje siłę skalibrowaną, bez surowego ADC.
     m_btnToggleRaw->setEnabled(false);  // Domyślnie wyłączone
     m_btnToggleRaw->setMinimumHeight(35);
     m_btnToggleRaw->setFont(QFont("Arial", 9));
@@ -505,7 +500,7 @@ void MeasurementTab::setupUI()
         m_showRawValues = checked;
         if (checked) {
             m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
-            m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+            m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
         } else {
             m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
             m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
@@ -756,7 +751,6 @@ void MeasurementTab::startMeasurement()
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
-    m_timer->start();
     
     std::cout << "[DEBUG] startMeasurement: Locking Raw/Calibrated button" << std::endl;
     
@@ -788,7 +782,6 @@ void MeasurementTab::stopMeasurement()
         return;
     }
     
-    m_timer->stop();
     m_isMeasuring = false;
     
     // Jeśli trwa powtórzenie, zakończ je
@@ -1377,64 +1370,31 @@ void MeasurementTab::onToggleMeasurement()
 
 void MeasurementTab::onReadSingleSample()
 {
-    // Odczyt z Arduino Nano z HX711 przez SerialCommunication
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data = m_serialPort->readData(500);
-        if (data.isValid) {
-            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-            readSingleSample(valueToUse);
-            m_lastSensorData = data;
-        } else {
-            // Jeśli dane nie są poprawne, wyświetl komunikat
-            m_lblStatus->setText("Status: BŁĄD ODCZYTU");
-            m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
-        }
-    } else {
-        // Brak podłączonego Arduino - wyświetl komunikat
+    // Korzystaj z ostatniej próbki wspólnego odbiornika. Nie wykonuj
+    // konkurencyjnego readData() na porcie obsługiwanym przez async reader.
+    if (!m_serialPort || !m_serialPort->isConnected()) {
         m_lblStatus->setText("Status: BRAK ARDUINO NANO Z HX711");
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
         emit arduinoConnectionStatus(false, "Nie wykryto Arduino Nano z HX711. Sprawdź połączenie USB.");
+        return;
     }
-}
+    if (!m_lastSensorData.isValid) {
+        m_lblStatus->setText("Status: OCZEKIWANIE NA PRÓBKĘ");
+        return;
+    }
+    if (m_showRawValues && !m_lastSensorData.hasRawValue) {
+        m_lblStatus->setText("Status: FIRMWARE NIE UDOSTĘPNIA SUROWEGO ADC");
+        return;
+    }
+    if (!m_showRawValues && !std::isfinite(m_lastSensorData.calibratedValue)) {
+        m_lblStatus->setText("Status: BRAK KALIBRACJI");
+        return;
+    }
 
-void MeasurementTab::onTimerTick()
-{
-    // Pobieranie danych z prawdziwego Arduino zamiast symulacji
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data;
-        if (m_serialPort->tryReadData(data)) {
-            if (data.isValid) {
-                std::cout << "[DEBUG] onTimerTick: RAW DATA FROM ARDUINO - timestamp=" << data.timestamp 
-                          << " value=" << data.value << " calibratedValue=" << data.calibratedValue 
-                          << " isValid=" << data.isValid << " crc=" << static_cast<int>(data.crc) << std::endl;
-                
-                m_lastSensorData = data;
-                // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-                double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-                std::cout << "[DEBUG] onTimerTick: valueToUse after conversion=" << valueToUse 
-                          << " m_showRawValues=" << m_showRawValues << std::endl;
-                
-                // Safety check before calling readSingleSample
-                try {
-                    std::cout << "[DEBUG] onTimerTick: About to call readSingleSample with value=" << valueToUse << std::endl;
-                    readSingleSample(valueToUse);
-                    std::cout << "[DEBUG] onTimerTick: readSingleSample completed successfully" << std::endl;
-                } catch (const std::exception& e) {
-                    std::cerr << "[ERROR] onTimerTick: Exception in readSingleSample: " << e.what() << std::endl;
-                } catch (...) {
-                    std::cerr << "[ERROR] onTimerTick: Unknown exception in readSingleSample" << std::endl;
-                }
-            } else {
-                std::cout << "[DEBUG] onTimerTick: Received invalid data" << std::endl;
-            }
-        } else {
-            std::cout << "[DEBUG] onTimerTick: tryReadData returned false" << std::endl;
-        }
-    } else {
-        std::cout << "[DEBUG] onTimerTick: Serial port not connected" << std::endl;
-    }
-    // Jeśli Arduino nie jest podłączone, nie wykonujemy symulacji - czekamy na podłączenie
+    double valueToUse = m_showRawValues
+        ? static_cast<double>(m_lastSensorData.value)
+        : m_lastSensorData.calibratedValue * 9.81 / 1000.0;
+    readSingleSample(valueToUse);
 }
 
 void MeasurementTab::onSelectionChanged()
