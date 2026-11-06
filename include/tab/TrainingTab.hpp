@@ -235,6 +235,7 @@ private:
     void updateDisplay();
     void updateProgressWidgets();
     void loadNextExercise();
+    void reconfigureGameForExercise(const TrainingExercise& exercise);
     void loadNextSeries();
     void loadNextRep();
     void checkExerciseCompletion();
