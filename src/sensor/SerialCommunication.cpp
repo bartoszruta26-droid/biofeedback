@@ -222,7 +222,8 @@ public:
     mutable std::mutex calibrationMutex;
     double zeroOffset = 0.0;
     double scaleFactor = 1.0;
-    bool isCalibrated = false;
+    bool isCalibrated = false; // host-side raw ADC conversion calibration
+    bool firmwareCalibrationConfirmed = false; // set only after explicit firmware CAL acknowledgement
     ArduinoInfo arduinoInfo;
     DataCallback dataCallback;
     std::mutex callbackMutex;
@@ -475,6 +476,10 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             m_impl->portHandle = fd;
         }
 #endif
+        {
+            std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+            m_impl->firmwareCalibrationConfirmed = false;
+        }
         m_impl->isConnected.store(true);
         { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -679,7 +684,11 @@ SensorData SerialCommunication::readData(int timeout) {
                     // calibration-state field. CRC validates transport only.
                     data.calibratedValue = std::numeric_limits<double>::quiet_NaN();
                     data.unit = MeasurementUnit::Unknown;
-                    data.calibrationStatus = CalibrationStatus::Unknown;
+                    {
+                        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+                        data.calibrationStatus = m_impl->firmwareCalibrationConfirmed
+                            ? CalibrationStatus::Calibrated : CalibrationStatus::Unknown;
+                    }
                     data.crc = packet[9];
                     data.isValid = true;
                     gotBinaryData = true;
@@ -721,7 +730,11 @@ SensorData SerialCommunication::readData(int timeout) {
                         }
                     }
                     data.unit = MeasurementUnit::Grams;
-                    data.calibrationStatus = CalibrationStatus::Calibrated;
+                    {
+                        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+                        data.calibrationStatus = m_impl->firmwareCalibrationConfirmed
+                            ? CalibrationStatus::Calibrated : CalibrationStatus::NotCalibrated;
+                    }
                     data.isValid = true;
                     break;
                 }
@@ -944,6 +957,7 @@ bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double kno
     m_impl->zeroOffset = static_cast<double>(rawZero);
     m_impl->scaleFactor = knownWeight / (static_cast<double>(rawSpan) - static_cast<double>(rawZero));
     m_impl->isCalibrated = true;
+    m_impl->firmwareCalibrationConfirmed = true;
     return true;
 }
 double SerialCommunication::convertToCalibrated(int32_t raw) const {
@@ -964,6 +978,7 @@ void SerialCommunication::resetCalibration() {
     m_impl->zeroOffset = 0.0;
     m_impl->scaleFactor = 1.0;
     m_impl->isCalibrated = false;
+    m_impl->firmwareCalibrationConfirmed = false;
 }
 
 uint32_t SerialCommunication::getCurrentTimestamp() {
