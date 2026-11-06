@@ -216,6 +216,7 @@ public:
     std::atomic<bool> isConnected{false};
     int baudRate = DEFAULT_BAUD_RATE;
     std::string portName;
+    mutable std::mutex watchdogMutex;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
     mutable std::mutex calibrationMutex;
@@ -473,7 +474,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         }
 #endif
         m_impl->isConnected.store(true);
-        m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
 #if DEBUG_CONNECTION
