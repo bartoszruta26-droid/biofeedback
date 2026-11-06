@@ -1077,6 +1077,7 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
             stagedUsers = users;
             previousKey = encryptionKey;
             encryptionKey = key;
+            keyChanged = true;
             for (auto& user : stagedUsers) {
                 if (user.encrypted || user.password.empty()) continue;
                 user.password = encryptPassword(user.password);
@@ -1084,6 +1085,7 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
                 ++hashedCount;
             }
             users = stagedUsers;
+            usersReplaced = true;
             currentUser = nullptr;
         }
         if (hashedCount > 0 && !saveUsers()) {
@@ -1095,8 +1097,8 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
         return hashedCount;
     } catch (const std::exception& e) {
         std::lock_guard<std::mutex> lock(m_mutex);
-        users = std::move(originalUsers);
-        encryptionKey = std::move(previousKey);
+        if (usersReplaced) users = std::move(originalUsers);
+        if (keyChanged) encryptionKey = std::move(previousKey);
         AUTH_ERROR("Migracja haseł przerwana: " << e.what());
         return 0;
     }
@@ -1144,6 +1146,7 @@ bool Authentication::login(const std::string& username, const std::string& passw
         return true;
     } catch (const std::exception& e) {
         AUTH_ERROR("Błąd logowania: " << e.what());
+        if (!lock.owns_lock()) lock.lock();
         currentUser = nullptr;
         return false;
     }
