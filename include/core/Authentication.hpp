@@ -16,7 +16,7 @@ struct UserData {
     std::string username;
     std::string password;
     std::string role;
-    bool encrypted;
+    bool encrypted; // true for PBKDF2 hashes or legacy XOR records
     
     // Konwersja do JSON
     std::string toJson() const;
@@ -31,8 +31,8 @@ struct UserData {
  * 
  * Authentication zapewnia:
  * - Wczytywanie danych użytkowników z pliku JSON
- * - Szyfrowanie haseł jeśli nie są zaszyfrowane
- * - Weryfikację loginu i hasła
+ * - Jednokierunkowe haszowanie haseł PBKDF2-HMAC-SHA256
+ * - Weryfikację skrótu hasła i migrację rekordów legacy
  * - Zarządzanie sesją użytkownika
  */
 class Authentication {
