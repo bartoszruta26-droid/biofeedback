@@ -588,6 +588,7 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
     }
 }
 
+
 std::string bytesToHex(const unsigned char* bytes, std::size_t length)
 {
     static const char digits[] = "0123456789abcdef";
@@ -981,8 +982,7 @@ UserData* Authentication::findUser(const std::string& username)
  */
 std::string Authentication::encryptPassword(const std::string& password)
 {
-    // Passwords are one-way hashed with PBKDF2-HMAC-SHA256 and a fresh
-    // cryptographically random salt. This method never returns plaintext.
+    // One-way salted PBKDF2-HMAC-SHA256; no reversible encryption or plaintext fallback.
     return hashPasswordPbkdf2(password);
 }
 
@@ -1052,7 +1052,7 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
  */
 int Authentication::encryptPasswordsIfNeeded(const std::string& key)
 {
-    // The key is retained only for decrypting legacy XOR-encrypted records.
+    // The supplied key is retained only for decrypting legacy XOR-encrypted records.
     if (key.size() < 16) {
         AUTH_ERROR("Klucz migracji rekordów legacy musi mieć co najmniej 16 znaków");
         return 0;
@@ -1124,14 +1124,12 @@ bool Authentication::login(const std::string& username, const std::string& passw
         if (user->encrypted && isPbkdf2PasswordHash(user->password)) {
             passwordMatches = verifyPasswordPbkdf2(password, user->password);
         } else if (user->encrypted) {
-            // Compatibility path for records created by the former reversible
-            // XOR/Base64 scheme. Successful login upgrades them to PBKDF2.
+            // Compatibility path for the former reversible XOR/Base64 records.
             const std::string legacyPassword = decryptPassword(user->password);
             passwordMatches = !legacyPassword.empty() && legacyPassword == password;
             needsUpgrade = passwordMatches;
         } else {
-            // Legacy plaintext records are accepted only for migration on
-            // successful authentication; they are never written back as plaintext.
+            // Plaintext legacy records are accepted only to upgrade them on successful login.
             passwordMatches = user->password == password;
             needsUpgrade = passwordMatches;
         }
