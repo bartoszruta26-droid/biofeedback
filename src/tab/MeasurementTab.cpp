@@ -1933,12 +1933,18 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
               << " m_isMeasuring=" << m_isMeasuring << std::endl;
     
     if (data.isValid) {
+        if (m_isMeasuring && !m_showRawValues && !std::isfinite(data.calibratedValue)) {
+            addDebugMessage("Pominięto próbkę: czujnik nie ma aktywnej kalibracji.", "WARNING");
+            return;
+        }
         m_lastSensorData = data;
         
         // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
-        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 g")
+        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2")
             .arg(data.value)
-            .arg(data.calibratedValue, 0, 'f', 2);
+            .arg(std::isfinite(data.calibratedValue)
+                     ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
+                     : QStringLiteral("N/A (brak kalibracji)"));
         addDebugMessage(arduinoDebug, "ARDUINO");
         
         if (m_isMeasuring) {
