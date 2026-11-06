@@ -3,6 +3,7 @@
 #include <QTextStream>
 #include <QDateTime>
 #include <QDir>
+#include <QStringList>
 
 namespace tab {
 
@@ -41,6 +42,8 @@ QString escapeCsvField(QString value)
 {
     const QChar quote(34);
     value.replace(QString(quote), QString(quote) + QString(quote));
+    value.replace(QChar(13), QLatin1Char(' '));
+    value.replace(QChar(10), QLatin1Char(' '));
     return quote + value + quote;
 }
 
