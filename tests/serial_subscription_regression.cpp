@@ -27,6 +27,8 @@ int main() {
     std::atomic<int> disconnectedEvents{0};
     std::atomic<int> firstSubscriberCalls{0};
     std::atomic<int> secondSubscriberCalls{0};
+    std::atomic<bool> blockingCallbackEntered{false};
+    std::atomic<bool> releaseBlockingCallback{false};
 
     const auto connectionId = serial.subscribeConnectionCallback(
         [&](bool connected, const std::string&) {
@@ -42,7 +44,15 @@ int main() {
             if (data.isValid && data.value == 123456) ++secondSubscriberCalls;
         });
 
-    if (!connectionId || !firstId || !secondId) {
+    const auto blockingId = serial.subscribeDataCallback(
+        [&](const sensor::SensorData& data) {
+            if (!data.isValid || data.value != 123456) return;
+            blockingCallbackEntered.store(true);
+            while (!releaseBlockingCallback.load())
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        });
+
+    if (!connectionId || !firstId || !secondId || !blockingId) {
         std::cerr << "Subscription registration failed\n";
         close(masterFd);
         return 1;
@@ -100,7 +110,8 @@ int main() {
     };
 
     const bool bothReceived = waitUntil(firstSubscriberCalls, 1, std::chrono::seconds(5)) &&
-                              waitUntil(secondSubscriberCalls, 1, std::chrono::seconds(1));
+                              waitUntil(secondSubscriberCalls, 1, std::chrono::seconds(1)) &&
+                              waitUntil(blockingCallbackEntered, true, std::chrono::seconds(1));
     if (!bothReceived) {
         std::cerr << "Both subscribers did not receive the same sample\n";
         emulatorRunning = false;
@@ -111,7 +122,27 @@ int main() {
         return 1;
     }
 
-    // Allow any already-copied callback snapshot to finish before measuring detachment.
+    // Unsubscribe must wait for a callback that has already entered.
+    std::atomic<bool> blockingUnsubscribeReturned{false};
+    std::thread blockingUnsubscriber([&]() {
+        serial.unsubscribeDataCallback(blockingId);
+        blockingUnsubscribeReturned.store(true);
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    const bool waitedForInFlightCallback = !blockingUnsubscribeReturned.load();
+    releaseBlockingCallback.store(true);
+    blockingUnsubscriber.join();
+    if (!waitedForInFlightCallback || !blockingUnsubscribeReturned.load()) {
+        std::cerr << "Unsubscribe did not wait for the in-flight callback\n";
+        emulatorRunning = false;
+        serial.stopAsyncReading();
+        emulator.join();
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
+    // Unsubscribe one receiver while preserving delivery to the others.
     serial.unsubscribeDataCallback(firstId);
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     const int firstAfterUnsubscribe = firstSubscriberCalls.load();
@@ -137,7 +168,8 @@ int main() {
     }
 
     serial.unsubscribeDataCallback(secondId);
+    serial.unsubscribeDataCallback(blockingId);
     serial.unsubscribeConnectionCallback(connectionId);
-    std::cout << "PASS: multi-subscriber delivery, isolated unsubscribe, connection events\n";
+    std::cout << "PASS: multi-subscriber delivery, in-flight unsubscribe barrier, connection events\n";
     return 0;
 }
