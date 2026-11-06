@@ -489,6 +489,13 @@ void TrainingTab::startTraining()
         QMessageBox::warning(this, "Brak planu", "Dodaj ćwiczenia przed rozpoczęciem treningu.");
         return;
     }
+    for (const TrainingExercise& exercise : m_exercisePlan) {
+        if (exercise.targetForce <= 0.0 || exercise.seriesCount <= 0 || exercise.repsPerSeries <= 0) {
+            QMessageBox::warning(this, tr("Nieprawidłowy plan"),
+                tr("Każde ćwiczenie musi mieć dodatnią siłę docelową, liczbę serii i liczbę powtórzeń."));
+            return;
+        }
+    }
     
     m_isTraining = true;
     m_isPaused = false;
@@ -616,9 +623,10 @@ void TrainingTab::setGameEngine(games::GameEngine* game, const QString& gameType
         return;
     }
 
+    auto* gameLayout = qobject_cast<QVBoxLayout*>(m_gameBox->layout());
     if (m_currentGame) {
         if (m_currentGame->isRunning()) m_currentGame->stop();
-        m_mainLayout->removeWidget(m_currentGame);
+        if (gameLayout) gameLayout->removeWidget(m_currentGame);
         m_currentGame->hide();
         m_currentGame->deleteLater();
         m_currentGame = nullptr;
@@ -627,13 +635,6 @@ void TrainingTab::setGameEngine(games::GameEngine* game, const QString& gameType
     m_currentGame = game;
     m_currentGameType = gameType;
 
-    if (!m_currentGame) return;
-
-    m_currentGame->setParent(m_gameBox);
-    m_currentGame->setMinimumHeight(300);
-    m_currentGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-
-    auto* gameLayout = qobject_cast<QVBoxLayout*>(m_gameBox->layout());
     if (gameLayout) {
         while (QLayoutItem* item = gameLayout->takeAt(0)) {
             if (QWidget* widget = item->widget()) {
@@ -642,8 +643,22 @@ void TrainingTab::setGameEngine(games::GameEngine* game, const QString& gameType
             }
             delete item;
         }
-        gameLayout->addWidget(m_currentGame);
     }
+
+    if (!m_currentGame) {
+        if (gameLayout) {
+            auto* placeholder = new QLabel(tr("Wybierz obsługiwaną grę, aby rozpocząć trening."), m_gameBox);
+            placeholder->setAlignment(Qt::AlignCenter);
+            placeholder->setMinimumHeight(300);
+            gameLayout->addWidget(placeholder);
+        }
+        return;
+    }
+
+    m_currentGame->setParent(m_gameBox);
+    m_currentGame->setMinimumHeight(300);
+    m_currentGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    if (gameLayout) gameLayout->addWidget(m_currentGame);
 
     connect(m_currentGame, &games::GameEngine::gameEnded,
             this, &TrainingTab::onGameEnded, Qt::UniqueConnection);
