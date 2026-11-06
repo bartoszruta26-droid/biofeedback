@@ -98,10 +98,11 @@ Testy sprzętowe oznaczyć jako NIE WYKONANO, jeżeli nie przeprowadzono ich na 
 ## Dodatkowe testy po audycie cyklu życia i kalibracji
 
 ### Kalibracja i binarna ścieżka danych
-1. Ustaw dwa punkty kalibracyjne: zero oraz znaną masę wzorcową wyrażoną w gramach.
-2. Potwierdź, że próbka binarna z poprawnym CRC zachowuje wartość surową i otrzymuje wartość skalibrowaną zgodną ze współczynnikiem.
-3. Zmień kalibrację podczas bezczynności odczytu i sprawdź, czy kolejne próbki używają nowego współczynnika.
-4. Sprawdź, czy aplikacja nie interpretuje surowych zliczeń ADC jako gramów lub niutonów bez wykonanej kalibracji.
+1. Wykonaj tare i kalibrację firmware'u dwoma punktami: zero oraz znana masa wzorcowa wyrażona w gramach.
+2. Potwierdź, że pole Force Value w ramce binarnej jest już skalibrowane i filtrowane przez firmware; parser zachowuje tę wartość bez ponownego skalowania.
+3. Porównaj wartość z ramki binarnej z odpowiedzią tekstową FORCE:g dla tego samego obciążenia.
+4. Osobno sprawdź pomocniczą konwersję hosta `setCalibrationPoint()/convertToCalibrated()` dla źródeł, które rzeczywiście dostarczają surowe ADC.
+5. Potwierdź, że konfiguracja protokołu jawnie rozróżnia dane surowe i skalibrowane, aby uniknąć podwójnej kalibracji lub interpretacji ADC jako gramów.
 
 ### Cykl życia połączenia
 1. Uruchom aplikację bez podłączonego Arduino i poczekaj na automatyczne wyszukiwanie.
