@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <chrono>
 #include <functional>
+#include <cstdint>
 #include <memory>
 #include <map>
 
@@ -72,6 +73,7 @@ public:
      * @brief Typ funkcji callback dla nowych danych
      */
     using DataCallback = std::function<void(const SensorData&)>;
+    using SubscriptionId = std::uint64_t;
     
     /**
      * @brief Typ funkcji callback dla statusu połączenia
@@ -171,6 +173,10 @@ public:
      * @param callback Funkcja wywoływana przy nowych danych
      */
     void setDataCallback(DataCallback callback);
+
+    /** Rejestruje niezależnego odbiorcę próbek. */
+    SubscriptionId subscribeDataCallback(DataCallback callback);
+    void unsubscribeDataCallback(SubscriptionId id);
     
     /**
      * @brief Rejestruje callback dla zmian statusu połączenia
