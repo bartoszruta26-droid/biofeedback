@@ -19,12 +19,13 @@ namespace sensor {
  */
 struct SensorData {
     uint32_t timestamp;      ///< Timestamp w milisekundach
-    int32_t value;           ///< Wartość surowa z czujnika
+    int32_t value;           ///< Wartość z ramki; binarna jest już skalibrowana
+    bool hasRawValue;        ///< Czy value zawiera surowe ADC
     double calibratedValue;  ///< Wartość po kalibracji, w gramach
     uint8_t crc;             ///< Suma kontrolna CRC
     bool isValid;            ///< Flagi poprawności danych
     
-    SensorData() : timestamp(0), value(0), calibratedValue(0.0), crc(0), isValid(false) {}
+    SensorData() : timestamp(0), value(0), hasRawValue(false), calibratedValue(0.0), crc(0), isValid(false) {}
 };
 
 /**
