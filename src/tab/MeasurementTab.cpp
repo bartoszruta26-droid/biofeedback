@@ -1911,37 +1911,43 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     if (!data.hasRawValue && m_currentUnit == ForceUnit::Raw)
         setCurrentUnit(ForceUnit::Newtons);
 
-    // The documented binary firmware frame contains calibrated force, not raw ADC.
-    // Automatically leave raw mode if the current protocol cannot supply raw counts.
     if (!data.hasRawValue && m_showRawValues && m_btnToggleRaw)
         m_btnToggleRaw->setChecked(false);
     if (m_btnToggleRaw && !m_isMeasuring)
         m_btnToggleRaw->setEnabled(data.hasRawValue);
 
-    if (!m_showRawValues && !std::isfinite(data.calibratedValue)) {
-        if (m_isMeasuring)
-            addDebugMessage("Pominięto próbkę: brak prawidłowej kalibracji siły.", "WARNING");
+    const bool calibratedGramsAvailable =
+        data.calibrationStatus == sensor::CalibrationStatus::Calibrated &&
+        data.unit == sensor::MeasurementUnit::Grams &&
+        std::isfinite(data.calibratedValue);
+
+    const QString frameValue = data.hasRawValue
+        ? QString("RAW_ADC_COUNTS=%1").arg(data.value)
+        : QString("FORCE_VALUE=%1").arg(
+              calibratedGramsAvailable
+                  ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
+                  : QStringLiteral("UNKNOWN_UNIT"));
+    addDebugMessage(frameValue, "ARDUINO");
+
+    // Raw ADC is diagnostic data, never a force measurement. It must not enter
+    // session buffers, statistics, graphs or exports with force units.
+    if (m_showRawValues) {
+        if (data.hasRawValue && m_isMeasuring)
+            addDebugMessage("Tryb RAW jest diagnostyczny; próbka ADC nie została dodana do pomiaru siły.", "INFO");
         return;
     }
 
-    const QString frameValue = data.hasRawValue
-        ? QString("RAW=%1").arg(data.value)
-        : QString("FORCE=%1 g").arg(data.calibratedValue, 0, 'f', 2);
-    const QString arduinoDebug = QString("%1 | CALIBRATED=%2")
-        .arg(frameValue)
-        .arg(std::isfinite(data.calibratedValue)
-                 ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
-                 : QStringLiteral("N/A"));
-    addDebugMessage(arduinoDebug, "ARDUINO");
+    if (!calibratedGramsAvailable) {
+        if (m_isMeasuring)
+            addDebugMessage("Pominięto próbkę: firmware nie potwierdził kalibracji w gramach.", "WARNING");
+        return;
+    }
 
     if (!m_isMeasuring) return;
 
-    const double valueToUse = m_showRawValues
-        ? static_cast<double>(data.value)
-        : data.calibratedValue * 9.81 / 1000.0;
-
-    if (!std::isfinite(valueToUse)) return;
-    readSingleSample(valueToUse);
+    const double forceNewtons = data.calibratedValue * 9.81 / 1000.0;
+    if (!std::isfinite(forceNewtons)) return;
+    readSingleSample(forceNewtons);
 }
 
 void MeasurementTab::connectToArduinoAsync()
