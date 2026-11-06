@@ -96,3 +96,17 @@ The current implementation must not be represented as providing secure storage o
 ## Operational warning
 
 The tracked default administrator credential must be considered compromised. Rotate it and any reused credential immediately. Removing it from the current tree is necessary but does not erase it from repository history or existing clones. If the repository has been shared, assess history cleanup and access exposure separately.
+
+## Implemented increment — versioned password hashing primitive
+
+A standalone `biofeedback::PasswordHasher` has been added on this branch:
+- PBKDF2-HMAC-SHA-256, 600,000 iterations, 128-bit random per-password salt, 256-bit derived output;
+- versioned self-describing representation: `pbkdf2-sha256$v1$<iterations>$<salt-hex>$<digest-hex>`;
+- constant-time digest comparison via `CRYPTO_memcmp`;
+- strict parsing and bounded work factor (600,000–2,000,000 iterations);
+- malformed, unsupported, plaintext, and out-of-range encodings are rejected;
+- regression assertions cover fresh salts, successful/failed verification, plaintext rejection, and malformed parameters.
+
+This primitive is intentionally not wired into the existing `Authentication` persistence/login flow yet. That flow currently stores a reversible-encryption flag and calls the legacy XOR-based `Encryption` API; switching it without a complete migration and recovery design could lock out users or corrupt the user store. Existing users and patient data have not been rewritten.
+
+No plaintext credential file has been added. Real credentials must be provisioned outside version control and stored in a password manager or a locally encrypted vault. Any credential previously committed in repository history must be considered exposed and rotated.
