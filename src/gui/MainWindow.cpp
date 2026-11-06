@@ -412,6 +412,9 @@ void MainWindow::createConnections()
             [this](const QString& gameType) {
         if (!m_trainingTab) return;
 
+        // TrainingTab is the only serial subscriber for this session and
+        // forwards each sample through handleSensorInput(). Do not attach the
+        // game's optional serial subscription here (that would duplicate input).
         games::GameEngine* game = nullptr;
         if (gameType == "pong") {
             game = new games::PongGame(m_trainingTab);
