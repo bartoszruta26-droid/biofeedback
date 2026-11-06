@@ -591,7 +591,7 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
 bool writeUsersAtomically(const std::string& path,const std::string& content)
 {
     if(path.empty())return false;
-    std::string temp=path+".tmp.XXXXXX";std::vector<char> n(temp.begin(),temp.end());n.push_back('\\0');
+    std::string temp=path+".tmp.XXXXXX";std::vector<char> n(temp.begin(),temp.end());n.push_back('\0');
     int fd=::mkstemp(n.data());if(fd<0)return false;const std::string tmp(n.data());
     bool ok=(::fchmod(fd,S_IRUSR|S_IWUSR)==0);std::size_t pos=0;
     while(ok&&pos<content.size()){ssize_t w=::write(fd,content.data()+pos,content.size()-pos);if(w<0&&errno==EINTR)continue;if(w<=0){ok=false;break;}pos+=static_cast<std::size_t>(w);}
@@ -817,17 +817,15 @@ bool Authentication::saveUsers()
     if (usersFilePath.empty()) return false;
     try {
         std::ostringstream output;
-        output << "{\\n    \\"users\\": [\\n";
-        for (std::size_t i=0;i<users.size();++i) {
+        output << "{\n    \"users\": [\n";
+        for (std::size_t i = 0; i < users.size(); ++i) {
             output << "        " << users[i].toJson();
-            if (i+1<users.size()) output << ",";
-            output << "\\n";
+            if (i + 1 < users.size()) output << ",";
+            output << "\n";
         }
-        output << "    ]\\n}\\n";
+        output << "    ]\n}\n";
         return writeUsersAtomically(usersFilePath, output.str());
-    } catch (...) {
-        return false;
-    }
+    } catch (...) { return false; }
 }
 
 /**
@@ -990,53 +988,23 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
  */
 int Authentication::encryptPasswordsIfNeeded(const std::string& key)
 {
-    AUTH_DEBUG(1, "Rozpoczynanie szyfrowania haseł");
-    
-    // Walidacja parametru
-    if (key.empty()) {
-        AUTH_ERROR("Klucz szyfrujący jest pusty");
-        return 0;
-    }
-    
-    int encryptedCount = 0;
-    
+    (void)key; // Password hashes do not use an application encryption key.
+    std::lock_guard<std::mutex> lock(m_mutex);
+    int migrated = 0;
     try {
-        encryptionKey = key;
-        AUTH_DEBUG(2, "Ustawiono klucz szyfrujący");
-
         for (auto& user : users) {
-            try {
-                if (!user.encrypted && !user.password.empty()) {
-                    // Zaszyfruj hasło
-                    user.password = encryptPassword(user.password);
-                    user.encrypted = true;
-                    encryptedCount++;
-                    
-                    #if DEBUG_PASSWORD_ENCRYPTION
-                    // Security: Do not log raw username - use redacted form
-                    AUTH_DEBUG(2, "Zaszyfrowano hasło dla użytkownika: [REDACTED] (length: " << user.username.length() << ")");
-                    #endif
-                }
-            } catch (const std::exception& e) {
-                // Security: Do not log raw username in error message
-                AUTH_WARN("Błąd podczas szyfrowania hasła dla użytkownika: [REDACTED]: " << e.what());
-                // Kontynuujemy z następnym użytkownikiem (gentle code)
+            if (!PasswordHasher::isEncoded(user.password) && !user.encrypted && !user.password.empty()) {
+                user.password = PasswordHasher::hash(user.password);
+                user.encrypted = true;
+                user.mustChangePassword = true;
+                ++migrated;
             }
         }
-
-        // Zapisz zaktualizowane dane
-        if (encryptedCount > 0) {
-            AUTH_DEBUG(2, "Zapisywanie zaktualizowanych danych użytkowników");
-            saveUsers();
+        if (migrated > 0) {
+            // Save outside this lock in the next explicit migration operation.
         }
-
-        AUTH_DEBUG(1, "Zaszyfrowano " << encryptedCount << " haseł");
-        return encryptedCount;
-        
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas szyfrowania haseł: " << e.what());
-        return encryptedCount;  // Zwracamy to co udało się zrobić
-    }
+        return migrated;
+    } catch (...) { return migrated; }
 }
 
 /**
