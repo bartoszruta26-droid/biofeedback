@@ -172,7 +172,7 @@ public:
     /**
      * @brief Podłącza silnik gry
      */
-    void setGameEngine(games::GameEngine* game);
+    void setGameEngine(games::GameEngine* game, const QString& gameType = QString());
     
     /**
      * @brief Pobiera aktualny wynik treningu
@@ -214,6 +214,7 @@ signals:
     void repetitionCompleted(int exerciseIndex, int seriesIndex, int repIndex);
     void newForceSample(double force);
     void trainingFinished(const QVector<ExerciseStats>& allStats);
+    void gameTypeRequested(const QString& gameType);
 
 public slots:
     void onSaveResults();
@@ -236,6 +237,7 @@ private:
     void updateProgressWidgets();
     void loadNextExercise();
     void reconfigureGameForExercise(const TrainingExercise& exercise);
+    void completeCurrentRepetition();
     void loadNextSeries();
     void loadNextRep();
     void checkExerciseCompletion();
@@ -280,6 +282,9 @@ private:
     // Widget gry (embedowany)
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
+    QString m_currentGameType;
+    bool m_repInProgress;
+    bool m_restForNextExercise;
     
     // Tabela statystyk
     QGroupBox* m_statsBox;
