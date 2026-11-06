@@ -109,7 +109,7 @@ bool ConfigManager::load(const std::string& path, bool validate) {
             m_statistics.loadsSuccessful.fetch_add(1);
             
             logMessage(ConfigManagerLogLevel::INFO, 
-                      QString("Configuration loaded successfully (%1 keys)").arg(m_config.size()),
+                      QString("Configuration loaded successfully (%1 keys)").arg(static_cast<qulonglong>(m_config.size())).toStdString(),
                       "load");
             return true;
         }
@@ -278,12 +278,12 @@ bool ConfigManager::createBackup(const std::string& path) const {
         
         if (QFile::copy(sourcePath, backupPath)) {
             logMessage(ConfigManagerLogLevel::VERBOSE,
-                      QString("Backup created: %1").arg(backupPath.toStdString()).toStdString(),
+                      QString("Backup created: %1").arg(backupPath).toStdString(),
                       "createBackup");
             return true;
         } else {
             logMessage(ConfigManagerLogLevel::WARNING,
-                      QString("Failed to create backup: %1").arg(backupPath.toStdString()).toStdString(),
+                      QString("Failed to create backup: %1").arg(backupPath).toStdString(),
                       "createBackup");
             return false;
         }
