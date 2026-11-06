@@ -347,7 +347,7 @@ std::string Encryption::encrypt(const std::string& data, const std::string& key)
     payload.insert(payload.end(),tag,tag+sizeof(tag));
     payload.insert(payload.end(),ciphertext.begin(),ciphertext.begin()+total);
     if(payload.size()>static_cast<std::size_t>(INT_MAX))throw std::runtime_error("Wynik szyfrowania jest zbyt duży");
-    std::string encoded(4*((payload.size()+2)/3),'\0');
+    std::string encoded(4*((payload.size()+2)/3)+1,'\0');
     const int n=EVP_EncodeBlock(reinterpret_cast<unsigned char*>(&encoded[0]),payload.data(),static_cast<int>(payload.size()));
     if(n<0)throw std::runtime_error("Kodowanie Base64 nie powiodło się");
     encoded.resize(static_cast<std::size_t>(n));
