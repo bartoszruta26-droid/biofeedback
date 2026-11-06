@@ -709,9 +709,12 @@ void SerialCommunication::startAsyncReading() {
                     }
                 }
                 // Wywołania odbiorców odbywają się poza blokadą rejestru.
-                if (primaryCallback) primaryCallback(d);
+                if (primaryCallback) {
+                    try { primaryCallback(d); } catch (...) {}
+                }
                 for (const auto& callback : subscribers) {
-                    if (callback) callback(d);
+                    if (!callback) continue;
+                    try { callback(d); } catch (...) {}
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
