@@ -73,6 +73,21 @@ int main() {
         return 1;
     }
 
+    // Concurrent connect attempts must serialize port creation and must
+    // not leak/overwrite the underlying file descriptor.
+    std::atomic<bool> concurrentConnectA{false};
+    std::atomic<bool> concurrentConnectB{false};
+    std::thread connectA([&]() { concurrentConnectA.store(serial.connect(slaveName, 115200)); });
+    std::thread connectB([&]() { concurrentConnectB.store(serial.connect(slaveName, 115200)); });
+    connectA.join();
+    connectB.join();
+    if (!concurrentConnectA.load() || !concurrentConnectB.load() || !serial.isConnected()) {
+        std::cerr << "Concurrent serial connect attempts were not safely serialized\\n";
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
+
     std::atomic<bool> emulatorRunning{true};
     std::thread emulator([&]() {
         int responseCount = 0;
