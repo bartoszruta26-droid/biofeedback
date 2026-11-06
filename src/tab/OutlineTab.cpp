@@ -12,6 +12,7 @@
 #include <QPainter>
 #include <QDesktopServices>
 #include <QUrl>
+#include <cmath>
 
 namespace tab {
 
@@ -933,15 +934,13 @@ void OutlineTab::onSensorDataReceived(const sensor::SensorData& data)
         return;
     }
     
-    // Jeśli trwa sesja i gra jest aktywna, przekaż dane do gry
-    if (m_isSessionActive && !m_isPaused && m_currentGame) {
-        // Przekazanie danych do aktywnej gry
-        // Wartość skalibrowana w gramach, konwersja na Newtony
-        double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
-        
-        // Gra otrzymuje dane jako parametr
-        // Implementacja zależy od konkretnej gry
-        // Przykład: m_currentGame->updateInput(forceInNewtons);
+    // Konspekt ma własny kanał wejściowy: przekaż próbkę wyłącznie do
+    // aktywnej gry tej sesji. Wartość skalibrowana jest wyrażona w gramach.
+    if (m_isSessionActive && !m_isPaused && m_currentGame &&
+        m_currentGame->isRunning() && !m_currentGame->isPaused() &&
+        std::isfinite(data.calibratedValue)) {
+        const double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
+        m_currentGame->handleSensorInput(forceInNewtons);
     }
     
     // Debug logging
