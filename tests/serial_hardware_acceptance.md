@@ -61,7 +61,27 @@ Po wdrożeniu centralnego rozdzielania próbek:
 5. Włączyć/wyłączyć automatyczne przewijanie i zmieniać filtr.
 6. Wyeksportować log i sprawdzić zawartość.
 
-## F. Protokół wyniku
+
+## F. Testy treningu biofeedback
+
+1. Utworzyć ćwiczenie z dodatnią siłą docelową, liczbą serii i powtórzeń.
+2. Potwierdzić, że wybrana gra jest osadzona w panelu treningowym.
+3. Wykonać kontrolowany cykl: wzrost siły powyżej 80% celu, a następnie spadek poniżej 40% celu.
+4. Potwierdzić, że cykl zostaje zaliczony dokładnie jako jedno powtórzenie.
+5. Utrzymać siłę powyżej 40% celu i potwierdzić, że nie są naliczane kolejne powtórzenia bez ponownego rozluźnienia.
+6. Dokończyć serię i sprawdzić czas odpoczynku oraz automatyczne przejście do kolejnej serii.
+7. Zmienić typ gry pomiędzy ćwiczeniami; potwierdzić, że stara gra zostaje zatrzymana, a nowa jest osadzona w panelu.
+8. Zatrzymać i ponownie uruchomić trening; potwierdzić wyzerowanie statystyk nowej sesji.
+
+Kryteria zaliczenia:
+- powtórzenie rozpoczyna się przy osiągnięciu 80% siły docelowej;
+- powtórzenie kończy się po spadku poniżej 40% siły docelowej;
+- pojedynczy cykl napięcie–rozluźnienie nalicza dokładnie jedno powtórzenie;
+- statystyki średniej i maksymalnej siły szczytowej odpowiadają zarejestrowanym powtórzeniom;
+- próbka sensora jest przekazywana do aktywnej gry tylko jednym torem;
+- brak zawieszenia przy zmianie gry i zatrzymaniu treningu.
+
+## G. Protokół wyniku
 
 Dla każdego testu zapisać:
 - datę i wersję aplikacji;
