@@ -116,7 +116,8 @@ private:
     bool m_ownSerial;
     sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
     sensor::SerialCommunication::SubscriptionId m_connectionSubscriptionId = 0;
-    void subscribeSensorData();                                          ///< Czy gra jest właścicielem obiektu serial
+    void subscribeSensorData();
+    void subscribeConnectionStatus();                                          ///< Czy gra jest właścicielem obiektu serial
     
     // Stałe fizyczne/logiczne
     const double m_minForce = 0.0;
