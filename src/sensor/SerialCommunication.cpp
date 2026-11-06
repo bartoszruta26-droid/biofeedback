@@ -217,6 +217,7 @@ public:
     std::string portName;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
+    mutable std::mutex calibrationMutex;
     double zeroOffset = 0.0;
     double scaleFactor = 1.0;
     bool isCalibrated = false;
@@ -809,18 +810,50 @@ int SerialCommunication::getTimeSinceLastActivity() const {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count();
 }
 
-double SerialCommunication::tare(int samples) { if (m_impl->isConnected) sendCommand("TARE", true); m_impl->zeroOffset = 0.0; return 0.0; }
-void SerialCommunication::setCalibrationPoint(int32_t raw, double known) { if (raw != 0) { m_impl->scaleFactor = known/raw; m_impl->isCalibrated = true; } }
-bool SerialCommunication::calibrate(int32_t, int32_t, double knownWeight) {
-    if (!m_impl->isConnected) return false;
-    std::string r = sendCommand("CAL:" + std::to_string(knownWeight), true);
-    m_impl->isCalibrated = (r.find("Calibrated!") != std::string::npos);
-    return m_impl->isCalibrated;
+double SerialCommunication::tare(int samples) {
+    Q_UNUSED(samples);
+    if (m_impl->isConnected) sendCommand("TARE", true);
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    return 0.0;
 }
-double SerialCommunication::convertToCalibrated(int32_t raw) const { return (raw - m_impl->zeroOffset) * m_impl->scaleFactor; }
-double SerialCommunication::getCalibrationScale() const { return m_impl->scaleFactor; }
-int32_t SerialCommunication::getCalibrationOffset() const { return static_cast<int32_t>(m_impl->zeroOffset); }
-void SerialCommunication::resetCalibration() { m_impl->zeroOffset = 0.0; m_impl->scaleFactor = 1.0; m_impl->isCalibrated = false; }
+void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
+    if (raw == 0 || !std::isfinite(known)) return;
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    m_impl->scaleFactor = known / static_cast<double>(raw);
+    m_impl->isCalibrated = true;
+}
+bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight) {
+    if (!m_impl->isConnected || rawSpan == rawZero ||
+        !std::isfinite(knownWeight) || knownWeight <= 0.0) return false;
+    const std::string response = sendCommand("CAL:" + std::to_string(knownWeight), true);
+    if (response.find("Calibrated!") == std::string::npos) return false;
+
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = static_cast<double>(rawZero);
+    m_impl->scaleFactor = knownWeight / static_cast<double>(rawSpan - rawZero);
+    m_impl->isCalibrated = true;
+    return true;
+}
+double SerialCommunication::convertToCalibrated(int32_t raw) const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return (static_cast<double>(raw) - m_impl->zeroOffset) * m_impl->scaleFactor;
+}
+double SerialCommunication::getCalibrationScale() const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return m_impl->scaleFactor;
+}
+int32_t SerialCommunication::getCalibrationOffset() const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return static_cast<int32_t>(m_impl->zeroOffset);
+}
+void SerialCommunication::resetCalibration() {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    m_impl->scaleFactor = 1.0;
+    m_impl->isCalibrated = false;
+}
 
 uint32_t SerialCommunication::getCurrentTimestamp() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
