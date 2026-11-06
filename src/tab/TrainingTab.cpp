@@ -8,10 +8,6 @@
 #include <QFont>
 #include <QColor>
 #include <QStackedWidget>
-#include "games/PongGame.hpp"
-#include "games/FlappyBirdGame.hpp"
-#include "games/MarioGame.hpp"
-#include "games/SinGame.hpp"
 
 namespace tab {
 
@@ -678,17 +674,8 @@ void TrainingTab::setGameEngine(games::GameEngine* game, const QString& gameType
     connect(m_currentGame, &games::GameEngine::scoreChanged,
             this, &TrainingTab::onScoreChanged, Qt::UniqueConnection);
 
-    if (m_serialPort) {
-        if (auto* gameWidget = dynamic_cast<games::PongGame*>(m_currentGame))
-            gameWidget->setSerialConnection(m_serialPort);
-        if (auto* gameWidget = dynamic_cast<games::FlappyBirdGame*>(m_currentGame))
-            gameWidget->setSerialConnection(m_serialPort);
-        if (auto* gameWidget = dynamic_cast<games::MarioGame*>(m_currentGame))
-            gameWidget->setSerialConnection(m_serialPort);
-        if (auto* gameWidget = dynamic_cast<games::SinGame*>(m_currentGame))
-            gameWidget->setSerialConnection(m_serialPort);
-    }
-
+    // Sensor samples have a single owner in this tab. onSensorDataReceived()
+    // forwards each valid sample once through GameEngine::handleSensorInput().
     m_currentGame->show();
 }
 
@@ -945,22 +932,33 @@ void TrainingTab::updateDisplay()
 
 void TrainingTab::updateProgressWidgets()
 {
+    if (m_exercisePlan.isEmpty() || m_currentExerciseIndex < 0 ||
+        m_currentExerciseIndex >= m_exercisePlan.size()) {
+        m_progressWidget->setCurrentExercise(0, m_exercisePlan.size());
+        m_progressWidget->setCurrentSeries(0, 0);
+        m_progressWidget->setCurrentRep(0, 0);
+        m_progressWidget->setSessionTime(m_sessionTime);
+        m_lblCurrentExercise->setText(tr("Ćwiczenie: —"));
+        m_lblCurrentSeries->setText(tr("Seria: —"));
+        m_lblCurrentRep->setText(tr("Powtórzenie: —"));
+        return;
+    }
+
+    const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
     m_progressWidget->setCurrentExercise(m_currentExerciseIndex, m_exercisePlan.size());
-    m_progressWidget->setCurrentSeries(m_currentSeriesIndex, 
-                                       m_exercisePlan[m_currentExerciseIndex].seriesCount);
-    m_progressWidget->setCurrentRep(m_currentRepIndex,
-                                    m_exercisePlan[m_currentExerciseIndex].repsPerSeries);
+    m_progressWidget->setCurrentSeries(m_currentSeriesIndex, exercise.seriesCount);
+    m_progressWidget->setCurrentRep(m_currentRepIndex, exercise.repsPerSeries);
     m_progressWidget->setSessionTime(m_sessionTime);
-    
+
     m_lblCurrentExercise->setText(QString("Ćwiczenie: %1/%2")
                                   .arg(m_currentExerciseIndex + 1)
                                   .arg(m_exercisePlan.size()));
     m_lblCurrentSeries->setText(QString("Seria: %1/%2")
                                 .arg(m_currentSeriesIndex + 1)
-                                .arg(m_exercisePlan[m_currentExerciseIndex].seriesCount));
+                                .arg(exercise.seriesCount));
     m_lblCurrentRep->setText(QString("Powtórzenie: %1/%2")
                              .arg(m_currentRepIndex + 1)
-                             .arg(m_exercisePlan[m_currentExerciseIndex].repsPerSeries));
+                             .arg(exercise.repsPerSeries));
 }
 
 void TrainingTab::loadNextExercise()
