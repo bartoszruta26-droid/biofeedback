@@ -925,7 +925,7 @@ std::string Authentication::encryptPassword(const std::string& password)
                 AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
             } else {
                 // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
+                auto& config = ConfigManager::instance();
                 encryptionKey = config.getEncryptionKey();
                 
                 if (encryptionKey.empty() || encryptionKey.length() < 16) {
@@ -980,7 +980,7 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
                 AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
             } else {
                 // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
+                auto& config = ConfigManager::instance();
                 encryptionKey = config.getEncryptionKey();
                 
                 if (encryptionKey.empty() || encryptionKey.length() < 16) {
