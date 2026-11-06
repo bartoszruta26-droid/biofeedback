@@ -594,10 +594,12 @@ bool writeUsersAtomically(const std::string& path,const std::string& content)
     int fd=::mkstemp(n.data());if(fd<0)return false;const std::string tmp(n.data());
     bool ok=(::fchmod(fd,S_IRUSR|S_IWUSR)==0);std::size_t pos=0;
     while(ok&&pos<content.size()){ssize_t w=::write(fd,content.data()+pos,content.size()-pos);if(w<0&&errno==EINTR)continue;if(w<=0){ok=false;break;}pos+=static_cast<std::size_t>(w);}
-    if(ok&&::fsync(fd)!=0)ok=false;if(::close(fd)!=0)ok=false;
+    if (ok && ::fsync(fd) != 0) ok = false;
+    if (::close(fd) != 0) ok = false;
     if(ok&&::rename(tmp.c_str(),path.c_str())!=0)ok=false;
     if(ok){auto slash=path.find_last_of('/');std::string dir=slash==std::string::npos?".":(slash==0?"/":path.substr(0,slash));int d=::open(dir.c_str(),O_RDONLY|O_DIRECTORY);if(d>=0){if(::fsync(d)!=0)ok=false;::close(d);}}
-    if(!ok)::unlink(tmp.c_str());return ok;
+    if (!ok) ::unlink(tmp.c_str());
+    return ok;
 }
 
 } // namespace
