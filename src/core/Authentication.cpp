@@ -716,7 +716,6 @@ Authentication::~Authentication()
     
     // Bezpieczne czyszczenie wrażliwych danych
     currentUser = nullptr;
-    encryptionKey.clear();
 }
 
 /**
