@@ -119,3 +119,10 @@ CRC-8 obejmuje bajty 0–8, łącznie z bajtem synchronizacyjnym. Pole `forceVal
 2. Potwierdź, że pojedyncza próbka wpływa na aktywną grę tylko raz.
 3. W zakładce Konspekt uruchom grę sesji i potwierdź przekazywanie skalibrowanej siły w niutonach.
 4. Wstrzymaj grę lub sesję; próbki nie powinny zmieniać stanu gry.
+
+
+### Pojedynczy odbiornik w zakładce Pomiary
+1. Uruchom pomiar i obserwuj licznik próbek oraz wykres przez co najmniej 60 sekund.
+2. Porównaj liczbę ramek odebranych przez terminal diagnostyczny z liczbą próbek zapisanych w sesji; jedna ramka nie może być zapisana dwukrotnie.
+3. Użyj przycisku ręcznego odczytu i potwierdź, że wykorzystuje ostatnią próbkę wspólnego odbiornika, bez dodatkowego żądania `DATA`.
+4. Sprawdź, że wybór trybu ADC jest dostępny wyłącznie wtedy, gdy firmware rzeczywiście dostarcza pole `RAW`; dla binarnej ramki skalibrowanej interfejs pozostaje w trybie siły.
