@@ -615,6 +615,8 @@ bool TrainingTab::isTrainingPaused() const
 
 void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
+    // TrainingTab is the sole serial subscriber for its game session. Games receive
+    // samples only through handleSensorInput(), preventing a second serial path.
     if (m_serialPort && m_dataSubscriptionId) {
         m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
         m_dataSubscriptionId = 0;
