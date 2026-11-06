@@ -19,7 +19,7 @@ std::string readAll(const std::string& p) {
 std::string legacyEncode(const std::string& plain, const std::string& key) {
     std::vector<unsigned char> bytes(plain.size());
     for (std::size_t i=0;i<plain.size();++i) bytes[i]=static_cast<unsigned char>(plain[i]) ^ static_cast<unsigned char>(key[i%key.size()]);
-    std::string out(4*((bytes.size()+2)/3)+1,'\\0');
+    std::string out(4*((bytes.size()+2)/3)+1,'\0');
     const int n=EVP_EncodeBlock(reinterpret_cast<unsigned char*>(&out[0]),bytes.data(),static_cast<int>(bytes.size()));
     out.resize(static_cast<std::size_t>(n)); return out;
 }
@@ -30,7 +30,7 @@ int main() {
     try {
         const std::string oldKey="old-test-xor-key";
         const std::string aesKey="regression-key-material-32-bytes";
-        const std::string plain="{\\"patientId\\":\\"synthetic-001\\",\\"note\\":\\"test-only\\"}";
+        const std::string plain="{\"patientId\":\"synthetic-001\",\"note\":\"test-only\"}";
         const std::string legacy=legacyEncode(plain,oldKey);
         { std::ofstream f(src,std::ios::binary); f<<legacy; }
         LegacyXorMigrationResult result; std::string error;
