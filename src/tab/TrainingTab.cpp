@@ -887,8 +887,11 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     const int sampleExerciseIndex = m_currentExerciseIndex;
     games::GameEngine* const sampleGame = m_currentGame;
 
-    const QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 g | FORCE=%3 N")
-        .arg(data.value)
+    const QString frameValue = data.hasRawValue
+        ? QString("RAW=%1").arg(data.value)
+        : QString("FORCE_VALUE=%1 g").arg(calibratedGrams, 0, 'f', 2);
+    const QString arduinoDebug = QString("Arduino: %1 | CALIBRATED=%2 g | FORCE=%3 N")
+        .arg(frameValue)
         .arg(calibratedGrams, 0, 'f', 2)
         .arg(force, 0, 'f', 2);
     addDebugMessage(arduinoDebug, "ARDUINO");
