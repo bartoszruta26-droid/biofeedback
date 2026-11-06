@@ -1397,19 +1397,25 @@ void MeasurementTab::onReadSingleSample()
         m_lblStatus->setText("Status: OCZEKIWANIE NA PRÓBKĘ");
         return;
     }
-    if (m_showRawValues && !m_lastSensorData.hasRawValue) {
-        m_lblStatus->setText("Status: FIRMWARE NIE UDOSTĘPNIA SUROWEGO ADC");
+    if (m_showRawValues) {
+        m_lblStatus->setText(m_lastSensorData.hasRawValue
+            ? "Status: RAW ADC — TRYB DIAGNOSTYCZNY, PRÓBKA NIE JEST SIŁĄ"
+            : "Status: FIRMWARE NIE UDOSTĘPNIA SUROWEGO ADC");
         return;
     }
-    if (!m_showRawValues && !std::isfinite(m_lastSensorData.calibratedValue)) {
-        m_lblStatus->setText("Status: BRAK KALIBRACJI");
+    if (m_lastSensorData.calibrationStatus != sensor::CalibrationStatus::Calibrated ||
+        m_lastSensorData.unit != sensor::MeasurementUnit::Grams ||
+        !std::isfinite(m_lastSensorData.calibratedValue)) {
+        m_lblStatus->setText("Status: BRAK POTWIERDZONEJ KALIBRACJI W GRAMACH");
         return;
     }
 
-    double valueToUse = m_showRawValues
-        ? static_cast<double>(m_lastSensorData.value)
-        : m_lastSensorData.calibratedValue * 9.81 / 1000.0;
-    readSingleSample(valueToUse);
+    const double forceNewtons = m_lastSensorData.calibratedValue * 9.81 / 1000.0;
+    if (!std::isfinite(forceNewtons)) {
+        m_lblStatus->setText("Status: NIEPRAWIDŁOWA WARTOŚĆ SIŁY");
+        return;
+    }
+    readSingleSample(forceNewtons);
 }
 
 void MeasurementTab::onSelectionChanged()
