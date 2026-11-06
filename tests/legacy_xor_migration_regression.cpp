@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -39,10 +40,10 @@ int main() {
         const std::string aesKey="regression-key-material-32-bytes";
         const std::string plain="{\"patientId\":\"synthetic-001\",\"note\":\"test-only\"}";
         const std::string legacy=legacyEncode(plain,oldKey);
+        { std::ofstream f(src,std::ios::binary); f<<legacy; }
         LegacyXorMigrationResult wrongKeyResult; std::string wrongKeyError;
         expect(!migrateLegacyXorFile(src,base+".wrong",base+".wrongbak","wrong-xor-key",aesKey,sha256Hex(plain),wrongKeyResult,wrongKeyError),
                "wrong legacy key must fail independent plaintext hash check");
-        { std::ofstream f(src,std::ios::binary); f<<legacy; }
         LegacyXorMigrationResult result; std::string error;
         expect(migrateLegacyXorFile(src,dst,bak,oldKey,aesKey,sha256Hex(plain),result,error), "migration failed: "+error);
         expect(readAll(src)==legacy, "source was modified");
