@@ -11,7 +11,6 @@
  */
 
 #include "core/Authentication.hpp"
-#include "core/ConfigManager.hpp"
 #include "core/PasswordHasher.hpp"
 #include <algorithm>
 #include <cctype>
@@ -1065,22 +1064,5 @@ std::string Authentication::getCurrentUserRole() const
  * 
  * @param key Klucz szyfrujący
  */
-void Authentication::setEncryptionKey(const std::string& key)
-{
-    AUTH_DEBUG(2, "Ustawianie klucza szyfrującego");
-    
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
-    // Walidacja parametru - gentle code
-    if (key.empty()) {
-        AUTH_WARN("Próba ustawienia pustego klucza szyfrującego");
-    }
-    
-    encryptionKey = key;
-    
-    #if DEBUG_PASSWORD_ENCRYPTION
-    AUTH_DEBUG(3, "Klucz szyfrujący ustawiony");
-    #endif
-}
 
 } // namespace biofeedback
