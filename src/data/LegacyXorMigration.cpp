@@ -6,6 +6,8 @@
 
 #include <cerrno>
 #include <cstdint>
+#include <iomanip>
+#include <sstream>
 #include <cstring>
 #include <fcntl.h>
 #include <fstream>
@@ -89,6 +91,16 @@ bool writeExclusiveFile(const std::string& path, const std::string& data, std::s
     return true;
 }
 
+std::string sha256Hex(const std::string& data) {
+    unsigned char digest[EVP_MAX_MD_SIZE]{};
+    unsigned int length = 0;
+    if (EVP_Digest(data.data(), data.size(), digest, &length, EVP_sha256(), nullptr) != 1 || length != 32)
+        throw std::runtime_error("Nie można obliczyć SHA-256 danych jawnych");
+    std::ostringstream out; out << std::hex << std::setfill('0');
+    for (unsigned int i=0; i<length; ++i) out << std::setw(2) << static_cast<unsigned int>(digest[i]);
+    OPENSSL_cleanse(digest, sizeof(digest));
+    return out.str();
+}
 bool syncParentDirectory(const std::string& path) {
     const auto slash = path.find_last_of('/');
     const std::string dir = slash == std::string::npos ? "." : (slash == 0 ? "/" : path.substr(0, slash));
@@ -105,6 +117,7 @@ bool migrateLegacyXorFile(const std::string& sourcePath,
                           const std::string& backupPath,
                           const std::string& legacyXorKey,
                           const std::string& aesKey,
+                          const std::string& expectedPlaintextSha256,
                           LegacyXorMigrationResult& result,
                           std::string& error) {
     result = {};
@@ -115,6 +128,10 @@ bool migrateLegacyXorFile(const std::string& sourcePath,
     }
     if (legacyXorKey.empty()) { error = "Brak starego klucza XOR"; return false; }
     if (aesKey.size() < 32) { error = "Nowy klucz AES musi mieć co najmniej 32 bajty"; return false; }
+    if (expectedPlaintextSha256.size() != 64 ||
+        expectedPlaintextSha256.find_first_not_of("0123456789abcdef") != std::string::npos) {
+        error = "Wymagany jest niezależnie ustalony SHA-256 tekstu jawnego (64 małe znaki hex)"; return false;
+    }
 
     struct stat dst{}, bak{};
     if (::lstat(destinationPath.c_str(), &dst) == 0 || errno != ENOENT ||
@@ -132,6 +149,16 @@ bool migrateLegacyXorFile(const std::string& sourcePath,
         plaintext[i] = static_cast<char>(encryptedBytes[i] ^ static_cast<unsigned char>(legacyXorKey[i % legacyXorKey.size()]));
     OPENSSL_cleanse(encryptedBytes.data(), encryptedBytes.size());
 
+    try {
+        if (sha256Hex(plaintext) != expectedPlaintextSha256) {
+            OPENSSL_cleanse(plaintext.data(), plaintext.size());
+            error = "SHA-256 odszyfrowanych danych nie zgadza się z niezależnym wzorcem; błędny klucz XOR lub uszkodzone źródło";
+            return false;
+        }
+    } catch (const std::exception& ex) {
+        OPENSSL_cleanse(plaintext.data(), plaintext.size());
+        error = ex.what(); return false;
+    }
     std::string newCiphertext;
     try {
         newCiphertext = Encryption::encrypt(plaintext, aesKey);
