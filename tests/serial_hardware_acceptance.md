@@ -98,6 +98,9 @@ Testy sprzętowe oznaczyć jako NIE WYKONANO, jeżeli nie przeprowadzono ich na 
 ## Dodatkowe testy po audycie cyklu życia i kalibracji
 
 ### Kalibracja i binarna ścieżka danych
+Protokół binarny zgodny z dokumentacją firmware ma 11 bajtów:
+`0xAA | timestamp[4] | forceValue[4] | CRC-8[1] | 0x55`.
+CRC-8 obejmuje bajty 0–8, łącznie z bajtem synchronizacyjnym. Pole `forceValue` jest wynikiem kalibracji i filtracji wykonanej w firmware; aplikacja nie skaluje go ponownie.
 1. Wykonaj tare i kalibrację firmware'u dwoma punktami: zero oraz znana masa wzorcowa wyrażona w gramach.
 2. Potwierdź, że pole Force Value w ramce binarnej jest już skalibrowane i filtrowane przez firmware; parser zachowuje tę wartość bez ponownego skalowania.
 3. Porównaj wartość z ramki binarnej z odpowiedzią tekstową FORCE:g dla tego samego obciążenia.
