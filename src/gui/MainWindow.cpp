@@ -535,7 +535,7 @@ void MainWindow::exportData()
 {
     // Export functionality is now handled by MeasurementTab
     if (m_measurementTab) {
-        m_measurementTab->onSaveMeasurementJSON();  // Or onSaveData() for CSV export
+        m_measurementTab->onSaveData();
     } else {
         QMessageBox::warning(this, tr("Błąd"), tr("Zakładka pomiarów nie jest zainicjalizowana."));
     }
