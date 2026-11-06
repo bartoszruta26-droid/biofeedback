@@ -474,7 +474,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         }
 #endif
         m_impl->isConnected.store(true);
-        { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
+        { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); } }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
 #if DEBUG_CONNECTION
@@ -601,7 +601,7 @@ SensorData SerialCommunication::readData(int timeout) {
 #else
     write(m_impl->portHandle, toSend.c_str(), toSend.size());
 #endif
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
     
     // Read response - look for binary packet followed by text
     char buf[256];
@@ -723,7 +723,7 @@ SensorData SerialCommunication::readData(int timeout) {
         std::cout << std::endl;
     }
     
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
     return data;
 }
 
@@ -839,13 +839,23 @@ void SerialCommunication::stopAsyncReading() {
         m_impl->asyncThread.join();
 }
 
-void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) { m_impl->watchdogTimeoutMs = enabled ? timeoutMs : INT_MAX; }
-void SerialCommunication::resetWatchdog() { m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
+void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) {
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    m_impl->watchdogTimeoutMs = enabled ? std::max(1, timeoutMs) : INT_MAX;
+}
+void SerialCommunication::resetWatchdog() {
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+}
 bool SerialCommunication::isWatchdogOK() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count() < m_impl->watchdogTimeoutMs;
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - m_impl->lastActivityTime).count() < m_impl->watchdogTimeoutMs;
 }
 int SerialCommunication::getTimeSinceLastActivity() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count();
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - m_impl->lastActivityTime).count());
 }
 
 double SerialCommunication::tare(int samples) {
@@ -932,7 +942,7 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
     if (write(m_impl->portHandle, toSend.c_str(), toSend.size()) !=
         static_cast<ssize_t>(toSend.size())) return "";
 #endif
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
     if (!waitForResponse || timeoutMs <= 0) return "";
 
     std::string response;
