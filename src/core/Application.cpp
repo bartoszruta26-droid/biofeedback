@@ -157,9 +157,9 @@ bool Application::initialize()
         m_authentication = std::make_unique<Authentication>("config/users.json");
         // Security: Require encryption key from environment variable for medical-grade security
         const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-        if (!envKey || std::string(envKey).empty()) {
+        if (!envKey || std::string(envKey).size() < 32) {
             throw std::runtime_error(
-                "CRITICAL: BIOFEEDBACK_ENCRYPTION_KEY environment variable must be set. "
+                 "CRITICAL: BIOFEEDBACK_ENCRYPTION_KEY must contain at least 32 bytes and be supplied externally. "
                 "For medical-grade security, encryption key must be provided externally "
                 "and never hardcoded in source code."
             );
