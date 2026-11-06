@@ -665,34 +665,38 @@ SensorData SerialCommunication::readData(int timeout) {
             // Also check for text response as fallback
             std::string resp(rawData.begin(), rawData.end());
             if (!gotBinaryData && resp.find("FORCE:") != std::string::npos) {
-                size_t fp = resp.find("FORCE:");
-                size_t gp = resp.find("g,", fp);
+                const size_t fp = resp.find("FORCE:");
+                const size_t gp = resp.find("g,", fp);
+                bool parsedForce = false;
                 if (gp != std::string::npos) {
                     try {
-                        data.calibratedValue = std::stod(resp.substr(fp+6, gp-fp-6));
+                        data.calibratedValue = std::stod(resp.substr(fp + 6, gp - fp - 6));
+                        parsedForce = std::isfinite(data.calibratedValue);
                     } catch (...) {}
                 }
-                size_t rp = resp.find("RAW:", gp);
-                if (rp != std::string::npos) {
-                    size_t cp = resp.find(",", rp+4);
-                    if (cp != std::string::npos) {
-                        try {
-                            data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
-                            data.hasRawValue = true;
-                        } catch (...) {}
-                    }
-                    size_t tp = resp.find("TS:", rp);
-                    if (tp != std::string::npos) {
-                        size_t mp = resp.find("ms", tp);
-                        if (mp != std::string::npos) {
+                if (parsedForce) {
+                    const size_t rp = resp.find("RAW:", gp);
+                    if (rp != std::string::npos) {
+                        const size_t cp = resp.find(",", rp + 4);
+                        if (cp != std::string::npos) {
                             try {
-                                data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
+                                data.value = std::stoi(resp.substr(rp + 4, cp - rp - 4));
+                                data.hasRawValue = true;
                             } catch (...) {}
                         }
+                        const size_t tp = resp.find("TS:", rp);
+                        if (tp != std::string::npos) {
+                            const size_t mp = resp.find("ms", tp);
+                            if (mp != std::string::npos) {
+                                try {
+                                    data.timestamp = std::stoul(resp.substr(tp + 3, mp - tp - 3));
+                                } catch (...) {}
+                            }
+                        }
                     }
+                    data.isValid = true;
+                    break;
                 }
-                data.isValid = true;
-                break;
             }
             
             if (gotBinaryData) break;
