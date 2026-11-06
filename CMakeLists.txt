@@ -50,6 +50,10 @@ target_link_libraries(biofeedback_core
 
 # Regression targets that can be built without Qt.
 enable_testing()
+add_executable(encryption_regression tests/encryption_regression.cpp)
+target_link_libraries(encryption_regression PRIVATE biofeedback_core)
+add_test(NAME encryption_regression COMMAND encryption_regression)
+
 add_executable(password_hasher_regression tests/password_hasher_regression.cpp)
 target_link_libraries(password_hasher_regression PRIVATE biofeedback_core)
 add_test(NAME password_hasher_regression COMMAND password_hasher_regression)
