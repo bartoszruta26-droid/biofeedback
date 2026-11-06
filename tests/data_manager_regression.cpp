@@ -31,7 +31,7 @@ int main() {
         expect(!noKey.savePatientData(deniedPatient, kPatientFile, false), "patient write without key must fail closed");
 
         DataManager dm;
-        dm.setEncryptionKey("regression-key-material");
+        dm.setEncryptionKey("regression-key-material-32-bytes");
 
         std::vector<Exercise> exercises;
         Exercise ex1;
