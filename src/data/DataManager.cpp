@@ -549,10 +549,12 @@ DataManager::~DataManager() {
 // ============================================================================
 
 void DataManager::setMinimumLogLevel(DataManagerLogLevel level) {
-    std::lock_guard<std::mutex> lock(logMutex);
-    minimumLogLevel = level;
-    logMessage(DataManagerLogLevel::INFO, 
-               "Minimum log level set to " + logLevelToString(level), 
+    {
+        std::lock_guard<std::mutex> lock(logMutex);
+        minimumLogLevel = level;
+    }
+    logMessage(DataManagerLogLevel::INFO,
+               "Minimum log level set to " + logLevelToString(level),
                "DataManager::setMinimumLogLevel");
 }
 
@@ -562,10 +564,12 @@ DataManagerLogLevel DataManager::getMinimumLogLevel() const {
 }
 
 void DataManager::setConsoleOutputEnabled(bool enabled) {
-    std::lock_guard<std::mutex> lock(logMutex);
-    consoleOutputEnabled = enabled;
-    logMessage(DataManagerLogLevel::INFO, 
-               "Console output " + std::string(enabled ? "enabled" : "disabled"), 
+    {
+        std::lock_guard<std::mutex> lock(logMutex);
+        consoleOutputEnabled = enabled;
+    }
+    logMessage(DataManagerLogLevel::INFO,
+               "Console output " + std::string(enabled ? "enabled" : "disabled"),
                "DataManager::setConsoleOutputEnabled");
 }
 
@@ -596,26 +600,29 @@ std::string DataManager::getStatisticsSummary() const {
 // ============================================================================
 
 void DataManager::setEncryptionKey(const std::string& key) {
-    std::lock_guard<std::mutex> lock(logMutex);
-    encryptionKey = key;
-    encryptionEnabled = !key.empty();
-    
-    if (encryptionEnabled) {
+    {
+        std::lock_guard<std::mutex> lock(logMutex);
+        encryptionKey = key;
+        encryptionEnabled = !key.empty();
+    }
+    if (!key.empty()) {
         statistics.encryptionOps++;
-        logMessage(DataManagerLogLevel::INFO, "Encryption key set (" + 
-                   std::to_string(key.length()) + " chars)", 
+        logMessage(DataManagerLogLevel::INFO,
+                   "Encryption key set (" + std::to_string(key.size()) + " chars)",
                    "DataManager::setEncryptionKey");
     } else {
-        logMessage(DataManagerLogLevel::WARNING, "Empty encryption key provided", 
+        logMessage(DataManagerLogLevel::WARNING, "Empty encryption key provided",
                    "DataManager::setEncryptionKey");
     }
 }
 
 void DataManager::clearEncryptionKey() {
-    std::lock_guard<std::mutex> lock(logMutex);
-    encryptionKey.clear();
-    encryptionEnabled = false;
-    logMessage(DataManagerLogLevel::INFO, "Encryption key cleared", 
+    {
+        std::lock_guard<std::mutex> lock(logMutex);
+        encryptionKey.clear();
+        encryptionEnabled = false;
+    }
+    logMessage(DataManagerLogLevel::INFO, "Encryption key cleared",
                "DataManager::clearEncryptionKey");
 }
 
