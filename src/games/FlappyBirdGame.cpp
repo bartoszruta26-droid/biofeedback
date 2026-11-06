@@ -9,6 +9,8 @@
 #include <QRectF>
 #include <QRandomGenerator>
 
+#include <cmath>
+
 namespace games {
 
 FlappyBirdGame::FlappyBirdGame(QWidget *parent)
@@ -199,7 +201,7 @@ bool FlappyBirdGame::isSerialConnected() const {
 }
 
 void FlappyBirdGame::onSensorDataReceived(const sensor::SensorData& data) {
-    if (!data.isValid) {
+    if (!data.isValid || !std::isfinite(data.calibratedValue)) {
         return;
     }
     
