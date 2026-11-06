@@ -26,6 +26,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
     src/core/Logger.cpp
+    src/core/PasswordHasher.cpp
     src/core/Authentication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
@@ -48,6 +49,10 @@ target_link_libraries(biofeedback_core
 )
 
 # Regression targets that can be built without Qt.
+add_executable(password_hasher_regression tests/password_hasher_regression.cpp)
+target_link_libraries(password_hasher_regression PRIVATE biofeedback_core)
+add_test(NAME password_hasher_regression COMMAND password_hasher_regression)
+
 add_executable(auth_regression tests/auth_regression.cpp)
 target_link_libraries(auth_regression PRIVATE biofeedback_core)
 
@@ -70,6 +75,7 @@ if(Qt5_FOUND)
         src/main.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
+        src/core/PasswordHasher.cpp
         src/core/ConfigManager.cpp
         src/core/Authentication.cpp
         src/gui/MainWindow.cpp
