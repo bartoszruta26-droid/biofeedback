@@ -19,6 +19,7 @@
 #include "core/DebugManager.hpp"
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <cstring>
 #include <algorithm>
 #include <fstream>
@@ -893,6 +894,7 @@ bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double kno
 }
 double SerialCommunication::convertToCalibrated(int32_t raw) const {
     std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    if (!m_impl->isCalibrated) return std::numeric_limits<double>::quiet_NaN();
     return (static_cast<double>(raw) - m_impl->zeroOffset) * m_impl->scaleFactor;
 }
 double SerialCommunication::getCalibrationScale() const {
