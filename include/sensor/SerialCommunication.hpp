@@ -358,6 +358,7 @@ private:
     bool writeToPort(const uint8_t* data, size_t length);
     SensorData parseSensorData(const std::vector<uint8_t>& rawData);
     void updateWatchdog();
+    void notifyConnectionCallbacks(bool connected, const std::string& message);
 };
 
 } // namespace sensor
