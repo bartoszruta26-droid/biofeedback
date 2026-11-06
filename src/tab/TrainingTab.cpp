@@ -191,6 +191,10 @@ TrainingTab::TrainingTab(QWidget *parent)
 
 TrainingTab::~TrainingTab()
 {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     stopTraining();
 }
 
@@ -581,12 +585,15 @@ bool TrainingTab::isTrainingPaused() const
 
 void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    m_serialPort = std::move(serial);
+
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback w wątku sensora - używamy QMetaObject dla bezpieczeństwa
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
+        m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
+            QMetaObject::invokeMethod(this, "onSensorDataReceived",
                                      Qt::QueuedConnection,
                                      Q_ARG(sensor::SensorData, data));
         });
