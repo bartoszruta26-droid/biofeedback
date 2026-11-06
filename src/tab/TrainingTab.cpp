@@ -1079,77 +1079,7 @@ void TrainingTab::completeCurrentRepetition()
         updateProgressWidgets();
     }
 }
-void TrainingTab::loadNextRep()
-{
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    if (m_currentRepIndex >= ex.repsPerSeries) {
-        // Powtórzenia w serii zakończone
-        checkExerciseCompletion();
-        return;
-    }
-    
-    m_peakForceInRep = 0;
-    updateProgressWidgets();
-}
 
-void TrainingTab::checkExerciseCompletion()
-{
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    if (m_currentSeriesIndex >= ex.seriesCount) {
-        // Ćwiczenie zakończone
-        calculateExerciseStats();
-        
-        ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-        stats.isCompleted = true;
-        
-        emit exerciseCompleted(m_currentExerciseIndex, stats);
-        
-        // Następne ćwiczenie
-        m_currentExerciseIndex++;
-        
-        // Odpoczynek między ćwiczeniami
-        if (m_currentExerciseIndex < m_exercisePlan.size()) {
-            m_inRestPeriod = true;
-            m_restTimeRemaining = 120;  // 2 minuty odpoczynku między ćwiczeniami
-            m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-            m_restTimer->start();
-        } else {
-            stopTraining();
-            emit trainingFinished(m_exerciseStats);
-        }
-    } else {
-        // Odpoczynek między seriami
-        m_inRestPeriod = true;
-        m_restTimeRemaining = static_cast<int>(ex.restTime);
-        m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-        m_restTimer->start();
-    }
-}
-
-void TrainingTab::calculateExerciseStats()
-{
-    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exerciseStats.size() ||
-        m_currentExerciseIndex >= m_exercisePlan.size()) {
-        return;
-    }
-
-    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-    const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
-
-    stats.completedSeries = qBound(0, m_currentSeriesIndex, exercise.seriesCount);
-    stats.isCompleted = stats.completedSeries >= exercise.seriesCount;
-}
-
-void TrainingTab::startRestTimer()
-{
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    m_restTimeRemaining = static_cast<int>(ex.restTime);
-    m_inRestPeriod = true;
-    m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-    m_restTimer->start();
-}
 
 void TrainingTab::updateRestDisplay()
 {
