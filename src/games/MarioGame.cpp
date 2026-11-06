@@ -494,6 +494,10 @@ void MarioGame::renderUI(QPainter& painter)
 
 void MarioGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
@@ -517,9 +521,13 @@ void MarioGame::setupSensorListening()
 {
     if (!m_serialPort) return;
     
-    m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
+    if (m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
         QMetaObject::invokeMethod(this, [this, data]() {
-            handleSensorInput(data.calibratedValue);
+            if (data.isValid) handleSensorInput(data.calibratedValue);
         }, Qt::QueuedConnection);
     });
     
@@ -536,6 +544,10 @@ void MarioGame::setupSensorListening()
 
 void MarioGame::cleanupSensorConnection()
 {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
