@@ -201,7 +201,10 @@ bool FlappyBirdGame::isSerialConnected() const {
 }
 
 void FlappyBirdGame::onSensorDataReceived(const sensor::SensorData& data) {
-    if (!data.isValid || !std::isfinite(data.calibratedValue)) {
+    if (!data.isValid ||
+        data.calibrationStatus != sensor::CalibrationStatus::Calibrated ||
+        data.unit != sensor::MeasurementUnit::Grams ||
+        !std::isfinite(data.calibratedValue)) {
         return;
     }
     
