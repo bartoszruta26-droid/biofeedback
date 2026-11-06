@@ -28,6 +28,7 @@ int main() {
     std::atomic<int> disconnectedEvents{0};
     std::atomic<int> firstSubscriberCalls{0};
     std::atomic<int> secondSubscriberCalls{0};
+    std::atomic<bool> calibratedValueValid{false};
     std::atomic<bool> blockingCallbackEntered{false};
     std::atomic<bool> releaseBlockingCallback{false};
 
@@ -38,7 +39,10 @@ int main() {
         });
     const auto firstId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
-            if (data.isValid && data.value == 123456 && std::abs(data.calibratedValue - 42.5) < 1e-6) ++firstSubscriberCalls;
+            if (data.isValid && data.value == 123456) {
+                ++firstSubscriberCalls;
+                if (std::abs(data.calibratedValue - 42.5) < 1e-6) calibratedValueValid.store(true);
+            }
         });
     const auto secondId = serial.subscribeDataCallback(
         [&](const sensor::SensorData& data) {
@@ -113,9 +117,13 @@ int main() {
 
     const bool bothReceived = waitUntil(firstSubscriberCalls, 1, std::chrono::seconds(5)) &&
                               waitUntil(secondSubscriberCalls, 1, std::chrono::seconds(1)) &&
-                              waitUntil(blockingCallbackEntered, true, std::chrono::seconds(1));
+                              waitUntil(blockingCallbackEntered, true, std::chrono::seconds(1)) &&
+                              waitUntil(calibratedValueValid, true, std::chrono::seconds(1));
     if (!bothReceived) {
-        std::cerr << "Both subscribers did not receive the same sample\n";
+        std::cerr << "Serial sample check failed: first=" << firstSubscriberCalls.load()
+                  << ", second=" << secondSubscriberCalls.load()
+                  << ", callbackEntered=" << blockingCallbackEntered.load()
+                  << ", calibrated=" << calibratedValueValid.load() << "\\n";
         releaseBlockingCallback.store(true);
         emulatorRunning = false;
         serial.stopAsyncReading();
