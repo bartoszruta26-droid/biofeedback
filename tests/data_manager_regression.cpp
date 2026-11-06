@@ -23,6 +23,7 @@ void expect(bool condition, const std::string& message) {
 int main() {
     try {
         DataManager dm;
+        dm.setEncryptionKey("regression-key-material");
 
         std::vector<Exercise> exercises;
         Exercise ex1;
