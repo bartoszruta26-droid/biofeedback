@@ -41,7 +41,7 @@ int main() {
         [&](const sensor::SensorData& data) {
             if (data.isValid && data.value == 123456) {
                 ++firstSubscriberCalls;
-                if (std::abs(data.calibratedValue - 42.5) < 1e-6) calibratedValueValid.store(true);
+                if (std::abs(data.calibratedValue - 123456.0) < 1e-6) calibratedValueValid.store(true);
             }
         });
     const auto secondId = serial.subscribeDataCallback(
@@ -96,7 +96,7 @@ int main() {
     });
 
     if (std::isfinite(serial.convertToCalibrated(123456))) {
-        std::cerr << "Uncalibrated ADC value was exposed as calibrated data\n";
+        std::cerr << "Host conversion should require an explicit calibration\n";
         emulatorRunning = false;
         emulator.join();
         serial.disconnect();
@@ -104,6 +104,14 @@ int main() {
         return 1;
     }
     serial.setCalibrationPoint(123456, 42.5);
+    if (std::abs(serial.convertToCalibrated(123456) - 42.5) > 1e-6) {
+        std::cerr << "Explicit host calibration conversion failed\n";
+        emulatorRunning = false;
+        emulator.join();
+        serial.disconnect();
+        close(masterFd);
+        return 1;
+    }
     serial.startAsyncReading();
     const auto waitUntil = [](const auto& value, int minimum,
                               std::chrono::milliseconds timeout) {
