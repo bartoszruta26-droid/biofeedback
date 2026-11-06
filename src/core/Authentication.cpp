@@ -1070,6 +1070,8 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
     std::vector<UserData> originalUsers, stagedUsers;
     std::string previousKey;
     int hashedCount = 0;
+    bool keyChanged = false;
+    bool usersReplaced = false;
     try {
         {
             std::lock_guard<std::mutex> lock(m_mutex);
