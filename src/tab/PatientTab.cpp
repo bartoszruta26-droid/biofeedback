@@ -267,6 +267,7 @@ void PatientTab::createConnections()
         m_birthDateEdit->setDate(QDate::currentDate().addYears(-18));
         m_genderCombo->setCurrentIndex(0);
         m_isEditMode = false;
+        m_currentRow = -1;
         m_addButton->setText(tr("Dodaj"));
         m_addButton->setEnabled(true);
     });
@@ -342,16 +343,18 @@ void PatientTab::addPatient(const QString& pesel, const QString& firstName,
                            const QString& gender, const QString& notes)
 {
     // Sprawdzenie czy PESEL już istnieje
-    int existingRow = findPatientByPesel(pesel);
-    if (existingRow >= 0 && !m_isEditMode) {
-        QMessageBox::warning(this, tr("Błąd"), 
+    const int existingRow = findPatientByPesel(pesel);
+    if (existingRow >= 0 && (!m_isEditMode || existingRow != m_currentRow)) {
+        QMessageBox::warning(this, tr("Błąd"),
                             tr("Pacjent z tym numerem PESEL już istnieje."));
         return;
     }
-    
+
     int row;
-    if (m_isEditMode && existingRow >= 0) {
-        row = existingRow;
+    if (m_isEditMode && m_currentRow >= 0 &&
+        m_currentRow < m_patientTable->rowCount()) {
+        // Aktualizujemy zaznaczony rekord także wtedy, gdy PESEL został poprawiony.
+        row = m_currentRow;
     } else {
         row = m_patientTable->rowCount();
         m_patientTable->insertRow(row);
@@ -367,6 +370,7 @@ void PatientTab::addPatient(const QString& pesel, const QString& firstName,
     if (m_isEditMode) {
         emit patientUpdated(row);
         m_isEditMode = false;
+        m_currentRow = -1;
         m_addButton->setText(tr("Dodaj"));
     } else {
         emit patientAdded(pesel, firstName, lastName);
