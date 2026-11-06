@@ -112,6 +112,15 @@ int main() {
         expect(loadedPatient.address == patient.address, "patient.address z backslash");
         expect(loadedPatient.medicalHistory == patient.medicalHistory, "patient.medicalHistory z newline");
 
+        TrainingPlan plan;
+        plan.id = "plan-1";
+        plan.patientId = "p-1";
+        plan.name = "Rehabilitation plan";
+        plan.description = "Encrypted plan";
+        expect(dm.saveTrainingPlan(plan, kResultsFile, false), "szyfrowany plan treningowy");
+        const auto loadedPlan = dm.loadTrainingPlan(kResultsFile, false);
+        expect(loadedPlan.id == plan.id && loadedPlan.patientId == plan.patientId, "odszyfrowany plan treningowy");
+
         const std::string exportPayload = "protected-json-payload";
         expect(dm.exportToJson(exportPayload, kResultsFile), "szyfrowany eksport JSON");
         expect(dm.importFromJson(kResultsFile) == exportPayload, "odszyfrowany import JSON");
