@@ -4,6 +4,7 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QDateTime>
+#include <QSignalBlocker>
 #include <QRandomGenerator>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -1893,6 +1894,9 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 
     m_lastSensorData = data;
 
+    if (!data.hasRawValue && m_currentUnit == ForceUnit::Raw)
+        setCurrentUnit(ForceUnit::Newtons);
+
     // The documented binary firmware frame contains calibrated force, not raw ADC.
     // Automatically leave raw mode if the current protocol cannot supply raw counts.
     if (!data.hasRawValue && m_showRawValues && m_btnToggleRaw)
@@ -2017,8 +2021,23 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 
 void MeasurementTab::setCurrentUnit(ForceUnit unit)
 {
+    if (unit == ForceUnit::Raw && !m_lastSensorData.hasRawValue) {
+        unit = ForceUnit::Newtons;
+        addDebugMessage("Firmware nie udostępnia surowych zliczeń ADC; pozostawiono niutony.", "WARNING");
+        if (m_unitSelector) {
+            const QSignalBlocker blocker(m_unitSelector);
+            m_unitSelector->setCurrentIndex(m_unitSelector->findData(static_cast<int>(ForceUnit::Newtons)));
+        }
+    }
+
+    const bool rawMode = unit == ForceUnit::Raw;
+    if (m_btnToggleRaw && m_btnToggleRaw->isChecked() != rawMode)
+        m_btnToggleRaw->setChecked(rawMode);
+    else
+        m_showRawValues = rawMode;
+
     m_currentUnit = unit;
-    
+
     // Aktualizuj wykres siły
     if (m_forcePlot) {
         m_forcePlot->setUnit(unit);
