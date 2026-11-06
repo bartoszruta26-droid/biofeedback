@@ -93,3 +93,25 @@ Dla każdego testu zapisać:
 - logi i opis odchyleń.
 
 Testy sprzętowe oznaczyć jako NIE WYKONANO, jeżeli nie przeprowadzono ich na fizycznym urządzeniu. Sam sukces kompilacji nie jest dowodem poprawności pomiaru.
+
+
+## Dodatkowe testy po audycie cyklu życia i kalibracji
+
+### Kalibracja i binarna ścieżka danych
+1. Ustaw dwa punkty kalibracyjne: zero oraz znaną wartość wzorcową.
+2. Potwierdź, że próbka binarna z poprawnym CRC zachowuje wartość surową i otrzymuje wartość skalibrowaną zgodną ze współczynnikiem.
+3. Zmień kalibrację podczas bezczynności odczytu i sprawdź, czy kolejne próbki używają nowego współczynnika.
+4. Sprawdź, czy aplikacja nie interpretuje surowych zliczeń ADC jako gramów lub niutonów bez wykonanej kalibracji.
+
+### Cykl życia połączenia
+1. Uruchom aplikację bez podłączonego Arduino i poczekaj na automatyczne wyszukiwanie.
+2. Zamknij aplikację podczas wyszukiwania; proces powinien zakończyć się bez zawieszenia i bez dostępu do zniszczonego widgetu.
+3. Podłącz Arduino podczas wyszukiwania; potwierdź identyfikację urządzenia i rozpoczęcie odbioru.
+4. Odłącz urządzenie podczas odbioru, a następnie ponownie je podłącz.
+5. Zmień zakładki podczas intensywnego odbioru i zamknij aplikację; nie powinno wystąpić zawieszenie ani awaria.
+
+### Pojedynczy kanał wejściowy gier
+1. W TrainingTab uruchom grę i wykonaj serię kontrolowanych nacisków.
+2. Potwierdź, że pojedyncza próbka wpływa na aktywną grę tylko raz.
+3. W zakładce Konspekt uruchom grę sesji i potwierdź przekazywanie skalibrowanej siły w niutonach.
+4. Wstrzymaj grę lub sesję; próbki nie powinny zmieniać stanu gry.
