@@ -351,8 +351,11 @@ void DebugTab::onSensorDataReceived(const sensor::SensorData& data)
         updateConnectionStatus(true);
         
         // Dodaj wiadomość do terminala z danymi z Arduino
-        QString arduinoMsg = QString("RAW=%1 | CALIBRATED=%2 | Timestamp=%3")
-            .arg(data.value)
+        const QString frameValue = data.hasRawValue
+            ? QString("RAW=%1").arg(data.value)
+            : QString("FORCE_VALUE=%1 g").arg(data.calibratedValue, 0, 'f', 2);
+        QString arduinoMsg = QString("%1 | CALIBRATED=%2 | Timestamp=%3")
+            .arg(frameValue)
             .arg(std::isfinite(data.calibratedValue)
                      ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
                      : QStringLiteral("N/A (brak kalibracji)"))
