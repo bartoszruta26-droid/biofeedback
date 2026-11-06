@@ -3,6 +3,7 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include <array>
+#include <climits>
 #include <stdexcept>
 namespace biofeedback {
 namespace {
