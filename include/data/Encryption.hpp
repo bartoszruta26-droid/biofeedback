@@ -150,12 +150,12 @@ public:
      * Metoda przeprowadza pełny proces szyfrowania:
      * 1. Walidacja parametrów wejściowych
      * 2. Konwersja danych do wektora bajtów
-     * 3. Szyfrowanie XOR z użyciem podanego klucza
+     * 3. Szyfrowanie uwierzytelnione AES-256-GCM
      * 4. Kodowanie wyniku do Base64
      * 5. Logowanie operacji i aktualizacja statystyk
      * 
      * @param data Dane do zaszyfrowania (string tekstowy)
-     * @param key Klucz szyfrujący (minimum 4 znaki, zalecane 8+)
+     * @param key Klucz szyfrujący (co najmniej 32 bajty losowego materiału kluczowego)
      * @return Zaszyfrowane dane zakodowane w Base64
      * 
      * @throws std::invalid_argument Jeśli klucz jest pusty
@@ -199,7 +199,7 @@ public:
      * 
      * @note Dla length = 0 ustawiana jest wartość domyślna 32
      * @note Dla length > 1024 klucz jest ograniczany do 1024 znaków (gentle code)
-     * @warning Przed użyciem należy wywołać srand() do inicjalizacji generatora losowego
+     * @warning Klucz jest generowany z użyciem kryptograficznego generatora systemowego
      * @note Zalecane minimum to 8 znaków dla podstawowego bezpieczeństwa
      */
     static std::string generateKey(size_t length = 32);
@@ -329,21 +329,6 @@ private:
     // ========================================================================
     // METODY PRYWATNE
     // ========================================================================
-    
-    /**
-     * @brief Prosty algorytm XOR do szyfrowania/deszyfrowania
-     * 
-     * Wykonuje operację XOR na danych z cyklicznie powtarzanym kluczem.
-     * Ta sama operacja służy zarówno do szyfrowania jak i deszyfrowania.
-     * 
-     * @param data Dane do przetworzenia
-     * @param key Klucz do operacji XOR
-     * @return Wynik operacji XOR
-     * 
-     * @throws std::invalid_argument Jeśli klucz jest pusty
-     * @throws std::runtime_error Jeśli wystąpi błąd alokacji pamięci
-     */
-    static std::vector<uint8_t> xorCipher(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key);
     
     /**
      * @brief Loguje komunikat z odpowiednim poziomem ważności
