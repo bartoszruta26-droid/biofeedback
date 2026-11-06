@@ -32,6 +32,7 @@
  */
 
 #include "data/DataManager.hpp"
+#include <openssl/crypto.h>
 #include <algorithm>
 #include <cctype>
 #include <dirent.h>
@@ -541,6 +542,7 @@ DataManager::DataManager()
  * Zapewnia bezpieczne czyszczenie zasobów
  */
 DataManager::~DataManager() {
+    clearEncryptionKey();
     logMessage(DataManagerLogLevel::VERBOSE, "DataManager destructed", "DataManager::~DataManager");
 }
 
@@ -602,6 +604,7 @@ std::string DataManager::getStatisticsSummary() const {
 void DataManager::setEncryptionKey(const std::string& key) {
     {
         std::lock_guard<std::mutex> lock(logMutex);
+        if (!encryptionKey.empty()) OPENSSL_cleanse(encryptionKey.data(), encryptionKey.size());
         encryptionKey = key;
         encryptionEnabled = !key.empty();
     }
@@ -619,6 +622,7 @@ void DataManager::setEncryptionKey(const std::string& key) {
 void DataManager::clearEncryptionKey() {
     {
         std::lock_guard<std::mutex> lock(logMutex);
+        if (!encryptionKey.empty()) OPENSSL_cleanse(encryptionKey.data(), encryptionKey.size());
         encryptionKey.clear();
         encryptionEnabled = false;
     }
