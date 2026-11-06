@@ -20,7 +20,7 @@ namespace sensor {
 struct SensorData {
     uint32_t timestamp;      ///< Timestamp w milisekundach
     int32_t value;           ///< Wartość surowa z czujnika
-    double calibratedValue;  ///< Wartość po kalibracji
+    double calibratedValue;  ///< Wartość po kalibracji, w gramach
     uint8_t crc;             ///< Suma kontrolna CRC
     bool isValid;            ///< Flagi poprawności danych
     
@@ -258,7 +258,7 @@ public:
     /**
      * @brief Ustawia punkt kalibracyjny
      * @param rawValue Surowa wartość z czujnika
-     * @param knownValue Znana wartość wzorcowa
+     * @param knownValue Znana wartość wzorcowa w gramach
      */
     void setCalibrationPoint(int32_t rawValue, double knownValue);
     
@@ -266,7 +266,7 @@ public:
      * @brief Kalibruje czujnik używając dwóch punktów
      * @param rawZero Surowa wartość dla zera
      * @param rawSpan Surowa wartość dla znanej wagi
-     * @param knownWeight Znana waga w jednostkach użytkownika
+     * @param knownWeight Znana masa wzorcowa w gramach
      * @return true jeśli kalibracja pomyślna
      */
     bool calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight);
