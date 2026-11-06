@@ -1124,9 +1124,17 @@ bool Authentication::login(const std::string& username, const std::string& passw
         if (user->encrypted && isPbkdf2PasswordHash(user->password)) {
             matches = verifyPasswordPbkdf2(password, user->password);
         } else if (user->encrypted) {
-            const std::string legacy = decryptPassword(user->password);
-            matches = !legacy.empty() && legacy == password;
-            upgrade = matches;
+            // Previous fail-open releases could mark a plaintext value as
+            // encrypted. Accept it only on exact password match, then upgrade
+            // it immediately to PBKDF2 before login succeeds.
+            if (user->password == password) {
+                matches = true;
+                upgrade = true;
+            } else {
+                const std::string legacy = decryptPassword(user->password);
+                matches = !legacy.empty() && legacy == password;
+                upgrade = matches;
+            }
         } else {
             matches = user->password == password;
             upgrade = matches;
