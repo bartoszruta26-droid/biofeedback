@@ -319,7 +319,7 @@ void EncryptionTypes::EncryptionStatistics::reset() {
     totalBytesProcessed.store(0);
 }
 std::string Encryption::encrypt(const std::string& data, const std::string& key) {
-    if (key.empty()) throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
+    if (key.size() < 32) throw std::invalid_argument("Klucz AES musi zawierać co najmniej 32 bajty losowego materiału");
     if (data.size() > MAX_DATA_SIZE || data.size() > static_cast<std::size_t>(INT_MAX))
         throw std::invalid_argument("Dane przekraczają dopuszczalny rozmiar");
     unsigned char aesKey[32]{};
@@ -367,7 +367,7 @@ std::string Encryption::encrypt(const std::string& data, const std::string& key)
 }
 std::string Encryption::decrypt(const std::string& encryptedData, const std::string& key) {
     static const std::string prefix="BFENC:v1:";
-    if(key.empty())throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
+    if(key.size()<32)throw std::invalid_argument("Klucz AES musi zawierać co najmniej 32 bajty losowego materiału");
     if(encryptedData.compare(0,prefix.size(),prefix)!=0)
         throw std::invalid_argument("Nieobsługiwany format szyfrogramu; migracja danych legacy musi być jawna");
     const std::string encoded=encryptedData.substr(prefix.size());
