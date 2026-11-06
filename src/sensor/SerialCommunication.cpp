@@ -647,8 +647,7 @@ SensorData SerialCommunication::readData(int timeout) {
                         rawData[packetStart + 10] != 0x55) continue;
 
                     uint8_t packet[10];
-                    std::copy_n(rawData.begin() + static_cast<std::ptrdiff_t>(packetStart),
-                                10, packet);
+                    std::memcpy(packet, rawData.data() + packetStart, sizeof(packet));
                     if (!verifyCRC8(packet, 10)) continue;
 
                     std::memcpy(&data.timestamp, packet + 1, sizeof(data.timestamp));
