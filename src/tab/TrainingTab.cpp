@@ -387,7 +387,7 @@ void TrainingTab::setupUI()
     
     // Timer
     m_timer = new QTimer(this);
-    m_timer->setInterval(100);  // 10 Hz
+    m_timer->setInterval(1000);  // 1 Hz – onTimerTick increments elapsed seconds
     
     m_restTimer = new QTimer(this);
     m_restTimer->setInterval(1000);  // 1 Hz
@@ -1046,6 +1046,7 @@ void TrainingTab::completeCurrentRepetition()
         stats.completedSeries = m_currentSeriesIndex;
         m_currentRepIndex = 0;
         emit seriesCompleted(m_currentExerciseIndex, completedSeriesIndex);
+        updateProgressWidgets();
 
         if (m_currentSeriesIndex >= exercise.seriesCount) {
             stats.isCompleted = true;
