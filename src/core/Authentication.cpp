@@ -1014,7 +1014,7 @@ bool Authentication::createUser(const std::string& username,const std::string& p
         actor=currentUser->username;
         UserData user{};
         user.username=username;
-        user.password=PasswordHasher::hash(password);
+        try { user.password=PasswordHasher::hash(password); } catch (...) { return false; }
         user.role=role;
         user.encrypted=true;
         user.mustChangePassword=false;
