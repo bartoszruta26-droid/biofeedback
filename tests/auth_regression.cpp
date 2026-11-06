@@ -34,6 +34,7 @@ int main(){
   expect(auth.changePassword("new-doctor-password-2026"),"second password change");
   expect(auth.login("brace-user","token-with-}-inside"),"brace legacy login");
   expect(auth.changePassword("new-brace-password-2026"),"third password change");
+  expect(auth.login("admin","new-admin-password-2026"),"administrator re-login");
   expect(auth.createUser("new-user","a-strong-password-2026","therapist"),"secure account creation");
   expect(!auth.createUser("new-user","another-strong-password","therapist"),"duplicate user rejected");
   auth.logout();
