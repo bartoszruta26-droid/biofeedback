@@ -42,6 +42,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_statusLabel(nullptr)
     , m_dashboardConnectionValue(nullptr)
     , m_dashboardForceValue(nullptr)
+    , m_dashboardMeasurementValue(nullptr)
     , m_samplingRateSpin(nullptr)
     , m_graphDurationSpin(nullptr)
     , m_unitCombo(nullptr)
@@ -161,7 +162,7 @@ void MainWindow::setupTabs()
     cards->addWidget(makeDashboardCard(tr("OSTATNI ODCZYT"), tr("-- N"),
         tr("Oczekiwanie na próbkę"), &m_dashboardForceValue), 0, 1);
     cards->addWidget(makeDashboardCard(tr("POMIAR"), tr("Bezczynny"),
-        tr("Brak aktywnej sesji"), nullptr), 1, 0);
+        tr("Brak aktywnej sesji"), &m_dashboardMeasurementValue), 1, 0);
     cards->addWidget(makeDashboardCard(tr("TRYB"), tr("Gotowy"),
         tr("Aplikacja desktopowa Qt"), nullptr), 1, 1);
     dashboardLayout->addLayout(cards);
@@ -509,6 +510,7 @@ void MainWindow::startDataCollection()
     if (m_isCollectingData) return;
     
     m_isCollectingData = true;
+    if (m_dashboardMeasurementValue) m_dashboardMeasurementValue->setText(tr("Aktywny"));
     if (m_startButton) m_startButton->setEnabled(false);
     if (m_stopButton) m_stopButton->setEnabled(true);
     m_actionStart->setEnabled(false);
@@ -525,6 +527,7 @@ void MainWindow::stopDataCollection()
     if (!m_isCollectingData) return;
     
     m_isCollectingData = false;
+    if (m_dashboardMeasurementValue) m_dashboardMeasurementValue->setText(tr("Bezczynny"));
     if (m_startButton) m_startButton->setEnabled(true);
     if (m_stopButton) m_stopButton->setEnabled(false);
     m_actionStart->setEnabled(true);
