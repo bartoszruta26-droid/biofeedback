@@ -6,6 +6,7 @@
 #include <QFont>
 #include <QtMath>
 #include <cmath>
+#include <utility>
 
 namespace games {
 
