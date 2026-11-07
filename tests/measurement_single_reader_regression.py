@@ -11,8 +11,8 @@ for forbidden in ("readData(", "tryReadData(", "m_timer", "onTimerTick"):
 manual_start = source.index("void MeasurementTab::onReadSingleSample()")
 manual_end = source.index("void MeasurementTab::onSelectionChanged()", manual_start)
 manual = source[manual_start:manual_end]
-if "m_lastSensorData" not in manual or "readSingleSample(value)" not in manual:
-    raise SystemExit("Manual capture must reuse the latest asynchronous frame")
+if "m_lastSensorData" not in manual or "readSingleSample(value, m_lastSensorData.timestamp)" not in manual:
+    raise SystemExit("Manual capture must reuse the latest asynchronous frame and device timestamp")
 
 receiver_start = source.index("void MeasurementTab::onSensorDataReceived")
 receiver_end = source.index("// MeasurementTab - Konwersja jednostek", receiver_start)
