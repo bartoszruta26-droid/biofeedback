@@ -1246,13 +1246,14 @@ void MeasurementTab::calculateRepetitionStats()
         // Analiza serii
         currentSeries.avgPeakForce = 0;
         currentSeries.totalWork = 0;
+        currentSeries.impulseTotal = 0;
         currentSeries.avgRiseRate = 0;
         currentSeries.avgFallRate = 0;
-        
+
         QVector<double> peakForces;
         for (const auto& rep : currentSeries.reps) {
             currentSeries.avgPeakForce += rep.peakForce;
-            currentSeries.totalWork += rep.areaUnderCurve;
+            currentSeries.impulseTotal += rep.areaUnderCurve;
             currentSeries.avgRiseRate += rep.riseRate;
             currentSeries.avgFallRate += rep.fallRate;
             peakForces.append(rep.peakForce);
@@ -1262,7 +1263,8 @@ void MeasurementTab::calculateRepetitionStats()
         currentSeries.avgRiseRate /= currentSeries.reps.size();
         currentSeries.avgFallRate /= currentSeries.reps.size();
         currentSeries.medianPeakForce = calculateMedian(peakForces);
-        currentSeries.impulseTotal = currentSeries.totalWork;
+        // Mechanical work is reported separately from force impulse (N·s).
+        currentSeries.totalWork = currentSeries.biomechanicalParams.W_total;
         
         // Wskaźnik zmęczenia (spadek siły względem pierwszego powtórzenia)
         if (currentSeries.reps.size() >= 2 && currentSeries.reps.first().peakForce > 0) {
