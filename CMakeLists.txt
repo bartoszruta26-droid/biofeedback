@@ -265,6 +265,13 @@ if(Qt5_FOUND)
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
+        include/sensor/SerialCommunication.hpp
+        include/measurement/MeasurementEngine.hpp
+        include/games/GameEngine.hpp
+        include/games/PongGame.hpp
+        include/games/FlappyBirdGame.hpp
+        include/games/MarioGame.hpp
+        include/games/SinGame.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
     target_include_directories(training_tab_process_restart_regression PRIVATE
