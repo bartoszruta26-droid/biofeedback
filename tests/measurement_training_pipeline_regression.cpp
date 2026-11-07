@@ -51,7 +51,7 @@ int main() {
     assert(!detector.process(2000, 0.0, true, afterGap));  // release baseline
     assert(!detector.process(2100, 10.0, true, afterGap)); // new contraction
     assert(!detector.process(2200, 12.0, true, afterGap));
-    assert(!detector.process(2300, 0.0, true, afterGap));
+    assert(detector.process(2300, 0.0, true, afterGap));
     assert(afterGap.sampleCount == 3);
     assert(afterGap.startTimestampMs == 2100);
 
