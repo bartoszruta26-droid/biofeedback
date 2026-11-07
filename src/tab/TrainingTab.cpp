@@ -492,7 +492,7 @@ void TrainingTab::startTraining()
     m_sessionTime = 0;
     for (auto& stats : m_exerciseStats) {
         stats.startTime = std::chrono::steady_clock::now();
-        stats.peakForcePerRep.clear();
+        stats.aggregatedReps = 0;
         stats.avgPeakForce = 0.0;
         stats.maxPeakForce = 0.0;
         stats.minPeakForce = 0.0;
@@ -843,6 +843,11 @@ void TrainingTab::onSharedRepetitionCompleted(double peakForceN, double duration
                                                double timeToPeakSeconds, double averageForceN,
                                                double impulseNs, double targetAccuracyPercent)
 {
+    Q_UNUSED(durationSeconds);
+    Q_UNUSED(timeToPeakSeconds);
+    Q_UNUSED(averageForceN);
+    Q_UNUSED(impulseNs);
+    Q_UNUSED(targetAccuracyPercent);
     if (!m_isTraining || m_isPaused || m_inRestPeriod ||
         m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) return;
 
@@ -850,23 +855,55 @@ void TrainingTab::onSharedRepetitionCompleted(double peakForceN, double duration
     if (m_currentRepIndex >= exercise.repsPerSeries) return;
 
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-    stats.peakForcePerRep.append(peakForceN);
-    stats.avgReactionTime += timeToPeakSeconds;
-    stats.averageForceN += averageForceN;
-    stats.totalImpulseNs += impulseNs;
-    stats.targetAccuracyPercent += targetAccuracyPercent;
-    stats.averageRepetitionDurationSeconds += durationSeconds;
-
     m_peakForceInRep = peakForceN;
     ++m_currentRepIndex;
-    stats.completedReps = stats.peakForcePerRep.size();
+    ++stats.completedReps;
     updateProgressWidgets();
 
     if (m_currentRepIndex >= exercise.repsPerSeries) {
         ++m_currentSeriesIndex;
-        stats.completedSeries = m_currentSeriesIndex;
         checkExerciseCompletion();
     }
+}
+
+void TrainingTab::onSharedSeriesCompleted(int repetitionCount, double averagePeakForceN,
+                                           double maximumPeakForceN, double minimumPeakForceN,
+                                           double averageTimeToPeakSeconds, double averageForceN,
+                                           double averageRepetitionDurationSeconds,
+                                           double totalImpulseNs, double targetAccuracyPercent,
+                                           double consistencyScorePercent)
+{
+    if (!m_isTraining || m_currentExerciseIndex < 0 ||
+        m_currentExerciseIndex >= m_exerciseStats.size() || repetitionCount <= 0) return;
+
+    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    const int previousCount = stats.aggregatedReps;
+    const int combinedCount = previousCount + repetitionCount;
+    const double oldWeight = static_cast<double>(previousCount);
+    const double newWeight = static_cast<double>(repetitionCount);
+    const double totalWeight = static_cast<double>(combinedCount);
+
+    if (previousCount == 0) {
+        stats.maxPeakForce = maximumPeakForceN;
+        stats.minPeakForce = minimumPeakForceN;
+    } else {
+        stats.maxPeakForce = std::max(stats.maxPeakForce, maximumPeakForceN);
+        stats.minPeakForce = std::min(stats.minPeakForce, minimumPeakForceN);
+    }
+    stats.avgPeakForce = (stats.avgPeakForce * oldWeight + averagePeakForceN * newWeight) / totalWeight;
+    stats.avgReactionTime = (stats.avgReactionTime * oldWeight +
+                             averageTimeToPeakSeconds * newWeight) / totalWeight;
+    stats.averageForceN = (stats.averageForceN * oldWeight + averageForceN * newWeight) / totalWeight;
+    stats.averageRepetitionDurationSeconds =
+        (stats.averageRepetitionDurationSeconds * oldWeight +
+         averageRepetitionDurationSeconds * newWeight) / totalWeight;
+    stats.targetAccuracyPercent =
+        (stats.targetAccuracyPercent * oldWeight + targetAccuracyPercent * newWeight) / totalWeight;
+    stats.consistencyScore =
+        (stats.consistencyScore * oldWeight + consistencyScorePercent * newWeight) / totalWeight;
+    stats.totalImpulseNs += totalImpulseNs;
+    stats.aggregatedReps = combinedCount;
+    ++stats.completedSeries;
 }
 
 void TrainingTab::onGameEnded(int /*score*/)
@@ -928,7 +965,8 @@ void TrainingTab::loadNextExercise()
     m_currentRepIndex = 0;
     
     const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
+    emit engineSeriesSizeRequested(ex.repsPerSeries);
+
     // Konfiguracja gry dla tego ćwiczenia
     QString currentGameType = m_gameTypeCombo->currentData().toString();
     if (currentGameType != ex.gameType) {
@@ -1022,43 +1060,13 @@ void TrainingTab::calculateExerciseStats()
     if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exerciseStats.size()) return;
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
     const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
-    const int completedCount = stats.peakForcePerRep.size();
 
-    stats.completedSeries = m_currentSeriesIndex;
-    stats.completedReps = completedCount;
-    stats.avgPeakForce = 0.0;
-    stats.maxPeakForce = 0.0;
-    stats.minPeakForce = 0.0;
-
-    if (completedCount > 0) {
-        double sum = 0.0;
-        stats.minPeakForce = stats.peakForcePerRep.front();
-        for (double peak : stats.peakForcePerRep) {
-            sum += peak;
-            stats.maxPeakForce = std::max(stats.maxPeakForce, peak);
-            stats.minPeakForce = std::min(stats.minPeakForce, peak);
-        }
-        stats.avgPeakForce = sum / static_cast<double>(completedCount);
-        stats.avgReactionTime /= static_cast<double>(completedCount);
-        stats.averageForceN /= static_cast<double>(completedCount);
-        stats.targetAccuracyPercent /= static_cast<double>(completedCount);
-        stats.averageRepetitionDurationSeconds /= static_cast<double>(completedCount);
-
-        double variance = 0.0;
-        for (double peak : stats.peakForcePerRep) {
-            const double delta = peak - stats.avgPeakForce;
-            variance += delta * delta;
-        }
-        const double standardDeviation = std::sqrt(variance / static_cast<double>(completedCount));
-        stats.consistencyScore = stats.avgPeakForce > 0.0
-            ? std::max(0.0, 100.0 - 100.0 * standardDeviation / stats.avgPeakForce) : 0.0;
-    }
-
+    // All force/time analytics come from MeasurementEngine series events.
     stats.duration = std::chrono::duration_cast<std::chrono::seconds>(
         std::chrono::steady_clock::now() - stats.startTime).count();
     const int expectedReps = exercise.seriesCount * exercise.repsPerSeries;
     stats.completionRate = expectedReps > 0
-        ? 100.0 * static_cast<double>(completedCount) / static_cast<double>(expectedReps)
+        ? 100.0 * static_cast<double>(stats.completedReps) / static_cast<double>(expectedReps)
         : 0.0;
     stats.isCompleted = true;
 }
