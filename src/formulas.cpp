@@ -142,10 +142,9 @@ const char* BiomechanicalParams::parameterName(std::size_t index) noexcept
 // ============================================================================
 
 Formulas::Formulas(double k_elastic, double patientMass, double sampleRate)
-    : k_elastic_(k_elastic)
-    , patient_mass_(patientMass)
-    , sample_rate_(sampleRate)
-    , dt_(1.0 / sampleRate)
+    : k_elastic_(std::isfinite(k_elastic) && k_elastic > 0.0 ? k_elastic : 0.0)
+    , patient_mass_(std::isfinite(patientMass) && patientMass > 0.0 ? patientMass : 0.0)
+    , sample_rate_(std::isfinite(sampleRate) && sampleRate > 0.0 ? sampleRate : 0.0)
 {
 }
 
@@ -748,10 +747,11 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     for (std::size_t index : {0u, 1u, 2u, 3u, 10u, 11u, 12u, 13u,
                               25u, 35u, 37u, 38u})
         params.setAvailability(index, ParameterAvailability::Available);
-    params.setAvailability(6, ParameterAvailability::RequiresCalibration);
-    params.setAvailability(20, ParameterAvailability::RequiresCalibration);
-    params.setAvailability(21, ParameterAvailability::RequiresCalibration);
-    params.setAvailability(28, ParameterAvailability::RequiresCalibration);
+    const bool hasElasticCalibration = std::isfinite(k_elastic_) && k_elastic_ > 0.0;
+    const auto calibrationStatus = hasElasticCalibration
+        ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration;
+    for (std::size_t index : {6u, 20u, 21u, 28u})
+        params.setAvailability(index, calibrationStatus);
 
     return params;
 }
@@ -947,9 +947,16 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
                               37u, 38u, 48u, 49u, 50u, 51u, 54u, 61u, 63u})
         params.setAvailability(index, ParameterAvailability::Available);
 
-    // These outputs depend on a configured elastic element or patient mass.
-    for (std::size_t index : {6u, 7u, 20u, 21u, 22u, 23u, 24u, 28u, 56u})
-        params.setAvailability(index, ParameterAvailability::RequiresCalibration);
+    // Mechanics-derived values are unavailable until the elastic system is calibrated.
+    const bool hasElasticCalibration = std::isfinite(k_elastic_) && k_elastic_ > 0.0;
+    const bool hasPatientMass = std::isfinite(patient_mass_) && patient_mass_ > 0.0;
+    const auto elasticStatus = hasElasticCalibration
+        ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration;
+    for (std::size_t index : {6u, 7u, 20u, 21u, 22u, 23u, 28u, 56u})
+        params.setAvailability(index, elasticStatus);
+    params.setAvailability(18, elasticStatus);
+    params.setAvailability(24, hasElasticCalibration && hasPatientMass
+        ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration);
 
     // Explicit external dependencies; do not fabricate proxy values.
     params.setAvailability(14, ParameterAvailability::InsufficientData);
