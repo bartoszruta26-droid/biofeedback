@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <condition_variable>
 #include <functional>
 #include <map>
 #include <memory>
@@ -72,7 +73,15 @@ private:
     MeasurementEngineConfig m_config;
     mutable std::mutex m_mutex;
     std::vector<MeasurementSample> m_history;
-    std::map<CallbackToken, SampleCallback> m_callbacks;
+    struct CallbackEntry {
+        explicit CallbackEntry(SampleCallback value) : callback(std::move(value)) {}
+        SampleCallback callback;
+        std::mutex mutex;
+        std::condition_variable idle;
+        bool active{true};
+        std::size_t inFlight{0};
+    };
+    std::map<CallbackToken, std::shared_ptr<CallbackEntry>> m_callbacks;
     std::uint64_t m_nextSequence{1};
     CallbackToken m_nextToken{1};
 };
