@@ -4,9 +4,7 @@
 #include <QWidget>
 #include <QTimer>
 #include <QString>
-#include <QMutex>
-#include <atomic>
-#include <memory>
+#include <QElapsedTimer>
 #include "core/DebugManager.hpp"
 
 namespace games {
@@ -202,9 +200,12 @@ protected:
     QTimer* m_gameTimer;
     
     // Czas ostatniej klatki
-    qint64 m_lastFrameTime;
+    QElapsedTimer m_frameClock;
+    qint64 m_gameElapsedMs;
+    quint64 m_frameCount;
+    quint64 m_invalidInputCount;
     
-    // Wartość wejściowa z sensora
+    // Wartość wejściowa z sensora (modyfikowana wyłącznie w wątku GUI)
     double m_sensorValue;
 };
 
