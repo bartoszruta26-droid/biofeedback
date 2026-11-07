@@ -994,7 +994,7 @@ void TrainingTab::updateSessionClocks()
 {
     if (!m_stateMachine.running() || !m_sessionClock.isValid()) return;
     const qint64 elapsedMs = m_sessionClock.elapsed();
-    m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_stateMachine.paused() && !m_stateMachine.resting());
+    m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, m_stateMachine.state() == biofeedback::training::SessionState::Active);
     m_sessionTime = static_cast<int>(m_trainingClock.sessionSeconds());
 }
 
