@@ -1372,23 +1372,14 @@ void MeasurementTab::updateLiveDisplay(double force)
 
 void MeasurementTab::calculateRepetitionStats()
 {
-    std::cout << "[DEBUG] calculateRepetitionStats START: m_currentRepForces.size()=" 
-              << m_currentRepForces.size() 
-              << " m_completedSeriesStats.size()=" << m_completedSeriesStats.size() << std::endl;
-    
-    if (m_currentRepForces.size() < 2) {
-        std::cout << "[DEBUG] calculateRepetitionStats END: m_currentRepForces.size() < 2" << std::endl;
+    if (m_currentRepForces.size() < 3 ||
+        m_currentRepForces.size() != m_currentRepTimes.size())
         return;
-    }
-    
+
     ensureCurrentSeriesInitialized();
-    if (m_completedSeriesStats.isEmpty() || m_currentSeries > 3) {
-        std::cerr << "[ERROR] calculateRepetitionStats: no active series is available" << std::endl;
+    if (m_completedSeriesStats.isEmpty() || m_currentSeries > 3)
         return;
-    }
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Setting repNumber=" << (m_currentRepInSeries + 1) << std::endl;
-    
+
     m_currentRepStats = RepetitionStats();
     m_currentRepStats.repNumber = m_currentRepInSeries + 1;
     m_currentRepStats.peakForce = m_repPeakForce;
@@ -1407,18 +1398,20 @@ void MeasurementTab::calculateRepetitionStats()
         m_currentRepStats.biomechanicalData.samples.emplace_back(
             sample.timestampMs, sample.forceN);
     }
+
     Formulas biomechanicalFormulas(
         m_elasticConstantInput ? m_elasticConstantInput->value() : 0.0,
         m_patientMassInput ? m_patientMassInput->value() : 0.0);
     m_currentRepStats.biomechanicalParams =
         biomechanicalFormulas.calculateRepParams(m_currentRepStats.biomechanicalData);
-    m_currentRepStats.timeToPeak = m_repPeakTime - m_repStartTime;
-    
-    // Rise rate (szybkość narastania)
-    if (m_repPeakTime - m_repStartTime > 0) {
-        m_currentRepStats.riseRate = (m_repPeakForce - m_repStartForce) / (m_repPeakTime - m_repStartTime);
+
+    m_currentRepStats.timeToPeak =
+        static_cast<double>(m_lastCompletedRepetition.timeToPeakMs) / 1000.0;
+    if (m_currentRepStats.timeToPeak > 0.0) {
+        m_currentRepStats.riseRate =
+            (m_repPeakForce - m_repStartForce) / m_currentRepStats.timeToPeak;
     }
-    
+
     // Average force decay rate from the peak to the first post-peak
     // sample at or below 10% of peak force.
     double fallEndTime = m_repPeakTime;
@@ -1435,166 +1428,124 @@ void MeasurementTab::calculateRepetitionStats()
         m_currentRepStats.fallRate =
             (m_repPeakForce - fallEndForce) / (fallEndTime - m_repPeakTime);
     }
-    
-    // Czas trwania
-    m_currentRepStats.duration = m_currentRepTimes.last() - m_repStartTime;
+
+    m_currentRepStats.duration =
+        static_cast<double>(m_lastCompletedRepetition.durationMs) / 1000.0;
     const double repetitionEndTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
     m_currentRepStats.endTime = repetitionEndTime;
     m_currentRepStats.startTime = repetitionEndTime - m_currentRepStats.duration;
-    
-    // Czas w górnych 8% siły
-    double thresholdTop = m_repPeakForce * 0.92;
-    double timeInTop = 0;
+
+    const double thresholdTop = m_repPeakForce * 0.92;
+    double timeInTop = 0.0;
     for (int i = 1; i < m_currentRepForces.size(); ++i) {
-        if (m_currentRepForces[i] >= thresholdTop && m_currentRepForces[i-1] >= thresholdTop) {
-            timeInTop += m_currentRepTimes[i] - m_currentRepTimes[i-1];
+        if (m_currentRepForces[i] >= thresholdTop &&
+            m_currentRepForces[i - 1] >= thresholdTop) {
+            timeInTop += m_currentRepTimes[i] - m_currentRepTimes[i - 1];
         }
     }
     m_currentRepStats.timeInTop8pct = timeInTop;
-    
-    // Czas w dolnych 8% siły (relaksacja między powtórzeniami)
-    double thresholdBottom = m_repPeakForce * 0.08;
-    double timeInBottom = 0;
+
+    const double thresholdBottom = m_repPeakForce * 0.08;
+    double timeInBottom = 0.0;
     for (int i = 1; i < m_currentRepForces.size(); ++i) {
-        if (m_currentRepForces[i] <= thresholdBottom && m_currentRepForces[i-1] <= thresholdBottom) {
-            timeInBottom += m_currentRepTimes[i] - m_currentRepTimes[i-1];
+        if (m_currentRepForces[i] <= thresholdBottom &&
+            m_currentRepForces[i - 1] <= thresholdBottom) {
+            timeInBottom += m_currentRepTimes[i] - m_currentRepTimes[i - 1];
         }
     }
     m_currentRepStats.timeInBottom8pct = timeInBottom;
-    
-    // Pole pod krzywą (impuls)
-    m_currentRepStats.areaUnderCurve = calculateAreaUnderCurve(m_currentRepForces, m_currentRepTimes);
-    
-    // Time-weighted mean force uses the same trapezoidal integral and
-    // repetition duration as RepetitionDetector::meanForceN.
+    m_currentRepStats.areaUnderCurve =
+        calculateAreaUnderCurve(m_currentRepForces, m_currentRepTimes);
+
     if (m_currentRepStats.duration > 0.0) {
         m_currentRepStats.avgForce =
             m_currentRepStats.areaUnderCurve / m_currentRepStats.duration;
-    } else {
-        double sum = 0.0;
-        for (double force : m_currentRepForces) sum += force;
-        m_currentRepStats.avgForce = sum / m_currentRepForces.size();
     }
-    
-    // Mediana
     QVector<double> sortedForces = m_currentRepForces;
     std::sort(sortedForces.begin(), sortedForces.end());
     m_currentRepStats.medianForce = calculateMedian(sortedForces);
-    
-    // Dominanta (najczęstsza wartość w histogramie)
     m_currentRepStats.modeForce = calculateMode(m_currentRepForces);
-    
     m_currentRepStats.isValid = true;
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before accessing m_completedSeriesStats.last()" << std::endl;
-    
-    // Dodaj do bieżącej serii
+
     SeriesStats& currentSeries = m_completedSeriesStats.last();
     currentSeries.reps.append(m_currentRepStats);
 
-    // Recalculate the current set from its complete repetition records after
-    // each accepted repetition; unavailable metrics retain explicit statuses.
     SeriesData biomechanicalSeries;
     biomechanicalSeries.seriesNumber = currentSeries.seriesNumber;
-    if (!currentSeries.reps.isEmpty()) {
-        biomechanicalSeries.startTime =
-            currentSeries.reps.first().biomechanicalData.startTime;
-        biomechanicalSeries.endTime =
-            currentSeries.reps.last().biomechanicalData.endTime;
-        biomechanicalSeries.reps.reserve(currentSeries.reps.size());
-        for (const auto& rep : currentSeries.reps)
-            biomechanicalSeries.reps.push_back(rep.biomechanicalData);
-        currentSeries.biomechanicalParams =
-            biomechanicalFormulas.calculateAllParams(biomechanicalSeries);
-    }
-        updateBiomechanicalTable();
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before emit repetitionCompleted" << std::endl;
-    
-    // Emituj sygnał
-    emit repetitionCompleted(m_currentSeries, m_currentRepStats.repNumber, m_currentRepStats);
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before updateStatsTable" << std::endl;
-    
-    // Aktualizuj tabelę
-    updateStatsTable();
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before checking series completion" << std::endl;
-    
-    // Sprawdź czy seria zakończona
-    m_currentRepInSeries++;
-    if (m_currentRepInSeries >= 8) {
-        // Analiza serii
-        currentSeries.avgPeakForce = 0;
-        currentSeries.totalWork = 0;
-        currentSeries.impulseTotal = 0;
-        currentSeries.avgRiseRate = 0;
-        currentSeries.avgFallRate = 0;
+    biomechanicalSeries.startTime =
+        currentSeries.reps.first().biomechanicalData.startTime;
+    biomechanicalSeries.endTime =
+        currentSeries.reps.last().biomechanicalData.endTime;
+    biomechanicalSeries.reps.reserve(
+        static_cast<std::size_t>(currentSeries.reps.size()));
+    for (const auto& rep : currentSeries.reps)
+        biomechanicalSeries.reps.push_back(rep.biomechanicalData);
+    currentSeries.biomechanicalParams =
+        biomechanicalFormulas.calculateAllParams(biomechanicalSeries);
 
-        QVector<double> peakForces;
-        for (const auto& rep : currentSeries.reps) {
-            currentSeries.avgPeakForce += rep.peakForce;
-            currentSeries.impulseTotal += rep.areaUnderCurve;
-            currentSeries.avgRiseRate += rep.riseRate;
-            currentSeries.avgFallRate += rep.fallRate;
-            peakForces.append(rep.peakForce);
-        }
-        
-        currentSeries.avgPeakForce /= currentSeries.reps.size();
-        currentSeries.avgRiseRate /= currentSeries.reps.size();
-        currentSeries.avgFallRate /= currentSeries.reps.size();
-        currentSeries.medianPeakForce = calculateMedian(peakForces);
-        // Mechanical work is reported separately from force impulse (N·s).
-        currentSeries.totalWork = currentSeries.biomechanicalParams.W_total;
-        
-        // Wskaźnik zmęczenia (spadek siły względem pierwszego powtórzenia)
-        if (currentSeries.reps.size() >= 2 && currentSeries.reps.first().peakForce > 0) {
-            double lastPeak = currentSeries.reps.last().peakForce;
-            double firstPeak = currentSeries.reps.first().peakForce;
-            currentSeries.fatigueIndex = ((firstPeak - lastPeak) / firstPeak) * 100.0;
-        }
-        
-        std::cout << "[DEBUG] calculateRepetitionStats: Before seriesDuration calculation, reps.size()=" 
-                  << currentSeries.reps.size() << std::endl;
-        
-        // Szybkość serii - zabezpieczenie przed pustym wektorem
-        // Cadence is repetitions divided by elapsed wall/session time from the
-        // first repetition start to the final repetition end. Subtracting the
-        // individual repetition durations was dimensionally wrong and usually
-        // produced zero or an inflated value.
-        const double seriesDuration = currentSeries.reps.last().endTime -
-                                      currentSeries.reps.first().startTime;
-        if (seriesDuration > 0.0)
-            currentSeries.seriesSpeed = currentSeries.reps.size() / seriesDuration;
-        
-        // Wskaźnik powtarzalności (odwrotność odchylenia standardowego)
-        double variance = 0;
-        for (double pf : peakForces) {
-            variance += (pf - currentSeries.avgPeakForce) * (pf - currentSeries.avgPeakForce);
-        }
-        variance /= peakForces.size();
-        double stdDev = std::sqrt(variance);
-        if (currentSeries.avgPeakForce > 0) {
-            currentSeries.consistencyScore = std::max(0.0, 100.0 - (stdDev / currentSeries.avgPeakForce) * 100.0);
-        }
-        
-        std::cout << "[DEBUG] calculateRepetitionStats: Before emit seriesCompleted" << std::endl;
+    // Keep the ordinary series summary current even when the operator stops
+    // before completing all eight repetitions.
+    currentSeries.avgPeakForce = 0.0;
+    currentSeries.impulseTotal = 0.0;
+    currentSeries.avgRiseRate = 0.0;
+    currentSeries.avgFallRate = 0.0;
+    QVector<double> peakForces;
+    for (const auto& rep : currentSeries.reps) {
+        currentSeries.avgPeakForce += rep.peakForce;
+        currentSeries.impulseTotal += rep.areaUnderCurve;
+        currentSeries.avgRiseRate += rep.riseRate;
+        currentSeries.avgFallRate += rep.fallRate;
+        peakForces.append(rep.peakForce);
+    }
+    const double repCount = static_cast<double>(currentSeries.reps.size());
+    currentSeries.avgPeakForce /= repCount;
+    currentSeries.avgRiseRate /= repCount;
+    currentSeries.avgFallRate /= repCount;
+    currentSeries.medianPeakForce = calculateMedian(peakForces);
+    currentSeries.totalWork = currentSeries.biomechanicalParams.W_total;
+    if (currentSeries.reps.size() >= 2 &&
+        currentSeries.reps.first().peakForce > 0.0) {
+        const double firstPeak = currentSeries.reps.first().peakForce;
+        const double lastPeak = currentSeries.reps.last().peakForce;
+        currentSeries.fatigueIndex = ((firstPeak - lastPeak) / firstPeak) * 100.0;
+    }
+    const double seriesDuration =
+        currentSeries.reps.last().endTime - currentSeries.reps.first().startTime;
+    currentSeries.seriesSpeed = seriesDuration > 0.0
+        ? repCount / seriesDuration : 0.0;
+
+    double variance = 0.0;
+    for (double peak : peakForces) {
+        const double difference = peak - currentSeries.avgPeakForce;
+        variance += difference * difference;
+    }
+    variance /= repCount;
+    const double stdDev = std::sqrt(variance);
+    currentSeries.consistencyScore = currentSeries.avgPeakForce > 0.0
+        ? std::max(0.0, 100.0 -
+            (stdDev / currentSeries.avgPeakForce) * 100.0) : 0.0;
+
+    emit repetitionCompleted(m_currentSeries, m_currentRepStats.repNumber, m_currentRepStats);
+    updateStatsTable();
+    ++m_currentRepInSeries;
+
+    // Recompute both the selected set and whole-session metrics after every
+    // completed repetition, not only after changing calibration inputs.
+    recalculateBiomechanicalResults();
+
+    if (m_currentRepInSeries >= 8) {
         emit seriesCompleted(m_currentSeries, currentSeries);
-        
-        // Przejdź do następnej serii lub zakończ sesję
         m_currentRepInSeries = 0;
-        m_currentSeries++;
-        
+        ++m_currentSeries;
         if (m_currentSeries > 3) {
-            m_lblStatus->setText("Status: SESJA ZAKOŃCZONA");
+            m_lblStatus->setText(tr("Status: SESJA ZAKOŃCZONA"));
             m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
             emit sessionFinished(m_completedSeriesStats);
         } else {
-            m_lblStatus->setText(QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
+            m_lblStatus->setText(
+                QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
         }
     }
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before updateSeriesProgress" << std::endl;
     updateSeriesProgress();
 }
 
