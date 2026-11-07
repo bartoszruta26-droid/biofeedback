@@ -1047,4 +1047,131 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.setAvailability(62, ParameterAvailability::RequiresCalibration);
     params.setAvailability(64, ParameterAvailability::RequiresHistory);
     return params;
+
+BiomechanicalParams Formulas::calculateSessionParams(const std::vector<SeriesData>& inputSeries) {
+    BiomechanicalParams result;
+    if (inputSeries.empty()) return result;
+
+    std::vector<const SeriesData*> ordered;
+    ordered.reserve(inputSeries.size());
+    for (const auto& series : inputSeries) {
+        if (series.reps.empty()) continue;
+        ordered.push_back(&series);
+    }
+    std::sort(ordered.begin(), ordered.end(),
+              [](const SeriesData* a, const SeriesData* b) {
+                  return a->seriesNumber < b->seriesNumber;
+              });
+    if (ordered.empty()) return result;
+
+    std::vector<BiomechanicalParams> setResults;
+    setResults.reserve(ordered.size());
+    std::size_t totalReps = 0;
+    double weightedMeanForce = 0.0;
+    double totalImpulse = 0.0;
+    std::vector<std::pair<double, double>> repForceRanges;
+    std::vector<double> fatigueIndices;
+    std::vector<double> setWorks;
+    std::vector<double> setPowers;
+    std::uint32_t firstStart = ordered.front()->startTime;
+    std::uint32_t previousEnd = ordered.front()->endTime;
+    double totalSetRestSeconds = 0.0;
+    std::size_t setRestIntervals = 0;
+
+    for (std::size_t setIndex = 0; setIndex < ordered.size(); ++setIndex) {
+        const SeriesData& set = *ordered[setIndex];
+        const BiomechanicalParams setParams = calculateAllParams(set);
+        for (std::size_t metric = 0; metric < ParameterCount; ++metric) {
+            if (setParams.availabilityAt(metric) == ParameterAvailability::InvalidInput) {
+                result.availability.fill(ParameterAvailability::InvalidInput);
+                return result;
+            }
+        }
+        setResults.push_back(setParams);
+        const std::size_t repsInSet = set.reps.size();
+        totalReps += repsInSet;
+        if (setParams.availabilityAt(1) == ParameterAvailability::Available) {
+            weightedMeanForce += setParams.F_set_mean * static_cast<double>(repsInSet);
+        }
+        for (const auto& rep : set.reps) {
+            const auto repParams = calculateRepParams(rep);
+            if (repParams.availabilityAt(8) == ParameterAvailability::Available)
+                totalImpulse += repParams.I_impulse;
+            repForceRanges.emplace_back(repParams.F_mean, repParams.F_range);
+        }
+        fatigueIndices.push_back(setParams.FI_set);
+        setWorks.push_back(setParams.W_total);
+        setPowers.push_back(setParams.P_set_avg);
+
+        if (setIndex > 0) {
+            const std::uint32_t restMs = set.startTime - previousEnd;
+            if (restMs < 0x80000000u) {
+                totalSetRestSeconds += static_cast<double>(restMs) / 1000.0;
+                ++setRestIntervals;
+            }
+        }
+        previousEnd = set.endTime;
+    }
+
+    if (totalReps > 0) {
+        result.F_grand_mean = weightedMeanForce / static_cast<double>(totalReps);
+        result.I_total = totalImpulse;
+        result.V_training = calculateTrainingVolume(repForceRanges);
+        result.setAvailability(40, ParameterAvailability::Available);
+        result.setAvailability(41, ParameterAvailability::Available);
+        result.setAvailability(42, ParameterAvailability::Available);
+    }
+
+    const std::uint32_t totalDurationMs = previousEnd - firstStart;
+    if (totalDurationMs > 0 && totalDurationMs < 0x80000000u) {
+        result.D_training = calculateDensity(static_cast<int>(ordered.size()),
+                                             static_cast<int>(totalReps),
+                                             static_cast<double>(totalDurationMs) / 1000.0);
+        result.setAvailability(44, ParameterAvailability::Available);
+    }
+    if (setRestIntervals > 0) {
+        result.T_rest_set = totalSetRestSeconds / static_cast<double>(setRestIntervals);
+        result.setAvailability(16, ParameterAvailability::Available);
+    }
+
+    if (setResults.size() >= 2) {
+        const double firstPeak = setResults.front().F_set_peak;
+        const double lastPeak = setResults.back().F_set_peak;
+        if (firstPeak > 0.0) {
+            result.FI_inter = ((firstPeak - lastPeak) / firstPeak) * 100.0;
+            result.setAvailability(33, ParameterAvailability::Available);
+        }
+    }
+
+    if (setResults.size() >= 3) {
+        result.FG = calculateFG(fatigueIndices[0], fatigueIndices[1], fatigueIndices[2]);
+        result.setAvailability(60, ParameterAvailability::Available);
+
+        const bool allWorkAvailable = std::all_of(
+            setResults.begin(), setResults.begin() + 3,
+            [](const BiomechanicalParams& p) {
+                return p.availabilityAt(6) == ParameterAvailability::Available;
+            });
+        if (allWorkAvailable) {
+            result.LBI = calculateLBI(setWorks[0], setWorks[1], setWorks[2]);
+            result.setAvailability(57, ParameterAvailability::Available);
+        } else {
+            result.setAvailability(57, ParameterAvailability::RequiresCalibration);
+        }
+
+        const bool allPowerAvailable = std::all_of(
+            setResults.begin(), setResults.begin() + 3,
+            [](const BiomechanicalParams& p) {
+                return p.availabilityAt(22) == ParameterAvailability::Available;
+            });
+        if (allPowerAvailable && result.FI_inter > 0.0) {
+            result.TAI = calculateTAI(setPowers[2], setPowers[0], result.FI_inter);
+            result.setAvailability(55, ParameterAvailability::Available);
+        } else if (!allPowerAvailable) {
+            result.setAvailability(55, ParameterAvailability::RequiresCalibration);
+        }
+    }
+    return result;
+}
+
 }
