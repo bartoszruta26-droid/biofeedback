@@ -1308,9 +1308,7 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
 
     if (!m_showRawValues) {
         biofeedback::training::RepetitionRecord repetition;
-        if (deviceTimestampMs == 0) {
-            m_repetitionDetector.reset();
-        } else if (m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)) {
+        if (m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)) {
             m_lastCompletedRepetition = repetition;
             m_currentRepForces.clear();
             m_currentRepTimes.clear();
