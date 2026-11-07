@@ -405,7 +405,7 @@ void TrainingTab::setupUI()
     
     // Timer
     m_timer = new QTimer(this);
-    m_timer->setInterval(100);  // 10 Hz
+    m_timer->setInterval(1000);  // 1 Hz — licznik sesji zwiększa się raz na sekundę
     
     m_restTimer = new QTimer(this);
     m_restTimer->setInterval(1000);  // 1 Hz
