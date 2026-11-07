@@ -321,6 +321,7 @@ private:
     QElapsedTimer m_sessionClock;
     QElapsedTimer m_restClock;
     qint64 m_activeExerciseTimeMs{0};
+    qint64 m_restDurationMs{0};
     qint64 m_lastClockUpdateMs{0};
     bool m_isTraining;
     bool m_isPaused;
