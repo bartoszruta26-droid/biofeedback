@@ -191,6 +191,8 @@ public:
     std::mutex asyncThreadMutex;
     std::thread asyncThread;
     std::thread::id asyncWorkerId;
+    // Serialize complete open/close state transitions, separately from I/O.
+    std::mutex connectionMutex;
     std::mutex readMutex;
     mutable std::mutex errorMutex;
     std::string lastError;
@@ -320,6 +322,10 @@ bool SerialCommunication::connect(const SerialConfig& config) { return openPort(
 bool SerialCommunication::connect(const std::string& portName, int baudRate) { return openPort(portName, baudRate); }
 
 bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
+    // Reap any asynchronous worker before acquiring the connection-state lock:
+    // callbacks running on that worker may themselves request a connection change.
+    stopAsyncReading();
+    std::unique_lock<std::mutex> connectionLock(m_impl->connectionMutex);
     try {
         // Walidacja parametrów wejściowych
         if (portName.empty()) {
@@ -357,7 +363,17 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
                 "SerialCommunication::openPort"
             );
 #endif
-            disconnect();
+            // openPort already owns connectionMutex; tear down the old handle
+            // inline rather than recursively calling disconnect().
+            std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
+#ifdef _WIN32
+            if (m_impl->portHandle != -1) CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
+#else
+            if (m_impl->portHandle >= 0) close(static_cast<int>(m_impl->portHandle));
+#endif
+            m_impl->isConnected.store(false, std::memory_order_release);
+            m_impl->portHandle = -1;
+            { std::lock_guard<std::mutex> stateLock(m_impl->stateMutex); m_impl->portName.clear(); }
         }
         
         { std::lock_guard<std::mutex> stateLock(m_impl->stateMutex); m_impl->baudRate = baudRate; }
@@ -456,6 +472,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             m_impl->isConnected.store(true, std::memory_order_release);
         }
         m_impl->markActivity();
+        connectionLock.unlock();
         notifyConnectionCallbacks(true, std::string("Connected to ") + portName);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
@@ -492,6 +509,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 
 void SerialCommunication::disconnect() {
     stopAsyncReading();
+    std::lock_guard<std::mutex> connectionLock(m_impl->connectionMutex);
 
     // Serialize handle teardown with every synchronous read/write operation.
     // readData(), sendCommand() and sendRawData() hold readMutex while using
