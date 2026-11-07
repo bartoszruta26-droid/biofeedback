@@ -21,5 +21,7 @@ if ", m_showRawValues(false)" not in source:
     raise SystemExit("Calibrated force in newtons must be the default measurement mode")
 if "m_btnToggleRaw->setEnabled(true)" not in source:
     raise SystemExit("Raw/calibrated mode must be selectable while idle")
+if "if (!m_serialPort || !m_serialPort->isConnected())" not in source:
+    raise SystemExit("Measurement must refuse to start without a connected sensor")
 
 print("Single asynchronous measurement reader policy passed")
