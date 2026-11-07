@@ -700,18 +700,23 @@ void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
         m_impl->lastError = "Calibration reference must be finite and positive";
         return;
     }
+
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
     const double delta = static_cast<double>(raw) - m_impl->zeroOffset;
-    if (!std::isfinite(delta) || delta == 0.0) {
-        m_impl->lastError = "Calibration point must differ from the tare baseline";
+    if (!std::isfinite(delta) || delta <= 0.0) {
+        m_impl->lastError = "Calibration point must be above the tare baseline";
         return;
     }
     const double scale = known / delta;
-    if (!std::isfinite(scale) || scale == 0.0) {
-        m_impl->lastError = "Calibration scale is not finite";
+    if (!std::isfinite(scale) || scale <= 0.0) {
+        m_impl->lastError = "Calibration scale must be finite and positive";
         return;
     }
     m_impl->scaleFactor = scale;
     m_impl->isCalibrated = true;
+    m_impl->calibrationReferenceRaw = raw;
+    m_impl->calibrationReferenceValue = known;
+    m_impl->calibrationCreatedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
     m_impl->lastError.clear();
 }
 bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight) {
@@ -797,9 +802,24 @@ bool SerialCommunication::isCalibrated() const {
     return m_impl->isCalibrated;
 }
 
-double SerialCommunication::getCalibrationScale() const { return m_impl->scaleFactor; }
-int32_t SerialCommunication::getCalibrationOffset() const { return static_cast<int32_t>(m_impl->zeroOffset); }
-void SerialCommunication::resetCalibration() { m_impl->zeroOffset = 0.0; m_impl->scaleFactor = 1.0; m_impl->isCalibrated = false; }
+double SerialCommunication::getCalibrationScale() const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    return m_impl->scaleFactor;
+}
+int32_t SerialCommunication::getCalibrationOffset() const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    return static_cast<int32_t>(m_impl->zeroOffset);
+}
+void SerialCommunication::resetCalibration() {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    m_impl->scaleFactor = 1.0;
+    m_impl->isCalibrated = false;
+    m_impl->tareSampleCount = 0;
+    m_impl->calibrationReferenceValue = 0.0;
+    m_impl->calibrationReferenceRaw = 0;
+    m_impl->calibrationCreatedAtUtc.clear();
+}
 
 uint32_t SerialCommunication::getCurrentTimestamp() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
