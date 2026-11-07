@@ -848,41 +848,52 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
                                 }
                             }
                         }
-                        break;
+                        // Do not break here: the same read chunk can contain
+                        // the calibrated FORCE text that follows the binary frame.
                     }
                 }
             }
             
-            // Also check for text response as fallback
+            // Parse the calibrated text even when a valid binary frame was
+            // already received. The firmware sends both in one DATA response.
             std::string resp(rawData.begin(), rawData.end());
-            if (!gotBinaryData && resp.find("FORCE:") != std::string::npos) {
-                size_t fp = resp.find("FORCE:");
-                size_t gp = resp.find("g,", fp);
-                if (gp != std::string::npos) {
+            const size_t forcePos = resp.find("FORCE:");
+            if (forcePos != std::string::npos) {
+                const size_t gramsEnd = resp.find("g,", forcePos);
+                if (gramsEnd != std::string::npos) {
                     try {
-                        data.calibratedValue = std::stod(resp.substr(fp+6, gp-fp-6));
+                        const double grams = std::stod(
+                            resp.substr(forcePos + 6, gramsEnd - forcePos - 6));
+                        if (std::isfinite(grams)) {
+                            data.calibratedValue = grams;
+                            data.hasCalibratedValue = true;
+                            data.isValid = true;
+                        }
                     } catch (...) {}
                 }
-                size_t rp = resp.find("RAW:", gp);
-                if (rp != std::string::npos) {
-                    size_t cp = resp.find(",", rp+4);
-                    if (cp != std::string::npos) {
+
+                const size_t rawPos = resp.find("RAW:", forcePos);
+                if (rawPos != std::string::npos) {
+                    const size_t rawEnd = resp.find(",", rawPos + 4);
+                    if (rawEnd != std::string::npos && !gotBinaryData) {
                         try {
-                            data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
+                            data.value = std::stoi(resp.substr(rawPos + 4, rawEnd - rawPos - 4));
                         } catch (...) {}
                     }
-                    size_t tp = resp.find("TS:", rp);
-                    if (tp != std::string::npos) {
-                        size_t mp = resp.find("ms", tp);
-                        if (mp != std::string::npos) {
-                            try {
-                                data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
-                            } catch (...) {}
+                    if (!gotBinaryData) {
+                        const size_t timestampPos = resp.find("TS:", rawPos);
+                        if (timestampPos != std::string::npos) {
+                            const size_t timestampEnd = resp.find("ms", timestampPos);
+                            if (timestampEnd != std::string::npos) {
+                                try {
+                                    data.timestamp = static_cast<uint32_t>(
+                                        std::stoul(resp.substr(timestampPos + 3,
+                                            timestampEnd - timestampPos - 3)));
+                                } catch (...) {}
+                            }
                         }
                     }
                 }
-                data.isValid = true;
-                break;
             }
             
             if (resp.find("[DATA_SENT]") != std::string::npos && gotBinaryData) {
