@@ -1,11 +1,12 @@
 # Biofeedback Application for Raspberry Pi 4
 
-A professional medical-grade biofeedback application built with C++, Qt5, and Arduino Nano integration for strain gauge sensor (HX711) data acquisition.
+A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live force visualization, repetition analysis, and sensor-driven training. Hardware calibration and clinical validation remain separate acceptance requirements.
 
 ## Features
 
 - **Patient Management**: Create, edit, import, export, and delete patient records
-- **Live Measurement**: Real-time graph visualization of sensor data with statistical analysis
+- **Live Measurement**: Real-time graph visualization, validated sample stream, and statistical analysis
+- **Repetition and Set Analysis**: Hysteresis-based repetition detection, peak/mean force, duration, time-to-peak, target achievement, and set variability (CV%)
 - **Training Games**: Multiple biofeedback-controlled games including:
   - **Sin/Tan Games** - Wave-based training exercises
   - **Flappy Bird** - Classic flapping game controlled by strain gauge
@@ -17,7 +18,7 @@ A professional medical-grade biofeedback application built with C++, Qt5, and Ar
 ## Interfejsy użytkownika
 
 - **Desktop GUI (Qt5)** — główna aplikacja okienkowa: pacjenci, pomiary, trening i diagnostyka; pulpit statusowy z szybką nawigacją.
-- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia. Zobacz `docs/TUI_DESIGN.md`.
+- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia; podgląd siły oraz podstawowy trening 3×8. Zobacz `docs/TUI_DESIGN.md`.
 - **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
 - **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
 
@@ -51,6 +52,8 @@ sudo apt install -y qtbase5-dev libqt5charts5-dev libserialport-dev \
 > `qtcharts5-dev`.
 
 ## Installation
+
+For the current Debian/Ubuntu build and DEB package instructions, see [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
 
 ### System Setup
 
