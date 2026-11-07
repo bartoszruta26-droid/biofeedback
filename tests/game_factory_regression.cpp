@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
+#include <QStringList>
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
