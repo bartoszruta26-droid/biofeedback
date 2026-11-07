@@ -965,10 +965,21 @@ void MeasurementTab::setupTrendsUI()
 
 void MeasurementTab::setPatientId(const QString& id)
 {
-    if (m_patientId != id && m_patientMassInput) {
+    if (m_patientId == id) return;
+
+    // Never carry samples or a live journal across patient boundaries.
+    // resetSession() closes and flushes the old patient's journal before
+    // clearing the in-memory stream, so an interrupted session remains
+    // recoverable only in the directory belonging to its original patient.
+    const bool hasActivePatientData =
+        !m_recordedSamples.isEmpty() || !m_completedSeriesStats.isEmpty() ||
+        m_sampleJournal.isOpen() || !m_sampleJournalPath.isEmpty();
+    if (hasActivePatientData)
+        resetSession();
+
+    if (m_patientMassInput) {
         const QSignalBlocker blocker(m_patientMassInput);
         m_patientMassInput->setValue(0.0);
-        recalculateBiomechanicalResults();
     }
     m_patientId = id;
 }
