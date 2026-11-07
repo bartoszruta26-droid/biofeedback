@@ -27,9 +27,11 @@ public:
     void setSessionCompleted(bool completed);
     void setHistoryFilePath(const QString& filePath);
     bool beginSession();
+    bool saveSessionAutomatically();
 
 private slots:
     void saveCurrentSession();
+    bool persistCurrentSession(bool showFeedback);
     void onHistoryEntryActivated(int row, int column);
 
 private:
