@@ -21,11 +21,12 @@ struct SensorData {
     uint32_t timestamp;      ///< Timestamp w milisekundach
     int32_t value;           ///< Wartość surowa z czujnika
     double calibratedValue;  ///< Wartość po kalibracji
+    bool hasCalibratedValue; ///< Czy ramka zawiera poprawną wartość w gramach
     uint8_t crc;             ///< Suma kontrolna CRC
     bool isValid;            ///< Flagi poprawności danych
     bool hasFrame;            ///< Czy odebrano ramkę (również z błędnym CRC)
     
-    SensorData() : timestamp(0), value(0), calibratedValue(0.0), crc(0), isValid(false), hasFrame(false) {}
+    SensorData() : timestamp(0), value(0), calibratedValue(0.0), hasCalibratedValue(false), crc(0), isValid(false), hasFrame(false) {}
 };
 
 /**
