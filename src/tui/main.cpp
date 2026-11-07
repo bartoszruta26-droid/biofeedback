@@ -1,5 +1,7 @@
 #include "tui/TuiModel.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "sensor/MeasurementSerialAdapter.hpp"
+#include "measurement/MeasurementEngine.hpp"
 #include "core/DebugManager.hpp"
 
 #include <ncurses.h>
@@ -22,7 +24,7 @@ constexpr int kMinimumRows = 20;
 
 struct LiveData {
     mutable std::mutex mutex;
-    sensor::SensorData latest;
+    biofeedback::measurement::MeasurementSample latest;
     bool hasSample = false;
 };
 
@@ -62,9 +64,9 @@ void drawPanel(int y, int x, int height, int width, const char* title)
 std::string sampleValue(const LiveData& live)
 {
     std::lock_guard<std::mutex> lock(live.mutex);
-    if (!live.hasSample || !live.latest.isValid) return "-- N";
+    if (!live.hasSample || !live.latest.isValid()) return "-- " + (live.hasSample ? live.latest.unit : std::string("count"));
     std::ostringstream value;
-    value << std::fixed << std::setprecision(2) << live.latest.calibratedValue << " N";
+    value << std::fixed << std::setprecision(2) << live.latest.value << " " << live.latest.unit;
     return value.str();
 }
 
@@ -227,9 +229,11 @@ int main(int argc, char** argv)
     sensor::SerialCommunication serial;
     serial.setVerbose(false);
     LiveData live;
-    const auto dataToken = serial.addDataCallback([&live](const sensor::SensorData& data) {
+    auto measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
+    sensor::MeasurementSerialAdapter measurementAdapter(serial, measurementEngine, "tui-hx711", "count");
+    const auto measurementToken = measurementEngine->subscribe([&live](const biofeedback::measurement::MeasurementSample& sample) {
         std::lock_guard<std::mutex> lock(live.mutex);
-        live.latest = data;
+        live.latest = sample;
         live.hasSample = true;
     });
     auto ports = scanSerialPortCandidates();
@@ -251,7 +255,7 @@ int main(int argc, char** argv)
 
     if (LINES < kMinimumRows || COLS < kMinimumColumns) {
         endwin();
-        serial.removeDataCallback(dataToken);
+        measurementEngine->unsubscribe(measurementToken);
         std::fprintf(stderr, "Terminal must be at least %dx%d characters.\n", kMinimumColumns, kMinimumRows);
         return EXIT_FAILURE;
     }
