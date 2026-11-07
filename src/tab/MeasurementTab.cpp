@@ -3,6 +3,7 @@
 #include "core/RuntimePaths.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QTextStream>
 #include <QDateTime>
 #include <QRandomGenerator>
