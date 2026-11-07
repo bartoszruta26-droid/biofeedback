@@ -2,38 +2,44 @@
 #include <cassert>
 using biofeedback::training::SessionState;
 using biofeedback::training::SessionStateMachine;
-int main(){
- SessionStateMachine s;
- assert(s.state()==SessionState::Idle && s.canStart());
- assert(!s.pause() && !s.resume() && !s.beginRest());
- assert(s.start() && s.state()==SessionState::Active);
- assert(!s.start());
- assert(s.pause() && s.state()==SessionState::Paused);
- assert(!s.pause() && s.resume() && s.state()==SessionState::Active);
- assert(s.beginRest() && s.state()==SessionState::Resting && s.resting());
- assert(s.pause() && s.paused() && s.resting());
- assert(s.resume() && s.state()==SessionState::Resting);
- assert(s.endRest() && s.state()==SessionState::Active);
- assert(s.interrupt() && s.state()==SessionState::Interrupted && s.canStart());
- assert(!s.interrupt() && !s.complete());
- assert(s.start() && s.state()==SessionState::Active);
- assert(s.complete() && s.state()==SessionState::Completed && s.canStart());
- assert(s.start() && s.state()==SessionState::Active);
- assert(s.interrupt() && s.state()==SessionState::Interrupted);
+using biofeedback::training::RestTarget;
+int main() {
+    SessionStateMachine machine;
+    assert(machine.state() == SessionState::Idle && machine.canStart());
+    assert(!machine.pause() && !machine.resume() && !machine.beginRest());
+    assert(machine.start() && machine.state() == SessionState::Active);
+    assert(!machine.start());
+    assert(machine.pause() && machine.state() == SessionState::Paused);
+    assert(!machine.pause() && machine.resume() && machine.state() == SessionState::Active);
 
- // A process restart restores an in-progress workout as paused. The caller
- // explicitly resumes into the exact prior phase, including an active rest.
- SessionStateMachine recovered;
- assert(recovered.restore(SessionState::Paused, SessionState::Active));
- assert(recovered.running() && recovered.paused() && !recovered.resting());
- assert(recovered.resume() && recovered.state()==SessionState::Active);
- assert(recovered.beginRest());
- assert(recovered.restore(SessionState::Paused, SessionState::Resting));
- assert(recovered.running() && recovered.paused() && recovered.resting());
- assert(recovered.resume() && recovered.state()==SessionState::Resting);
- // Recovery always starts paused so a process restart cannot implicitly
- // restart the timer or deliver live sensor samples before user confirmation.
- assert(!recovered.restore(SessionState::Paused, SessionState::Completed));
- assert(!recovered.restore(static_cast<SessionState>(99), SessionState::Active));
- return 0;
+    // Rest between sets preserves its target while paused and after recovery.
+    assert(machine.beginRest(RestTarget::NextSeries));
+    assert(machine.resting() && machine.restTarget() == RestTarget::NextSeries);
+    assert(machine.pause() && machine.paused() && machine.resting());
+    assert(machine.resume() && machine.state() == SessionState::Resting);
+    assert(machine.endRest() && machine.state() == SessionState::Active);
+    assert(machine.restTarget() == RestTarget::NextSeries);
+
+    // Rest between exercises has a different continuation target.
+    assert(machine.beginRest(RestTarget::NextExercise));
+    assert(machine.restTarget() == RestTarget::NextExercise);
+    SessionStateMachine recovered;
+    assert(recovered.restore(SessionState::Paused, SessionState::Resting, RestTarget::NextExercise));
+    assert(recovered.running() && recovered.paused() && recovered.resting());
+    assert(recovered.restTarget() == RestTarget::NextExercise);
+    assert(recovered.resume() && recovered.state() == SessionState::Resting);
+    assert(recovered.endRest() && recovered.state() == SessionState::Active);
+    assert(recovered.restTarget() == RestTarget::NextSeries);
+
+    assert(machine.interrupt() && machine.state() == SessionState::Interrupted && machine.canStart());
+    assert(!machine.interrupt() && !machine.complete());
+    assert(machine.start() && machine.complete());
+    assert(machine.state() == SessionState::Completed && machine.canStart());
+
+    // Invalid enum values and incompatible restoration are rejected.
+    assert(!recovered.restore(SessionState::Paused, SessionState::Completed));
+    assert(!recovered.restore(static_cast<SessionState>(99), SessionState::Active));
+    assert(!recovered.restore(SessionState::Paused, SessionState::Active,
+                              static_cast<RestTarget>(99)));
+    return 0;
 }
