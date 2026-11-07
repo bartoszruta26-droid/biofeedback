@@ -169,7 +169,17 @@ void MainWindow::setupTabs()
     connect(m_trainingTab, &tab::TrainingTab::trainingStarted,
             m_patientTab, [this]() { m_patientTab->setEnabled(false); });
     connect(m_trainingTab, &tab::TrainingTab::trainingStopped,
-            m_patientTab, [this]() { m_patientTab->setEnabled(true); });
+            m_patientTab, [this]() {
+                if (!m_measurementTab->isMeasurementActive())
+                    m_patientTab->setEnabled(true);
+            });
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStarted,
+            m_patientTab, [this]() { m_patientTab->setEnabled(false); });
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
+            m_patientTab, [this]() {
+                if (!m_trainingTab->isTrainingActive())
+                    m_patientTab->setEnabled(true);
+            });
     
     QWidget* dashboard = new QWidget(m_tabWidget);
     QVBoxLayout* dashboardLayout = new QVBoxLayout(dashboard);
