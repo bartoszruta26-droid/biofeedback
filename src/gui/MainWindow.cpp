@@ -79,8 +79,10 @@ MainWindow::MainWindow(QWidget *parent)
         if (!data.isValid) return;
         const double forceNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
         if (!std::isfinite(forceNewtons) || forceNewtons < 0.0) return;
-        QMetaObject::invokeMethod(this, [this, forceNewtons]() {
-            forwardSensorToGame(forceNewtons);
+        constexpr double gameReferenceForceN = 50.0;
+        const double normalizedGameInput = qBound(0.0, forceNewtons / gameReferenceForceN * 100.0, 100.0);
+        QMetaObject::invokeMethod(this, [this, normalizedGameInput]() {
+            forwardSensorToGame(normalizedGameInput);
         }, Qt::QueuedConnection);
     });
 
