@@ -1,4 +1,5 @@
 #include "tab/MeasurementTab.hpp"
+#include "core/RuntimePaths.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QFileInfo>
 #include <QTextStream>
@@ -695,7 +696,7 @@ void MeasurementTab::loadAllHistoricalMeasurements()
         return;
     }
     
-    QString dataDir = QDir::currentPath() + "/data/patients/" + m_patientId;
+    QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
     QDir dir(dataDir);
     if (!dir.exists()) {
         return;
@@ -1473,7 +1474,7 @@ void MeasurementTab::onSaveMeasurementJSON()
     }
     
     // Utwórz katalog dla pacjenta jeśli nie istnieje
-    QString dataDir = QDir::currentPath() + "/data/patients/" + m_patientId;
+    QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
     QDir dir;
     if (!dir.exists(dataDir)) {
         dir.mkpath(dataDir);
@@ -1675,7 +1676,7 @@ void MeasurementTab::loadPatientTrends()
         return;
     }
     
-    QString dataDir = QDir::currentPath() + "/data/patients/" + m_patientId;
+    QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
     QDir dir(dataDir);
     if (!dir.exists()) {
         QMessageBox::information(this, "Informacja", "Brak zapisanych sesji dla tego pacjenta.");
