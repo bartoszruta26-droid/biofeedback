@@ -25,6 +25,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
+    src/sensor/CalibrationProfile.cpp
     src/sensor/ProtocolParser.cpp
     src/core/Logger.cpp
     src/core/PasswordHasher.cpp
@@ -92,6 +93,10 @@ add_executable(config_manager_regression
 target_include_directories(config_manager_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(config_manager_regression PRIVATE Qt5::Core)
 add_test(NAME config_manager_regression COMMAND config_manager_regression)
+
+add_executable(calibration_profile_regression tests/calibration_profile_regression.cpp)
+target_link_libraries(calibration_profile_regression PRIVATE biofeedback_core)
+add_test(NAME calibration_profile_regression COMMAND calibration_profile_regression)
 
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
