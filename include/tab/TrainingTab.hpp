@@ -341,7 +341,6 @@ private:
     
     int m_sessionTime;
     int m_restTimeRemaining;
-    bool m_inRestPeriod;
     bool m_restAdvancesExercise;
     biofeedback::training::RepetitionDetector m_repetitionDetector;
     std::vector<biofeedback::training::RepetitionRecord> m_currentSeriesRepetitions;
