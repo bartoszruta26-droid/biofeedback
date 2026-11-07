@@ -663,13 +663,16 @@ bool TrainingTab::exportResultsToCSV(const QString& filename)
     out << "Ćwiczenie,Seria,Powtórzenie,Czas_trwania_ms,Czas_do_szczytu_ms,"
            "Siła_średnia_N,Siła_szczytowa_N,Próbki,Cel_osiągnięty\n";
 
-    for (const auto& stats : m_exerciseStats) {
+    for (int exerciseIndex = 0; exerciseIndex < m_exerciseStats.size(); ++exerciseIndex) {
+        const auto& stats = m_exerciseStats[exerciseIndex];
+        const double targetForce = exerciseIndex < m_exercisePlan.size()
+            ? m_exercisePlan[exerciseIndex].targetForce : 0.0;
+        QString escapedName = stats.exerciseName;
+        escapedName.replace("\"", "\"\"");
         for (const auto& item : stats.repetitions) {
             const auto& rep = item.measurement;
-            const bool targetReached = item.seriesIndex > 0 &&
-                item.seriesIndex <= stats.series.size() &&
-                rep.peakForceN > 0.0;
-            out << '"' << stats.exerciseName.replace('"', "\"\"") << '"' << ","
+            const bool targetReached = targetForce > 0.0 && rep.peakForceN >= targetForce;
+            out << "\"" << escapedName << "\"" << ","
                 << item.seriesIndex << "," << item.repetitionIndex << ","
                 << rep.durationMs << "," << rep.timeToPeakMs << ","
                 << QString::number(rep.meanForceN, 'f', 4) << ","
