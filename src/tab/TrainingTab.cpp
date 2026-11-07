@@ -1542,29 +1542,9 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         m_currentGame->pause();
     }
     m_repetitionDetector.setTargetForce(m_exercisePlan[m_currentExerciseIndex].targetForce);
-    // setTargetForce resets the detector; reinstate the previously validated
-    // in-flight state after the exercise target has been configured.
     if (!detectorObject.isEmpty() && resumeState == biofeedback::training::SessionState::Active) {
-        biofeedback::training::RepetitionDetectorSnapshot savedDetector;
-        savedDetector.version = static_cast<std::uint32_t>(detectorObject.value("version").toInt(1));
-        savedDetector.active = detectorObject.value("active").toBool(false);
-        savedDetector.waitingForRelease = detectorObject.value("waiting_for_release").toBool(false);
-        savedDetector.startTimestampMs = static_cast<std::uint32_t>(detectorObject.value("start_timestamp_ms").toDouble());
-        savedDetector.lastTimestampMs = static_cast<std::uint32_t>(detectorObject.value("last_timestamp_ms").toDouble());
-        savedDetector.peakTimestampMs = static_cast<std::uint32_t>(detectorObject.value("peak_timestamp_ms").toDouble());
-        savedDetector.peakForceN = detectorObject.value("peak_force_n").toDouble();
-        savedDetector.areaForceMs = detectorObject.value("area_force_ms").toDouble();
-        savedDetector.previousForceN = detectorObject.value("previous_force_n").toDouble();
-        savedDetector.sampleCount = static_cast<std::size_t>(qMax(0.0, detectorObject.value("sample_count").toDouble()));
-        for (const QJsonValue& sampleValue : detectorObject.value("samples").toArray()) {
-            if (!sampleValue.isObject()) return false;
-            const QJsonObject sample = sampleValue.toObject();
-            savedDetector.samples.push_back({
-                static_cast<std::uint32_t>(sample.value("timestamp_ms").toDouble()),
-                sample.value("force_n").toDouble()
-            });
-        }
-        if (!m_repetitionDetector.restore(savedDetector)) return false;
+        // Restore the detector already parsed and validated above.
+        if (!m_repetitionDetector.restore(detectorSnapshot)) return false;
     }
     updateProgressWidgets();
     updateDisplay();
