@@ -18,6 +18,7 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <memory>
+#include <chrono>
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
@@ -83,11 +84,17 @@ struct ExerciseStats {
     double maxPeakForce;
     double avgReactionTime;
     double consistencyScore;
+    double minPeakForce;
+    double duration;
+    double completionRate;
+    QVector<double> peakForcePerRep;
+    std::chrono::steady_clock::time_point startTime;
     bool isCompleted;
     
     ExerciseStats() : completedSeries(0), completedReps(0), avgPeakForce(0),
                       maxPeakForce(0), avgReactionTime(0), consistencyScore(0),
-                      isCompleted(false) {}
+                      minPeakForce(0), duration(0), completionRate(0),
+                      isCompleted(false) { startTime = std::chrono::steady_clock::now(); }
 };
 
 /**
