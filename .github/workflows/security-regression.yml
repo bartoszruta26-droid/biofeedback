@@ -22,7 +22,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build regression targets
-        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api
+        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api measurement_engine_regression
       - name: Smoke-test local HTTP API
         run: |
           ./build/biofeedback_api --port 18765 > /tmp/biofeedback-api.log 2>&1 &
