@@ -40,5 +40,20 @@ int main() {
     assert(repetition.samples.size() == repetition.sampleCount);
     assert(std::abs(repetition.samples.front().forceN - gramsToNewtons(100.0)) < 1e-9);
     assert(std::abs(repetition.samples.back().forceN - gramsToNewtons(10.0)) < 1e-9);
+    // A sample gap must not re-arm detection in the middle of a sustained
+    // contraction. A baseline sample is required before the next repetition.
+    detector.reset();
+    RepetitionRecord afterGap;
+    assert(!detector.process(1000, 10.0, true, afterGap));
+    assert(!detector.process(1100, 12.0, true, afterGap));
+    assert(!detector.process(1800, 12.0, true, afterGap)); // gap > 500 ms
+    assert(!detector.process(1900, 12.0, true, afterGap)); // still contracted
+    assert(!detector.process(2000, 0.0, true, afterGap));  // release baseline
+    assert(!detector.process(2100, 10.0, true, afterGap)); // new contraction
+    assert(!detector.process(2200, 12.0, true, afterGap));
+    assert(!detector.process(2300, 0.0, true, afterGap));
+    assert(afterGap.sampleCount == 3);
+    assert(afterGap.startTimestampMs == 2100);
+
     return 0;
 }
