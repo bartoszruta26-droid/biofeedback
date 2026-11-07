@@ -84,6 +84,15 @@ add_executable(measurement_engine_regression tests/measurement_engine_regression
 target_link_libraries(measurement_engine_regression PRIVATE biofeedback_core)
 add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
 
+# ConfigManager regression (Qt Core only; exercises load/validate/save locking).
+add_executable(config_manager_regression
+    tests/config_manager_regression.cpp
+    src/core/ConfigManager.cpp
+)
+target_include_directories(config_manager_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(config_manager_regression PRIVATE Qt5::Core)
+add_test(NAME config_manager_regression COMMAND config_manager_regression)
+
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
 if(Qt5_FOUND)
