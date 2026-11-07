@@ -95,6 +95,8 @@ struct ExerciseStats {
     double avgReactionTime;
     double consistencyScore;
     bool isCompleted;
+    QVector<TrainingRepetitionRecord> repetitions;
+    QVector<biofeedback::training::SeriesSummary> series;
     
     ExerciseStats() : completedSeries(0), completedReps(0), avgPeakForce(0),
                       maxPeakForce(0), avgReactionTime(0), consistencyScore(0),
