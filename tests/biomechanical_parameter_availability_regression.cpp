@@ -95,6 +95,12 @@ int main()
     };
 
     const BiomechanicalParams repetitionResult = formulas.calculateRepParams(first);
+    // Time-weighted mean for the non-uniform 0/100/300 ms samples is
+    // (1 + 2) N*s / 0.3 s = 10 N, not the sample-count mean 6.67 N.
+    assert(near(repetitionResult.F_mean, 10.0));
+    // Total absolute spring work for 0 -> 20 -> 0 N at k=100 N/m:
+    // 2 J loading + 2 J unloading = 4 J.
+    assert(near(repetitionResult.W_total, 4.0));
     assert(repetitionResult.availabilityAt(0) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(20) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(64) == ParameterAvailability::InsufficientData);
