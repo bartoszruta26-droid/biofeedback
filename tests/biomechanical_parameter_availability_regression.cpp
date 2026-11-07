@@ -213,6 +213,10 @@ int main()
     assert(near(sessionResult.T_rest_set, 0.55));
     assert(sessionResult.availabilityAt(33) == ParameterAvailability::Available);
     assert(sessionResult.FI_inter > 0.0);
+    assert(sessionResult.availabilityAt(46) == ParameterAvailability::Available);
+    assert(sessionResult.FMC > 0.0);
+    assert(sessionResult.availabilityAt(47) == ParameterAvailability::Available);
+    assert(std::isfinite(sessionResult.ISI));
     assert(sessionResult.availabilityAt(40) == ParameterAvailability::Available);
     assert(sessionResult.F_grand_mean > 0.0);
     assert(sessionResult.availabilityAt(41) == ParameterAvailability::Available);
@@ -227,6 +231,8 @@ int main()
 
     const BiomechanicalParams oneSetSession = formulas.calculateSessionParams({set1});
     assert(oneSetSession.availabilityAt(33) == ParameterAvailability::InsufficientData);
+    assert(oneSetSession.availabilityAt(46) == ParameterAvailability::InsufficientData);
+    assert(oneSetSession.availabilityAt(47) == ParameterAvailability::InsufficientData);
     assert(oneSetSession.availabilityAt(60) == ParameterAvailability::InsufficientData);
     const BiomechanicalParams uncalibratedSession =
         uncalibrated.calculateSessionParams({set1, set2, set3});
