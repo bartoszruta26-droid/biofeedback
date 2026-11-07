@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
+#include <cstdint>
 #include <memory>
 #include <map>
 #include <mutex>
@@ -174,7 +175,10 @@ public:
      * @brief Rejestruje callback dla nowych danych
      * @param callback Funkcja wywoływana przy nowych danych
      */
-    void setDataCallback(DataCallback callback);
+    using DataCallbackId = std::uint64_t;
+    DataCallbackId addDataCallback(DataCallback callback);
+    void removeDataCallback(DataCallbackId id);
+    void setDataCallback(DataCallback callback); // compatibility wrapper
     
     /**
      * @brief Rejestruje callback dla zmian statusu połączenia
