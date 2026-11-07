@@ -3,6 +3,7 @@
 #include "measurement/MeasurementEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 
+#include <atomic>
 #include <memory>
 #include <string>
 
@@ -29,6 +30,7 @@ private:
     SerialCommunication::CallbackToken m_token{0};
     std::string m_source;
     std::string m_unit;
+    std::shared_ptr<std::atomic<bool>> m_active;
 };
 
 } // namespace sensor
