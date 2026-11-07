@@ -101,6 +101,9 @@ int main()
 
     assert(result.availabilityAt(0) == ParameterAvailability::Available);
     assert(result.availabilityAt(4) == ParameterAvailability::Available);
+    assert(result.availabilityAt(2) == ParameterAvailability::Available);
+    assert(result.availabilityAt(3) == ParameterAvailability::Available);
+    assert(result.availabilityAt(18) == ParameterAvailability::Available);
     assert(result.availabilityAt(14) == ParameterAvailability::Available);
     assert(near(result.T_rest_rep, 0.05));
     assert(result.availabilityAt(20) == ParameterAvailability::Available);
