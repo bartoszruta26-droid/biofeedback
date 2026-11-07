@@ -1,0 +1,137 @@
+#include "sensor/CalibrationProfile.hpp"
+
+#include <nlohmann/json.hpp>
+
+#include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <utility>
+
+namespace sensor {
+namespace {
+using json = nlohmann::json;
+
+void setError(std::string* error, const std::string& message)
+{
+    if (error) *error = message;
+}
+
+json toJson(const CalibrationProfile& profile)
+{
+    return json{
+        {"schemaVersion", profile.schemaVersion},
+        {"deviceId", profile.deviceId},
+        {"firmwareVersion", profile.firmwareVersion},
+        {"sensorModel", profile.sensorModel},
+        {"unit", profile.unit},
+        {"zeroOffsetRaw", profile.zeroOffsetRaw},
+        {"scaleFactor", profile.scaleFactor},
+        {"referenceValue", profile.referenceValue},
+        {"referenceRaw", profile.referenceRaw},
+        {"sampleCount", profile.sampleCount},
+        {"createdAtUtc", profile.createdAtUtc}
+    };
+}
+}
+
+bool CalibrationProfile::isValidFor(const std::string& expectedDeviceId) const noexcept
+{
+    return schemaVersion == CurrentSchemaVersion &&
+           !deviceId.empty() &&
+           deviceId == expectedDeviceId &&
+           unit == "N" &&
+           std::isfinite(zeroOffsetRaw) &&
+           std::isfinite(scaleFactor) && scaleFactor > 0.0 &&
+           std::isfinite(referenceValue) && referenceValue > 0.0 &&
+           sampleCount >= 1 && sampleCount <= 1000 &&
+           !createdAtUtc.empty();
+}
+
+bool CalibrationProfileStore::save(const std::string& path,
+                                    const CalibrationProfile& profile,
+                                    std::string* error)
+{
+    if (path.empty()) {
+        setError(error, "Calibration profile path is empty");
+        return false;
+    }
+    if (!profile.isValidFor(profile.deviceId)) {
+        setError(error, "Calibration profile is invalid or unsupported");
+        return false;
+    }
+
+    const std::filesystem::path target(path);
+    const std::filesystem::path temporary = target.string() + ".tmp";
+    try {
+        if (target.has_parent_path()) {
+            std::filesystem::create_directories(target.parent_path());
+        }
+        {
+            std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+            if (!output) {
+                setError(error, "Cannot open temporary calibration profile for writing");
+                return false;
+            }
+            output << toJson(profile).dump(2) << '\n';
+            output.flush();
+            if (!output.good()) {
+                setError(error, "Failed while writing calibration profile");
+                output.close();
+                std::filesystem::remove(temporary);
+                return false;
+            }
+        }
+        std::filesystem::rename(temporary, target);
+        if (error) error->clear();
+        return true;
+    } catch (const std::exception& exception) {
+        std::error_code ignored;
+        std::filesystem::remove(temporary, ignored);
+        setError(error, exception.what());
+        return false;
+    }
+}
+
+std::optional<CalibrationProfile> CalibrationProfileStore::load(
+    const std::string& path,
+    const std::string& expectedDeviceId,
+    std::string* error)
+{
+    if (path.empty() || expectedDeviceId.empty()) {
+        setError(error, "Profile path and expected device identifier are required");
+        return std::nullopt;
+    }
+
+    try {
+        std::ifstream input(path, std::ios::binary);
+        if (!input) {
+            setError(error, "Cannot open calibration profile");
+            return std::nullopt;
+        }
+        const json document = json::parse(input);
+        CalibrationProfile profile;
+        profile.schemaVersion = document.at("schemaVersion").get<int>();
+        profile.deviceId = document.at("deviceId").get<std::string>();
+        profile.firmwareVersion = document.value("firmwareVersion", std::string{});
+        profile.sensorModel = document.value("sensorModel", std::string{"HX711"});
+        profile.unit = document.at("unit").get<std::string>();
+        profile.zeroOffsetRaw = document.at("zeroOffsetRaw").get<double>();
+        profile.scaleFactor = document.at("scaleFactor").get<double>();
+        profile.referenceValue = document.at("referenceValue").get<double>();
+        profile.referenceRaw = document.at("referenceRaw").get<int32_t>();
+        profile.sampleCount = document.at("sampleCount").get<int>();
+        profile.createdAtUtc = document.at("createdAtUtc").get<std::string>();
+
+        if (!profile.isValidFor(expectedDeviceId)) {
+            setError(error, "Calibration profile version, values, or device identifier do not match");
+            return std::nullopt;
+        }
+        if (error) error->clear();
+        return profile;
+    } catch (const std::exception& exception) {
+        setError(error, exception.what());
+        return std::nullopt;
+    }
+}
+
+} // namespace sensor
