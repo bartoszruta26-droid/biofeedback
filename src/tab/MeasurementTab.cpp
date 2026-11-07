@@ -874,6 +874,7 @@ void MeasurementTab::resetSession()
     
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
+    m_recordedSamples.clear();
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
@@ -957,7 +958,8 @@ void MeasurementTab::simulateSensorData()
     readSingleSample(currentForce, static_cast<std::uint32_t>(simTime * 1000.0));
 }
 
-void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs)
+void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs,
+                                       std::int32_t rawValue, bool hasRawValue)
 {
     if (!std::isfinite(forceValue)) return;
 
@@ -972,6 +974,23 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
 
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
+
+    RecordedMeasurementSample recorded;
+    recorded.sequence = static_cast<quint64>(m_recordedSamples.size()) + 1;
+    recorded.timestampUnixMs = QDateTime::currentMSecsSinceEpoch();
+    recorded.deviceTimestampMs = deviceTimestampMs;
+    recorded.elapsedTimeSeconds = currentTime;
+    recorded.value = forceValue;
+    recorded.rawValue = rawValue;
+    recorded.hasRawValue = hasRawValue;
+    recorded.unit = m_showRawValues ? "count" : "N";
+    recorded.source = "desktop-hx711";
+    recorded.quality = "valid";
+    m_recordedSamples.append(recorded);
+
+    if (m_rawBox)
+        m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
+
     constexpr int liveBufferCapacity = 10000;
     if (m_rawForceBuffer.size() > liveBufferCapacity)
         m_rawForceBuffer.remove(0, m_rawForceBuffer.size() - liveBufferCapacity);
@@ -1383,7 +1402,7 @@ void MeasurementTab::onReadSingleSample()
     if (!std::isfinite(value)) return;
     if (m_sessionStartTime <= 0.0) ensureSessionClockStarted();
     ensureCurrentSeriesInitialized();
-    readSingleSample(value, m_lastSensorData.timestamp);
+    readSingleSample(value, m_lastSensorData.timestamp, m_lastSensorData.value, true);
     m_lblStatus->setText(tr("Status: PRÓBKA ZAPISANA"));
     m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
 }
@@ -1416,7 +1435,7 @@ void MeasurementTab::onSaveMeasurementJSON()
     const bool hasCompletedRepetition = std::any_of(
         m_completedSeriesStats.cbegin(), m_completedSeriesStats.cend(),
         [](const SeriesStats& series) { return !series.reps.isEmpty(); });
-    if (!hasCompletedRepetition) {
+    if (!hasCompletedRepetition && m_recordedSamples.isEmpty()) {
         QMessageBox::warning(this, "Ostrzeżenie", "Brak zakończonych powtórzeń do zapisania.");
         return;
     }
@@ -1579,6 +1598,7 @@ bool MeasurementTab::exportToJSON(const QString& filename)
     session.patientId = m_patientId;
     session.date = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
     session.series = m_completedSeriesStats;
+    session.samples = m_recordedSamples;
 
     const QByteArray payload = serializeSessionToJSON(session).toUtf8();
     QSaveFile file(filename);
@@ -1611,7 +1631,10 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_patientSessions.append(session);
         m_patientId = session.patientId;
         m_completedSeriesStats = session.series;
-        
+        m_recordedSamples = session.samples;
+        if (m_rawBox)
+            m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
+
         // Odśwież widok
         m_statsTable->setRowCount(0);
         for (const auto& series : m_completedSeriesStats) {
@@ -1764,7 +1787,25 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
     root["sessionId"] = session.sessionId;
     root["patientId"] = session.patientId;
     root["date"] = session.date;
-    
+    root["schemaVersion"] = 2;
+
+    QJsonArray samplesArray;
+    for (const auto& sample : session.samples) {
+        QJsonObject sampleObj;
+        sampleObj["sequence"] = static_cast<qint64>(sample.sequence);
+        sampleObj["timestampUnixMs"] = sample.timestampUnixMs;
+        sampleObj["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
+        sampleObj["elapsedTimeSeconds"] = sample.elapsedTimeSeconds;
+        sampleObj["value"] = sample.value;
+        sampleObj["rawValue"] = sample.rawValue;
+        sampleObj["hasRawValue"] = sample.hasRawValue;
+        sampleObj["unit"] = sample.unit;
+        sampleObj["source"] = sample.source;
+        sampleObj["quality"] = sample.quality;
+        samplesArray.append(sampleObj);
+    }
+    root["samples"] = samplesArray;
+
     QJsonArray seriesArray;
     for (const auto& series : session.series) {
         QJsonObject seriesObj;
@@ -1819,7 +1860,25 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
     session.sessionId = root["sessionId"].toString();
     session.patientId = root["patientId"].toString();
     session.date = root["date"].toString();
-    
+
+    const QJsonArray samplesArray = root["samples"].toArray();
+    session.samples.reserve(samplesArray.size());
+    for (const auto& sampleValue : samplesArray) {
+        const QJsonObject sampleObj = sampleValue.toObject();
+        RecordedMeasurementSample sample;
+        sample.sequence = static_cast<quint64>(sampleObj["sequence"].toVariant().toULongLong());
+        sample.timestampUnixMs = sampleObj["timestampUnixMs"].toVariant().toLongLong();
+        sample.deviceTimestampMs = static_cast<quint32>(sampleObj["deviceTimestampMs"].toVariant().toULongLong());
+        sample.elapsedTimeSeconds = sampleObj["elapsedTimeSeconds"].toDouble();
+        sample.value = sampleObj["value"].toDouble();
+        sample.rawValue = sampleObj["rawValue"].toInt();
+        sample.hasRawValue = sampleObj["hasRawValue"].toBool();
+        sample.unit = sampleObj["unit"].toString();
+        sample.source = sampleObj["source"].toString();
+        sample.quality = sampleObj["quality"].toString();
+        session.samples.append(sample);
+    }
+
     QJsonArray seriesArray = root["series"].toArray();
     for (const auto& seriesVal : seriesArray) {
         QJsonObject seriesObj = seriesVal.toObject();
@@ -1914,7 +1973,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     // Calibrated biomechanical samples are delivered through MeasurementEngine.
     // Raw ADC capture remains a diagnostic-only path and is never treated as force.
     if (m_isMeasuring && m_showRawValues)
-        readSingleSample(static_cast<double>(data.value), data.timestamp);
+        readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true);
 }
 
 void MeasurementTab::onMeasurementSample(
@@ -1932,7 +1991,7 @@ void MeasurementTab::onMeasurementSample(
         m_repetitionDetector.reset();
         return;
     }
-    readSingleSample(force, sample.deviceTimestampMs);
+    readSingleSample(force, sample.deviceTimestampMs, sample.rawValue, true);
 }
 
 // ============================================================================
