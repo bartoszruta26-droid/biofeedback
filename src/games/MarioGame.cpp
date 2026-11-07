@@ -208,8 +208,6 @@ void MarioGame::generateObstacles(double deltaTime)
 
 void MarioGame::updateObstacles(double deltaTime)
 {
-    double groundY = height() * GROUND_Y_RATIO;
-    
     for (int i = m_obstacles.size() - 1; i >= 0; --i) {
         auto& obs = m_obstacles[i];
         
