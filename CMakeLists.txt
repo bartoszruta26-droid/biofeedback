@@ -53,6 +53,13 @@ target_link_libraries(biofeedback_core
 add_library(biofeedback_measurement STATIC src/measurement/MeasurementEngine.cpp)
 target_include_directories(biofeedback_measurement PUBLIC ${CMAKE_SOURCE_DIR}/include)
 
+# Repetition segmentation and set-level biomechanics are independent of Qt.
+add_library(biofeedback_training STATIC src/training/RepetitionDetector.cpp)
+target_include_directories(biofeedback_training PUBLIC ${CMAKE_SOURCE_DIR}/include)
+add_executable(repetition_detector_regression tests/repetition_detector_regression.cpp)
+target_link_libraries(repetition_detector_regression PRIVATE biofeedback_training)
+add_test(NAME repetition_detector_regression COMMAND repetition_detector_regression)
+
 add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
 target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement)
 add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
@@ -223,6 +230,7 @@ if(Qt5_FOUND)
     # Link libraries
     target_link_libraries(${PROJECT_NAME}
         biofeedback_measurement
+        biofeedback_training
         Qt5::Core
         Qt5::Widgets
         Qt5::Charts
