@@ -192,9 +192,25 @@ public:
     std::thread asyncThread;
     std::thread::id asyncWorkerId;
     std::mutex readMutex;
+    mutable std::mutex errorMutex;
     std::string lastError;
     std::atomic<bool> verbose{false};
+    mutable std::mutex timestampMutex;
     int32_t timestampOffset = 0;
+    mutable std::mutex watchdogMutex;
+    mutable std::mutex calibrationMutex;
+    void markActivity() {
+        std::lock_guard<std::mutex> lock(watchdogMutex);
+        lastActivityTime = std::chrono::steady_clock::now();
+    }
+    void setLastError(std::string error) {
+        std::lock_guard<std::mutex> lock(errorMutex);
+        lastError = std::move(error);
+    }
+    std::string getLastErrorSnapshot() const {
+        std::lock_guard<std::mutex> lock(errorMutex);
+        return lastError;
+    }
 };
 
 SerialCommunication::SerialCommunication() : m_impl(std::make_unique<Impl>()) {
@@ -350,7 +366,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
         if (h == INVALID_HANDLE_VALUE) { 
-            m_impl->lastError = "Cannot open " + portName;
+            m_impl->setLastError("Cannot open " + portName);
             DWORD errorCode = GetLastError();
             core::DebugManager::instance().sendDebugMessage(
                 QString("Failed to open port %1. Windows error code: %2").arg(QString::fromStdString(portName)).arg(errorCode),
@@ -383,14 +399,14 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         to.WriteTotalTimeoutConstant = 1000;
         if (!SetCommTimeouts(h, &to)) {
             CloseHandle(h);
-            m_impl->lastError = "Cannot configure serial port timeouts";
+            m_impl->setLastError("Cannot configure serial port timeouts");
             return false;
         }
         newPortHandle = reinterpret_cast<intptr_t>(h);
 #else
         int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
         if (fd < 0) { 
-            m_impl->lastError = "Cannot open " + portName;
+            m_impl->setLastError("Cannot open " + portName);
             core::DebugManager::instance().sendDebugMessage(
                 QString("Failed to open port %1: %2").arg(QString::fromStdString(portName)).arg(strerror(errno)),
                 core::DebugLevel::ERROR,
@@ -439,7 +455,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             }
             m_impl->isConnected.store(true, std::memory_order_release);
         }
-        m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        m_impl->markActivity();
         notifyConnectionCallbacks(true, std::string("Connected to ") + portName);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
@@ -500,7 +516,7 @@ void SerialCommunication::disconnect() {
 
 bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
     if (!m_impl->isConnected || m_impl->portHandle == -1 || data == nullptr || length == 0) {
-        m_impl->lastError = "Serial write rejected: invalid connection or buffer";
+        m_impl->setLastError("Serial write rejected: invalid connection or buffer");
         return false;
     }
 
@@ -512,7 +528,7 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
             length - offset, static_cast<size_t>(std::numeric_limits<DWORD>::max())));
         DWORD written = 0;
         if (!WriteFile(handle, data + offset, chunk, &written, nullptr) || written == 0) {
-            m_impl->lastError = "Serial write failed";
+            m_impl->setLastError("Serial write failed");
             return false;
         }
         offset += static_cast<size_t>(written);
@@ -521,7 +537,7 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
     const int fd = static_cast<int>(m_impl->portHandle);
     const int originalFlags = fcntl(fd, F_GETFL);
     if (originalFlags < 0 || fcntl(fd, F_SETFL, originalFlags | O_NONBLOCK) < 0) {
-        m_impl->lastError = "Serial write configuration failed";
+        m_impl->setLastError("Serial write configuration failed");
         return false;
     }
 
@@ -530,7 +546,7 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
     while (offset < length) {
         const auto now = std::chrono::steady_clock::now();
         if (now >= deadline) {
-            m_impl->lastError = "Serial write timed out";
+            m_impl->setLastError("Serial write timed out");
             success = false;
             break;
         }
@@ -547,14 +563,14 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
         const int ready = poll(&descriptor, 1, timeoutMs);
         if (ready < 0 && errno == EINTR) continue;
         if (ready == 0) {
-            m_impl->lastError = "Serial write timed out";
+            m_impl->setLastError("Serial write timed out");
             success = false;
             break;
         }
         if (ready < 0 ||
             (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 ||
             (descriptor.revents & POLLOUT) == 0) {
-            m_impl->lastError = "Serial write failed";
+            m_impl->setLastError("Serial write failed");
             success = false;
             break;
         }
@@ -568,13 +584,13 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
             continue;
         }
 
-        m_impl->lastError = "Serial write failed";
+        m_impl->setLastError("Serial write failed");
         success = false;
         break;
     }
 
     if (fcntl(fd, F_SETFL, originalFlags) < 0) {
-        m_impl->lastError = "Serial write completed but port flags could not be restored";
+        m_impl->setLastError("Serial write completed but port flags could not be restored");
         success = false;
     }
     if (!success) return false;
@@ -586,7 +602,7 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
 int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int timeout) {
     if (!m_impl->isConnected || m_impl->portHandle == -1 ||
         buffer == nullptr || maxLength == 0 || timeout < 0) {
-        m_impl->lastError = "Serial read rejected: invalid connection, buffer, or timeout";
+        m_impl->setLastError("Serial read rejected: invalid connection, buffer, or timeout");
         return -1;
     }
 
@@ -594,7 +610,7 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     HANDLE handle = reinterpret_cast<HANDLE>(m_impl->portHandle);
     COMMTIMEOUTS originalTimeouts{};
     if (!GetCommTimeouts(handle, &originalTimeouts)) {
-        m_impl->lastError = "Serial read timeout configuration unavailable";
+        m_impl->setLastError("Serial read timeout configuration unavailable");
         return -1;
     }
 
@@ -603,7 +619,7 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     readTimeouts.ReadTotalTimeoutMultiplier = 0;
     readTimeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(timeout);
     if (!SetCommTimeouts(handle, &readTimeouts)) {
-        m_impl->lastError = "Serial read timeout configuration failed";
+        m_impl->setLastError("Serial read timeout configuration failed");
         return -1;
     }
 
@@ -613,11 +629,11 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     const BOOL readSucceeded = ReadFile(handle, buffer, requested, &bytesRead, nullptr);
     const BOOL restoreSucceeded = SetCommTimeouts(handle, &originalTimeouts);
     if (!restoreSucceeded) {
-        m_impl->lastError = "Serial read completed but timeout settings could not be restored";
+        m_impl->setLastError("Serial read completed but timeout settings could not be restored");
         return -1;
     }
     if (!readSucceeded) {
-        m_impl->lastError = "Serial read failed";
+        m_impl->setLastError("Serial read failed");
         return -1;
     }
     return static_cast<int>(bytesRead);
@@ -625,7 +641,7 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     const int fd = static_cast<int>(m_impl->portHandle);
     const int originalFlags = fcntl(fd, F_GETFL);
     if (originalFlags < 0 || fcntl(fd, F_SETFL, originalFlags | O_NONBLOCK) < 0) {
-        m_impl->lastError = "Serial read configuration failed";
+        m_impl->setLastError("Serial read configuration failed");
         return -1;
     }
 
@@ -653,13 +669,13 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
         if (ready == 0) break;
         if (ready < 0 ||
             (descriptor.revents & (POLLERR | POLLNVAL)) != 0) {
-            m_impl->lastError = "Serial read failed";
+            m_impl->setLastError("Serial read failed");
             result = -1;
             break;
         }
         if ((descriptor.revents & POLLHUP) != 0 &&
             (descriptor.revents & POLLIN) == 0) {
-            m_impl->lastError = "Serial port closed during read";
+            m_impl->setLastError("Serial port closed during read");
             result = -1;
             break;
         }
@@ -672,13 +688,13 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
         }
         if (bytesRead == 0) break;
         if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
-        m_impl->lastError = "Serial read failed";
+        m_impl->setLastError("Serial read failed");
         result = -1;
         break;
     }
 
     if (fcntl(fd, F_SETFL, originalFlags) < 0) {
-        m_impl->lastError = "Serial read completed but port flags could not be restored";
+        m_impl->setLastError("Serial read completed but port flags could not be restored");
         return -1;
     }
     return result;
@@ -742,7 +758,7 @@ ArduinoInfo SerialCommunication::getArduinoInfo() const {
 SensorData SerialCommunication::readData(int timeout) {
     SensorData data;
     if (timeout < 0) {
-        m_impl->lastError = "Serial read rejected: negative timeout";
+        m_impl->setLastError("Serial read rejected: negative timeout");
         return data;
     }
     if (!m_impl->isConnected) return data;
@@ -754,7 +770,7 @@ SensorData SerialCommunication::readData(int timeout) {
 if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
         return data;
     }
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    m_impl->markActivity();
     
     // Read response within the caller-provided total deadline.
     uint8_t buf[256];
@@ -872,7 +888,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
     }
     
     if (!rawData.empty()) {
-        m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        m_impl->markActivity();
     }
     return data;
 }
@@ -1010,51 +1026,86 @@ void SerialCommunication::stopAsyncReading() {
     if (worker.joinable()) worker.join();
 }
 
-void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) { m_impl->watchdogTimeoutMs = enabled ? timeoutMs : INT_MAX; }
-void SerialCommunication::resetWatchdog() { m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
+void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) {
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    m_impl->watchdogTimeoutMs = enabled ? timeoutMs : INT_MAX;
+}
+void SerialCommunication::resetWatchdog() { m_impl->markActivity(); }
 bool SerialCommunication::isWatchdogOK() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count() < m_impl->watchdogTimeoutMs;
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - m_impl->lastActivityTime).count();
+    return elapsed < m_impl->watchdogTimeoutMs;
 }
 int SerialCommunication::getTimeSinceLastActivity() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count();
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - m_impl->lastActivityTime).count());
 }
-
-double SerialCommunication::tare(int samples) { if (m_impl->isConnected) sendCommand("TARE", true); m_impl->zeroOffset = 0.0; return 0.0; }
-void SerialCommunication::setCalibrationPoint(int32_t raw, double known) { if (raw != 0) { m_impl->scaleFactor = known/raw; m_impl->isCalibrated = true; } }
+double SerialCommunication::tare(int samples) {
+    (void)samples;
+    if (m_impl->isConnected) sendCommand("TARE", true);
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    return 0.0;
+}
+void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
+    if (raw == 0) return;
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->scaleFactor = known / raw;
+    m_impl->isCalibrated = true;
+}
 bool SerialCommunication::calibrate(int32_t, int32_t, double knownWeight) {
     if (!m_impl->isConnected) return false;
-    std::string r = sendCommand("CAL:" + std::to_string(knownWeight), true);
-    m_impl->isCalibrated = (r.find("Calibrated!") != std::string::npos);
-    return m_impl->isCalibrated;
+    const std::string response = sendCommand("CAL:" + std::to_string(knownWeight), true);
+    const bool calibrated = response.find("Calibrated!") != std::string::npos;
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->isCalibrated = calibrated;
+    return calibrated;
 }
-double SerialCommunication::convertToCalibrated(int32_t raw) const { return (raw - m_impl->zeroOffset) * m_impl->scaleFactor; }
-double SerialCommunication::getCalibrationScale() const { return m_impl->scaleFactor; }
-int32_t SerialCommunication::getCalibrationOffset() const { return static_cast<int32_t>(m_impl->zeroOffset); }
-void SerialCommunication::resetCalibration() { m_impl->zeroOffset = 0.0; m_impl->scaleFactor = 1.0; m_impl->isCalibrated = false; }
+double SerialCommunication::convertToCalibrated(int32_t raw) const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return (raw - m_impl->zeroOffset) * m_impl->scaleFactor;
+}
+double SerialCommunication::getCalibrationScale() const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return m_impl->scaleFactor;
+}
+int32_t SerialCommunication::getCalibrationOffset() const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return static_cast<int32_t>(m_impl->zeroOffset);
+}
+void SerialCommunication::resetCalibration() {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    m_impl->scaleFactor = 1.0;
+    m_impl->isCalibrated = false;
+}
 
 uint32_t SerialCommunication::getCurrentTimestamp() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 void SerialCommunication::syncTimestamp(uint32_t arduinoTimestamp) {
-    if (!m_impl->isConnected || arduinoTimestamp == 0) {
-        m_impl->timestampOffset = 0;
-        return;
+    const uint32_t hostTimestamp = getCurrentTimestamp();
+    const int32_t offset = (m_impl->isConnected && arduinoTimestamp != 0)
+        ? static_cast<int32_t>(hostTimestamp - arduinoTimestamp) : 0;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->timestampMutex);
+        m_impl->timestampOffset = offset;
     }
-    uint32_t hostTimestamp = getCurrentTimestamp();
-    m_impl->timestampOffset = static_cast<int32_t>(hostTimestamp - arduinoTimestamp);
 #if DEBUG_SERIAL_COMM
     core::DebugManager::instance().sendDebugMessage(
         QString("Timestamp sync: Host=%1, Arduino=%2, Offset=%3 ms")
-            .arg(hostTimestamp).arg(arduinoTimestamp).arg(m_impl->timestampOffset),
+            .arg(hostTimestamp).arg(arduinoTimestamp).arg(offset),
         core::DebugLevel::DEBUG,
         "SerialCommunication::syncTimestamp"
     );
 #endif
 }
-
-int32_t SerialCommunication::getTimestampOffset() const { 
-    return m_impl->timestampOffset; 
+int32_t SerialCommunication::getTimestampOffset() const {
+    std::lock_guard<std::mutex> lock(m_impl->timestampMutex);
+    return m_impl->timestampOffset;
 }
 
 std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
@@ -1064,12 +1115,12 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
     if (cmd.empty() || cmd.size() > MaxCommandLength ||
         cmd.find_first_of("\r\n") != std::string::npos ||
         cmd.find('\0') != std::string::npos) {
-        m_impl->lastError = "Rejected invalid serial command";
+        m_impl->setLastError("Rejected invalid serial command");
         return "";
     }
     for (const unsigned char ch : cmd) {
         if (ch < 0x20 || ch > 0x7e) {
-            m_impl->lastError = "Rejected invalid serial command";
+            m_impl->setLastError("Rejected invalid serial command");
             return "";
         }
     }
@@ -1079,7 +1130,7 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
 if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
         return "";
     }
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    m_impl->markActivity();
     if (!waitForResponse) return "";
     constexpr size_t MaxResponseBytes = 4096;
     std::string resp;
@@ -1108,12 +1159,12 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
     if (!writeToPort(data, len)) return false;
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    m_impl->markActivity();
     return true;
 }
 
 void SerialCommunication::setVerbose(bool v) { m_impl->verbose.store(v, std::memory_order_release); }
-std::string SerialCommunication::getLastError() const { return m_impl->lastError; }
+std::string SerialCommunication::getLastError() const { return m_impl->getLastErrorSnapshot(); }
 void SerialCommunication::setCRCPolynomial(uint8_t) {}
 
 } // namespace sensor

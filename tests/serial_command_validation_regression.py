@@ -18,7 +18,7 @@ required = [
     'cmd.find_first_of("\\r\\n")',
     "cmd.find('\\0')",
     "ch < 0x20 || ch > 0x7e",
-    'm_impl->lastError = "Rejected invalid serial command"',
+    'm_impl->setLastError("Rejected invalid serial command")',
 ]
 missing = [item for item in required if item not in body]
 if missing:
