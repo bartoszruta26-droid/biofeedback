@@ -45,6 +45,8 @@ struct LiveData {
     int completedSeries = 0;
     int completedReps = 0;
     std::string trainingMessage = "Polacz czujnik, aby rozpoczac trening.";
+    std::string exerciseName = "Uscisk dloni";
+    int exercisePresetIndex = 0;
     struct SessionRep { int seriesIndex; int repetitionIndex; biofeedback::training::RepetitionRecord measurement; };
     std::vector<biofeedback::training::RepetitionRecord> currentSeries;
     std::vector<SessionRep> sessionRepetitions;
@@ -98,7 +100,7 @@ void saveTrainingSession(LiveData& live)
         const auto& rep = item.measurement;
         const bool achieved = rep.peakForceN >= live.trainingTargetForceN;
         out << "\"" << live.sessionStartedAt << "\","
-            << "\"Trening biofeedback\"," << item.seriesIndex << ","
+            << "\""<< live.exerciseName <<"\"," << item.seriesIndex << ","
             << item.repetitionIndex << ","
             << QString::number(rep.peakForceN, 'f', 4) << ","
             << QString::number(rep.meanForceN, 'f', 4) << ","
@@ -236,6 +238,7 @@ void drawModule(tui::Screen screen,
         int series = 0, reps = 0, totalSeries = 0, totalReps = 0, repsInSeries = 0;
         int restSeconds = 0, restRemaining = 0;
         bool resting = false;
+        std::string exerciseName;
         std::string message;
         biofeedback::training::SeriesSummary last;
         {
@@ -251,10 +254,12 @@ void drawModule(tui::Screen screen,
             restSeconds = live.restSeconds;
             restRemaining = live.restRemaining;
             resting = live.trainingResting;
+            exerciseName = live.exerciseName;
             message = live.trainingMessage;
             last = live.lastSeries;
         }
         drawText(8, x + 2, std::string("Sesja: ") + (!active ? "zakonczona / bezczynna" : (paused ? "pauza" : "aktywna")));
+        drawText(9, x + 2, "Cwiczenie: " + exerciseName);
         drawText(10, x + 2, "Cel: " + std::to_string(static_cast<int>(target)) + " N | Serie: " +
                  std::to_string(series) + "/" + std::to_string(totalSeries) +
                  " | Powtorzenia: " + std::to_string(reps) + "/" +
@@ -596,6 +601,20 @@ int main(int argc, char** argv)
             if (active == static_cast<std::size_t>(tui::Screen::Training)) {
                 std::lock_guard<std::mutex> lock(live.mutex);
                 if (!live.trainingActive) live.targetSeriesCount = std::min(10, live.targetSeriesCount + 1);
+            }
+            break;
+        case 'e':
+        case 'E':
+            if (active == static_cast<std::size_t>(tui::Screen::Training)) {
+                std::lock_guard<std::mutex> lock(live.mutex);
+                if (!live.trainingActive) {
+                    static const char* names[] = {
+                        "Uscisk dloni", "Zgiecie nadgarstka",
+                        "Prostowanie nadgarstka", "Cwiczenie ogolne"
+                    };
+                    live.exercisePresetIndex = (live.exercisePresetIndex + 1) % 4;
+                    live.exerciseName = names[live.exercisePresetIndex];
+                }
             }
             break;
         case ',':
