@@ -1048,6 +1048,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.setAvailability(64, ParameterAvailability::RequiresHistory);
     return params;
 
+}
+
 BiomechanicalParams Formulas::calculateSessionParams(const std::vector<SeriesData>& inputSeries) {
     BiomechanicalParams result;
     if (inputSeries.empty()) return result;
@@ -1173,4 +1175,3 @@ BiomechanicalParams Formulas::calculateSessionParams(const std::vector<SeriesDat
     return result;
 }
 
-}
