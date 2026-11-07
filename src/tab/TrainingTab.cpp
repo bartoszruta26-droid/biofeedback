@@ -1239,6 +1239,7 @@ void TrainingTab::finishCurrentSeries()
         m_currentRepIndex = 0;
         m_restAdvancesExercise = true;
         m_restTimeRemaining = 120;
+        m_restDurationMs = 120000;
     } else {
         m_restAdvancesExercise = false;
         m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
