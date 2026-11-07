@@ -21,6 +21,7 @@
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
 #include "games/TanGame.hpp"
+#include "games/ArkanoidGame.hpp"
 #include "games/GameFactory.hpp"
 
 namespace tab {
@@ -267,6 +268,7 @@ void TrainingTab::setupUI()
     configLayout->addWidget(new QLabel("Gra:", this));
     m_gameTypeCombo = new QComboBox(this);
     m_gameTypeCombo->addItem("Pong", "pong");
+    m_gameTypeCombo->addItem("Arkanoid", "arkanoid");
     m_gameTypeCombo->addItem("Flappy Bird", "flappy");
     m_gameTypeCombo->addItem("Mario", "mario");
     m_gameTypeCombo->addItem("Sinusoidalna", "sin");
@@ -732,6 +734,8 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
         if (auto* game = dynamic_cast<games::SinGame*>(m_currentGame))
             game->setSerialConnection(m_serialPort);
         if (auto* game = dynamic_cast<games::TanGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::ArkanoidGame*>(m_currentGame))
             game->setSerialConnection(m_serialPort);
     }
 }
