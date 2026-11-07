@@ -46,7 +46,7 @@ DebugTab::DebugTab(QWidget *parent)
     registerAsDebugReceiver();
 }
 
-DebugTab::~DebugTab() override
+DebugTab::~DebugTab()
 {
     // Odłącz callback przy niszczeniu
     core::DebugManager::instance().unregisterDebugCallback();
@@ -263,13 +263,18 @@ void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> 
     m_serialPort = serial;
     
     if (m_serialPort) {
-        // Połącz sygnały SerialCommunication z slotami DebugTab
-        connect(m_serialPort.get(), &sensor::SerialCommunication::sensorDataReady,
-                this, &DebugTab::onSensorDataReceived, Qt::QueuedConnection);
-        
-        connect(m_serialPort.get(), &sensor::SerialCommunication::connectionStatusChanged,
-                this, &DebugTab::onConnectionStatusChanged, Qt::QueuedConnection);
-        
+        // SerialCommunication is a callback-based service, not a QObject.
+        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
+            QMetaObject::invokeMethod(this, [this, data]() {
+                onSensorDataReceived(data);
+            }, Qt::QueuedConnection);
+        });
+        m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
+            const QString text = QString::fromStdString(message);
+            QMetaObject::invokeMethod(this, [this, connected, text]() {
+                onConnectionStatusChanged(connected, text);
+            }, Qt::QueuedConnection);
+        });
         addDebugMessage("Połączenie z SerialCommunication nawiązane", "SERIAL");
     }
 }
@@ -338,7 +343,7 @@ void DebugTab::onConnectionStatusChanged(bool connected, const QString& message)
     m_hasArduinoConnection = connected;
     
     if (connected) {
-        m_currentPort = m_serialPort ? m_serialPort->getPortName() : "Unknown";
+        m_currentPort = m_serialPort ? QString::fromStdString(m_serialPort->getPortName()) : "Unknown";
         m_baudRate = m_serialPort ? m_serialPort->getBaudRate() : 0;
         
         m_lblPortName->setText(QString("Port: %1").arg(m_currentPort));
