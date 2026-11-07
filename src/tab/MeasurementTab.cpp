@@ -401,9 +401,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_lastSensorData = sensor::SensorData();
     
-    // Próba automatycznego podłączenia do Arduino w tle
-    connectToArduinoAsync();
-    
     // MeasurementTab nie posiada własnego terminala debugowego.
     // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
     // który przekazuje je do centralnej zakładki DebugTab.
@@ -1869,6 +1866,11 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
         });
+
+        // Start discovery only after the shared device service has been injected.
+        if (!m_connectionThread.joinable()) {
+            connectToArduinoAsync();
+        }
     }
 }
 
