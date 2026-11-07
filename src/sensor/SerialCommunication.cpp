@@ -37,13 +37,13 @@
 // ============================================================================
 
 /// Enable detailed debug logging for serial operations
-constexpr bool DEBUG_SERIAL_COMM = true;
+constexpr bool DEBUG_SERIAL_COMM = false;
 
 /// Enable verbose data packet debugging
 constexpr bool DEBUG_DATA_PACKETS = false;
 
 /// Enable connection state debugging
-constexpr bool DEBUG_CONNECTION = true;
+constexpr bool DEBUG_CONNECTION = false;
 
 /// Enable CRC validation debugging
 constexpr bool DEBUG_CRC = false;
@@ -184,7 +184,7 @@ public:
     std::thread asyncThread;
     std::mutex readMutex;
     std::string lastError;
-    bool verbose = true;
+    bool verbose = false;
     int32_t timestampOffset = 0;
 };
 
