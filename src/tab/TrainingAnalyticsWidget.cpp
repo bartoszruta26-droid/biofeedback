@@ -236,7 +236,7 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
             const auto& series = exercise.series[index];
             QJsonObject seriesEntry;
             seriesEntry.insert("series_index", index + 1);
-            seriesEntry.insert("repetition_count", static_cast<qint64>(series.repetitionCount));
+            seriesEntry.insert("repetition_count", static_cast<double>(series.repetitionCount));
             seriesEntry.insert("average_peak_force_n", series.averagePeakForceN);
             seriesEntry.insert("maximum_peak_force_n", series.maximumPeakForceN);
             seriesEntry.insert("average_duration_ms", series.averageDurationMs);
@@ -253,13 +253,13 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
             QJsonObject repetitionEntry;
             repetitionEntry.insert("series_index", record.seriesIndex);
             repetitionEntry.insert("repetition_index", record.repetitionIndex);
-            repetitionEntry.insert("start_timestamp_ms", static_cast<qint64>(measurement.startTimestampMs));
-            repetitionEntry.insert("end_timestamp_ms", static_cast<qint64>(measurement.endTimestampMs));
-            repetitionEntry.insert("duration_ms", static_cast<qint64>(measurement.durationMs));
-            repetitionEntry.insert("time_to_peak_ms", static_cast<qint64>(measurement.timeToPeakMs));
+            repetitionEntry.insert("start_timestamp_ms", static_cast<double>(measurement.startTimestampMs));
+            repetitionEntry.insert("end_timestamp_ms", static_cast<double>(measurement.endTimestampMs));
+            repetitionEntry.insert("duration_ms", static_cast<double>(measurement.durationMs));
+            repetitionEntry.insert("time_to_peak_ms", static_cast<double>(measurement.timeToPeakMs));
             repetitionEntry.insert("peak_force_n", measurement.peakForceN);
             repetitionEntry.insert("mean_force_n", measurement.meanForceN);
-            repetitionEntry.insert("sample_count", static_cast<qint64>(measurement.sampleCount));
+            repetitionEntry.insert("sample_count", static_cast<double>(measurement.sampleCount));
             repetitionEntries.append(repetitionEntry);
         }
         exerciseEntry.insert("repetitions", repetitionEntries);
