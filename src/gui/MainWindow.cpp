@@ -161,6 +161,7 @@ void MainWindow::setupTabs()
         m_measurementTab->setSerialConnection(m_serialPort);
         m_outlineTab->setSerialConnection(m_serialPort);
         m_trainingTab->setSerialConnection(m_serialPort);
+        m_trainingTab->setMeasurementEngine(m_measurementTab->measurementEngine());
         m_debugTab->setSerialConnection(m_serialPort);
     }
 
