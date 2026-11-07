@@ -161,6 +161,7 @@ private:
     
     // Aktualna siła z sensora (znormalizowana 0.0 - 1.0)
     double m_currentForce;
+    bool m_wasFlapping;
     
     // Licznik punktów za przeszkody
     int m_obstaclesPassed;
