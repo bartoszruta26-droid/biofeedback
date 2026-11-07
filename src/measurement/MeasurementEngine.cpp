@@ -95,7 +95,7 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
         }
     }
 
-    std::vector<SampleCallback> callbacks;
+    std::vector<std::shared_ptr<CallbackEntry>> callbacks;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         sample.sequence = m_nextSequence++;
@@ -106,8 +106,20 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
         callbacks.reserve(m_callbacks.size());
         for (const auto& entry : m_callbacks) callbacks.push_back(entry.second);
     }
-    for (const auto& callback : callbacks) {
+    for (const auto& entry : callbacks) {
+        SampleCallback callback;
+        {
+            std::lock_guard<std::mutex> lock(entry->mutex);
+            if (!entry->active) continue;
+            ++entry->inFlight;
+            callback = entry->callback;
+        }
         try { callback(sample); } catch (...) { /* Subscriber errors do not stop acquisition. */ }
+        {
+            std::lock_guard<std::mutex> lock(entry->mutex);
+            --entry->inFlight;
+            if (entry->inFlight == 0) entry->idle.notify_all();
+        }
     }
     return sample;
 }
@@ -116,14 +128,24 @@ MeasurementEngine::CallbackToken MeasurementEngine::subscribe(SampleCallback cal
     if (!callback) return 0;
     std::lock_guard<std::mutex> lock(m_mutex);
     const CallbackToken token = m_nextToken++;
-    m_callbacks.emplace(token, std::move(callback));
+    m_callbacks.emplace(token, std::make_shared<CallbackEntry>(std::move(callback)));
     return token;
 }
 
 void MeasurementEngine::unsubscribe(CallbackToken token) {
     if (token == 0) return;
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_callbacks.erase(token);
+    std::shared_ptr<CallbackEntry> entry;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        const auto it = m_callbacks.find(token);
+        if (it == m_callbacks.end()) return;
+        entry = it->second;
+        m_callbacks.erase(it);
+    }
+    // Return only after all callbacks already admitted for this subscriber finish.
+    std::unique_lock<std::mutex> lock(entry->mutex);
+    entry->active = false;
+    entry->idle.wait(lock, [&entry] { return entry->inFlight == 0; });
 }
 
 std::vector<MeasurementSample> MeasurementEngine::history() const {
