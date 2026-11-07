@@ -121,5 +121,5 @@ int main(){
 
   std::remove(kUsersFile);
   std::cout<<"OK: auth_regression\n"; return 0;
- }catch(const std::exception& e){std::cerr<<"FAIL: "<<e.what()<<"\n";std::remove(kUsersFile);return 1;}
+ }catch(const std::exception& e){std::cerr<<"FAIL: "<<e.what()<<"\n";std::remove(kUsersFile);std::remove(kFirstRunFile);return 1;}
 }
