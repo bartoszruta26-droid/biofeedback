@@ -717,7 +717,7 @@ QVector<ExerciseStats> TrainingTab::getTrainingStats() const
 
 void TrainingTab::refreshAnalytics()
 {
-    if (m_analyticsWidget) m_analyticsWidget->setStats(m_exerciseStats);
+    if (m_analyticsWidget) m_analyticsWidget->setStats(m_exerciseStats, m_sessionTime);
 }
 
 bool TrainingTab::exportResultsToCSV(const QString& filename)
