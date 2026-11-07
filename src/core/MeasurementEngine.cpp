@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <limits>
 #include <numeric>
 #include <stdexcept>
 
@@ -105,6 +106,15 @@ void MeasurementEngine::setTargetForceN(double targetForceN)
     m_config.targetForceN = targetForceN;
 }
 
+bool MeasurementEngine::setRepetitionsPerSeries(std::size_t repetitionsPerSeries)
+{
+    if (repetitionsPerSeries == 0 || repetitionsPerSeries > 1000 || m_inContraction)
+        return false;
+    m_config.repetitionsPerSeries = repetitionsPerSeries;
+    m_currentSeries.clear();
+    return true;
+}
+
 void MeasurementEngine::reset()
 {
     m_repetition.clear();
@@ -204,18 +214,31 @@ SeriesStats MeasurementEngine::finishSeries() const
     double riseSum = 0.0;
     double fallSum = 0.0;
     double accuracySum = 0.0;
+    double averageForceSum = 0.0;
+    double timeToPeakSum = 0.0;
+    double repetitionDurationSum = 0.0;
+    stats.minimumPeakForceN = std::numeric_limits<double>::infinity();
     for (const auto& repetition : m_currentSeries) {
         peaks.push_back(repetition.peakForceN);
+        stats.maximumPeakForceN = std::max(stats.maximumPeakForceN, repetition.peakForceN);
+        stats.minimumPeakForceN = std::min(stats.minimumPeakForceN, repetition.peakForceN);
         stats.totalImpulseNs += repetition.impulseNs;
         riseSum += repetition.riseRateNPerSecond;
         fallSum += repetition.fallRateNPerSecond;
         accuracySum += repetition.targetAccuracyPercent;
+        averageForceSum += repetition.averageForceN;
+        timeToPeakSum += repetition.timeToPeakSeconds;
+        repetitionDurationSum += repetition.durationSeconds;
     }
+    const double count = static_cast<double>(m_currentSeries.size());
     stats.averagePeakForceN = mean(peaks);
     stats.medianPeakForceN = percentile(peaks, 0.50);
-    stats.averageRiseRateNPerSecond = riseSum / static_cast<double>(m_currentSeries.size());
-    stats.averageFallRateNPerSecond = fallSum / static_cast<double>(m_currentSeries.size());
-    stats.targetAccuracyPercent = accuracySum / static_cast<double>(m_currentSeries.size());
+    stats.averageForceN = averageForceSum / count;
+    stats.averageTimeToPeakSeconds = timeToPeakSum / count;
+    stats.averageRepetitionDurationSeconds = repetitionDurationSum / count;
+    stats.averageRiseRateNPerSecond = riseSum / count;
+    stats.averageFallRateNPerSecond = fallSum / count;
+    stats.targetAccuracyPercent = accuracySum / count;
 
     if (peaks.size() >= 2 && peaks.front() > 0.0) {
         stats.fatigueIndexPercent = 100.0 * (peaks.front() - peaks.back()) / peaks.front();
