@@ -46,6 +46,7 @@ void RepetitionDetector::reset() noexcept {
     m_areaForceMs = 0.0;
     m_previousForceN = 0.0;
     m_sampleCount = 0;
+    m_samples.clear();
 }
 
 void RepetitionDetector::begin(std::uint32_t timestampMs, double forceN) noexcept {
@@ -57,6 +58,8 @@ void RepetitionDetector::begin(std::uint32_t timestampMs, double forceN) noexcep
     m_areaForceMs = 0.0;
     m_previousForceN = forceN;
     m_sampleCount = 1;
+    m_samples.clear();
+    m_samples.push_back({timestampMs, forceN});
 }
 
 bool RepetitionDetector::process(std::uint32_t timestampMs, double forceN, bool valid,
@@ -90,6 +93,7 @@ bool RepetitionDetector::process(std::uint32_t timestampMs, double forceN, bool 
     m_lastTimestampMs = timestampMs;
     m_previousForceN = forceN;
     ++m_sampleCount;
+    m_samples.push_back({timestampMs, forceN});
 
     if (forceN > m_peakForceN) {
         m_peakForceN = forceN;
@@ -110,6 +114,7 @@ bool RepetitionDetector::process(std::uint32_t timestampMs, double forceN, bool 
     completed.peakForceN = m_peakForceN;
     completed.meanForceN = m_areaForceMs / static_cast<double>(durationMs);
     completed.sampleCount = m_sampleCount;
+    completed.samples = m_samples;
     reset();
     return true;
 }
