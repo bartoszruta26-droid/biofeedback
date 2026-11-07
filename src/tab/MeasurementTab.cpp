@@ -579,12 +579,12 @@ void MeasurementTab::setupUI()
     m_lblStatus->setStyleSheet("color: blue; font-weight: bold;");
     m_lblStatus->setMinimumHeight(25);
     
-    m_lblSeriesInfo = new QLabel("Seria: 0/3 | Powtórzenia: 0/8", this);
+    m_lblSeriesInfo = new QLabel(QString("Seria: 1 | Powtórzenia: 0/%1").arg(m_engineRepetitionsPerSeries), this);
     m_lblSeriesInfo->setFont(QFont("Arial", 11));
     m_lblSeriesInfo->setMinimumHeight(25);
     
     m_seriesProgress = new QProgressBar(this);
-    m_seriesProgress->setRange(0, 24);  // 3 serie x 8 powtórzeń
+    m_seriesProgress->setRange(0, m_engineRepetitionsPerSeries);
     m_seriesProgress->setValue(0);
     m_seriesProgress->setFormat("Postęp: %v/24");
     m_seriesProgress->setMinimumHeight(25);
