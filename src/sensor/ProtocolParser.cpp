@@ -45,13 +45,9 @@ void ProtocolParser::feed(const uint8_t* data, std::size_t length) {
     }
 
     while (m_buffer.size() >= kFrameSize) {
-        auto marker = m_buffer.end();
-        for (auto it = m_buffer.begin() + 9; it + 1 < m_buffer.end(); ++it) {
-            if (*it == 0xAA && *(it + 1) == 0x55) {
-                marker = it;
-                break;
-            }
-        }
+        auto marker = std::search(m_buffer.begin() + 9, m_buffer.end(),
+                                  std::begin(std::array<uint8_t,2>{0xAA,0x55}),
+                                  std::end(std::array<uint8_t,2>{0xAA,0x55}));
         if (marker == m_buffer.end()) {
             // Keep the final ten bytes: a frame may be split across feed calls.
             const auto discard = m_buffer.size() - (kFrameSize - 1);
