@@ -634,7 +634,7 @@ bool TrainingTab::exportResultsToCSV(const QString& filename)
     QTextStream out(&file);
     out << "exercise_name,completed_series,completed_reps,avg_peak_force_N,max_peak_force_N,"
            "min_peak_force_N,avg_time_to_peak_s,avg_force_N,total_impulse_Ns,"
-           "target_accuracy_percent,consistency_percent,duration_s,completion_rate_percent\\n";
+           "target_accuracy_percent,consistency_percent,duration_s,completion_rate_percent\n";
     const auto csv = [](const QString& value) {
         QString escaped = value;
         escaped.replace("\\", "\\\\");
@@ -653,7 +653,7 @@ bool TrainingTab::exportResultsToCSV(const QString& filename)
             << QString::number(stats.targetAccuracyPercent, 'f', 2) << ','
             << QString::number(stats.consistencyScore, 'f', 2) << ','
             << QString::number(stats.duration, 'f', 1) << ','
-            << QString::number(stats.completionRate, 'f', 2) << '\\n';
+            << QString::number(stats.completionRate, 'f', 2) << '\n';
     }
     return file.flush();
 }
