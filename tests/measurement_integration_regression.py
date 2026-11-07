@@ -31,5 +31,7 @@ if "bool hasTimestamp{false};" not in engine_header:
     raise SystemExit("MeasurementInput must carry explicit timestamp validity")
 if "else if (!input.hasTimestamp)" not in engine_source:
     raise SystemExit("MeasurementEngine must validate timestamp presence, not reserve uint32 zero")
+if "deviceTimestampMs == 0" in measurement_tab:
+    raise SystemExit("MeasurementTab must not treat a valid wrapped device timestamp as a reset signal")
 
 print("Patient routing and device timestamp integration regression passed")
