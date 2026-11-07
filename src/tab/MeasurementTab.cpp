@@ -950,6 +950,8 @@ void MeasurementTab::readSingleSample(double forceValue)
     
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
+    if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(false);
+    if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 
     // ADC counts are diagnostic only and must never be interpreted as newtons.
     if (!m_showRawValues) {
