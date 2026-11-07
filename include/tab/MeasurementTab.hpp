@@ -261,7 +261,6 @@ public:
      * @param serial Połączenie szeregowe
      */
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
-    bool isMeasurementActive() const noexcept { return m_isMeasuring; }
     
     /**
      * @brief Sprawdza czy Arduino jest podłączone
