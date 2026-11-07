@@ -503,6 +503,7 @@ void TrainingTab::startTraining()
         return;
     }
 
+    if (m_analyticsWidget) m_analyticsWidget->beginSession();
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
