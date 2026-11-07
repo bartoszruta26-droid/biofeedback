@@ -206,6 +206,7 @@ protected:
     qint64 m_lastFrameTime;
     QElapsedTimer m_monotonicClock;
     qint64 m_accumulatedSessionMs;
+    double m_simulationAccumulator;
     
     // Wartość wejściowa z sensora
     double m_sensorValue;
