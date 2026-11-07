@@ -513,7 +513,7 @@ int SerialCommunication::getBaudRate() const {
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
     if (!m_impl->isConnected) return info;
-    std::string resp = sendCommand("ID", true);
+    std::string resp = sendCommand("ID", true, timeout);
     if (resp.find("DEVICE:") != std::string::npos) {
         std::istringstream iss(resp); std::string line;
         while (std::getline(iss, line)) {
