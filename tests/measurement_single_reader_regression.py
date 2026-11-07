@@ -19,8 +19,8 @@ if "if (m_isMeasuring)" not in manual or "AKTYWNY POMIAR ZAPISUJE PRÓBKI AUTOMA
 receiver_start = source.index("void MeasurementTab::onSensorDataReceived")
 receiver_end = source.index("// MeasurementTab - Konwersja jednostek", receiver_start)
 receiver = source[receiver_start:receiver_end]
-if "readSingleSample(static_cast<double>(data.value), data.timestamp)" not in receiver:
-    raise SystemExit("RAW diagnostic capture must use the raw ADC field and source timestamp")
+if "readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true)" not in receiver:
+    raise SystemExit("RAW diagnostic capture must archive the raw ADC field and source timestamp")
 handler_start = source.index("void MeasurementTab::onMeasurementSample")
 handler_end = source.index("// MeasurementTab - Konwersja jednostek", handler_start)
 handler = source[handler_start:handler_end]
