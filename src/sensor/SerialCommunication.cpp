@@ -913,7 +913,7 @@ int32_t SerialCommunication::getTimestampOffset() const {
     return m_impl->timestampOffset; 
 }
 
-std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
+std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse, int timeoutMs) {
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
     std::string toSend = cmd + "\n";
@@ -924,9 +924,10 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
 #endif
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     if (!waitForResponse) return "";
+    if (timeoutMs <= 0) return "";
     std::string resp; char buf[256];
     auto start = std::chrono::steady_clock::now();
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() < 2000) {
+    while (std::chrono::steady_clock::now() - start < std::chrono::milliseconds(timeoutMs)) {
         int rd = 0;
 #ifdef _WIN32
         DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
