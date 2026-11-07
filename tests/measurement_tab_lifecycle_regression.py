@@ -27,6 +27,9 @@ if "m_repetitionDetector.reset()" not in source:
 for required in (
     "QElapsedTimer m_sessionElapsedTimer",
     "m_sessionElapsedTimer.elapsed() / 1000.0",
+    "m_sessionElapsedOffsetSeconds",
+    "recorded.calibratedMassKg = calibratedMassKg",
+    "sample.calibratedMassKg = sampleObj[\"calibratedMassKg\"].toDouble()",
     "constexpr int liveBufferCapacity = 10000",
     "m_recordedSamples.append(recorded)",
     "void MeasurementTab::showCurrentMeasurementData()",
