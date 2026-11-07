@@ -984,8 +984,6 @@ void MeasurementTab::loadAllHistoricalMeasurements()
         return;
     }
     
-    // Recover interrupted append-only sample journals before loading finalized JSON.
-    recoverSampleJournals(dataDir);
     // Wczytaj wszystkie historyczne sesje JSON
     QStringList jsonFiles = dir.entryList(QStringList() << "pomiar_*.json", QDir::Files);
     
@@ -1013,6 +1011,8 @@ void MeasurementTab::loadAllHistoricalMeasurements()
             }
         }
     }
+    // Finalized sessions take precedence over duplicate unfinished journals.
+    recoverSampleJournals(dataDir);
 }
 
 void MeasurementTab::setTargetForce(double force)
@@ -2185,7 +2185,6 @@ void MeasurementTab::loadPatientTrends()
     }
     
     m_patientSessions.clear();
-    recoverSampleJournals(dataDir);
     QStringList jsonFiles = dir.entryList(QStringList() << "pomiar_*.json", QDir::Files);
     
     for (const QString& fileName : jsonFiles) {
@@ -2203,6 +2202,10 @@ void MeasurementTab::loadPatientTrends()
         }
     }
     
+    // Prefer a finalized JSON session over its still-present journal (e.g. a crash
+    // after atomic JSON commit but before journal cleanup).
+    recoverSampleJournals(dataDir);
+
     if (m_patientSessions.isEmpty()) {
         QMessageBox::information(this, "Informacja", "Brak zapisanych sesji JSON dla tego pacjenta.");
         return;
