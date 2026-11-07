@@ -12,6 +12,7 @@
 #include <QElapsedTimer>
 #include <QVector>
 #include <QString>
+#include <QJsonObject>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QComboBox>
@@ -269,6 +270,9 @@ private:
     void advanceAfterRest();
     void startRestTimer();
     void updateRestDisplay();
+    QJsonObject buildExecutionCheckpoint() const;
+    bool restoreExecutionCheckpoint(const QJsonObject& checkpoint);
+    bool saveExecutionCheckpoint();
     
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
@@ -325,6 +329,8 @@ private:
     biofeedback::training::TrainingSessionClock m_trainingClock;
     biofeedback::training::SessionStateMachine m_stateMachine;
     qint64 m_restDurationMs{0};
+    qint64 m_sessionElapsedOffsetMs{0};
+    int m_lastCheckpointSeconds{-1};
     bool m_isTraining;
     bool m_isPaused;
     
