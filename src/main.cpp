@@ -144,13 +144,7 @@ namespace {
         exit(signum);
     }
     
-    /**
-     * @brief Print current application state for debugging purposes
-     * 
-     * Helper function to dump diagnostic information about the application state.
-     * Useful for troubleshooting startup/shutdown issues.
-     */
-     // namespace anonymous
+ } // namespace anonymous
 
 // ============================================================================
 // MAIN FUNCTION - Entry Point
