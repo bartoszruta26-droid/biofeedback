@@ -770,7 +770,7 @@ SensorData SerialCommunication::readData(int timeout) {
 if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
         return data;
     }
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    m_impl->markActivity();
     
     // Read response within the caller-provided total deadline.
     uint8_t buf[256];
@@ -888,7 +888,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
     }
     
     if (!rawData.empty()) {
-        m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        m_impl->markActivity();
     }
     return data;
 }
@@ -1130,7 +1130,7 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
 if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
         return "";
     }
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    m_impl->markActivity();
     if (!waitForResponse) return "";
     constexpr size_t MaxResponseBytes = 4096;
     std::string resp;
@@ -1159,7 +1159,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
     if (!writeToPort(data, len)) return false;
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    m_impl->markActivity();
     return true;
 }
 
