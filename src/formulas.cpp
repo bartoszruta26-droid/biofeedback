@@ -46,6 +46,14 @@ void BiomechanicalParams::reset() {
     FG = 0.0; ESI = 0.0; BRC = 0.0; CEI = 0.0; LPT = 0.0;
 }
 
+const char* BiomechanicalParams::parameterUnit(std::size_t index) noexcept
+{
+    static constexpr const char* units[ParameterCount] = {
+        "N", "N", "N", "N", "N", "N", "J", "J", "N·s", "N·s", "s", "s", "s", "—", "s", "s", "s", "s", "m/s", "Hz", "W", "W", "W", "J", "W/kg", "N/s", "N/s", "N/s", "J", "%", "N", "%", "%", "%", "—", "—", "s²", "N/s²", "bit", "—", "N", "N·s", "N²", "%", "powt./s", "—", "%", "%", "s", "s", "—", "—", "—", "—", "—", "—", "—", "—", "%", "—", "—", "—", "—", "—", "%"
+    };
+    return index < ParameterCount ? units[index] : "";
+}
+
 std::array<double, BiomechanicalParams::ParameterCount> BiomechanicalParams::values() const noexcept
 {
     return {F_peak, F_mean, F_min, F_range, F_set_mean, F_set_peak, W_total, W_rep_avg, I_impulse, I_set_avg, T_rep, T_conc, T_ecc, R_CE, T_rest_rep, T_set, T_rest_set, T_rep_avg, v_avg, f_rep, P_peak, P_rep_avg, P_set_avg, E_total, P_norm, RFD, RFD_set_avg, RFD_max, E_elastic, eta, sigma_F, CV_F, FI_set, FI_inter, MCI, PSI, Var_T, SI, H_entropy, BPR, F_grand_mean, I_total, V_training, INT, D_training, SEI, FMC, ISI, TUT_avg, TUT_total, MQS, NML, PSE, TRI, IRI, TAI, MEI, LBI, FRI, CTS, FG, ESI, BRC, CEI, LPT};
