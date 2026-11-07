@@ -2,6 +2,8 @@
 #define TAB_DEBUGTAB_HPP
 
 #include <QWidget>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
