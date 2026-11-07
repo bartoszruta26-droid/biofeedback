@@ -1,6 +1,7 @@
 #include "core/Authentication.hpp"
 
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -49,6 +50,8 @@ void expect(bool condition, const std::string& message)
 int main()
 {
     try {
+        // Exercise the explicit plaintext development path independent of the runner environment.
+        unsetenv("BIOFEEDBACK_ENCRYPTION_KEY");
         writeUsersJson();
 
         biofeedback::Authentication auth(kUsersFile);
