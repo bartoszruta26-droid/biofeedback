@@ -57,6 +57,8 @@ for required in (
     'root["samples"] = samplesArray',
     'const QJsonArray samplesArray = root["samples"].toArray()',
     "deserializeSessionFromJSON(jsonContent, false)",
+    "if (includeSamples) {",
+    "const QJsonArray biomechanicalSamples = biomechanicalInput[\"samples\"].toArray()",
     "currentSeries.reps.last().endTime -",
     "currentSeries.reps.first().startTime",
 ):
