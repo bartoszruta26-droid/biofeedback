@@ -247,11 +247,13 @@ if(Qt5_FOUND)
     add_executable(game_engine_regression
         tests/game_engine_regression.cpp
         src/games/GameEngine.cpp
+        src/core/DebugManager.cpp
         include/games/GameEngine.hpp
+        include/core/DebugManager.hpp
     )
     set_target_properties(game_engine_regression PROPERTIES AUTOMOC ON)
     target_include_directories(game_engine_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    target_link_libraries(game_engine_regression PRIVATE Qt5::Core Qt5::Widgets)
+    target_link_libraries(game_engine_regression PRIVATE Qt5::Core Qt5::Widgets Threads::Threads)
 
 
     # Process-restart regression for durable analytics and checkpoint history.

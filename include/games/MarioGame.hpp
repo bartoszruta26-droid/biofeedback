@@ -7,7 +7,6 @@
 #include <QVector>
 #include <QRectF>
 #include <QRandomGenerator>
-#include <QElapsedTimer>
 #include <memory>
 
 namespace games {
@@ -150,7 +149,6 @@ private:
     
     // Tensometr
     double m_sensorThreshold;      // Próg aktywacji
-    QElapsedTimer m_chargeClock;      // Czas rozpoczęcia ładowania
     
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
