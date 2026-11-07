@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QVector>
 #include <QJsonArray>
+#include <QUuid>
 
 #include "tab/TrainingTab.hpp"
 
@@ -28,10 +29,11 @@ public:
     void setHistoryFilePath(const QString& filePath);
     bool beginSession();
     bool saveSessionAutomatically();
+    bool saveSessionCheckpoint();
 
 private slots:
     void saveCurrentSession();
-    bool persistCurrentSession(bool showFeedback);
+    bool persistCurrentSession(bool showFeedback, bool finalize = true);
     void onHistoryEntryActivated(int row, int column);
 
 private:
@@ -54,6 +56,7 @@ private:
     bool m_historyReadable{true};
     QString m_historyFilePath;
     QString m_activeSessionHistoryFilePath;
+    QString m_activeSessionId;
     QString m_pendingHistoryFilePath;
     bool m_sessionSaved{false};
     QTableWidget* m_seriesTable{nullptr};
