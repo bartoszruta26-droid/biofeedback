@@ -111,6 +111,26 @@ int main()
     // Total absolute spring work for 0 -> 20 -> 0 N at k=100 N/m:
     // 2 J loading + 2 J unloading = 4 J.
     assert(near(repetitionResult.W_total, 4.0));
+
+    RepetitionData powerRep;
+    powerRep.startTime = 0;
+    powerRep.peakTime = 200;
+    powerRep.endTime = 300;
+    powerRep.startForce = 0.0;
+    powerRep.peakForce = 20.0;
+    powerRep.endForce = 0.0;
+    powerRep.samples = {
+        SensorSample(0, 0.0),
+        SensorSample(100, 10.0),
+        SensorSample(200, 20.0),
+        SensorSample(300, 0.0)
+    };
+    const BiomechanicalParams powerResult = formulas.calculateRepParams(powerRep);
+    // Mean absolute extension speed = (10+10+20)/100 / 0.3 = 1.333... m/s.
+    assert(near(powerResult.v_avg, 4.0 / 3.0));
+    // Instantaneous peak power is max(F_i * |dF/dt| / k) = 10 W,
+    // not max(F) multiplied by a velocity peak from another instant.
+    assert(near(powerResult.P_peak, 10.0));
     assert(repetitionResult.availabilityAt(0) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(20) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(64) == ParameterAvailability::InsufficientData);
