@@ -260,11 +260,14 @@ bool DebugTab::exportLogsToFile(const QString& filename)
 
 void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
+    if (m_serialPort && m_serialCallbackId != 0)
+        m_serialPort->removeDataCallback(m_serialCallbackId);
+    m_serialPort = std::move(serial);
+    m_serialCallbackId = 0;
+
     if (m_serialPort) {
         // SerialCommunication is a callback-based service, not a QObject.
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
+        m_serialCallbackId = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
             QMetaObject::invokeMethod(this, [this, data]() {
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
