@@ -3,6 +3,7 @@
 
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include <QColor>
 #include <QPointF>
 #include <QRectF>
 #include <memory>
