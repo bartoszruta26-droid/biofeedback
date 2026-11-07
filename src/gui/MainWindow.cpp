@@ -7,6 +7,7 @@
 #include "tab/DebugTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
+#include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QApplication>
 #include <QSettings>
@@ -58,7 +59,8 @@ MainWindow::MainWindow(QWidget *parent)
     , m_serialPort(nullptr)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
-    setMinimumSize(1280, 800);
+    setMinimumSize(1100, 700);
+    resize(1440, 900);
     setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:10px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:11px 18px;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:12px;} QLabel#dashboardValue{color:#14243a;font-size:21pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:8px;padding:10px 16px;font-weight:600;} QPushButton:hover{background:#06696c;}");
     
     // Shared serial service; UI tabs subscribe independently to its data stream.
@@ -74,6 +76,14 @@ MainWindow::MainWindow(QWidget *parent)
             }, Qt::QueuedConnection);
         });
 
+    m_serialDataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
+        if (!data.isValid) return;
+        const double forceNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
+        QMetaObject::invokeMethod(this, [this, forceNewtons]() {
+            forwardSensorToGame(forceNewtons);
+        }, Qt::QueuedConnection);
+    });
+
     setupUI();
     setupMenuBar();
     setupToolBar();
@@ -86,9 +96,11 @@ MainWindow::~MainWindow()
 {
     saveSettings();
     if (m_serialPort) {
+        m_serialPort->stopAsyncReading();
+        m_serialPort->removeDataCallback(m_serialDataCallbackToken);
+        m_serialDataCallbackToken = 0;
         m_serialPort->removeConnectionCallback(m_serialConnectionCallbackToken);
         m_serialConnectionCallbackToken = 0;
-        m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
     }
 }
@@ -713,13 +725,20 @@ void MainWindow::onUpdateTimerTimeout()
 void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerciseData)
 {
     qDebug() << "Starting game:" << gameId << "for exercise:" << exerciseData.name;
-    
+    if (gameId == "sin_game" && (!m_serialPort || !m_serialPort->isConnected())) {
+        QMessageBox::warning(this, tr("Brak urządzenia"),
+                             tr("Podłącz skalibrowany czujnik HX711 przed uruchomieniem gry."));
+        return;
+    }
+
     // Stop existing game if any
     stopGame();
     
     // Create appropriate game based on ID
     if (gameId == "sin_game") {
-        m_currentGame = new games::SinGame(this);
+        auto* sinGame = new games::SinGame(this);
+        sinGame->setSerialConnection(m_serialPort);
+        m_currentGame = sinGame;
         
         // Connect game signals
         connect(m_currentGame, &games::GameEngine::gameEnded,
