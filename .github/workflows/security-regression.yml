@@ -21,6 +21,8 @@ jobs:
         run: python3 tests/measurement_tab_lifecycle_regression.py
       - name: Check game sensor ownership
         run: python3 tests/game_sensor_ownership_regression.py
+      - name: Check game sensor ownership
+        run: python3 tests/game_sensor_ownership_regression.py
       - name: Install build dependencies
         run: |
           sudo apt-get update
@@ -28,7 +30,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build regression targets
-        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api measurement_engine_regression serial_pty_regression
+        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api measurement_engine_regression force_units_regression serial_pty_regression
       - name: Smoke-test local HTTP API
         run: |
           ./build/biofeedback_api --port 18765 > /tmp/biofeedback-api.log 2>&1 &
