@@ -522,9 +522,22 @@ SensorData SerialCommunication::readData(int timeout) {
     std::vector<uint8_t> rawData;
     auto start = std::chrono::steady_clock::now();
     bool gotBinaryData = false;
-    
+    const auto assignFrame = [this, &data](const ProtocolFrame& frame) {
+        data.timestamp = frame.timestampMs;
+        data.value = frame.rawValue;
+        data.crc = frame.crc;
+        data.calibratedValue = m_impl->isCalibrated
+            ? convertToCalibrated(frame.rawValue) : 0.0;
+        data.isValid = true;
+    };
+    if (auto queuedFrame = m_impl->protocolParser.takeFrame()) {
+        assignFrame(*queuedFrame);
+        gotBinaryData = true;
+    }
+
     const int effectiveTimeoutMs = std::max(1, timeout);
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(
+    while (!gotBinaryData &&
+           std::chrono::duration_cast<std::chrono::milliseconds>(
            std::chrono::steady_clock::now() - start).count() < effectiveTimeoutMs) {
         int rd = 0;
 #ifdef _WIN32
@@ -538,13 +551,9 @@ SensorData SerialCommunication::readData(int timeout) {
             m_impl->protocolParser.feed(reinterpret_cast<const uint8_t*>(buf),
                                         static_cast<std::size_t>(rd));
             if (auto frame = m_impl->protocolParser.takeFrame()) {
-                data.timestamp = frame->timestampMs;
-                data.value = frame->rawValue;
-                data.crc = frame->crc;
-                data.calibratedValue = m_impl->isCalibrated
-                    ? convertToCalibrated(frame->rawValue) : 0.0;
-                data.isValid = true;
+                assignFrame(*frame);
                 gotBinaryData = true;
+                break;
             }
 
             // Also check for text response as fallback
