@@ -43,6 +43,7 @@ MeasurementEngine::MeasurementEngine(EngineConfig config) : m_config(config)
 
 std::optional<RepetitionStats> MeasurementEngine::addSample(const Sample& sample)
 {
+    m_lastSampleAccepted = false;
     if (!sample.valid || sample.unit != ForceUnit::Newton ||
         !std::isfinite(sample.timestampSeconds) || !std::isfinite(sample.force) ||
         sample.force < 0.0) {
@@ -67,6 +68,7 @@ std::optional<RepetitionStats> MeasurementEngine::addSample(const Sample& sample
 
     m_lastTimestampSeconds = sample.timestampSeconds;
     m_lastSource = sample.source;
+    m_lastSampleAccepted = true;
 
     if (!m_inContraction) {
         if (sample.force < m_config.contractionStartThresholdN) return std::nullopt;
@@ -110,6 +112,7 @@ void MeasurementEngine::reset()
     m_completedSeries.clear();
     m_inContraction = false;
     m_rejectedSamples = 0;
+    m_lastSampleAccepted = false;
     m_lastTimestampSeconds = -1.0;
     m_lastSource.reset();
 }
