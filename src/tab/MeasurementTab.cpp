@@ -502,6 +502,7 @@ void MeasurementTab::setupUI()
         m_showRawValues = checked;
         if (m_forcePlot)
             m_forcePlot->setUnit(checked ? ForceUnit::Raw : m_currentUnit);
+        if (m_unitSelector) m_unitSelector->setEnabled(!checked);
         if (checked) {
             m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
             m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
@@ -523,8 +524,7 @@ void MeasurementTab::setupUI()
     m_unitSelector = new QComboBox(this);
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
     m_unitSelector->addItem("Kilogram-siła (kgf)", static_cast<int>(ForceUnit::Kilograms));
-    m_unitSelector->addItem("Wartość surowa (ADC)", static_cast<int>(ForceUnit::Raw));
-    m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
+remove raw unit selector option    m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
     m_unitSelector->setMinimumHeight(35);
     m_unitSelector->setFont(QFont("Arial", 10));
     connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
@@ -811,7 +811,7 @@ void MeasurementTab::stopMeasurement()
     
     // Odblokuj przycisk zmiany trybu Raw/Calibrated po zatrzymaniu pomiaru
     if (m_btnToggleRaw) {
-        m_btnToggleRaw->setEnabled(true);
+        m_btnToggleRaw->setEnabled(m_rawForceBuffer.isEmpty());
         // Przywróć odpowiedni kolor w zależności od stanu
         if (m_showRawValues) {
             m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
@@ -862,6 +862,8 @@ void MeasurementTab::resetSession()
     
     m_statsTable->setRowCount(0);
     m_rawTable->setRowCount(0);
+    if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(true);
+    if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 }
 
 void MeasurementTab::simulateSensorData()
@@ -1959,11 +1961,11 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 void MeasurementTab::setCurrentUnit(ForceUnit unit)
 {
     m_currentUnit = unit;
-    m_showRawValues = (unit == ForceUnit::Raw);
-    if (m_btnToggleRaw && m_btnToggleRaw->isChecked() != m_showRawValues)
-        m_btnToggleRaw->setChecked(m_showRawValues);
+    m_showRawValues = false;
+    if (m_btnToggleRaw && m_btnToggleRaw->isChecked())
+        m_btnToggleRaw->setChecked(false);
     if (m_forcePlot)
-        m_forcePlot->setUnit(m_showRawValues ? ForceUnit::Raw : unit);
+        m_forcePlot->setUnit(unit);
     
     // Aktualizuj etykiety w tabelach
     updateUnitDisplay();
@@ -2034,6 +2036,17 @@ void MeasurementTab::updateRawTableUnits()
     // Aktualizuj nagłówek kolumny siły
     if (m_rawTable->columnCount() > 1) {
         m_rawTable->setHorizontalHeaderItem(1, new QTableWidgetItem("Siła [" + unitLabel + "]"));
+        const int rows = m_rawTable->rowCount();
+        const int offset = std::max(0, m_rawForceBuffer.size() - rows);
+        for (int row = 0; row < rows; ++row) {
+            const int sampleIndex = offset + row;
+            if (sampleIndex >= m_rawForceBuffer.size()) break;
+            const double sample = m_rawForceBuffer[sampleIndex];
+            const double displayed = m_showRawValues ? sample
+                : (m_currentUnit == ForceUnit::Kilograms ? sample / 9.80665 : sample);
+            m_rawTable->setItem(row, 1,
+                new QTableWidgetItem(QString::number(displayed, 'f', 2)));
+        }
     }
 }
 
