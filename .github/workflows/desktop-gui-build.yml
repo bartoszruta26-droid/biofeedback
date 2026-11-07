@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - integration/all-work
+      - 'sync/**'
       - fix/desktop-gui-full-build-2026-11-07
   pull_request:
     branches:
