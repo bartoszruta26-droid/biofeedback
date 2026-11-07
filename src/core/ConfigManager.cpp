@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 #include <iostream>
 #include <QThread>
 #include <QFile>
