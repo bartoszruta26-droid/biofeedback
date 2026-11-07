@@ -781,8 +781,8 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
     // another command or inject control bytes into the serial stream.
     constexpr std::size_t MaxCommandLength = 128;
     if (cmd.empty() || cmd.size() > MaxCommandLength ||
-        cmd.find_first_of("\\r\\n") != std::string::npos ||
-        cmd.find('\\0') != std::string::npos) {
+        cmd.find_first_of("\r\n") != std::string::npos ||
+        cmd.find('\0') != std::string::npos) {
         m_impl->lastError = "Rejected invalid serial command";
         return "";
     }
@@ -817,6 +817,7 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
     if (m_impl->verbose && !resp.empty()) std::cout << "[SerialComm] " << resp << std::endl;
     return resp;
 }
+
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
     if (!m_impl->isConnected || !data || len == 0) return false;
