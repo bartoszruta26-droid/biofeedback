@@ -59,6 +59,7 @@ private:
     QString m_activeSessionId;
     QString m_pendingHistoryFilePath;
     bool m_sessionSaved{false};
+    bool m_sessionInProgress{false};
     QTableWidget* m_seriesTable{nullptr};
     QTableWidget* m_repetitionTable{nullptr};
     QtCharts::QChartView* m_peakChart{nullptr};
