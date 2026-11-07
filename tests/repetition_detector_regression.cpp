@@ -47,15 +47,19 @@ int main() {
     assert(rep.sampleCount == 4);
     assert(std::abs(rep.peakForceN - 45.0) < 1e-9);
 
+    // A malformed checkpoint is rejected without modifying a separate
+    // detector that was already restored from the valid snapshot.
+    RepetitionDetector guarded({50.0, 0.20, 0.10, 2.0, 250, 30000, 500});
+    assert(guarded.restore(snapshot));
     auto corrupt = snapshot;
     ++corrupt.sampleCount;
-    assert(!recovered.restore(corrupt));
-    // Rejected restore is non-destructive: continue the original detector.
-    assert(recovered.isActive());
-    assert(recovered.process(2300, 4.0, true, rep));
+    assert(!guarded.restore(corrupt));
+    assert(guarded.isActive());
+    assert(guarded.process(2200, 45.0, true, rep) == false);
+    assert(guarded.process(2300, 4.0, true, rep));
     assert(rep.startTimestampMs == 2000 && rep.endTimestampMs == 2300);
-    assert(!recovered.isActive()); // completion emitted once
-    assert(!recovered.process(2400, 0.0, true, rep)); // no duplicate
+    assert(!guarded.isActive());
+    assert(!guarded.process(2400, 0.0, true, rep));
 
     // A short spike is discarded, not counted as a repetition.
     detector.reset();
