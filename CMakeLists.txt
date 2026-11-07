@@ -100,6 +100,7 @@ if(CURSES_FOUND)
     add_executable(biofeedback_tui
         src/tui/main.cpp
         src/sensor/SerialCommunication.cpp
+        src/sensor/MeasurementSerialAdapter.cpp
         src/core/DebugManager.cpp
         include/core/DebugManager.hpp
     )
@@ -147,6 +148,7 @@ if(Qt5_FOUND)
         src/tab/TrainingTab.cpp
         src/tab/DebugTab.cpp
         src/sensor/SerialCommunication.cpp
+        src/sensor/MeasurementSerialAdapter.cpp
         src/data/DataManager.cpp
         src/data/Encryption.cpp
         src/games/GameEngine.cpp
@@ -173,6 +175,8 @@ if(Qt5_FOUND)
         include/tab/TrainingTab.hpp
         include/tab/DebugTab.hpp
         include/sensor/SerialCommunication.hpp
+        include/sensor/MeasurementSerialAdapter.hpp
+        include/measurement/MeasurementEngine.hpp
         include/data/DataManager.hpp
         include/data/Encryption.hpp
         include/games/GameEngine.hpp
@@ -202,6 +206,7 @@ if(Qt5_FOUND)
 
     # Link libraries
     target_link_libraries(${PROJECT_NAME}
+        biofeedback_measurement
         Qt5::Core
         Qt5::Widgets
         Qt5::Charts
