@@ -6,6 +6,15 @@
 #include <filesystem>
 #include <fstream>
 #include <utility>
+#include <cstdio>
+#include <cerrno>
+#include <system_error>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace sensor {
 namespace {
@@ -14,6 +23,26 @@ using json = nlohmann::json;
 void setError(std::string* error, const std::string& message)
 {
     if (error) *error = message;
+}
+
+bool atomicReplace(const std::filesystem::path& temporary,
+                   const std::filesystem::path& target,
+                   std::string* error)
+{
+#ifdef _WIN32
+    if (!MoveFileExW(temporary.c_str(), target.c_str(),
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        setError(error, std::system_error(
+            static_cast<int>(GetLastError()), std::system_category()).what());
+        return false;
+    }
+#else
+    if (std::rename(temporary.c_str(), target.c_str()) != 0) {
+        setError(error, std::system_error(errno, std::generic_category()).what());
+        return false;
+    }
+#endif
+    return true;
 }
 
 json toJson(const CalibrationProfile& profile)
@@ -69,15 +98,18 @@ std::optional<double> CalibrationMath::convertRaw(int32_t raw,
 
 bool CalibrationProfile::isValidFor(const std::string& expectedDeviceId) const noexcept
 {
-    return schemaVersion == CurrentSchemaVersion &&
-           !deviceId.empty() &&
-           deviceId == expectedDeviceId &&
-           unit == "g" &&
-           std::isfinite(zeroOffsetRaw) &&
-           std::isfinite(scaleFactor) && scaleFactor > 0.0 &&
-           std::isfinite(referenceValue) && referenceValue > 0.0 &&
-           sampleCount >= 1 && sampleCount <= 1000 &&
-           !createdAtUtc.empty();
+    if (schemaVersion != CurrentSchemaVersion || deviceId.empty() ||
+        deviceId != expectedDeviceId || unit != "g" ||
+        !std::isfinite(zeroOffsetRaw) || !std::isfinite(scaleFactor) ||
+        scaleFactor <= 0.0 || !std::isfinite(referenceValue) ||
+        referenceValue <= 0.0 || sampleCount < 1 || sampleCount > 1000 ||
+        createdAtUtc.empty()) return false;
+
+    const double rawDelta = static_cast<double>(referenceRaw) - zeroOffsetRaw;
+    if (rawDelta <= 0.0) return false;
+    const double expectedScale = referenceValue / rawDelta;
+    const double scaleTolerance = std::max(1e-12, std::abs(expectedScale) * 1e-6);
+    return std::abs(scaleFactor - expectedScale) <= scaleTolerance;
 }
 
 bool CalibrationProfileStore::save(const std::string& path,
@@ -114,7 +146,11 @@ bool CalibrationProfileStore::save(const std::string& path,
                 return false;
             }
         }
-        std::filesystem::rename(temporary, target);
+        if (!atomicReplace(temporary, target, error)) {
+            std::error_code ignored;
+            std::filesystem::remove(temporary, ignored);
+            return false;
+        }
         if (error) error->clear();
         return true;
     } catch (const std::exception& exception) {
