@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QString>
 #include <QMutex>
 #include <atomic>
@@ -203,6 +204,8 @@ protected:
     
     // Czas ostatniej klatki
     qint64 m_lastFrameTime;
+    QElapsedTimer m_monotonicClock;
+    qint64 m_accumulatedSessionMs;
     
     // Wartość wejściowa z sensora
     double m_sensorValue;
