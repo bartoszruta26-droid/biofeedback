@@ -317,6 +317,7 @@ private:
     int m_sessionTime;
     int m_restTimeRemaining;
     bool m_inRestPeriod;
+    bool m_waitingForNextExercise;
     
     double m_currentForce;
     double m_peakForceInRep;
