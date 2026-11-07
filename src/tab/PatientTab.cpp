@@ -1,4 +1,5 @@
 #include "tab/PatientTab.hpp"
+#include "core/RuntimePaths.hpp"
 #include <QFileInfo>
 #include <QTextStream>
 #include <QDateTime>
@@ -595,7 +596,7 @@ void PatientTab::onSelectionChanged()
         
         // Ustaw aktualnie załadowanego pacjenta
         m_currentPatientPesel = pesel;
-        m_currentPatientDataPath = QDir::currentPath() + "/data/patients/" + pesel;
+        m_currentPatientDataPath = biofeedback::runtime::patientDirectory(pesel);
         
         emit patientSelected(pesel, firstName, lastName);
         emit currentPatientChanged(m_currentPatientPesel, m_currentPatientDataPath);
