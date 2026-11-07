@@ -386,6 +386,7 @@ private:
     // Logika i dane
     QTimer* m_timer;
     bool m_isMeasuring;
+    bool m_isPaused{false};
     QString m_patientId;
     
     int m_currentSeries;      // 1-3
