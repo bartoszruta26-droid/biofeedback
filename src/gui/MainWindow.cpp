@@ -407,6 +407,8 @@ void MainWindow::createConnections()
     });
     connect(m_trainingTab, &tab::TrainingTab::trainingStopped,
             m_measurementTab, &tab::MeasurementTab::stopMeasurement);
+    connect(m_trainingTab, &tab::TrainingTab::trainingPaused,
+            m_measurementTab, &tab::MeasurementTab::setMeasurementPaused);
     connect(m_measurementTab, &tab::MeasurementTab::newForceSample, this,
             [this](double forceN, double, bool isRaw) {
                 if (!isRaw) forwardSensorToGame(forceN);
