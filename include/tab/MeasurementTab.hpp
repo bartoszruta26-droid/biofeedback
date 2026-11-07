@@ -25,6 +25,7 @@
 #include <QComboBox>
 
 #include "sensor/SerialCommunication.hpp"
+#include "core/MeasurementEngine.hpp"
 #include "core/DebugManager.hpp"
 
 namespace tab {
@@ -204,7 +205,7 @@ public:
     /**
      * @brief Ręczne wczytanie pojedynczej próbki siły
      */
-    void readSingleSample(double forceValue);
+    void readSingleSample(double forceValue, double forceInNewtons = -1.0);
     
     /**
      * @brief Analizuje serię i zwraca statystyki
@@ -308,8 +309,8 @@ private:
     void ensureSessionClockStarted();
     void setupUI();
     void updateLiveDisplay(double force);
-    void detectRepetitions();
-    void calculateRepetitionStats();
+    void consumeEngineRepetition(const measurement::RepetitionStats& stats);
+    void consumeEngineSeries(const measurement::SeriesStats& stats);
     void updateStatsTable();
     void updateSeriesProgress();
     double calculateMedian(const QVector<double>& values) const;
@@ -420,6 +421,8 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SensorData m_lastSensorData;
     std::atomic<bool> m_hasArduinoConnection{false};
+    measurement::MeasurementEngine m_measurementEngine;
+    measurement::SampleSource m_sampleSource{measurement::SampleSource::Device};
 };
 
 } // namespace tab
