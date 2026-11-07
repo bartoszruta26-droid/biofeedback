@@ -30,6 +30,8 @@
 
 namespace tab {
 
+namespace measurement = biofeedback::measurement;
+
 /**
  * @brief Jednostki wyświetlania siły
  */
