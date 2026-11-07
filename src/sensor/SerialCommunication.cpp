@@ -509,7 +509,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 
 void SerialCommunication::disconnect() {
     stopAsyncReading();
-    std::lock_guard<std::mutex> connectionLock(m_impl->connectionMutex);
+    std::unique_lock<std::mutex> connectionLock(m_impl->connectionMutex);
 
     // Serialize handle teardown with every synchronous read/write operation.
     // readData(), sendCommand() and sendRawData() hold readMutex while using
@@ -527,8 +527,9 @@ void SerialCommunication::disconnect() {
         m_impl->portHandle = -1;
         { std::lock_guard<std::mutex> stateLock(m_impl->stateMutex); m_impl->portName.clear(); }
     }
-    // Callbacks run after releasing readMutex so subscribers may safely
-    // query state or initiate a new operation without self-deadlocking.
+    // Release both lifecycle and I/O locks before invoking user callbacks:
+    // callbacks may synchronously call connect() or disconnect().
+    connectionLock.unlock();
     notifyConnectionCallbacks(false, "Disconnected");
 }
 
