@@ -1190,9 +1190,21 @@ BiomechanicalParams Formulas::calculateSessionParams(const std::vector<SeriesDat
             result.FI_inter = ((firstPeak - lastPeak) / firstPeak) * 100.0;
             result.setAvailability(33, ParameterAvailability::Available);
         }
+
+        const double secondSetPeak = setResults[1].F_set_peak;
+        if (firstPeak > 0.0) {
+            result.ISI = calculateISI(secondSetPeak, firstPeak);
+            result.setAvailability(47, ParameterAvailability::Available);
+        }
     }
 
     if (setResults.size() >= 3) {
+        const double firstSetMean = setResults.front().F_set_mean;
+        const double thirdSetMean = setResults[2].F_set_mean;
+        if (firstSetMean > 0.0) {
+            result.FMC = calculateFMC(thirdSetMean, firstSetMean);
+            result.setAvailability(46, ParameterAvailability::Available);
+        }
         result.FG = calculateFG(fatigueIndices[0], fatigueIndices[1], fatigueIndices[2]);
         result.setAvailability(60, ParameterAvailability::Available);
 
