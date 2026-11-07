@@ -1289,7 +1289,7 @@ void TrainingTab::finishCurrentSeries()
         m_restTimeRemaining = 120;
         m_restDurationMs = 120000;
     } else {
-            m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
+        m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
         m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
     }
 
