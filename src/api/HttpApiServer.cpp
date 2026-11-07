@@ -78,11 +78,20 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             sendJson(socket, 200, R"({"ok":true})"); return;
         }
         if (method == "GET" && path == "/api/v1/status") {
+            QJsonArray capabilities;
+            capabilities.append(QStringLiteral("health"));
+            capabilities.append(QStringLiteral("status"));
+            QJsonArray limitations;
+            limitations.append(QStringLiteral("device_control"));
+            limitations.append(QStringLiteral("patient_repository"));
+            limitations.append(QStringLiteral("measurement_stream"));
             const QJsonObject status{
-                {"status", "ready"}, {"version", "0.1.0"}, {"mode", "desktop-api"},
+                {"status", QStringLiteral("ready")},
+                {"version", QStringLiteral("0.1.0")},
+                {"mode", QStringLiteral("desktop-api")},
                 {"timestamp", QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
-                {"capabilities", QJsonArray{"health", "status"}},
-                {"limitations", QJsonArray{"device_control", "patient_repository", "measurement_stream"}}
+                {"capabilities", capabilities},
+                {"limitations", limitations}
             };
             sendJson(socket, 200, QJsonDocument(status).toJson(QJsonDocument::Compact)); return;
         }
