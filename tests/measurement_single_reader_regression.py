@@ -11,8 +11,8 @@ for forbidden in ("readData(", "tryReadData(", "m_timer", "onTimerTick"):
 manual_start = source.index("void MeasurementTab::onReadSingleSample()")
 manual_end = source.index("void MeasurementTab::onSelectionChanged()", manual_start)
 manual = source[manual_start:manual_end]
-if "m_lastSensorData" not in manual or "readSingleSample(value, m_lastSensorData.timestamp)" not in manual:
-    raise SystemExit("Manual capture must reuse the latest asynchronous frame and device timestamp")
+if "m_lastSensorData" not in manual or "readSingleSample(value, m_lastSensorData.timestamp, m_lastSensorData.value, true)" not in manual:
+    raise SystemExit("Manual capture must reuse the latest asynchronous frame, timestamp and raw ADC value")
 if "if (m_isMeasuring)" not in manual or "AKTYWNY POMIAR ZAPISUJE PRÓBKI AUTOMATYCZNIE" not in manual:
     raise SystemExit("Manual capture must not replay a sample while the asynchronous session is recording")
 
