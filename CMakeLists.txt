@@ -129,6 +129,7 @@ if(Qt5_FOUND)
         src/sensor/SerialCommunication.cpp
         src/sensor/ProtocolParser.cpp
         src/sensor/CalibrationProfile.cpp
+        src/core/MeasurementEngine.cpp
         src/data/DataManager.cpp
         src/data/Encryption.cpp
         src/games/GameEngine.cpp
@@ -157,6 +158,7 @@ if(Qt5_FOUND)
         include/sensor/SerialCommunication.hpp
         include/sensor/ProtocolParser.hpp
         include/sensor/CalibrationProfile.hpp
+        include/core/MeasurementEngine.hpp
         include/data/DataManager.hpp
         include/data/Encryption.hpp
         include/games/GameEngine.hpp
