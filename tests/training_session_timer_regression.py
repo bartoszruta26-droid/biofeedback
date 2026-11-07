@@ -9,15 +9,15 @@ analytics = Path("src/tab/TrainingAnalyticsWidget.cpp").read_text(encoding="utf-
 
 checks = {
     "monotonic session clock": "QElapsedTimer m_sessionClock" in header,
-    "separate active exercise accumulator": "m_activeExerciseTimeMs" in header,
+    "deterministic active/session clock model": "TrainingSessionClock m_trainingClock" in header,
     "rest clock monotonic": "QElapsedTimer m_restClock" in header,
-    "active time excludes pause and rest": "if (!m_isPaused && !m_inRestPeriod)" in source,
+    "active time excludes pause and rest": "m_trainingClock.update(elapsedMs, !m_isPaused && !m_inRestPeriod)" in source,
     "session clock keeps ticking during pause": "m_timer->stop();" not in source[source.index("void TrainingTab::pauseTraining"):source.index("void TrainingTab::resumeTraining")],
     "rest countdown based on elapsed monotonic time": "m_restDurationMs - m_restClock.elapsed()" in source,
     "rest duration freezes on pause": "m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;" in source,
     "completed/interrupted stop distinction": "void TrainingTab::stopTraining(bool completed)" in source,
     "automatic completion marked completed": "stopTraining(true);" in source,
-    "active duration exposed to analytics": "activeDurationSeconds" in analytics_h and "m_activeExerciseTimeMs / 1000" in source,
+    "active duration exposed to analytics": "activeDurationSeconds" in analytics_h and "m_trainingClock.activeSeconds()" in source,
     "session status persisted": '"session_status"' in analytics,
     "active duration persisted": '"active_duration_seconds"' in analytics,
 }
