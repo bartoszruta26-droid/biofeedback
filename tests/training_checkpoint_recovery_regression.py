@@ -19,7 +19,7 @@ checks = {
     "crash after exercise change is recoverable": "saveExecutionCheckpoint()" in tab[tab.index("void TrainingTab::loadNextExercise"):tab.index("void TrainingTab::loadNextSeries")],
     "rest transitions checkpoint": "saveExecutionCheckpoint()" in tab[tab.index("void TrainingTab::advanceAfterRest"):tab.index("void TrainingTab::calculateExerciseStats")],
     "recovery offered after loading patient history": "recoverPendingSession(recovered)" in tab and "Odzyskiwanie treningu" in tab,
-    "recovery validates cursor bounds": "exerciseIndex >= plan.size()" in tab and "seriesIndex >= plan[exerciseIndex].seriesCount" in tab,
+    "recovery validates cursor bounds": "exerciseIndex >= stagedPlan.size()" in tab and "seriesIndex >= stagedPlan[exerciseIndex].seriesCount" in tab,
     "restoring starts paused and retains resume state": "restore(biofeedback::training::SessionState::Paused," in tab,
     "session clock restores elapsed values": "m_trainingClock.restore(sessionMs, activeMs)" in tab and "m_sessionElapsedOffsetMs + elapsedMs" in tab,
     "state machine restore validates state": "bool restore(SessionState state" in machine,
