@@ -23,6 +23,7 @@
 #include <QComboBox>
 
 #include "sensor/SerialCommunication.hpp"
+#include "sensor/MeasurementSerialAdapter.hpp"
 #include "core/DebugManager.hpp"
 
 namespace tab {
@@ -267,6 +268,7 @@ public:
      * @return true jeśli Arduino Nano z HX711 jest podłączone
      */
     bool isArduinoConnected() const;
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> measurementEngine() const { return m_measurementEngine; }
     
     /**
      * @brief Dodaje wiadomość do centralnego terminala debugowego (DebugTab)
@@ -414,6 +416,8 @@ private:
     
     // Połączenie szeregowe z Arduino
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
+    std::unique_ptr<sensor::MeasurementSerialAdapter> m_measurementAdapter;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
     sensor::SensorData m_lastSensorData;
     bool m_hasArduinoConnection;
