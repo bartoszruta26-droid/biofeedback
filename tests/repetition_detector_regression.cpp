@@ -52,6 +52,7 @@ int main() {
     assert(!recovered.restore(corrupt));
 
     // A short spike is discarded, not counted as a repetition.
+    detector.reset();
     assert(!detector.process(700, 15.0, true, rep));
     assert(!detector.process(800, 0.0, true, rep));
     assert(!detector.isActive());
