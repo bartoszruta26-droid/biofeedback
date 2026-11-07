@@ -1,5 +1,6 @@
 #include "tab/MeasurementTab.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "measurement/Units.hpp"
 #include <QFileInfo>
 #include <QTextStream>
 #include <QDateTime>
@@ -179,7 +180,7 @@ void ForcePlotWidget::setUnit(ForceUnit unit)
 QString ForcePlotWidget::getUnitLabel() const
 {
     switch (m_unit) {
-        case ForceUnit::Kilograms: return "kg";
+        case ForceUnit::Kilograms: return "kgf";
         case ForceUnit::Raw: return "ADC";
         default: return "N";
     }
@@ -520,7 +521,7 @@ void MeasurementTab::setupUI()
     // Wybór jednostki siły
     m_unitSelector = new QComboBox(this);
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
-    m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
+    m_unitSelector->addItem("Kilogram-siła (kgf)", static_cast<int>(ForceUnit::Kilograms));
     m_unitSelector->addItem("Wartość surowa (ADC)", static_cast<int>(ForceUnit::Raw));
     m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
     m_unitSelector->setMinimumHeight(35);
@@ -994,8 +995,8 @@ void MeasurementTab::updateLiveDisplay(double force)
     if (!m_showRawValues) {
         switch (m_currentUnit) {
             case ForceUnit::Kilograms:
-                displayForce = force * 1000.0 / 9.81;  // N -> kg
-                unitLabel = "kg";
+                displayForce = force / biofeedback::measurement::standardGravityMetersPerSecondSquared;  // N -> kgf
+                unitLabel = "kgf";
                 std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
                 break;
             case ForceUnit::Raw:
@@ -1953,7 +1954,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
             // Jeśli nie używamy wartości surowej, przelicz na wybraną jednostkę
             if (!m_showRawValues && m_currentUnit != ForceUnit::Newtons) {
                 // calibratedValue jest w gramach, przelicz na Newtony najpierw
-                double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
+                double forceInNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
                 valueToUse = convertForce(forceInNewtons, m_currentUnit);
                 std::cout << "[DEBUG] onSensorDataReceived: Converted to unit, valueToUse=" << valueToUse << std::endl;
             } else if (m_showRawValues) {
@@ -1962,7 +1963,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
                 std::cout << "[DEBUG] onSensorDataReceived: Using raw value=" << valueToUse << std::endl;
             } else {
                 // calibratedValue jest w gramach, przelicz na Newtony
-                valueToUse = data.calibratedValue * 9.81 / 1000.0;
+                valueToUse = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
                 std::cout << "[DEBUG] onSensorDataReceived: Converted to Newtons, valueToUse=" << valueToUse << std::endl;
             }
             
@@ -1986,7 +1987,7 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
     switch (targetUnit) {
         case ForceUnit::Kilograms:
             // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
-            return newtons * 1000.0 / 9.81;  // zwraca w kg
+            return newtons / biofeedback::measurement::standardGravityMetersPerSecondSquared;  // zwraca w kgf
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
             return newtons;
@@ -2038,7 +2039,7 @@ void MeasurementTab::updateUnitDisplay()
         double displayForce = currentForce;
         
         if (!m_showRawValues && m_currentUnit == ForceUnit::Kilograms) {
-            displayForce = currentForce * 1000.0 / 9.81;
+            displayForce = currentForce / biofeedback::measurement::standardGravityMetersPerSecondSquared;
         }
         
         m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
