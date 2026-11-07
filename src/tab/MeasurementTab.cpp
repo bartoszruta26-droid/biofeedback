@@ -381,7 +381,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
-    , m_showRawValues(true)  // Domyślnie pokazujemy wartości surowe (Value z Arduino)
+    , m_showRawValues(false)  // Domyślnie pokazujemy skalibrowaną siłę w niutonach
     , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
     , m_unitSelector(nullptr)
     , m_trendsBox(nullptr)
@@ -1944,7 +1944,7 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 {
     switch (targetUnit) {
         case ForceUnit::Kilograms:
-            // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
+            // Convert newtons to kilogram-force using standard gravity.
             return newtons / biofeedback::measurement::standardGravityMetersPerSecondSquared;  // zwraca w kgf
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
