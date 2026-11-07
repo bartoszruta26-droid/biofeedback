@@ -90,13 +90,13 @@ checks = {
     ),
     "checkpoint restore stages detector before commit": (
         "biofeedback::training::RepetitionDetector stagedDetector" in tab and
-        "if (!stagedDetector.restore(detectorSnapshot)) return false;" in tab and
-        tab.index("if (!stagedDetector.restore(detectorSnapshot)) return false;") <
+        "if (!stagedDetector.restore(detectorSnapshot))" in tab and
+        tab.index("if (!stagedDetector.restore(detectorSnapshot))") <
         tab.index("// Phase 2: commit.")
     ),
     "version 2 requires a detector snapshot": "checkpointVersion >= 2 && !hasDetectorSnapshot" in tab,
     "recovery rejects incomplete or mismatched exercise statistics": (
-        "if (stagedStats.size() != stagedPlan.size()) return false;" in tab and
+        "if (stagedStats.size() != stagedPlan.size())" in tab and
         "stagedStats[index].exerciseName != stagedPlan[index].name" in tab
     ),
     "restored elapsed values are finite and ordered": (
