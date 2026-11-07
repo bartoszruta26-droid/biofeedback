@@ -389,7 +389,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_trendsContent(nullptr)
     , m_chkShowTrends(nullptr)
     , m_serialPort(nullptr)
-    , m_hasArduinoConnection(false)
 {
     // Inicjalizacja wskaźników przycisków JSON
     m_btnSaveJSON = nullptr;
