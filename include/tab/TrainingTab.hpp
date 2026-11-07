@@ -26,6 +26,8 @@
 
 namespace tab {
 
+class TrainingAnalyticsWidget;
+
 /**
  * @brief Widget do wizualizacji postępu treningu
  */
@@ -247,6 +249,7 @@ private:
     void setupUI();
     void updateDisplay();
     void updateProgressWidgets();
+    void refreshAnalytics();
     void loadNextExercise();
     void loadNextSeries();
     void loadNextRep();
@@ -299,6 +302,7 @@ private:
     QGroupBox* m_statsBox;
     QWidget* m_statsContainer;
     QLabel* m_statsSummaryLabel;
+    TrainingAnalyticsWidget* m_analyticsWidget;
     
     // Logika i dane
     QTimer* m_timer;
