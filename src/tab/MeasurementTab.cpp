@@ -1678,7 +1678,7 @@ void MeasurementTab::loadPatientTrends()
             QString jsonContent = in.readAll();
             file.close();
             
-            MeasurementSession session = deserializeSessionFromJSON(jsonContent);
+            MeasurementSession session = deserializeSessionFromJSON(jsonContent, false);
             if (!session.sessionId.isEmpty()) {
                 m_patientSessions.append(session);
             }
