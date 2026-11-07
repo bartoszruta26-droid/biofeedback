@@ -690,6 +690,19 @@ void TrainingTab::setCurrentPatientContext(const QString& patientPesel,
             ? QString()
             : QDir(patientDataPath).filePath(QStringLiteral("training_history.json"));
         m_analyticsWidget->setHistoryFilePath(historyPath);
+        QJsonObject recovered;
+        if (m_analyticsWidget->recoverPendingSession(recovered)) {
+            const auto answer = QMessageBox::question(this, tr("Odzyskiwanie treningu"),
+                tr("Znaleziono niedokończoną sesję treningową. Czy wznowić ją od zapisanego miejsca?"),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+            if (answer == QMessageBox::Yes && restoreExecutionCheckpoint(recovered.value("execution_state").toObject())) {
+                addDebugMessage("Odzyskano sesję treningową. Trening jest wstrzymany do chwili wybrania Wznów.", "INFO");
+            } else {
+                m_analyticsWidget->setSessionCompleted(false);
+                m_analyticsWidget->saveSessionAutomatically();
+                addDebugMessage("Odzyskana sesja została oznaczona jako przerwana.", "WARNING");
+            }
+        }
     }
 }
 
@@ -1159,6 +1172,7 @@ void TrainingTab::loadNextRep()
 {
     m_peakForceInRep = 0.0;
     updateProgressWidgets();
+    saveExecutionCheckpoint();
 }
 
 void TrainingTab::onRepetitionDetected(
@@ -1285,6 +1299,7 @@ void TrainingTab::finishCurrentSeries()
         m_restClock.start();
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
         if (!m_isPaused) m_restTimer->start();
+        saveExecutionCheckpoint();
     } else {
         advanceAfterRest();
     }
@@ -1307,6 +1322,7 @@ void TrainingTab::advanceAfterRest()
     } else {
         loadNextSeries();
     }
+    saveExecutionCheckpoint();
 }
 
 void TrainingTab::calculateExerciseStats()
@@ -1347,6 +1363,148 @@ void TrainingTab::startRestTimer()
     m_restClock.start();
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
     if (!m_isPaused) m_restTimer->start();
+}
+
+
+QJsonObject TrainingTab::buildExecutionCheckpoint() const
+{
+    QJsonObject state;
+    state.insert("format_version", 1);
+    state.insert("state", static_cast<int>(m_stateMachine.state()));
+    state.insert("resume_state", static_cast<int>(m_stateMachine.resumeState()));
+    state.insert("current_exercise_index", m_currentExerciseIndex);
+    state.insert("current_series_index", m_currentSeriesIndex);
+    state.insert("current_repetition_index", m_currentRepIndex);
+    state.insert("rest_advances_exercise", m_restAdvancesExercise);
+    state.insert("session_elapsed_ms", static_cast<double>(m_trainingClock.sessionMilliseconds()));
+    state.insert("active_elapsed_ms", static_cast<double>(m_trainingClock.activeMilliseconds()));
+    qint64 remainingRestMs = m_restDurationMs;
+    if (m_inRestPeriod && !m_isPaused && m_restClock.isValid())
+        remainingRestMs = qMax<qint64>(0, m_restDurationMs - m_restClock.elapsed());
+    state.insert("rest_remaining_ms", static_cast<double>(remainingRestMs));
+
+    QJsonArray plan;
+    for (const auto& exercise : m_exercisePlan) {
+        QJsonObject item;
+        item.insert("name", exercise.name);
+        item.insert("series_count", exercise.seriesCount);
+        item.insert("repetitions_per_series", exercise.repsPerSeries);
+        item.insert("target_force_n", exercise.targetForce);
+        item.insert("rest_seconds", exercise.restTime);
+        item.insert("game_type", exercise.gameType);
+        plan.append(item);
+    }
+    state.insert("exercise_plan", plan);
+    return state;
+}
+
+bool TrainingTab::saveExecutionCheckpoint()
+{
+    if (!m_analyticsWidget || !m_isTraining) return false;
+    updateSessionClocks();
+    m_analyticsWidget->setExecutionState(buildExecutionCheckpoint());
+    return m_analyticsWidget->saveSessionCheckpoint();
+}
+
+bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
+{
+    if (checkpoint.value("format_version").toInt() != 1 ||
+        !checkpoint.value("exercise_plan").isArray()) return false;
+
+    QVector<TrainingExercise> plan;
+    const QJsonArray planValues = checkpoint.value("exercise_plan").toArray();
+    for (const QJsonValue& value : planValues) {
+        if (!value.isObject()) return false;
+        const QJsonObject item = value.toObject();
+        TrainingExercise exercise;
+        exercise.name = item.value("name").toString();
+        exercise.seriesCount = item.value("series_count").toInt();
+        exercise.repsPerSeries = item.value("repetitions_per_series").toInt();
+        exercise.targetForce = item.value("target_force_n").toDouble();
+        exercise.restTime = item.value("rest_seconds").toDouble();
+        exercise.gameType = item.value("game_type").toString();
+        if (exercise.name.isEmpty() || exercise.seriesCount < 1 ||
+            exercise.repsPerSeries < 1 || exercise.targetForce < 0.0 ||
+            exercise.restTime < 0.0) return false;
+        plan.append(exercise);
+    }
+    if (plan.isEmpty()) return false;
+
+    const int exerciseIndex = checkpoint.value("current_exercise_index").toInt(-1);
+    const int seriesIndex = checkpoint.value("current_series_index").toInt(-1);
+    const int repetitionIndex = checkpoint.value("current_repetition_index").toInt(-1);
+    if (exerciseIndex < 0 || exerciseIndex >= plan.size() ||
+        seriesIndex < 0 || seriesIndex >= plan[exerciseIndex].seriesCount ||
+        repetitionIndex < 0 || repetitionIndex >= plan[exerciseIndex].repsPerSeries)
+        return false;
+
+    const auto savedState = static_cast<biofeedback::training::SessionState>(
+        checkpoint.value("state").toInt(static_cast<int>(biofeedback::training::SessionState::Active)));
+    auto resumeState = static_cast<biofeedback::training::SessionState>(
+        checkpoint.value("resume_state").toInt(static_cast<int>(biofeedback::training::SessionState::Active)));
+    if (savedState == biofeedback::training::SessionState::Resting)
+        resumeState = biofeedback::training::SessionState::Resting;
+    else if (savedState != biofeedback::training::SessionState::Paused)
+        resumeState = biofeedback::training::SessionState::Active;
+    if (resumeState != biofeedback::training::SessionState::Active &&
+        resumeState != biofeedback::training::SessionState::Resting) return false;
+
+    m_exercisePlan = plan;
+    m_exerciseStats = m_analyticsWidget->currentStats();
+    while (m_exerciseStats.size() < m_exercisePlan.size()) {
+        ExerciseStats stats;
+        stats.exerciseName = m_exercisePlan[m_exerciseStats.size()].name;
+        m_exerciseStats.append(stats);
+    }
+    if (m_exerciseStats.size() > m_exercisePlan.size()) return false;
+    m_currentExerciseIndex = exerciseIndex;
+    m_currentSeriesIndex = seriesIndex;
+    m_currentRepIndex = repetitionIndex;
+    m_restAdvancesExercise = checkpoint.value("rest_advances_exercise").toBool(false);
+    m_restDurationMs = qMax<qint64>(0, static_cast<qint64>(
+        checkpoint.value("rest_remaining_ms").toDouble()));
+    m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
+    m_inRestPeriod = resumeState == biofeedback::training::SessionState::Resting;
+    m_isTraining = true;
+    m_isPaused = true;
+
+    const qint64 sessionMs = qMax<qint64>(0, static_cast<qint64>(
+        checkpoint.value("session_elapsed_ms").toDouble()));
+    const qint64 activeMs = qMax<qint64>(0, static_cast<qint64>(
+        checkpoint.value("active_elapsed_ms").toDouble()));
+    m_sessionElapsedOffsetMs = sessionMs;
+    m_trainingClock.restore(sessionMs, activeMs);
+    m_sessionTime = static_cast<int>(sessionMs / 1000);
+    m_sessionClock.start();
+    m_stateMachine.restore(biofeedback::training::SessionState::Paused, resumeState);
+    m_repetitionDetector.reset();
+    m_currentSeriesRepetitions.clear();
+    for (const auto& record : m_exerciseStats[m_currentExerciseIndex].repetitions) {
+        if (record.seriesIndex == m_currentSeriesIndex + 1)
+            m_currentSeriesRepetitions.push_back(record.measurement);
+    }
+
+    m_exerciseSelector->clear();
+    for (const auto& exercise : m_exercisePlan) m_exerciseSelector->addItem(exercise.name);
+    m_exerciseSelector->setCurrentIndex(m_currentExerciseIndex);
+    m_configBox->setEnabled(false);
+    m_btnStartStop->setText("Stop");
+    m_btnStartStop->setStyleSheet("background-color: #cc4444; color: white;");
+    m_btnPauseResume->setEnabled(true);
+    m_btnPauseResume->setText("Wznów");
+    configureGameForExercise();
+    if (m_currentGame) {
+        m_currentGame->reset();
+        m_currentGame->start();
+        m_currentGame->pause();
+    }
+    m_repetitionDetector.setTargetForce(m_exercisePlan[m_currentExerciseIndex].targetForce);
+    updateProgressWidgets();
+    updateDisplay();
+    if (m_inRestPeriod)
+        m_lblRestTimer->setText(QString("Odpoczynek: %1 s — sesja odzyskana, wstrzymana").arg(m_restTimeRemaining));
+    m_timer->start();
+    return true;
 }
 
 void TrainingTab::updateRestDisplay()
