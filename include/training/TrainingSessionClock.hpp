@@ -4,6 +4,12 @@ namespace biofeedback::training {
 class TrainingSessionClock {
 public:
  void reset() noexcept { last_=0; active_=0; initialized_=false; }
+ void restore(std::int64_t sessionMs, std::int64_t activeMs) noexcept {
+  last_ = sessionMs < 0 ? 0 : sessionMs;
+  active_ = activeMs < 0 ? 0 : activeMs;
+  if (active_ > last_) active_ = last_;
+  initialized_ = true;
+ }
  void update(std::int64_t elapsed, bool isActive) noexcept {
   if(elapsed<0) elapsed=0;
   if(!initialized_){last_=elapsed;initialized_=true;return;}
