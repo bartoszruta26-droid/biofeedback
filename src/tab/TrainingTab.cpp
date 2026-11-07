@@ -182,6 +182,7 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_sessionTime(0)
     , m_restTimeRemaining(0)
     , m_inRestPeriod(false)
+    , m_waitingForNextExercise(false)
     , m_currentForce(0.0)
     , m_peakForceInRep(0.0)
     , m_serialPort(nullptr)
@@ -419,7 +420,12 @@ void TrainingTab::setupUI()
             m_restTimer->stop();
             m_inRestPeriod = false;
             m_lblRestTimer->setText("");
-            loadNextSeries();
+            if (m_waitingForNextExercise) {
+                m_waitingForNextExercise = false;
+                loadNextExercise();
+            } else {
+                loadNextSeries();
+            }
         }
     });
 }
@@ -527,6 +533,7 @@ void TrainingTab::stopTraining()
     m_isTraining = false;
     m_isPaused = false;
     m_inRestPeriod = false;
+    m_waitingForNextExercise = false;
     
     // Zatrzymanie gry jeśli aktywna
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -887,6 +894,7 @@ void TrainingTab::checkExerciseCompletion()
         // Odpoczynek między ćwiczeniami
         if (m_currentExerciseIndex < m_exercisePlan.size()) {
             m_inRestPeriod = true;
+            m_waitingForNextExercise = true;
             m_restTimeRemaining = 120;  // 2 minuty odpoczynku między ćwiczeniami
             m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
             m_restTimer->start();
@@ -896,6 +904,7 @@ void TrainingTab::checkExerciseCompletion()
         }
     } else {
         // Odpoczynek między seriami
+        m_waitingForNextExercise = false;
         m_inRestPeriod = true;
         m_restTimeRemaining = static_cast<int>(ex.restTime);
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
