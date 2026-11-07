@@ -22,6 +22,6 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build regression targets
-        run: cmake --build build --parallel 2 --target login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression measurement_engine_regression protocol_parser_regression
+        run: cmake --build build --parallel 2 --target login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression measurement_engine_regression protocol_parser_regression protocol_parser_regression
       - name: Run regression tests
         run: ctest --test-dir build --output-on-failure
