@@ -79,7 +79,7 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
         sample.quality = Quality::InvalidUnit;
     } else if (!input.sensorValid) {
         sample.quality = Quality::SensorRejected;
-    } else if (input.deviceTimestampMs == 0) {
+    } else if (!input.hasTimestamp) {
         sample.quality = Quality::MissingTimestamp;
     } else if (!std::isfinite(input.value)) {
         sample.quality = Quality::NonFiniteValue;
