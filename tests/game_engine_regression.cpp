@@ -10,7 +10,7 @@
 
 #define REQUIRE(condition) do { \
     if (!(condition)) { \
-        std::fprintf(stderr, "GameEngine regression failed at %s:%d: %s\\n", __FILE__, __LINE__, #condition); \
+        std::fprintf(stderr, "GameEngine regression failed at %s:%d: %s\n", __FILE__, __LINE__, #condition); \
         std::abort(); \
     } \
 } while (false)
@@ -27,10 +27,9 @@ protected:
     void initialize() override { m_lastDelta = 0.0; }
     void update(double deltaTime) override { m_lastDelta = deltaTime; }
     void render(QPainter&) override {}
-    bool handleInput(double value) override { ++m_inputCount; m_lastHandled = value; return true; }
+    bool handleInput(double) override { ++m_inputCount; return true; }
 private:
     double m_lastDelta = 0.0;
-    double m_lastHandled = 0.0;
     int m_inputCount = 0;
 };
 
@@ -54,6 +53,9 @@ int main(int argc, char **argv)
     const QString runningStats = game.getGameStats();
     REQUIRE(runningStats.contains(QStringLiteral("state=running")));
     REQUIRE(runningStats.contains(QStringLiteral("frames=")));
+    game.award(5);
+    game.start();
+    REQUIRE(game.getScore() == 5);
 
     game.pause();
     REQUIRE(game.isPaused());
