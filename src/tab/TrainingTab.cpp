@@ -1136,14 +1136,16 @@ void TrainingTab::loadNextSeries()
             stopTraining(true);
             emit trainingFinished(completed);
         } else {
-            m_restTimeRemaining = 120;
-            m_restDurationMs = 120000;
-            if (!m_stateMachine.resting() &&
-                !m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise))
-                return;
+            // The last repetition normally stages this rest in finishCurrentSeries.
+            if (!m_stateMachine.resting()) {
+                m_restTimeRemaining = 120;
+                m_restDurationMs = 120000;
+                if (!m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise))
+                    return;
+                m_restClock.start();
+            }
             if (m_stateMachine.restTarget() != biofeedback::training::RestTarget::NextExercise)
                 return;
-            m_restClock.start();
             m_lblRestTimer->setText(QString("Odpoczynek przed kolejnym ćwiczeniem: %1 s")
                                     .arg(m_restTimeRemaining));
             m_restTimer->start();
