@@ -22,6 +22,7 @@ checks = {
     "Windows read buffer is bounded to int": "static_cast<size_t>(INT_MAX)" in read_helper,
     "POSIX read waits for input readiness": "descriptor.events = POLLIN;" in read_helper,
     "POSIX read uses a steady-clock deadline": "std::chrono::steady_clock::now() +" in read_helper,
+    "POSIX read bounds interrupted retries after deadline": "if (now >= deadline && pollAttempted) break;" in read_helper,
     "POSIX read retries interrupted operations": "errno == EINTR" in read_helper,
     "POSIX read retries temporary backpressure": "errno == EAGAIN || errno == EWOULDBLOCK" in read_helper,
     "POSIX read detects closed port": "POLLHUP" in read_helper,
