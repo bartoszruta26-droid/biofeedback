@@ -5,6 +5,7 @@
 #include <iostream>
 #include <QThread>
 #include <QFile>
+#include <QFileInfo>
 #include <QDir>
 
 using json = nlohmann::json;
@@ -303,43 +304,56 @@ bool ConfigManager::createBackup(const std::string& path) const {
 }
 
 bool ConfigManager::validateConfiguration() const {
-    // Basic validation - can be extended based on requirements
+    // load() already holds m_mutex. Do not call public getters here: they
+    // acquire the same non-recursive QMutex and would deadlock.
     bool valid = true;
-    
-    // Check critical keys exist
-    std::vector<std::string> requiredKeys = {
-        "serial.port",
-        "serial.baud_rate",
-        "data.base_path",
-        "encryption.enabled"
+    const std::vector<std::string> requiredKeys = {
+        "serial.port", "serial.baud_rate", "data.base_path", "encryption.enabled"
     };
-    
+
     for (const auto& key : requiredKeys) {
         if (m_config.find(key) == m_config.end()) {
             logMessage(ConfigManagerLogLevel::WARNING,
-                      QString("Missing required config key: %1").arg(QString::fromStdString(key)).toStdString(),
-                      "validateConfiguration");
+                       QString("Missing required config key: %1")
+                           .arg(QString::fromStdString(key)).toStdString(),
+                       "validateConfiguration");
             valid = false;
         }
     }
-    
-    // Validate numeric ranges
-    int baudRate = getInt("serial.baud_rate", 0);
-    if (baudRate <= 0 || baudRate > 1000000) {
+
+    const auto numericValue = [this](const std::string& key, double fallback) {
+        const auto it = m_config.find(key);
+        if (it == m_config.end()) return fallback;
+        if (const auto* value = std::get_if<int>(&it->second)) return static_cast<double>(*value);
+        if (const auto* value = std::get_if<double>(&it->second)) return *value;
+        return fallback;
+    };
+
+    const double baudRate = numericValue("serial.baud_rate", 0.0);
+    if (!std::isfinite(baudRate) || baudRate <= 0.0 || baudRate > 1000000.0) {
         logMessage(ConfigManagerLogLevel::ERROR,
-                  QString("Invalid baud_rate: %1").arg(baudRate).toStdString(),
-                  "validateConfiguration");
+                   QString("Invalid baud_rate: %1").arg(baudRate).toStdString(),
+                   "validateConfiguration");
         valid = false;
     }
-    
-    double sensitivity = getDouble("games.biofeedback_sensitivity", 0.0);
-    if (sensitivity < 0.1 || sensitivity > 10.0) {
+
+    const double sensitivity = numericValue("games.biofeedback_sensitivity", 1.0);
+    if (!std::isfinite(sensitivity) || sensitivity < 0.1 || sensitivity > 10.0) {
         logMessage(ConfigManagerLogLevel::WARNING,
-                  QString("Biofeedback sensitivity out of recommended range: %1").arg(sensitivity).toStdString(),
-                  "validateConfiguration");
-        // Not fatal, just a warning
+                   QString("Biofeedback sensitivity out of recommended range: %1")
+                       .arg(sensitivity).toStdString(),
+                   "validateConfiguration");
     }
-    
+
+    const auto portIt = m_config.find("serial.port");
+    if (portIt != m_config.end()) {
+        const auto* port = std::get_if<std::string>(&portIt->second);
+        if (!port || port->empty()) {
+            logMessage(ConfigManagerLogLevel::ERROR, "serial.port must be a non-empty string",
+                       "validateConfiguration");
+            valid = false;
+        }
+    }
     return valid;
 }
 
@@ -677,6 +691,7 @@ std::vector<std::string> ConfigManager::parseKey(const std::string& key) const {
 void ConfigManager::setNestedValue(json& j, const std::string& key, 
                                     const ConfigValue& value) const {
     auto parts = parseKey(key);
+    if (parts.empty() || parts.back().empty()) return;
     json* current = &j;
     
     for (size_t i = 0; i < parts.size() - 1; ++i) {
