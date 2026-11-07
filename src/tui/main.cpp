@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
     cbreak(); noecho(); keypad(stdscr, TRUE); curs_set(0);
     if (LINES < kMinimumRows || COLS < kMinimumColumns) {
         endwin();
-        std::fprintf(stderr, "Terminal must be at least %dx%d characters.\\n", kMinimumColumns, kMinimumRows);
+        std::fprintf(stderr, "Terminal must be at least %dx%d characters.\n", kMinimumColumns, kMinimumRows);
         return EXIT_FAILURE;
     }
     std::size_t selected = 0;
