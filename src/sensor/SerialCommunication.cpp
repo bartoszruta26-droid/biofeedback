@@ -173,6 +173,7 @@ public:
     std::atomic<bool> isConnected{false};
     int baudRate = DEFAULT_BAUD_RATE;
     std::string portName;
+    mutable std::mutex stateMutex;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
     double zeroOffset = 0.0;
@@ -343,7 +344,10 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             disconnect();
         }
         
-        m_impl->baudRate = baudRate;
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+            m_impl->baudRate = baudRate;
+        }
         
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -420,8 +424,11 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         int fl = fcntl(fd, F_GETFL); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
         m_impl->portHandle = fd;
 #endif
-        m_impl->portName = portName;
-        m_impl->isConnected = true;
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+            m_impl->portName = portName;
+            m_impl->isConnected = true;
+        }
         m_impl->lastActivityTime = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
@@ -474,7 +481,12 @@ void SerialCommunication::disconnect() {
 #else
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
-    m_impl->portHandle = -1; m_impl->isConnected = false; m_impl->portName.clear();
+    m_impl->portHandle = -1;
+    {
+        std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+        m_impl->isConnected = false;
+        m_impl->portName.clear();
+    }
     ConnectionCallback connectionCallback;
     {
         std::lock_guard<std::mutex> callbackLock(m_impl->callbackMutex);
@@ -489,8 +501,14 @@ void SerialCommunication::disconnect() {
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
-std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? m_impl->portName : ""; }
-int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
+std::string SerialCommunication::getPortName() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+    return m_impl->isConnected ? m_impl->portName : "";
+}
+int SerialCommunication::getBaudRate() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+    return m_impl->baudRate;
+}
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
@@ -504,7 +522,10 @@ ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
             else if (line.find("FW:") == 0) info.firmwareVersion = line.substr(3);
         }
         info.isConnected = true; info.boardId = 1;
-        m_impl->arduinoInfo = info;
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+            m_impl->arduinoInfo = info;
+        }
     }
     return info;
 }
@@ -531,7 +552,10 @@ bool SerialCommunication::autoConnect(int maxAttempts) {
     return false;
 }
 
-ArduinoInfo SerialCommunication::getArduinoInfo() const { return m_impl->arduinoInfo; }
+ArduinoInfo SerialCommunication::getArduinoInfo() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+    return m_impl->arduinoInfo;
+}
 
 SensorData SerialCommunication::readData(int timeout) {
     SensorData data;
