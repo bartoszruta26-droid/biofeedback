@@ -29,7 +29,7 @@ checks = {
     "checkpoint restores plan and cursor": '"exercise_plan"' in source and "restoreExecutionCheckpoint" in source and "current_repetition_index" in source,
     "recovery prompts before resuming": "Odzyskiwanie treningu" in source and "recoverPendingSession" in source,
     "rest remainder is checkpointed": '"rest_remaining_ms"' in source and "m_restDurationMs - m_restClock.elapsed()" in source,
-    "recovered session is resumed paused": "SessionState::Paused, resumeState" in source,
+    "recovered session is resumed paused": "restore(biofeedback::training::SessionState::Paused," in source,
     "state machine supports restoration": "bool restore(SessionState state" in machine,
     "state machine has all terminal states": "Completed, Interrupted" in machine,
 }
