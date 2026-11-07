@@ -4,6 +4,14 @@
 #include "measurement/MeasurementEngine.hpp"
 #include "training/RepetitionDetector.hpp"
 #include "core/DebugManager.hpp"
+#include "core/RuntimePaths.hpp"
+
+#include <QCoreApplication>
+#include <QDateTime>
+#include <QDir>
+#include <QFile>
+#include <QFileDevice>
+#include <QTextStream>"
 
 #include <ncurses.h>
 
@@ -37,9 +45,25 @@ struct LiveData {
     int completedSeries = 0;
     int completedReps = 0;
     std::string trainingMessage = "Polacz czujnik, aby rozpoczac trening.";
+    struct SessionRep { int seriesIndex; int repetitionIndex; biofeedback::training::RepetitionRecord measurement; };
     std::vector<biofeedback::training::RepetitionRecord> currentSeries;
+    std::vector<SessionRep> sessionRepetitions;
     biofeedback::training::SeriesSummary lastSeries;
     biofeedback::training::RepetitionDetector repetitionDetector;
+    int restSeconds = 60;
+    int restRemaining = 0;
+    bool trainingResting = false;
+    qint64 lastRestTickMs = 0;
+    bool sessionNeedsSave = false;
+    bool sessionSaved = false;
+    QString sessionStartedAt;
+    std::uint64_t validSampleCount = 0;
+    std::uint64_t invalidSampleCount = 0;
+    QString lastSampleQuality = "brak probki";
+    double lastPeakForceN = 0.0;
+    double lastMeanForceN = 0.0;
+    std::uint32_t lastRepDurationMs = 0;
+    std::uint32_t lastTimeToPeakMs = 0;
 };
 
 std::vector<std::string> scanSerialPortCandidates()
@@ -47,6 +71,53 @@ std::vector<std::string> scanSerialPortCandidates()
     auto ports = sensor::SerialCommunication::scanAvailablePorts();
     std::sort(ports.begin(), ports.end());
     return ports;
+}
+
+
+QString tuiSessionFilePath()
+{
+    return QDir(biofeedback::runtime::appDataDirectory())
+        .filePath(QStringLiteral("tui_sessions.csv"));
+}
+
+void saveTrainingSession(LiveData& live)
+{
+    if (live.sessionSaved || live.sessionRepetitions.empty()) return;
+    const QString path = tuiSessionFilePath();
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        live.trainingMessage = "Blad zapisu historii sesji: " + file.errorString().toStdString();
+        return;
+    }
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+    if (file.size() == 0)
+        out << "Rozpoczecie_UTC,Cwiczenie,Seria,Powtorzenie,Sila_szczytowa_N,"
+               "Sila_srednia_N,Czas_ms,Czas_do_szczytu_ms,Probki,Cel_N,Cel_osiagniety\n";
+    for (const auto& item : live.sessionRepetitions) {
+        const auto& rep = item.measurement;
+        const bool achieved = rep.peakForceN >= live.trainingTargetForceN;
+        out << "\"" << live.sessionStartedAt << "\","
+            << "\"Trening biofeedback\"," << item.seriesIndex << ","
+            << item.repetitionIndex << ","
+            << QString::number(rep.peakForceN, 'f', 4) << ","
+            << QString::number(rep.meanForceN, 'f', 4) << ","
+            << rep.durationMs << "," << rep.timeToPeakMs << ","
+            << rep.sampleCount << ","
+            << QString::number(live.trainingTargetForceN, 'f', 2) << ","
+            << (achieved ? "tak" : "nie") << "\n";
+    }
+    out.flush();
+    const bool ok = file.error() == QFile::NoError;
+    file.close();
+    if (ok) {
+        QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        live.sessionSaved = true;
+        live.sessionNeedsSave = false;
+        live.trainingMessage = "Sesja zapisana w lokalnej historii: " + path.toStdString();
+    } else {
+        live.trainingMessage = "Blad zapisu historii sesji.";
+    }
 }
 
 void drawText(int y, int x, const std::string& value, int maxWidth = -1)
@@ -163,6 +234,8 @@ void drawModule(tui::Screen screen,
         bool active = false, paused = false;
         double target = 0.0;
         int series = 0, reps = 0, totalSeries = 0, totalReps = 0, repsInSeries = 0;
+        int restSeconds = 0, restRemaining = 0;
+        bool resting = false;
         std::string message;
         biofeedback::training::SeriesSummary last;
         {
@@ -175,6 +248,9 @@ void drawModule(tui::Screen screen,
             totalSeries = live.targetSeriesCount;
             totalReps = live.targetRepsPerSeries;
             repsInSeries = static_cast<int>(live.currentSeries.size());
+            restSeconds = live.restSeconds;
+            restRemaining = live.restRemaining;
+            resting = live.trainingResting;
             message = live.trainingMessage;
             last = live.lastSeries;
         }
@@ -190,8 +266,10 @@ void drawModule(tui::Screen screen,
                  " powt. | sredni szczyt: " +
                  std::to_string(static_cast<int>(last.averagePeakForceN)) + " N | CV: " +
                  std::to_string(static_cast<int>(last.peakForceCoefficientOfVariationPercent)) + "%");
-        drawText(16, x + 2, "Plan: [/] serie, ,/. powtorzenia. Cel: +/- 5 N. Wymagany skalibrowany HX711.");
-        drawText(18, x + 2, message);
+        drawText(16, x + 2, "Odpoczynek: " + std::to_string(restSeconds) + " s" +
+                 (resting ? " | pozostalo: " + std::to_string(restRemaining) + " s" : " | gotowy"));
+        drawText(17, x + 2, "Plan: [/] serie, ,/. powt., +/- cel, ;/' odpoczynek +/- 5 s.");
+        drawText(19, x + 2, message);
         break;
     }
     case tui::Screen::Devices: {
@@ -213,11 +291,33 @@ void drawModule(tui::Screen screen,
         drawText(LINES - 6, x + 2, state);
         break;
     }
-    case tui::Screen::Diagnostics:
+    case tui::Screen::Diagnostics: {
+        std::uint64_t validSamples = 0, invalidSamples = 0;
+        QString quality;
+        double peak = 0.0, mean = 0.0;
+        std::uint32_t duration = 0, timeToPeak = 0;
+        {
+            std::lock_guard<std::mutex> lock(live.mutex);
+            validSamples = live.validSampleCount;
+            invalidSamples = live.invalidSampleCount;
+            quality = QString::fromStdString(live.lastSampleQuality);
+            peak = live.lastPeakForceN;
+            mean = live.lastMeanForceN;
+            duration = live.lastRepDurationMs;
+            timeToPeak = live.lastTimeToPeakMs;
+        }
         drawText(8, x + 2, "Interfejs terminalowy: aktywny");
         drawText(10, x + 2, serial.isConnected() ? "Adapter szeregowy: polaczony" : "Adapter szeregowy: rozlaczony");
-        drawText(12, x + 2, "Tryb: podglad, bez zapisu danych klinicznych");
+        drawText(12, x + 2, "Probki poprawne: " + std::to_string(validSamples) +
+                 " | odrzucone: " + std::to_string(invalidSamples));
+        drawText(14, x + 2, "Jakosc ostatniej probki: " + quality.toStdString());
+        drawText(16, x + 2, "Ostatnie powtorzenie: szczyt " + std::to_string(peak) +
+                 " N | srednia " + std::to_string(mean) + " N");
+        drawText(18, x + 2, "Czas: " + std::to_string(duration) + " ms | do szczytu: " +
+                 std::to_string(timeToPeak) + " ms");
+        drawText(20, x + 2, "Historia sesji: " + tuiSessionFilePath().toStdString());
         break;
+    }
     case tui::Screen::Settings:
         drawText(8, x + 2, "Nawigacja: strzalki, Home/End, Enter, Q lub Esc");
         drawText(10, x + 2, "Urzadzenia: lewo/prawo, C - polacz, D - rozlacz, R - skanuj");
@@ -272,6 +372,8 @@ void draw(std::size_t selected,
 
 int main(int argc, char** argv)
 {
+    QCoreApplication::setOrganizationName("Biofeedback");
+    QCoreApplication::setApplicationName("Biofeedback");
     if (argc > 1) {
         const std::string option(argv[1]);
         if (option == "--version") {
@@ -310,16 +412,27 @@ int main(int argc, char** argv)
         std::lock_guard<std::mutex> lock(live.mutex);
         live.latest = sample;
         live.hasSample = true;
-        if (!sample.isValid() || sample.unit != "kg") return;
+        live.lastSampleQuality = biofeedback::measurement::qualityName(sample.quality);
+        if (!sample.isValid() || sample.unit != "kg") {
+            ++live.invalidSampleCount;
+            return;
+        }
+        ++live.validSampleCount;
         const double forceN = sample.value * 9.80665;
         if (!std::isfinite(forceN) || forceN < 0.0) return;
         live.recentForceN.push_back(forceN);
         if (live.recentForceN.size() > 120) live.recentForceN.erase(live.recentForceN.begin());
-        if (!live.trainingActive || live.trainingPaused) return;
+        if (!live.trainingActive || live.trainingPaused || live.trainingResting) return;
         biofeedback::training::RepetitionRecord repetition;
         if (!live.repetitionDetector.process(sample.deviceTimestampMs, forceN, true, repetition))
             return;
         live.currentSeries.push_back(repetition);
+        live.sessionRepetitions.push_back({live.completedSeries + 1,
+            static_cast<int>(live.currentSeries.size()), repetition});
+        live.lastPeakForceN = repetition.peakForceN;
+        live.lastMeanForceN = repetition.meanForceN;
+        live.lastRepDurationMs = repetition.durationMs;
+        live.lastTimeToPeakMs = repetition.timeToPeakMs;
         ++live.completedReps;
         if (static_cast<int>(live.currentSeries.size()) >= live.targetRepsPerSeries) {
             live.lastSeries = biofeedback::training::summarizeSeries(
@@ -331,6 +444,12 @@ int main(int argc, char** argv)
                 live.trainingActive = false;
                 live.trainingPaused = false;
                 live.trainingMessage = "Plan treningowy wykonany.";
+                live.sessionNeedsSave = true;
+            } else if (live.restSeconds > 0) {
+                live.trainingResting = true;
+                live.restRemaining = live.restSeconds;
+                live.lastRestTickMs = QDateTime::currentMSecsSinceEpoch();
+                live.trainingMessage = "Seria zakonczona - trwa odpoczynek.";
             }
         }
     });
@@ -413,13 +532,22 @@ int main(int argc, char** argv)
                         live.completedSeries = 0;
                         live.completedReps = 0;
                         live.currentSeries.clear();
+                        live.sessionRepetitions.clear();
                         live.lastSeries = {};
+                        live.trainingResting = false;
+                        live.restRemaining = 0;
+                        live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+                        live.sessionNeedsSave = false;
+                        live.sessionSaved = false;
                         live.trainingMessage = "Trening aktywny - wykonuj pelne cykle napiecia i zwolnienia.";
                         live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
                     }
                 } else {
                     live.trainingActive = false;
                     live.trainingPaused = false;
+                    live.trainingResting = false;
+                    live.restRemaining = 0;
+                    live.sessionNeedsSave = !live.sessionRepetitions.empty();
                     live.trainingMessage = "Sesja zatrzymana przez operatora.";
                     live.repetitionDetector.reset();
                 }
@@ -480,6 +608,18 @@ int main(int argc, char** argv)
                 if (!live.trainingActive) live.targetRepsPerSeries = std::min(50, live.targetRepsPerSeries + 1);
             }
             break;
+        case ';':
+            if (active == static_cast<std::size_t>(tui::Screen::Training)) {
+                std::lock_guard<std::mutex> lock(live.mutex);
+                if (!live.trainingActive) live.restSeconds = std::max(0, live.restSeconds - 5);
+            }
+            break;
+        case 39:
+            if (active == static_cast<std::size_t>(tui::Screen::Training)) {
+                std::lock_guard<std::mutex> lock(live.mutex);
+                if (!live.trainingActive) live.restSeconds = std::min(600, live.restSeconds + 5);
+            }
+            break;
         case 'q':
         case 'Q':
         case 27:
@@ -488,8 +628,33 @@ int main(int argc, char** argv)
         default:
             break;
         }
+        {
+            std::lock_guard<std::mutex> lock(live.mutex);
+            if (live.trainingResting) {
+                const qint64 now = QDateTime::currentMSecsSinceEpoch();
+                const qint64 elapsedSeconds = (now - live.lastRestTickMs) / 1000;
+                if (elapsedSeconds > 0) {
+                    live.restRemaining = std::max(0, live.restRemaining - static_cast<int>(elapsedSeconds));
+                    live.lastRestTickMs += elapsedSeconds * 1000;
+                    if (live.restRemaining == 0) {
+                        live.trainingResting = false;
+                        live.trainingMessage = "Odpoczynek zakonczony - rozpoczyna sie kolejna seria.";
+                    }
+                }
+            }
+            if (live.sessionNeedsSave) saveTrainingSession(live);
+        }
     }
 
+    {
+        std::lock_guard<std::mutex> lock(live.mutex);
+        if (live.trainingActive) {
+            live.trainingActive = false;
+            live.trainingPaused = false;
+            live.sessionNeedsSave = !live.sessionRepetitions.empty();
+        }
+        if (live.sessionNeedsSave) saveTrainingSession(live);
+    }
     endwin();
     serial.disconnect();
     measurementEngine->unsubscribe(measurementToken);
