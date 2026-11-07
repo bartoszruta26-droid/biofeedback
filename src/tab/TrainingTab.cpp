@@ -1443,129 +1443,181 @@ bool TrainingTab::saveExecutionCheckpoint()
 
 bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
 {
+    // Phase 1: parse and validate everything into temporary values. No live
+    // session, analytics, timer, or widget state is changed in this phase.
     const int checkpointVersion = checkpoint.value("format_version").toInt();
     if ((checkpointVersion != 1 && checkpointVersion != 2) ||
-        !checkpoint.value("exercise_plan").isArray()) return false;
+        !checkpoint.value("exercise_plan").isArray() || !m_analyticsWidget)
+        return false;
 
-    QVector<TrainingExercise> plan;
+    const auto isFiniteNonNegative = [](double value) {
+        return std::isfinite(value) && value >= 0.0;
+    };
+    const auto readUnsignedTimestamp = [](const QJsonValue& value, std::uint32_t& result) {
+        if (!value.isDouble()) return false;
+        const double number = value.toDouble();
+        if (!std::isfinite(number) || number < 0.0 ||
+            number > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) ||
+            std::floor(number) != number) return false;
+        result = static_cast<std::uint32_t>(number);
+        return true;
+    };
+
+    QVector<TrainingExercise> stagedPlan;
     const QJsonArray planValues = checkpoint.value("exercise_plan").toArray();
+    if (planValues.isEmpty() || planValues.size() > 256) return false;
     for (const QJsonValue& value : planValues) {
         if (!value.isObject()) return false;
         const QJsonObject item = value.toObject();
         TrainingExercise exercise;
         exercise.name = item.value("name").toString();
-        exercise.seriesCount = item.value("series_count").toInt();
-        exercise.repsPerSeries = item.value("repetitions_per_series").toInt();
-        exercise.targetForce = item.value("target_force_n").toDouble();
-        exercise.restTime = item.value("rest_seconds").toDouble();
+        exercise.seriesCount = item.value("series_count").toInt(-1);
+        exercise.repsPerSeries = item.value("repetitions_per_series").toInt(-1);
+        exercise.targetForce = item.value("target_force_n").toDouble(-1.0);
+        exercise.restTime = item.value("rest_seconds").toDouble(-1.0);
         exercise.gameType = item.value("game_type").toString();
-        if (exercise.name.isEmpty() || exercise.seriesCount < 1 ||
-            exercise.repsPerSeries < 1 || exercise.targetForce < 0.0 ||
-            exercise.restTime < 0.0) return false;
-        plan.append(exercise);
+        if (exercise.name.trimmed().isEmpty() || exercise.seriesCount < 1 ||
+            exercise.seriesCount > 100 || exercise.repsPerSeries < 1 ||
+            exercise.repsPerSeries > 1000 ||
+            !isFiniteNonNegative(exercise.targetForce) || exercise.targetForce > 100000.0 ||
+            !isFiniteNonNegative(exercise.restTime) || exercise.restTime > 86400.0)
+            return false;
+        stagedPlan.append(exercise);
     }
-    if (plan.isEmpty()) return false;
 
     const int exerciseIndex = checkpoint.value("current_exercise_index").toInt(-1);
     const int seriesIndex = checkpoint.value("current_series_index").toInt(-1);
     const int repetitionIndex = checkpoint.value("current_repetition_index").toInt(-1);
-    if (exerciseIndex < 0 || exerciseIndex >= plan.size() ||
-        seriesIndex < 0 || seriesIndex >= plan[exerciseIndex].seriesCount ||
-        repetitionIndex < 0 || repetitionIndex >= plan[exerciseIndex].repsPerSeries)
+    if (exerciseIndex < 0 || exerciseIndex >= stagedPlan.size() ||
+        seriesIndex < 0 || seriesIndex >= stagedPlan[exerciseIndex].seriesCount ||
+        repetitionIndex < 0 || repetitionIndex >= stagedPlan[exerciseIndex].repsPerSeries)
         return false;
 
     const int savedStateValue = checkpoint.value("state").toInt(
         static_cast<int>(biofeedback::training::SessionState::Active));
     const int resumeStateValue = checkpoint.value("resume_state").toInt(
         static_cast<int>(biofeedback::training::SessionState::Active));
-    if (savedStateValue < static_cast<int>(biofeedback::training::SessionState::Idle) ||
-        savedStateValue > static_cast<int>(biofeedback::training::SessionState::Interrupted) ||
+    if (savedStateValue < static_cast<int>(biofeedback::training::SessionState::Active) ||
+        savedStateValue > static_cast<int>(biofeedback::training::SessionState::Resting) ||
         resumeStateValue < static_cast<int>(biofeedback::training::SessionState::Active) ||
         resumeStateValue > static_cast<int>(biofeedback::training::SessionState::Resting))
         return false;
+
     const auto savedState = static_cast<biofeedback::training::SessionState>(savedStateValue);
     auto resumeState = static_cast<biofeedback::training::SessionState>(resumeStateValue);
     if (savedState == biofeedback::training::SessionState::Resting)
         resumeState = biofeedback::training::SessionState::Resting;
     else if (savedState != biofeedback::training::SessionState::Paused)
         resumeState = biofeedback::training::SessionState::Active;
-    if (savedState == biofeedback::training::SessionState::Idle ||
-        savedState == biofeedback::training::SessionState::Completed ||
-        savedState == biofeedback::training::SessionState::Interrupted)
+    if (savedState != biofeedback::training::SessionState::Active &&
+        savedState != biofeedback::training::SessionState::Paused &&
+        savedState != biofeedback::training::SessionState::Resting)
         return false;
-    if (resumeState != biofeedback::training::SessionState::Active &&
-        resumeState != biofeedback::training::SessionState::Resting) return false;
 
-    m_exercisePlan = plan;
-    m_analyticsWidget->setExecutionState(checkpoint);
-    m_exerciseStats = m_analyticsWidget->currentStats();
-    while (m_exerciseStats.size() < m_exercisePlan.size()) {
-        ExerciseStats stats;
-        stats.exerciseName = m_exercisePlan[m_exerciseStats.size()].name;
-        m_exerciseStats.append(stats);
-    }
-    if (m_exerciseStats.size() > m_exercisePlan.size()) return false;
-    m_currentExerciseIndex = exerciseIndex;
-    m_currentSeriesIndex = seriesIndex;
-    m_currentRepIndex = repetitionIndex;
     const int savedRestTarget = checkpoint.value("rest_target").toInt(
         static_cast<int>(biofeedback::training::RestTarget::NextSeries));
     if (savedRestTarget < static_cast<int>(biofeedback::training::RestTarget::NextSeries) ||
         savedRestTarget > static_cast<int>(biofeedback::training::RestTarget::NextExercise))
         return false;
-    m_restDurationMs = qMax<qint64>(0, static_cast<qint64>(
-        checkpoint.value("rest_remaining_ms").toDouble()));
-    m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
-    m_restClock.invalidate();
+    const auto restTarget = static_cast<biofeedback::training::RestTarget>(savedRestTarget);
 
-    const qint64 sessionMs = qMax<qint64>(0, static_cast<qint64>(
-        checkpoint.value("session_elapsed_ms").toDouble()));
-    const qint64 activeMs = qMax<qint64>(0, static_cast<qint64>(
-        checkpoint.value("active_elapsed_ms").toDouble()));
+    const double restMsValue = checkpoint.value("rest_remaining_ms").toDouble(0.0);
+    const double sessionMsValue = checkpoint.value("session_elapsed_ms").toDouble(-1.0);
+    const double activeMsValue = checkpoint.value("active_elapsed_ms").toDouble(-1.0);
+    if (!isFiniteNonNegative(restMsValue) || restMsValue > 86400000.0 ||
+        !isFiniteNonNegative(sessionMsValue) || sessionMsValue > 9.0e15 ||
+        !isFiniteNonNegative(activeMsValue) || activeMsValue > sessionMsValue)
+        return false;
+    const qint64 stagedRestMs = static_cast<qint64>(std::floor(restMsValue));
+    const qint64 sessionMs = static_cast<qint64>(std::floor(sessionMsValue));
+    const qint64 activeMs = static_cast<qint64>(std::floor(activeMsValue));
+    if (resumeState == biofeedback::training::SessionState::Resting && stagedRestMs <= 0)
+        return false;
+    if (resumeState == biofeedback::training::SessionState::Active && stagedRestMs != 0)
+        return false;
+
+    biofeedback::training::SessionStateMachine stagedStateMachine;
+    if (!stagedStateMachine.restore(biofeedback::training::SessionState::Paused,
+                                    resumeState, restTarget))
+        return false;
+
+    // Parse and validate the detector independently of the live detector.
+    biofeedback::training::RepetitionDetector stagedDetector;
+    stagedDetector.setTargetForce(stagedPlan[exerciseIndex].targetForce);
+    const QJsonObject detectorObject = checkpoint.value("repetition_detector").toObject();
+    const bool hasDetectorSnapshot = !detectorObject.isEmpty();
+    if (checkpointVersion >= 2 && !hasDetectorSnapshot) return false;
+    if (hasDetectorSnapshot && resumeState == biofeedback::training::SessionState::Active) {
+        biofeedback::training::RepetitionDetectorSnapshot detectorSnapshot;
+        const int detectorVersion = detectorObject.value("version").toInt(-1);
+        if (detectorVersion != 1 || !detectorObject.value("samples").isArray())
+            return false;
+        detectorSnapshot.version = static_cast<std::uint32_t>(detectorVersion);
+        detectorSnapshot.active = detectorObject.value("active").toBool(false);
+        detectorSnapshot.waitingForRelease = detectorObject.value("waiting_for_release").toBool(false);
+        if (!readUnsignedTimestamp(detectorObject.value("start_timestamp_ms"), detectorSnapshot.startTimestampMs) ||
+            !readUnsignedTimestamp(detectorObject.value("last_timestamp_ms"), detectorSnapshot.lastTimestampMs) ||
+            !readUnsignedTimestamp(detectorObject.value("peak_timestamp_ms"), detectorSnapshot.peakTimestampMs))
+            return false;
+        detectorSnapshot.peakForceN = detectorObject.value("peak_force_n").toDouble(
+            std::numeric_limits<double>::quiet_NaN());
+        detectorSnapshot.areaForceMs = detectorObject.value("area_force_ms").toDouble(
+            std::numeric_limits<double>::quiet_NaN());
+        detectorSnapshot.previousForceN = detectorObject.value("previous_force_n").toDouble(
+            std::numeric_limits<double>::quiet_NaN());
+        const double sampleCount = detectorObject.value("sample_count").toDouble(-1.0);
+        const QJsonArray samples = detectorObject.value("samples").toArray();
+        if (!std::isfinite(sampleCount) || sampleCount < 0.0 || sampleCount > 100000.0 ||
+            std::floor(sampleCount) != sampleCount || samples.size() != static_cast<int>(sampleCount))
+            return false;
+        detectorSnapshot.sampleCount = static_cast<std::size_t>(sampleCount);
+        detectorSnapshot.samples.reserve(static_cast<std::size_t>(samples.size()));
+        for (const QJsonValue& value : samples) {
+            if (!value.isObject()) return false;
+            const QJsonObject sample = value.toObject();
+            std::uint32_t timestamp = 0;
+            const double force = sample.value("force_n").toDouble(
+                std::numeric_limits<double>::quiet_NaN());
+            if (!readUnsignedTimestamp(sample.value("timestamp_ms"), timestamp) ||
+                !isFiniteNonNegative(force)) return false;
+            detectorSnapshot.samples.push_back({timestamp, force});
+        }
+        if (!stagedDetector.restore(detectorSnapshot)) return false;
+    }
+
+    // The statistics are already loaded from the recovered history entry.
+    // Stage their shape before committing any of the execution state.
+    QVector<ExerciseStats> stagedStats = m_analyticsWidget->currentStats();
+    while (stagedStats.size() < stagedPlan.size()) {
+        ExerciseStats stats;
+        stats.exerciseName = stagedPlan[stagedStats.size()].name;
+        stagedStats.append(stats);
+    }
+    if (stagedStats.size() != stagedPlan.size()) return false;
+
+    std::vector<biofeedback::training::RepetitionRecord> stagedSeriesRepetitions;
+    for (const auto& record : stagedStats[exerciseIndex].repetitions) {
+        if (record.seriesIndex == seriesIndex + 1)
+            stagedSeriesRepetitions.push_back(record.measurement);
+    }
+
+    // Phase 2: commit. All rejectable input has been checked above.
+    m_exercisePlan = std::move(stagedPlan);
+    m_exerciseStats = std::move(stagedStats);
+    m_analyticsWidget->setExecutionState(checkpoint);
+    m_currentExerciseIndex = exerciseIndex;
+    m_currentSeriesIndex = seriesIndex;
+    m_currentRepIndex = repetitionIndex;
+    m_restDurationMs = stagedRestMs;
+    m_restTimeRemaining = static_cast<int>((stagedRestMs + 999) / 1000);
+    m_restClock.invalidate();
     m_sessionElapsedOffsetMs = sessionMs;
     m_trainingClock.restore(sessionMs, activeMs);
     m_sessionTime = static_cast<int>(sessionMs / 1000);
     m_sessionClock.start();
-    const auto restTarget = static_cast<biofeedback::training::RestTarget>(savedRestTarget);
-    if (!m_stateMachine.restore(biofeedback::training::SessionState::Paused, resumeState, restTarget))
-        return false;
-    m_repetitionDetector.reset();
-    const QJsonObject detectorObject = checkpoint.value("repetition_detector").toObject();
-    biofeedback::training::RepetitionDetectorSnapshot detectorSnapshot;
-    const bool hasDetectorSnapshot = !detectorObject.isEmpty();
-    if (hasDetectorSnapshot) {
-        detectorSnapshot.version = static_cast<std::uint32_t>(detectorObject.value("version").toInt(1));
-        detectorSnapshot.active = detectorObject.value("active").toBool(false);
-        detectorSnapshot.waitingForRelease = detectorObject.value("waiting_for_release").toBool(false);
-        detectorSnapshot.startTimestampMs = static_cast<std::uint32_t>(detectorObject.value("start_timestamp_ms").toDouble());
-        detectorSnapshot.lastTimestampMs = static_cast<std::uint32_t>(detectorObject.value("last_timestamp_ms").toDouble());
-        detectorSnapshot.peakTimestampMs = static_cast<std::uint32_t>(detectorObject.value("peak_timestamp_ms").toDouble());
-        detectorSnapshot.peakForceN = detectorObject.value("peak_force_n").toDouble();
-        detectorSnapshot.areaForceMs = detectorObject.value("area_force_ms").toDouble();
-        detectorSnapshot.previousForceN = detectorObject.value("previous_force_n").toDouble();
-        const double sampleCount = detectorObject.value("sample_count").toDouble(-1.0);
-        if (!std::isfinite(sampleCount) || sampleCount < 0.0 || sampleCount > 100000.0 ||
-            std::floor(sampleCount) != sampleCount) return false;
-        detectorSnapshot.sampleCount = static_cast<std::size_t>(sampleCount);
-        const QJsonArray samples = detectorObject.value("samples").toArray();
-        for (const QJsonValue& value : samples) {
-            if (!value.isObject()) return false;
-            const QJsonObject sample = value.toObject();
-            detectorSnapshot.samples.push_back({
-                static_cast<std::uint32_t>(sample.value("timestamp_ms").toDouble()),
-                sample.value("force_n").toDouble()
-            });
-        }
-        if (detectorSnapshot.sampleCount != detectorSnapshot.samples.size())
-            return false;
-    }
-    if (resumeState == biofeedback::training::SessionState::Resting)
-        detectorSnapshot = biofeedback::training::RepetitionDetectorSnapshot{};
-    m_currentSeriesRepetitions.clear();
-    for (const auto& record : m_exerciseStats[m_currentExerciseIndex].repetitions) {
-        if (record.seriesIndex == m_currentSeriesIndex + 1)
-            m_currentSeriesRepetitions.push_back(record.measurement);
-    }
+    m_stateMachine = stagedStateMachine;
+    m_repetitionDetector = stagedDetector;
+    m_currentSeriesRepetitions = std::move(stagedSeriesRepetitions);
 
     m_exerciseSelector->clear();
     for (const auto& exercise : m_exercisePlan) m_exerciseSelector->addItem(exercise.name);
@@ -1581,16 +1633,13 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         m_currentGame->start();
         m_currentGame->pause();
     }
-    m_repetitionDetector.setTargetForce(m_exercisePlan[m_currentExerciseIndex].targetForce);
-    if (hasDetectorSnapshot && resumeState == biofeedback::training::SessionState::Active) {
-        if (!m_repetitionDetector.restore(detectorSnapshot)) return false;
-    }
     updateProgressWidgets();
     updateDisplay();
     if (m_stateMachine.resting()) {
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s — sesja odzyskana, wstrzymana").arg(m_restTimeRemaining));
-        if (resumeState == biofeedback::training::SessionState::Resting)
-            m_restTimer->stop();
+        m_restTimer->stop();
+    } else {
+        m_lblRestTimer->clear();
     }
     m_timer->start();
     return true;
