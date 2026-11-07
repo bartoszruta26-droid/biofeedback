@@ -98,13 +98,13 @@ int main()
     assert(result.availabilityAt(39) == ParameterAvailability::RequiresAdditionalSensor);
     assert(result.availabilityAt(52) == ParameterAvailability::RequiresAdditionalSensor);
     assert(result.availabilityAt(53) == ParameterAvailability::RequiresHistory);
-    assert(result.availabilityAt(57) == ParameterAvailability::RequiresCalibration);
+    assert(result.availabilityAt(58) == ParameterAvailability::RequiresCalibration);
     assert(result.availabilityAt(64) == ParameterAvailability::RequiresHistory);
 
     // A missing historical or sensor-dependent metric is never advertised as
     // a measured result merely because its reset numeric field happens to be 0.
     assert(result.availabilityAt(53) != ParameterAvailability::Available);
-    assert(result.availabilityAt(57) != ParameterAvailability::Available);
+    assert(result.availabilityAt(58) != ParameterAvailability::Available);
     assert(result.availabilityAt(64) != ParameterAvailability::Available);
 
     std::cout << "Biomechanical parameter availability and timestamp integration passed\n";
