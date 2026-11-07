@@ -76,7 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
         });
 
     m_serialDataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
-        if (!data.isValid) return;
+        if (!data.isValid || !data.hasCalibratedValue) return;
         const double forceNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
         if (!std::isfinite(forceNewtons) || forceNewtons < 0.0) return;
         constexpr double gameReferenceForceN = 50.0;
