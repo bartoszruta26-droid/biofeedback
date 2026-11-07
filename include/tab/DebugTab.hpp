@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QColor>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
