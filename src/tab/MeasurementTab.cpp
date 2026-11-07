@@ -872,6 +872,7 @@ void MeasurementTab::resetSession()
     m_totalReps = 0;
     m_sessionStartTime = 0;
     m_sessionElapsedTimer.invalidate();
+    m_sessionElapsedOffsetSeconds = 0.0;
     
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
@@ -972,7 +973,8 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
 
     // Elapsed time must be monotonic even when the system wall clock is
     // corrected while a measurement is running.
-    const double currentTime = m_sessionElapsedTimer.elapsed() / 1000.0;
+    const double currentTime = m_sessionElapsedOffsetSeconds +
+                               m_sessionElapsedTimer.elapsed() / 1000.0;
 
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
@@ -1637,6 +1639,10 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_patientId = session.patientId;
         m_completedSeriesStats = session.series;
         m_recordedSamples = session.samples;
+        m_sessionElapsedOffsetSeconds = m_recordedSamples.isEmpty()
+            ? 0.0 : m_recordedSamples.last().elapsedTimeSeconds;
+        m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+        m_sessionElapsedTimer.start();
         if (m_rawBox)
             m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
         showCurrentMeasurementData();
