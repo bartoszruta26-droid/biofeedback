@@ -23,6 +23,7 @@ public:
     MeasurementSerialAdapter& operator=(const MeasurementSerialAdapter&) = delete;
 
     bool isAttached() const noexcept;
+    biofeedback::measurement::MeasurementSample processSample(const SensorData& data);
 
 private:
     SerialCommunication& m_serial;
