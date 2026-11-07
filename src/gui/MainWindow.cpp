@@ -11,6 +11,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/TanGame.hpp"
+#include "games/ArkanoidGame.hpp"
 #include "games/GameFactory.hpp"
 #include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -804,6 +805,8 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
         game->setSerialConnection(m_serialPort);
     else if (auto* game = dynamic_cast<games::TanGame*>(selectedGame))
         game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::ArkanoidGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
 
     m_currentGame = selectedGame;
     connect(m_currentGame, &games::GameEngine::gameEnded,
@@ -830,7 +833,7 @@ void MainWindow::stopGame()
     disconnect(game, nullptr, this, nullptr);
     game->stop();
     m_gameStack->removeWidget(game);
-    delete game;
+    game->deleteLater();
     m_gameStack->hide();
     qDebug() << "Game stopped";
 }
