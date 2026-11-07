@@ -4,6 +4,10 @@
 #include <QTextStream>
 #include <QFile>
 #include <QDateTime>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <cmath>
 #include <QFont>
 #include <QColor>
 #include <QStackedWidget>
@@ -621,6 +625,107 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
     connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
     connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
     // Games receive normalized force through onSharedForceSample().
+}
+
+bool TrainingTab::exportResultsToCSV(const QString& filename)
+{
+    QFile file(filename);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
+    QTextStream out(&file);
+    out << "exercise_name,completed_series,completed_reps,avg_peak_force_N,max_peak_force_N,"
+           "min_peak_force_N,avg_time_to_peak_s,avg_force_N,total_impulse_Ns,"
+           "target_accuracy_percent,consistency_percent,duration_s,completion_rate_percent\\n";
+    const auto csv = [](const QString& value) {
+        QString escaped = value;
+        escaped.replace("\\", "\\\\");
+        escaped.replace("\"", "\"\"");
+        return "\"" + escaped + "\"";
+    };
+    for (const auto& stats : m_exerciseStats) {
+        out << csv(stats.exerciseName) << ','
+            << stats.completedSeries << ',' << stats.completedReps << ','
+            << QString::number(stats.avgPeakForce, 'f', 4) << ','
+            << QString::number(stats.maxPeakForce, 'f', 4) << ','
+            << QString::number(stats.minPeakForce, 'f', 4) << ','
+            << QString::number(stats.avgReactionTime, 'f', 4) << ','
+            << QString::number(stats.averageForceN, 'f', 4) << ','
+            << QString::number(stats.totalImpulseNs, 'f', 4) << ','
+            << QString::number(stats.targetAccuracyPercent, 'f', 2) << ','
+            << QString::number(stats.consistencyScore, 'f', 2) << ','
+            << QString::number(stats.duration, 'f', 1) << ','
+            << QString::number(stats.completionRate, 'f', 2) << '\\n';
+    }
+    return file.flush();
+}
+
+bool TrainingTab::exportTrainingPlan(const QString& filename)
+{
+    QJsonArray exercises;
+    for (const auto& exercise : m_exercisePlan) {
+        QJsonObject item;
+        item["name"] = exercise.name;
+        item["targetForceN"] = exercise.targetForce;
+        item["seriesCount"] = exercise.seriesCount;
+        item["repsPerSeries"] = exercise.repsPerSeries;
+        item["restTimeSeconds"] = exercise.restTime;
+        item["gameType"] = exercise.gameType;
+        exercises.append(item);
+    }
+    QJsonObject root;
+    root["schemaVersion"] = 1;
+    root["exercises"] = exercises;
+
+    QFile file(filename);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    return file.flush();
+}
+
+bool TrainingTab::importTrainingPlan(const QString& filename)
+{
+    QFile file(filename);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return false;
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) return false;
+
+    const QJsonObject root = document.object();
+    if (root.value("schemaVersion").toInt(-1) != 1 ||
+        !root.value("exercises").isArray()) return false;
+
+    QVector<TrainingExercise> imported;
+    const QJsonArray exercises = root.value("exercises").toArray();
+    if (exercises.isEmpty() || exercises.size() > 100) return false;
+    for (const QJsonValue& value : exercises) {
+        if (!value.isObject()) return false;
+        const QJsonObject item = value.toObject();
+        TrainingExercise exercise;
+        exercise.name = item.value("name").toString().trimmed();
+        exercise.targetForce = item.value("targetForceN").toDouble(-1.0);
+        exercise.seriesCount = item.value("seriesCount").toInt(0);
+        exercise.repsPerSeries = item.value("repsPerSeries").toInt(0);
+        exercise.restTime = item.value("restTimeSeconds").toInt(-1);
+        exercise.gameType = item.value("gameType").toString();
+        if (exercise.name.isEmpty() || !std::isfinite(exercise.targetForce) ||
+            exercise.targetForce < 0.0 || exercise.seriesCount < 1 ||
+            exercise.seriesCount > 100 || exercise.repsPerSeries < 1 ||
+            exercise.repsPerSeries > 1000 || exercise.restTime < 0 ||
+            exercise.restTime > 3600) return false;
+        imported.append(exercise);
+    }
+
+    m_exercisePlan = imported;
+    m_exerciseStats.clear();
+    m_exerciseSelector->clear();
+    for (const auto& exercise : m_exercisePlan) {
+        ExerciseStats stats;
+        stats.exerciseName = exercise.name;
+        m_exerciseStats.append(stats);
+        m_exerciseSelector->addItem(exercise.name);
+    }
+    m_currentExerciseIndex = -1;
+    updateDisplay();
+    return true;
 }
 
 void TrainingTab::onSaveResults()
