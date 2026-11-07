@@ -39,6 +39,7 @@ double RepetitionDetector::releaseThresholdN() const noexcept {
 
 void RepetitionDetector::reset() noexcept {
     m_active = false;
+    m_waitingForRelease = false;
     m_startTimestampMs = 0;
     m_lastTimestampMs = 0;
     m_peakTimestampMs = 0;
