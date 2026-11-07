@@ -49,6 +49,18 @@ target_link_libraries(biofeedback_core
         Qt5::Core
 )
 
+# Local loopback HTTP API. Sensitive and hardware operations remain disabled
+# until authentication, authorization and measurement services are integrated.
+add_executable(biofeedback_api
+    src/api/main.cpp
+    src/api/HttpApiServer.cpp
+    include/api/HttpApiServer.hpp
+)
+set_target_properties(biofeedback_api PROPERTIES AUTOMOC ON)
+target_include_directories(biofeedback_api PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network)
+install(TARGETS biofeedback_api DESTINATION bin)
+
 # Regression targets that can be built without Qt.
 enable_testing()
 add_executable(encryption_regression tests/encryption_regression.cpp)
