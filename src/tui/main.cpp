@@ -252,7 +252,7 @@ int main(int argc, char** argv)
     if (LINES < kMinimumRows || COLS < kMinimumColumns) {
         endwin();
         serial.removeDataCallback(dataToken);
-        std::fprintf(stderr, "Terminal must be at least %dx%d characters.\\n", kMinimumColumns, kMinimumRows);
+        std::fprintf(stderr, "Terminal must be at least %dx%d characters.\n", kMinimumColumns, kMinimumRows);
         return EXIT_FAILURE;
     }
 
