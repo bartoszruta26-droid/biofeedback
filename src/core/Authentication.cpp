@@ -33,23 +33,23 @@
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
 // ============================================================================
 #ifndef DEBUG_AUTHENTICATION
-    #define DEBUG_AUTHENTICATION 1          ///< Główna flaga debugowania autentykacji
+    #define DEBUG_AUTHENTICATION 0          ///< Diagnostyka wymaga jawnego włączenia
 #endif
 
 #ifndef DEBUG_USER_OPERATIONS
-    #define DEBUG_USER_OPERATIONS 1         ///< Flag dla operacji na użytkownikach
+    #define DEBUG_USER_OPERATIONS 0         ///< Diagnostyka wymaga jawnego włączenia
 #endif
 
 #ifndef DEBUG_PASSWORD_ENCRYPTION
-    #define DEBUG_PASSWORD_ENCRYPTION 1     ///< Flag dla szyfrowania haseł
+    #define DEBUG_PASSWORD_ENCRYPTION 0     ///< Diagnostyka wymaga jawnego włączenia
 #endif
 
 #ifndef DEBUG_JSON_PARSING
-    #define DEBUG_JSON_PARSING 1            ///< Flag dla parsowania JSON
+    #define DEBUG_JSON_PARSING 0            ///< Diagnostyka wymaga jawnego włączenia
 #endif
 
 #ifndef DEBUG_FILE_OPERATIONS
-    #define DEBUG_FILE_OPERATIONS 1         ///< Flag dla operacji na plikach
+    #define DEBUG_FILE_OPERATIONS 0         ///< Diagnostyka wymaga jawnego włączenia
 #endif
 
 // ============================================================================
