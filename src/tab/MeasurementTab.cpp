@@ -1455,8 +1455,11 @@ void MeasurementTab::onLoadData()
 
 void MeasurementTab::onSaveMeasurementJSON()
 {
-    if (m_completedSeriesStats.isEmpty()) {
-        QMessageBox::warning(this, "Ostrzeżenie", "Brak danych pomiarowych do zapisu!");
+    const bool hasCompletedRepetition = std::any_of(
+        m_completedSeriesStats.cbegin(), m_completedSeriesStats.cend(),
+        [](const SeriesStats& series) { return !series.reps.isEmpty(); });
+    if (!hasCompletedRepetition) {
+        QMessageBox::warning(this, "Ostrzeżenie", "Brak zakończonych powtórzeń do zapisania.");
         return;
     }
     
@@ -1675,7 +1678,7 @@ void MeasurementTab::loadPatientTrends()
     }
     
     m_patientSessions.clear();
-    QStringList jsonFiles = dir.entryList(QStringList() << "*.json", QDir::Files);
+    QStringList jsonFiles = dir.entryList(QStringList() << "pomiar_*.json", QDir::Files);
     
     for (const QString& fileName : jsonFiles) {
         QString filePath = dataDir + "/" + fileName;
