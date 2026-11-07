@@ -75,3 +75,9 @@ The desktop Training tab now exposes a dedicated analytics panel:
 The operator can explicitly save a session summary to the local history. The history file is stored with owner-only filesystem permissions. When a patient is selected, the history file is stored in that patient's application data directory; otherwise it uses the unassigned application history. The history JSON contains aggregate training metrics and does not embed the patient's name or PESEL. It is not encrypted by this widget; configure the application's existing encryption facilities and protect the operating-system account and backups accordingly.
 
 The Training tab instantiates the selected Pong, Flappy Bird, Mario Run or sinusoidal game. Sensor force is mapped to a 0–100 game input relative to the exercise target force. Game points are kept separate from sensor-derived repetition counts and are displayed in the session analytics.
+
+## Patient-linked records and privacy boundaries
+
+Patient charts are reloaded from the local application data directory at startup and saved through DataManager when added or edited. The patient JSON file follows the application's encryption setting (`encryption.enabled`) and is written with owner-only permissions. The directory name uses a SHA-256 digest rather than displaying the PESEL value; this is path obfuscation/pseudonymization, not anonymization.
+
+Selecting a patient switches the desktop session-history view to that patient's data directory. Patient switching is disabled while a training session is active to prevent accidental cross-patient attribution. The session-history JSON is an explicit opt-in summary and is owner-only but is not encrypted by the analytics widget. Do not treat filesystem permissions or a hashed directory name as a substitute for encrypted backups and appropriate access controls.
