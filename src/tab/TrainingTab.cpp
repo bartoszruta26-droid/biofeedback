@@ -510,6 +510,9 @@ void TrainingTab::startTraining()
     }
     if (!m_stateMachine.start()) return;
     m_sessionTime = 0;
+    m_restTimeRemaining = 0;
+    m_restDurationMs = 0;
+    m_restClock.invalidate();
     m_sessionElapsedOffsetMs = 0;
     m_lastCheckpointSeconds = -1;
     m_trainingClock.reset();
@@ -1325,6 +1328,9 @@ void TrainingTab::advanceAfterRest()
     updateSessionClocks();
     m_restTimer->stop();
     const auto target = m_stateMachine.restTarget();
+    m_restDurationMs = 0;
+    m_restTimeRemaining = 0;
+    m_restClock.invalidate();
     if (m_stateMachine.resting() && !m_stateMachine.paused()) {
         if (!m_stateMachine.endRest()) return;
     }
@@ -1533,8 +1539,8 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     const qint64 activeMs = static_cast<qint64>(std::floor(activeMsValue));
     if (resumeState == biofeedback::training::SessionState::Resting && stagedRestMs <= 0)
         return false;
-    if (resumeState == biofeedback::training::SessionState::Active && stagedRestMs != 0)
-        return false;
+    const qint64 effectiveRestMs = resumeState == biofeedback::training::SessionState::Resting
+        ? stagedRestMs : 0;
 
     biofeedback::training::SessionStateMachine stagedStateMachine;
     if (!stagedStateMachine.restore(biofeedback::training::SessionState::Paused,
@@ -1608,8 +1614,8 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     m_currentExerciseIndex = exerciseIndex;
     m_currentSeriesIndex = seriesIndex;
     m_currentRepIndex = repetitionIndex;
-    m_restDurationMs = stagedRestMs;
-    m_restTimeRemaining = static_cast<int>((stagedRestMs + 999) / 1000);
+    m_restDurationMs = effectiveRestMs;
+    m_restTimeRemaining = static_cast<int>((effectiveRestMs + 999) / 1000);
     m_restClock.invalidate();
     m_sessionElapsedOffsetMs = sessionMs;
     m_trainingClock.restore(sessionMs, activeMs);
