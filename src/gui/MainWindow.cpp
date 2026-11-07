@@ -49,8 +49,123 @@ MainWindow::MainWindow(QWidget *parent)
     , m_debugMaxLines(500)
     , m_serialPort(nullptr)
 {
-    setWindowTitle(tr("Biofeedback - Monitor Wagi"));
-    setMinimumSize(1280, 800);
+    setWindowTitle(tr("Biofeedback"));
+    setMinimumSize(1180, 760);
+
+    // Consistent modern desktop theme. Widgets keep native Qt behavior while
+    // sharing a restrained dark-blue/teal visual language.
+    QApplication::setStyle("Fusion");
+    if (qApp) {
+        qApp->setFont(QFont("Segoe UI", 10));
+        qApp->setStyleSheet(R"(
+            QMainWindow, QWidget {
+                background: #f4f7fb;
+                color: #17243a;
+            }
+            QMenuBar, QMenu {
+                background: #ffffff;
+                color: #17243a;
+                border: 0;
+            }
+            QMenuBar::item {
+                padding: 7px 12px;
+                background: transparent;
+            }
+            QMenuBar::item:selected, QMenu::item:selected {
+                background: #e6f4f3;
+                color: #087f82;
+            }
+            QTabWidget::pane {
+                background: #ffffff;
+                border: 1px solid #dce5ef;
+                border-radius: 10px;
+                top: -1px;
+            }
+            QTabBar::tab {
+                background: #eaf0f6;
+                color: #52627a;
+                padding: 11px 18px;
+                margin-right: 4px;
+                border: 0;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+            }
+            QTabBar::tab:selected {
+                background: #ffffff;
+                color: #087f82;
+                font-weight: 600;
+                border-bottom: 3px solid #10a3a0;
+            }
+            QPushButton {
+                background: #087f82;
+                color: #ffffff;
+                border: 0;
+                border-radius: 7px;
+                padding: 9px 16px;
+                min-height: 18px;
+                font-weight: 600;
+            }
+            QPushButton:hover { background: #066b70; }
+            QPushButton:pressed { background: #04565b; }
+            QPushButton:disabled { background: #cbd5e1; color: #64748b; }
+            QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+                background: #ffffff;
+                color: #17243a;
+                border: 1px solid #cbd7e4;
+                border-radius: 6px;
+                padding: 7px 9px;
+                min-height: 20px;
+                selection-background-color: #0b9294;
+            }
+            QGroupBox {
+                background: #ffffff;
+                border: 1px solid #dce5ef;
+                border-radius: 9px;
+                margin-top: 12px;
+                padding: 12px;
+                font-weight: 600;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 12px;
+                padding: 0 5px;
+                color: #087f82;
+            }
+            QTableWidget, QTreeWidget, QTextEdit, QPlainTextEdit {
+                background: #ffffff;
+                alternate-background-color: #f5f8fc;
+                color: #17243a;
+                border: 1px solid #dce5ef;
+                border-radius: 7px;
+                gridline-color: #e7edf4;
+            }
+            QHeaderView::section {
+                background: #edf3f8;
+                color: #43536b;
+                border: 0;
+                border-bottom: 1px solid #dce5ef;
+                padding: 8px;
+                font-weight: 600;
+            }
+            QStatusBar {
+                background: #ffffff;
+                color: #52627a;
+                border-top: 1px solid #dce5ef;
+            }
+            QProgressBar {
+                background: #e7edf4;
+                color: #17243a;
+                border: 0;
+                border-radius: 5px;
+                text-align: center;
+                min-height: 12px;
+            }
+            QProgressBar::chunk {
+                background: #10a3a0;
+                border-radius: 5px;
+            }
+        )");
+    }
     
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
