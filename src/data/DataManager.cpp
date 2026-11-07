@@ -339,7 +339,7 @@ std::string PatientData::toJson() const {
 #endif
         
         return json.str();
-    } catch (const std::exception& e) {
+    } catch (const std::exception&) {
         std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Failed to serialize PatientData" 
                   << std::endl;
         return "{}"; // Return empty JSON object on error
@@ -390,7 +390,7 @@ PatientData PatientData::fromJson(const std::string& json) {
                   << std::endl;
 #endif
         
-    } catch (const std::exception& e) {
+    } catch (const std::exception&) {
         std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Exception during PatientData parsing" 
                   << std::endl;
         // Return empty patient object on error
