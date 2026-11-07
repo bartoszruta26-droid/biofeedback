@@ -23,6 +23,8 @@ if "bool TrainingAnalyticsWidget::beginSession()" not in widget:
     raise SystemExit("Training session must snapshot its history destination at start")
 if "m_activeSessionHistoryFilePath" not in save:
     raise SystemExit("Session save must use the original patient destination")
+if "saveSessionCheckpoint" not in widget or "session_id" not in save or "in_progress" not in save:
+    raise SystemExit("Active sessions must be checkpointed and updated in place")
 if "saveSessionAutomatically" not in save:
     raise SystemExit("Interrupted sessions must be saved automatically")
 if "repetitions > 0 ? weightedPeak / repetitions : 0.0" not in save:
