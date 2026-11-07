@@ -51,8 +51,10 @@ DebugTab::DebugTab(QWidget *parent)
 DebugTab::~DebugTab()
 {
     if (m_serialPort) {
-        m_serialPort->setDataCallback({});
-        m_serialPort->setConnectionCallback({});
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_serialPort->removeConnectionCallback(m_connectionCallbackToken);
+        m_dataCallbackToken = 0;
+        m_connectionCallbackToken = 0;
     }
     core::DebugManager::instance().unregisterDebugCallback();
 }
@@ -268,34 +270,28 @@ bool DebugTab::exportLogsToFile(const QString& filename)
 void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
     if (m_serialPort) {
-        m_serialPort->setDataCallback({});
-        m_serialPort->setConnectionCallback({});
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_serialPort->removeConnectionCallback(m_connectionCallbackToken);
+        m_dataCallbackToken = 0;
+        m_connectionCallbackToken = 0;
     }
     m_serialPort = serial;
-
     if (!m_serialPort) return;
 
-    // SerialCommunication is a plain C++ service, not a QObject. Bridge its
-    // callbacks onto the Qt GUI thread explicitly.
-    m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-        QMetaObject::invokeMethod(this, [this, data]() {
-            onSensorDataReceived(data);
-        }, Qt::QueuedConnection);
+    // SerialCommunication is a plain C++ service. Queue callbacks onto the Qt GUI thread.
+    m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, [this, data]() { onSensorDataReceived(data); }, Qt::QueuedConnection);
     });
-    m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
+    m_connectionCallbackToken = m_serialPort->addConnectionCallback([this](bool connected, const std::string& message) {
         const QString qtMessage = QString::fromStdString(message);
         QMetaObject::invokeMethod(this, [this, connected, qtMessage]() {
             onConnectionStatusChanged(connected, qtMessage);
         }, Qt::QueuedConnection);
     });
 
-    if (m_serialPort->isConnected()) {
-        onConnectionStatusChanged(true, tr("Połączenie aktywne"));
-    } else {
-        addDebugMessage("Usługa SerialCommunication gotowa; brak aktywnego połączenia", "SERIAL");
-    }
+    if (m_serialPort->isConnected()) onConnectionStatusChanged(true, tr("Połączenie aktywne"));
+    else addDebugMessage("Usługa SerialCommunication gotowa; brak aktywnego połączenia", "SERIAL");
 }
-
 bool DebugTab::isArduinoConnected() const
 {
     return m_hasArduinoConnection;
