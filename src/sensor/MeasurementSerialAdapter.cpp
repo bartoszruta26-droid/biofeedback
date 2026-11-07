@@ -15,11 +15,15 @@ MeasurementSerialAdapter::MeasurementSerialAdapter(
       m_unit(std::move(unit)) {
     if (!m_engine || m_source.empty() || m_unit.empty()) return;
 
+    m_active = std::make_shared<std::atomic<bool>>(true);
+
     const std::weak_ptr<biofeedback::measurement::MeasurementEngine> weakEngine = m_engine;
     const std::string sourceCopy = m_source;
     const std::string unitCopy = m_unit;
+    const auto active = m_active;
     m_token = m_serial.addDataCallback(
-        [weakEngine, sourceCopy, unitCopy](const SensorData& data) {
+        [weakEngine, sourceCopy, unitCopy, active](const SensorData& data) {
+            if (!active->load()) return;
             const auto engineLocked = weakEngine.lock();
             if (!engineLocked) return;
 
@@ -35,6 +39,7 @@ MeasurementSerialAdapter::MeasurementSerialAdapter(
 }
 
 MeasurementSerialAdapter::~MeasurementSerialAdapter() {
+    if (m_active) m_active->store(false);
     if (m_token != 0) m_serial.removeDataCallback(m_token);
 }
 
