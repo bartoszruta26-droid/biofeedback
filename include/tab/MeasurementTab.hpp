@@ -26,6 +26,7 @@
 #include "sensor/MeasurementSerialAdapter.hpp"
 #include "training/RepetitionDetector.hpp"
 #include "core/DebugManager.hpp"
+#include "formulas.hpp"
 
 namespace tab {
 
@@ -108,6 +109,8 @@ struct RepetitionStats {
     double medianForce;         // Mediana siły [N]
     double modeForce;           // Dominanta siły [N]
     bool isValid;
+    RepetitionData biomechanicalData;
+    BiomechanicalParams biomechanicalParams;
     
     RepetitionStats() : repNumber(0), peakForce(0), timeToPeak(0), 
                         riseRate(0), fallRate(0), duration(0), startTime(0), endTime(0),
@@ -132,6 +135,7 @@ struct SeriesStats {
     double consistencyScore;            // Wskaźnik powtarzalności [%]
     double impulseTotal;                // Całkowity impuls [N·s]
     QString sessionDate;                // Data sesji pomiarowej
+    BiomechanicalParams biomechanicalParams; // 65 parametrów z oceną dostępności
     
     SeriesStats() : seriesNumber(0), avgPeakForce(0), medianPeakForce(0),
                     fatigueIndex(0), totalWork(0), avgRiseRate(0),
@@ -424,6 +428,7 @@ private:
     double m_repStartTime;
     double m_repPeakTime;
     biofeedback::training::RepetitionDetector m_repetitionDetector;
+    biofeedback::training::RepetitionRecord m_lastCompletedRepetition;
     
     // Wyniki
     QVector<SeriesStats> m_completedSeriesStats;
