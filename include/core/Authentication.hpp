@@ -71,6 +71,8 @@ public:
     bool requiresPasswordChange() const;
     bool changePassword(const std::string& newPassword);
     bool createUser(const std::string& username, const std::string& password, const std::string& role);
+    bool hasUsers() const;
+    bool createInitialAdministrator(const std::string& username, const std::string& password);
     
     /**
      * @brief Wylogowuje bieżącego użytkownika
