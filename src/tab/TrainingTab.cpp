@@ -513,6 +513,7 @@ void TrainingTab::startTraining()
     m_sessionTime = 0;
     m_trainingClock.reset();
     m_sessionClock.start();
+    m_trainingClock.update(0, true);
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
