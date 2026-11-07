@@ -246,6 +246,7 @@ if(Qt5_FOUND)
     add_executable(game_engine_regression
         tests/game_engine_regression.cpp
         src/games/GameEngine.cpp
+        src/core/DebugManager.cpp
         include/games/GameEngine.hpp
         include/core/DebugManager.hpp
     )
