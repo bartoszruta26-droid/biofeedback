@@ -232,7 +232,8 @@ void sendForceReadout() {
     Serial.print(raw_value);
     Serial.print(F(",TS:"));
     Serial.print(millis());
-    Serial.println(F("ms"));
+    Serial.print(F("ms,CAL:"));
+    Serial.println(is_calibrated ? 1 : 0);
 }
 
 void sendBinaryData() {
