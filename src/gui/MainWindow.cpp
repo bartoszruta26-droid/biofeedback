@@ -18,6 +18,7 @@
 #include <QGridLayout>
 #include <QFrame>
 #include <QMetaObject>
+#include <cmath>
 #include <memory>
 
 namespace gui {
