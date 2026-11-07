@@ -126,6 +126,12 @@ bool TrainingAnalyticsWidget::beginSession() {
             m_currentStats.cbegin(), m_currentStats.cend(),
             [](const ExerciseStats& exercise) { return !exercise.repetitions.isEmpty(); });
         if (hasRepetitions) return false;
+        m_activeSessionHistoryFilePath.clear();
+        if (!m_pendingHistoryFilePath.isEmpty()) {
+            m_historyFilePath = m_pendingHistoryFilePath;
+            m_pendingHistoryFilePath.clear();
+            loadHistory();
+        }
     }
     m_activeSessionHistoryFilePath = m_historyFilePath;
     m_sessionSaved = false;
