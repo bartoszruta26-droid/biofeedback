@@ -9,11 +9,11 @@ source_path = Path("src/sensor/SerialCommunication.cpp")
 source = source_path.read_text(encoding="utf-8")
 
 checks = {
-    "serial diagnostics disabled": r"constexpr\\s+bool\\s+DEBUG_SERIAL_COMM\\s*=\\s*false\\s*;",
-    "connection diagnostics disabled": r"constexpr\\s+bool\\s+DEBUG_CONNECTION\\s*=\\s*false\\s*;",
-    "packet diagnostics disabled": r"constexpr\\s+bool\\s+DEBUG_DATA_PACKETS\\s*=\\s*false\\s*;",
-    "CRC diagnostics disabled": r"constexpr\\s+bool\\s+DEBUG_CRC\\s*=\\s*false\\s*;",
-    "verbose serial output disabled by default": r"bool\\s+verbose\\s*=\\s*false\\s*;",
+    "serial diagnostics disabled": r"constexpr\s+bool\s+DEBUG_SERIAL_COMM\s*=\s*false\s*;",
+    "connection diagnostics disabled": r"constexpr\s+bool\s+DEBUG_CONNECTION\s*=\s*false\s*;",
+    "packet diagnostics disabled": r"constexpr\s+bool\s+DEBUG_DATA_PACKETS\s*=\s*false\s*;",
+    "CRC diagnostics disabled": r"constexpr\s+bool\s+DEBUG_CRC\s*=\s*false\s*;",
+    "verbose serial output disabled by default": r"bool\s+verbose\s*=\s*false\s*;",
 }
 
 failed = []
