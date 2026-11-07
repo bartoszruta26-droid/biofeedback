@@ -49,7 +49,7 @@ void RepetitionDetector::reset() noexcept {
     m_samples.clear();
 }
 
-void RepetitionDetector::begin(std::uint32_t timestampMs, double forceN) noexcept {
+void RepetitionDetector::begin(std::uint32_t timestampMs, double forceN) {
     m_active = true;
     m_startTimestampMs = timestampMs;
     m_lastTimestampMs = timestampMs;
