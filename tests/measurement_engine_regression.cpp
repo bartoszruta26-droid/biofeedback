@@ -49,6 +49,24 @@ int main()
     assert(!engine.addSample(mixed));
     assert(engine.rejectedSampleCount() == 2);
 
+    // Shared series aggregation and target-zone accuracy are produced by the engine.
+    MeasurementEngine seriesEngine({2.0, 1.0, 5.0, 0.20, 2});
+    double timestamp = 0.0;
+    for (int repetition = 0; repetition < 2; ++repetition) {
+        const double repForces[] = {3.0, 5.0, 5.5, 8.0, 5.0, 1.0};
+        for (double force : repForces) {
+            Sample sample{timestamp, force, ForceUnit::Newton, SampleSource::Replay, true};
+            seriesEngine.addSample(sample);
+            timestamp += 0.1;
+        }
+    }
+    const auto seriesResults = seriesEngine.takeCompletedSeries();
+    assert(seriesResults.size() == 1);
+    assert(seriesResults.front().repetitionCount == 2);
+    assert(std::abs(seriesResults.front().averagePeakForceN - 8.0) < 1e-9);
+    assert(seriesResults.front().totalImpulseNs > 0.0);
+    assert(seriesResults.front().targetAccuracyPercent > 0.0);
+
     std::cout << "measurement_engine_regression: PASS\n";
     return 0;
 }
