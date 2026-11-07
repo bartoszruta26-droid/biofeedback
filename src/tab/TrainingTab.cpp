@@ -1,4 +1,5 @@
 #include "tab/TrainingTab.hpp"
+#include "tab/TrainingAnalyticsWidget.hpp"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTextStream>
@@ -174,6 +175,7 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
     , m_statsSummaryLabel(nullptr)
+    , m_analyticsWidget(nullptr)
     , m_timer(nullptr)
     , m_restTimer(nullptr)
     , m_isTraining(false)
@@ -377,7 +379,6 @@ void TrainingTab::setupUI()
     
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki sesji", this);
-    m_statsBox->setMaximumHeight(150);
     QVBoxLayout* statsLayout = new QVBoxLayout(m_statsBox);
     
     m_statsContainer = new QWidget(this);
@@ -386,6 +387,8 @@ void TrainingTab::setupUI()
     m_statsSummaryLabel = new QLabel("Brak zarejestrowanych powtórzeń.", m_statsContainer);
     m_statsSummaryLabel->setWordWrap(true);
     statsContentLayout->addWidget(m_statsSummaryLabel);
+    m_analyticsWidget = new TrainingAnalyticsWidget(m_statsContainer);
+    statsContentLayout->addWidget(m_analyticsWidget, 1);
     statsLayout->addWidget(m_statsContainer);
     
     m_mainLayout->addWidget(m_statsBox);
@@ -506,6 +509,7 @@ void TrainingTab::startTraining()
         fresh.exerciseName = m_exercisePlan[i].name;
         m_exerciseStats[i] = fresh;
     }
+    refreshAnalytics();
     
     // Inicjalizacja pierwszego ćwiczenia
     loadNextExercise();
@@ -660,6 +664,11 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
 QVector<ExerciseStats> TrainingTab::getTrainingStats() const
 {
     return m_exerciseStats;
+}
+
+void TrainingTab::refreshAnalytics()
+{
+    if (m_analyticsWidget) m_analyticsWidget->setStats(m_exerciseStats);
 }
 
 bool TrainingTab::exportResultsToCSV(const QString& filename)
@@ -1003,6 +1012,7 @@ void TrainingTab::onRepetitionDetected(
     record.repetitionIndex = m_currentRepIndex + 1;
     record.measurement = repetition;
     stats.repetitions.append(record);
+    refreshAnalytics();
     stats.completedReps = stats.repetitions.size();
     stats.maxPeakForce = qMax(stats.maxPeakForce, repetition.peakForceN);
     stats.avgPeakForce = 0.0;
@@ -1047,6 +1057,7 @@ void TrainingTab::finishCurrentSeries()
         m_currentSeriesRepetitions, exercise.targetForce);
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
     stats.series.append(summary);
+    refreshAnalytics();
     stats.completedSeries = stats.series.size();
     const double cv = biofeedback::training::summarizeSeries(
         stats.repetitions.isEmpty()
