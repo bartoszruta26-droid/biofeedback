@@ -31,6 +31,18 @@ Ważne rozróżnienie: wykres zakładki MeasurementTab jest realizowany przez `F
 - Eksport JSON w wersji 2 obejmuje pełny strumień zarejestrowanych próbek (czas hosta, czas urządzenia, czas sesji, wartość, jednostka, surowy odczyt ADC, źródło i jakość). Można zapisać także sesję, w której nie zakończono jeszcze powtórzenia.
 - Archiwum zachowuje także skalibrowaną masę w kg obok wartości siły w N i surowego ADC. Import JSON odtwarza próbki na wykresie i w tabeli, zachowuje tryb RAW/skalibrowany oraz kontynuuje oś czasu od ostatniego zapisanego znacznika czasu.
 
+## 3. Integracja 65 parametrów — wdrożony etap
+
+- Model `BiomechanicalParams` zawiera teraz 65 uporządkowanych nazw, jednostek i statusów dostępności.
+- Statusy są odrębne od wartości liczbowej: `Available`, `InsufficientData`, `RequiresCalibration`, `RequiresAdditionalSensor`, `RequiresHistory`, `InvalidInput`. Wartość 0 może być prawidłowym wynikiem; brak danych nie jest już utożsamiany z zerem.
+- `MeasurementTab` przekazuje rzeczywiste próbki z `RepetitionDetector` do `Formulas`, oblicza parametry powtórzenia i bieżącej serii oraz wyświetla tabelę 65 parametrów z jednostką i statusem.
+- JSON zapisuje wyniki i statusy dla każdego powtórzenia i serii, a także wejściowe znaczniki czasu, siły i próbki powtórzenia, co pozwala odtworzyć i ponownie przeliczyć wyniki po imporcie.
+- Naprawiono agregację mocy szczytowej: maksimum jest wybierane spośród mocy poszczególnych powtórzeń, a nie obliczane z maksimum siły z całej serii i próbek ostatniego powtórzenia.
+- Oddzielono impuls siły [N·s] od pracy mechanicznej [J] w statystykach serii.
+- Całkowanie impulsu wykorzystuje rzeczywiste odstępy między znacznikami czasu i metodę trapezów, z odrzucaniem nieprawidłowych segmentów oraz obsługą przepełnienia zegara urządzenia.
+- Pochodne, wskaźnik płynności i czas pod napięciem ignorują nieprawidłowe próbki oraz odstępy czasu cofnięte lub niejednoznaczne.
+- Dodano test CTest `biomechanical_parameter_availability_regression`, obejmujący całkowanie przy nierównomiernym próbkowaniu, nieprawidłowe próbki, przepełnienie znacznika czasu, kompletność nazw/jednostek i statusy zależne od kalibracji/czujników/historii.
+
 ## 3. Ustalenia wymagające dalszej pracy
 
 ### 3.1 Trwałość i kompletność archiwum
