@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -244,14 +245,14 @@ public:
     /**
      * @brief Kalibruje czujnik (tare)
      * @param samples Liczba próbek do uśrednienia
-     * @return Wartość tare
+     * @return Mediana surowych próbek; NaN przy błędzie odczytu
      */
     double tare(int samples = 10);
     
     /**
      * @brief Ustawia punkt kalibracyjny
      * @param rawValue Surowa wartość z czujnika
-     * @param knownValue Znana wartość wzorcowa
+     * @param knownValue Znana wartość wzorcowa w jednostkach wyniku kalibracji (po uprzednim tare)
      */
     void setCalibrationPoint(int32_t rawValue, double knownValue);
     
