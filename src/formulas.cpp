@@ -288,15 +288,21 @@ double Formulas::calculateSetAvgImpulse(const std::vector<double>& repImpulses) 
 // ==================== Kategoria 2: Parametry Czasowe ====================
 
 double Formulas::calculateRepDuration(uint32_t startTime, uint32_t endTime) {
-    return (endTime - startTime) / 1000.0;  // Konwersja ms -> s
+    const std::uint32_t delta = endTime - startTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateConcentricTime(uint32_t startTime, uint32_t peakTime) {
-    return (peakTime - startTime) / 1000.0;
+    const std::uint32_t delta = peakTime - startTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateEccentricTime(uint32_t peakTime, uint32_t endTime) {
-    return (endTime - peakTime) / 1000.0;
+    const std::uint32_t delta = endTime - peakTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateCERatio(double concTime, double eccTime) {
@@ -304,15 +310,21 @@ double Formulas::calculateCERatio(double concTime, double eccTime) {
 }
 
 double Formulas::calculateInterRepRest(uint32_t prevEndTime, uint32_t nextStartTime) {
-    return (nextStartTime > prevEndTime) ? (nextStartTime - prevEndTime) / 1000.0 : 0.0;
+    const std::uint32_t delta = nextStartTime - prevEndTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateSetDuration(uint32_t startTime, uint32_t endTime) {
-    return (endTime - startTime) / 1000.0;
+    const std::uint32_t delta = endTime - startTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateInterSetRest(uint32_t prevSetEnd, uint32_t nextSetStart) {
-    return (nextSetStart > prevSetEnd) ? (nextSetStart - prevSetEnd) / 1000.0 : 0.0;
+    const std::uint32_t delta = nextSetStart - prevSetEnd;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateAvgRepTime(const std::vector<double>& repTimes) {
