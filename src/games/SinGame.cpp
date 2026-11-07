@@ -143,7 +143,8 @@ void SinGame::update(double deltaTime) {
     if (!isRunning()) return;
 
     // Aktualizacja fazy sinusa (ruch wykresu w lewo)
-    m_phase -= m_scrollSpeed * deltaTime;
+    // Przelicz piksele/s na zmianę fazy przez częstotliwość przestrzenną.
+    m_phase -= m_scrollSpeed * m_frequency * deltaTime;
     
     // Pozycja X "bramki" sprawdzającej trafienie (stała w prawo od środka)
     // Gracz celuje w linię pionową na 75% szerokości ekranu
@@ -163,12 +164,14 @@ void SinGame::update(double deltaTime) {
     // Sprawdzamy czy kursor jest w pobliżu linii sinusa w punkcie checkX
     double distance = std::abs(m_cursorY - m_targetY);
     
-    if (distance < m_tolerance) {
+    // Histereza zapobiega wielokrotnemu naliczaniu punktów przy drżeniu sygnału.
+    const double exitTolerance = m_tolerance * 1.5;
+    if (distance < (m_isHit ? exitTolerance : m_tolerance)) {
         if (!m_isHit) {
             m_isHit = true;
             // Punktacja: im mniejszy dystans, tym więcej punktów
-            int points = static_cast<int>((m_tolerance - distance) * 10);
-            addScore(points);
+            const double accuracy = qBound(0.0, (m_tolerance - distance) / m_tolerance, 1.0);
+            addScore(qBound(1, static_cast<int>(std::ceil(accuracy * 10.0)), 10));
         }
     } else {
         m_isHit = false;
