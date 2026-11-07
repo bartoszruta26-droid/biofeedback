@@ -350,3 +350,17 @@ Please read CONTRIBUTING.md for details on our code of conduct and the process f
 ## Disclaimer
 
 This software is for research and development purposes. For medical use, proper certification and regulatory approval are required.
+
+
+## Lokalny serwer API
+
+Minimalny serwer statusu HTTP (Qt Network) można zbudować i uruchomić:
+
+    cmake -S . -B build
+    cmake --build build --target biofeedback_api
+    ./build/biofeedback_api --port 8765
+
+Usługa nasłuchuje wyłącznie na `127.0.0.1` i udostępnia `/healthz` oraz
+`/api/v1/status`. Sterowanie sprzętem, dane pacjentów i strumień pomiarowy
+pozostają wyłączone do czasu wdrożenia uwierzytelniania, autoryzacji oraz
+wspólnych usług domenowych. Nie wystawiaj tego prototypu na sieć publiczną.
