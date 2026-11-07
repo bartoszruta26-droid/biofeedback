@@ -62,10 +62,11 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
     }
 
     m_historyTable = new QTableWidget(m_tabs);
-    m_historyTable->setColumnCount(8);
+    m_historyTable->setColumnCount(9);
     m_historyTable->setHorizontalHeaderLabels({
-        tr("Zapisano"), tr("Czas [s]"), tr("Ćwiczenia"), tr("Serie"),
-        tr("Powtórzenia"), tr("Śr. szczyt [N]"), tr("Maks. [N]"), tr("Punkty gier")
+        tr("Zapisano"), tr("Status"), tr("Sesja [s]"), tr("Aktywnie [s]"),
+        tr("Ćwiczenia"), tr("Serie"), tr("Powtórzenia"),
+        tr("Śr. szczyt [N]"), tr("Maks. [N]")
     });
     m_historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -94,9 +95,11 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
     loadHistory();
 }
 
-void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int durationSeconds) {
+void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int durationSeconds,
+                                         int activeDurationSeconds) {
     m_currentStats = stats;
     m_durationSeconds = durationSeconds;
+    m_activeDurationSeconds = activeDurationSeconds;
     bool hasRepetitions = false;
     for (const auto& exercise : stats)
         hasRepetitions = hasRepetitions || !exercise.repetitions.isEmpty();
@@ -106,6 +109,10 @@ void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int 
     rebuildRepetitionTable(stats);
     rebuildPeakChart(stats);
     rebuildForceTraceChart(stats);
+}
+
+void TrainingAnalyticsWidget::setSessionCompleted(bool completed) {
+    m_sessionCompleted = completed;
 }
 
 void TrainingAnalyticsWidget::setHistoryFilePath(const QString& filePath) {
@@ -184,13 +191,14 @@ void TrainingAnalyticsWidget::rebuildHistoryTable() {
         const QJsonObject entry = value.toObject();
         const QStringList values = {
             entry.value("saved_at").toString(),
+            entry.value("session_status").toString("legacy"),
             QString::number(entry.value("duration_seconds").toInt()),
+            QString::number(entry.value("active_duration_seconds").toInt()),
             QString::number(entry.value("exercise_count").toInt()),
             QString::number(entry.value("series_count").toInt()),
             QString::number(entry.value("repetition_count").toInt()),
             QString::number(entry.value("average_peak_force_n").toDouble(), 'f', 2),
-            QString::number(entry.value("maximum_peak_force_n").toDouble(), 'f', 2),
-            QString::number(entry.value("game_points").toInt())
+            QString::number(entry.value("maximum_peak_force_n").toDouble(), 'f', 2)
         };
         const int row = m_historyTable->rowCount();
         m_historyTable->insertRow(row);
@@ -284,6 +292,8 @@ void TrainingAnalyticsWidget::onHistoryEntryActivated(int row, int /*column*/) {
 
     m_currentStats = restored;
     m_durationSeconds = entry.value("duration_seconds").toInt();
+    m_activeDurationSeconds = entry.value("active_duration_seconds").toInt();
+    m_sessionCompleted = entry.value("session_status").toString() == "completed";
     m_sessionSaved = true;
     m_saveHistoryButton->setEnabled(false);
     rebuildSummary(restored);
@@ -320,6 +330,8 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
     entry.insert("schema_version", 2);
     entry.insert("saved_at", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
     entry.insert("duration_seconds", m_durationSeconds);
+    entry.insert("active_duration_seconds", m_activeDurationSeconds);
+    entry.insert("session_status", m_sessionCompleted ? "completed" : "interrupted");
     entry.insert("exercise_count", exerciseCount);
     entry.insert("series_count", seriesCount);
     entry.insert("repetition_count", repetitions);
