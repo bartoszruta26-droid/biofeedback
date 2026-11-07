@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
 #include <QFileDevice>
@@ -65,11 +66,26 @@ inline QString ensureUserConfigFile(const QString& fileName)
 
 inline QString patientDirectory(const QString& patientId)
 {
-    QString safeId = patientId;
-    safeId.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9_-]")), QStringLiteral("_"));
-    if (safeId.isEmpty()) safeId = QStringLiteral("unassigned");
-    const QString path = QDir(appDataDirectory()).filePath(
-        QStringLiteral("patients/") + safeId);
+    const QString root = QDir(appDataDirectory()).filePath(QStringLiteral("patients"));
+    QDir().mkpath(root);
+    if (patientId.trimmed().isEmpty()) {
+        const QString unassigned = QDir(root).filePath(QStringLiteral("unassigned"));
+        QDir().mkpath(unassigned);
+        return unassigned;
+    }
+
+    // Do not expose PESEL or another direct identifier in filesystem paths.
+    const QString pseudonymousId = QString::fromLatin1(
+        QCryptographicHash::hash(patientId.toUtf8(), QCryptographicHash::Sha256).toHex());
+    const QString path = QDir(root).filePath(pseudonymousId);
+
+    // Migrate legacy directories that used a sanitized patient identifier.
+    QString legacyId = patientId;
+    legacyId.replace(QRegularExpression(QStringLiteral("[^A-Za-z0-9_-]")), QStringLiteral("_"));
+    const QString legacyPath = QDir(root).filePath(legacyId);
+    if (legacyPath != path && QDir(legacyPath).exists() && !QDir(path).exists())
+        QDir().rename(legacyPath, path);
+
     QDir().mkpath(path);
     return path;
 }
