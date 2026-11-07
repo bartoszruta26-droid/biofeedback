@@ -46,6 +46,81 @@ void BiomechanicalParams::reset() {
     FG = 0.0; ESI = 0.0; BRC = 0.0; CEI = 0.0; LPT = 0.0;
 }
 
+std::array<double, BiomechanicalParams::ParameterCount> BiomechanicalParams::values() const noexcept
+{
+    return {F_peak, F_mean, F_min, F_range, F_set_mean, F_set_peak, W_total, W_rep_avg, I_impulse, I_set_avg, T_rep, T_conc, T_ecc, R_CE, T_rest_rep, T_set, T_rest_set, T_rep_avg, v_avg, f_rep, P_peak, P_rep_avg, P_set_avg, E_total, P_norm, RFD, RFD_set_avg, RFD_max, E_elastic, eta, sigma_F, CV_F, FI_set, FI_inter, MCI, PSI, Var_T, SI, H_entropy, BPR, F_grand_mean, I_total, V_training, INT, D_training, SEI, FMC, ISI, TUT_avg, TUT_total, MQS, NML, PSE, TRI, IRI, TAI, MEI, LBI, FRI, CTS, FG, ESI, BRC, CEI, LPT};
+}
+
+void BiomechanicalParams::assignValues(
+    const std::array<double, BiomechanicalParams::ParameterCount>& v) noexcept
+{
+    F_peak = v[0];
+    F_mean = v[1];
+    F_min = v[2];
+    F_range = v[3];
+    F_set_mean = v[4];
+    F_set_peak = v[5];
+    W_total = v[6];
+    W_rep_avg = v[7];
+    I_impulse = v[8];
+    I_set_avg = v[9];
+    T_rep = v[10];
+    T_conc = v[11];
+    T_ecc = v[12];
+    R_CE = v[13];
+    T_rest_rep = v[14];
+    T_set = v[15];
+    T_rest_set = v[16];
+    T_rep_avg = v[17];
+    v_avg = v[18];
+    f_rep = v[19];
+    P_peak = v[20];
+    P_rep_avg = v[21];
+    P_set_avg = v[22];
+    E_total = v[23];
+    P_norm = v[24];
+    RFD = v[25];
+    RFD_set_avg = v[26];
+    RFD_max = v[27];
+    E_elastic = v[28];
+    eta = v[29];
+    sigma_F = v[30];
+    CV_F = v[31];
+    FI_set = v[32];
+    FI_inter = v[33];
+    MCI = v[34];
+    PSI = v[35];
+    Var_T = v[36];
+    SI = v[37];
+    H_entropy = v[38];
+    BPR = v[39];
+    F_grand_mean = v[40];
+    I_total = v[41];
+    V_training = v[42];
+    INT = v[43];
+    D_training = v[44];
+    SEI = v[45];
+    FMC = v[46];
+    ISI = v[47];
+    TUT_avg = v[48];
+    TUT_total = v[49];
+    MQS = v[50];
+    NML = v[51];
+    PSE = v[52];
+    TRI = v[53];
+    IRI = v[54];
+    TAI = v[55];
+    MEI = v[56];
+    LBI = v[57];
+    FRI = v[58];
+    CTS = v[59];
+    FG = v[60];
+    ESI = v[61];
+    BRC = v[62];
+    CEI = v[63];
+    LPT = v[64];
+}
+
 const char* BiomechanicalParams::parameterName(std::size_t index) noexcept
 {
     static constexpr const char* names[ParameterCount] = {
