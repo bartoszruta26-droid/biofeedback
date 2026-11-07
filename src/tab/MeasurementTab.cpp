@@ -396,6 +396,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_statsTable(nullptr)
     , m_biomechBox(nullptr)
     , m_biomechTable(nullptr)
+    , m_elasticConstantInput(nullptr)
+    , m_patientMassInput(nullptr)
     , m_rawBox(nullptr)
     , m_rawTable(nullptr)
     , m_isMeasuring(false)
@@ -658,6 +660,31 @@ void MeasurementTab::setupUI()
     m_biomechBox = new QGroupBox("Parametry biomechaniczne (65)", this);
     m_biomechBox->setFont(QFont("Arial", 11, QFont::Bold));
     QVBoxLayout* biomechLayout = new QVBoxLayout();
+    QHBoxLayout* calibrationLayout = new QHBoxLayout();
+    calibrationLayout->addWidget(new QLabel(tr("Sztywność układu [N/m]:"), this));
+    m_elasticConstantInput = new QDoubleSpinBox(this);
+    m_elasticConstantInput->setRange(0.0, 1000000.0);
+    m_elasticConstantInput->setDecimals(2);
+    m_elasticConstantInput->setSingleStep(10.0);
+    m_elasticConstantInput->setSpecialValueText(tr("Brak kalibracji"));
+    m_elasticConstantInput->setValue(0.0);
+    m_elasticConstantInput->setToolTip(
+        tr("Wprowadź zmierzoną sztywność układu sprężystego. Nie wpisuj wartości szacunkowej."));
+    calibrationLayout->addWidget(m_elasticConstantInput);
+    calibrationLayout->addWidget(new QLabel(tr("Masa pacjenta [kg]:"), this));
+    m_patientMassInput = new QDoubleSpinBox(this);
+    m_patientMassInput->setRange(0.0, 500.0);
+    m_patientMassInput->setDecimals(2);
+    m_patientMassInput->setSingleStep(0.5);
+    m_patientMassInput->setSpecialValueText(tr("Brak danych"));
+    m_patientMassInput->setValue(0.0);
+    calibrationLayout->addWidget(m_patientMassInput);
+    biomechLayout->addLayout(calibrationLayout);
+    connect(m_elasticConstantInput, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { recalculateBiomechanicalResults(); });
+    connect(m_patientMassInput, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { recalculateBiomechanicalResults(); });
+
     m_biomechTable = new QTableWidget(this);
     m_biomechTable->setColumnCount(4);
     m_biomechTable->setHorizontalHeaderLabels(
@@ -1124,7 +1151,9 @@ void MeasurementTab::calculateRepetitionStats()
         m_currentRepStats.biomechanicalData.samples.emplace_back(
             sample.timestampMs, sample.forceN);
     }
-    Formulas biomechanicalFormulas;
+    Formulas biomechanicalFormulas(
+        m_elasticConstantInput ? m_elasticConstantInput->value() : 0.0,
+        m_patientMassInput ? m_patientMassInput->value() : 0.0);
     m_currentRepStats.biomechanicalParams =
         biomechanicalFormulas.calculateRepParams(m_currentRepStats.biomechanicalData);
     m_currentRepStats.timeToPeak = m_repPeakTime - m_repStartTime;
@@ -1311,6 +1340,36 @@ void MeasurementTab::calculateRepetitionStats()
     
     std::cout << "[DEBUG] calculateRepetitionStats: Before updateSeriesProgress" << std::endl;
     updateSeriesProgress();
+}
+
+void MeasurementTab::recalculateBiomechanicalResults()
+{
+    const double elasticConstant = m_elasticConstantInput
+        ? m_elasticConstantInput->value() : 0.0;
+    const double patientMass = m_patientMassInput
+        ? m_patientMassInput->value() : 0.0;
+    Formulas formulas(elasticConstant, patientMass);
+
+    for (auto& seriesStats : m_completedSeriesStats) {
+        if (seriesStats.reps.isEmpty()) {
+            seriesStats.biomechanicalParams = BiomechanicalParams();
+            continue;
+        }
+
+        SeriesData seriesData;
+        seriesData.seriesNumber = seriesStats.seriesNumber;
+        seriesData.startTime = seriesStats.reps.first().biomechanicalData.startTime;
+        seriesData.endTime = seriesStats.reps.last().biomechanicalData.endTime;
+        seriesData.reps.reserve(seriesStats.reps.size());
+        for (auto& repetition : seriesStats.reps) {
+            repetition.biomechanicalParams =
+                formulas.calculateRepParams(repetition.biomechanicalData);
+            seriesData.reps.push_back(repetition.biomechanicalData);
+        }
+        seriesStats.biomechanicalParams = formulas.calculateAllParams(seriesData);
+    }
+
+    updateBiomechanicalTable();
 }
 
 void MeasurementTab::updateBiomechanicalTable()
