@@ -17,7 +17,7 @@ void writeUsersJson(){
  std::ofstream out(kUsersFile);
  out << "{\n  \"users\": [\n"
  " {\"username\":\"admin\",\"password\":\"legacy-admin\",\"role\":\"administrator\",\"encrypted\":false},\n"
- " {\"username\":\"doctor\"x\",\"password\":\"legacy\"pass\",\"role\":\"therapist\",\"encrypted\":false},\n"
+ " {\"username\":\"doctor\\\"x\",\"password\":\"legacy\\\"pass\",\"role\":\"therapist\",\"encrypted\":false},
  " {\"username\":\"brace-user\",\"password\":\"token-with-}-inside\",\"role\":\"tester\",\"encrypted\":false}\n"
  " ]\n}\n";
 }
