@@ -38,6 +38,8 @@ for required in (
     "m_elasticConstantInput->value()",
     "m_patientMassInput->value()",
     "recalculateBiomechanicalResults()",
+    "m_biomechSeriesSelector->addItem",
+    "m_biomechSeriesSelector->currentData().toInt()",
     'root["elasticConstantNPerM"] = session.elasticConstantNPerM',
     'root["patientMassKg"] = session.patientMassKg',
     'root["schemaVersion"] = 3',
