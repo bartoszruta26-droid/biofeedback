@@ -46,7 +46,7 @@ int main(int argc, char** argv)
     QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
     assert(std::abs(game.lastInput - 42.5) < 1e-9);
 
-    game.resume();
+    game.start(); // start() while paused must resume, not reset the game.
     assert(!game.isPaused() && game.isRunning());
     QThread::msleep(25);
     game.gameLoop();
