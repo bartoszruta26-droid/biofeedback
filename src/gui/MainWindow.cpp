@@ -397,6 +397,10 @@ void MainWindow::createConnections()
             m_trainingTab, &tab::TrainingTab::onSharedForceSample, Qt::QueuedConnection);
     connect(m_measurementTab, &tab::MeasurementTab::sharedRepetitionCompleted,
             m_trainingTab, &tab::TrainingTab::onSharedRepetitionCompleted, Qt::QueuedConnection);
+    connect(m_measurementTab, &tab::MeasurementTab::sharedSeriesCompleted,
+            m_trainingTab, &tab::TrainingTab::onSharedSeriesCompleted, Qt::QueuedConnection);
+    connect(m_trainingTab, &tab::TrainingTab::engineSeriesSizeRequested,
+            m_measurementTab, &tab::MeasurementTab::setEngineRepetitionsPerSeries);
     connect(m_trainingTab, &tab::TrainingTab::trainingStarted, this, [this]() {
         m_measurementTab->resetSession();
         m_measurementTab->startMeasurement();
