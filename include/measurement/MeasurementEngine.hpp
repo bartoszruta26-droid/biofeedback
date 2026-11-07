@@ -25,6 +25,7 @@ const char* qualityName(Quality quality) noexcept;
 
 struct MeasurementInput {
     std::uint32_t deviceTimestampMs{0};
+    bool hasTimestamp{false};
     std::int32_t rawValue{0};
     double value{0.0};
     bool sensorValid{false};
