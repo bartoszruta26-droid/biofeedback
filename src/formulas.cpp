@@ -49,7 +49,7 @@ void BiomechanicalParams::reset() {
 const char* BiomechanicalParams::parameterUnit(std::size_t index) noexcept
 {
     static constexpr const char* units[ParameterCount] = {
-        "N", "N", "N", "N", "N", "N", "J", "J", "N·s", "N·s", "s", "s", "s", "—", "s", "s", "s", "s", "m/s", "Hz", "W", "W", "W", "J", "W/kg", "N/s", "N/s", "N/s", "J", "%", "N", "%", "%", "%", "—", "—", "s²", "N/s²", "bit", "—", "N", "N·s", "N²", "%", "powt./s", "—", "%", "%", "s", "s", "—", "—", "—", "—", "—", "—", "—", "—", "%", "—", "—", "—", "—", "—", "%"
+        "N", "N", "N", "N", "N", "N", "J", "J", "N·s", "N·s", "s", "s", "s", "—", "s", "s", "s", "s", "m/s", "Hz", "W", "W", "W", "J", "W/kg", "N/s", "N/s", "N/s", "J", "%", "N", "%", "%", "%", "—", "—", "s²", "N/s²", "bit", "—", "N", "N·s", "N²", "%", "powt./s", "m/s", "%", "%", "s", "s", "—", "—", "—", "—", "—", "—", "—", "—", "%", "—", "—", "—", "—", "—", "%"
     };
     return index < ParameterCount ? units[index] : "";
 }
@@ -944,6 +944,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     // Moc
     params.P_set_avg = calculateSetAvgPower(params.W_total, params.T_set);
     params.P_rep_avg = calculateAvgPower(params.W_total / series.reps.size(), params.T_rep_avg);
+    // W / (T * F) has dimensions of velocity (m/s), not a dimensionless score.
+    params.SEI = calculateSEI(params.W_total, params.T_set, params.F_set_mean);
     params.P_peak = calculateSetPeakForce(repPeakPowers);
     
     // RFD
@@ -1070,6 +1072,11 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.setAvailability(18, elasticStatus);
     params.setAvailability(24, hasElasticCalibration && hasPatientMass
         ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration);
+    params.setAvailability(45, hasElasticCalibration && params.T_set > 0.0 &&
+        params.F_set_mean > 0.0
+        ? ParameterAvailability::Available
+        : (hasElasticCalibration ? ParameterAvailability::InsufficientData
+                                 : ParameterAvailability::RequiresCalibration));
 
     // Explicit external dependencies; do not fabricate proxy values.
     params.setAvailability(14, interRepRestIntervals > 0
