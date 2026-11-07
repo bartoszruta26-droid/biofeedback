@@ -55,7 +55,7 @@ void SinGame::setDifficultyLevel(int level) {
     m_tolerance = qMax(10.0, 50.0 - (m_difficultyLevel * 8.0)); 
     m_frequency = 0.015 + (m_difficultyLevel * 0.005);
     
-    emit scoreChanged(0); // Reset punktów przy zmianie poziomu
+    setScore(0); // Keep the base score and scoreChanged signal consistent
 }
 
 int SinGame::getDifficultyLevel() const {
