@@ -17,10 +17,17 @@ if "m_lastSensorData" not in manual or "readSingleSample(value)" not in manual:
 receiver_start = source.index("void MeasurementTab::onSensorDataReceived")
 receiver_end = source.index("// MeasurementTab - Konwersja jednostek", receiver_start)
 receiver = source[receiver_start:receiver_end]
-if "readSingleSample(value)" not in receiver:
-    raise SystemExit("Live samples must flow from the shared callback into measurement")
-if "!data.hasCalibratedValue" not in receiver:
-    raise SystemExit("Calibrated biomechanics must reject raw-only binary frames")
+if "readSingleSample(static_cast<double>(data.value))" not in receiver:
+    raise SystemExit("RAW diagnostic capture must use the raw ADC field")
+handler_start = source.index("void MeasurementTab::onMeasurementSample")
+handler_end = source.index("// MeasurementTab - Konwersja jednostek", handler_start)
+handler = source[handler_start:handler_end]
+if "sample.isValid()" not in handler or 'sample.unit != "kg"' not in handler:
+    raise SystemExit("Calibrated biomechanics must consume valid canonical mass samples")
+if "standardGravityMetersPerSecondSquared" not in handler:
+    raise SystemExit("Canonical mass must be converted to SI force exactly once")
+if "m_measurementEngine->subscribe" not in source:
+    raise SystemExit("MeasurementTab must subscribe to the shared measurement engine")
 if "m_showRawValues(false)" not in source:
     raise SystemExit("Calibrated force in SI units must be the default")
 if "m_btnToggleRaw->setEnabled(true)" not in source:
