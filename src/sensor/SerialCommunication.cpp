@@ -166,7 +166,7 @@ bool SerialCommunication::verifyCRC8(const uint8_t* data, size_t length) {
 
 class SerialCommunication::Impl {
 public:
-    int portHandle = -1;
+    intptr_t portHandle = -1;
     bool isConnected = false;
     int baudRate = DEFAULT_BAUD_RATE;
     std::string portName;
@@ -378,7 +378,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             m_impl->lastError = "Cannot configure serial port timeouts";
             return false;
         }
-        m_impl->portHandle = reinterpret_cast<int>(h);
+        m_impl->portHandle = reinterpret_cast<intptr_t>(h);
 #else
         int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
         if (fd < 0) { 
@@ -460,7 +460,7 @@ void SerialCommunication::disconnect() {
     stopAsyncReading();
     if (!m_impl->isConnected) return;
 #ifdef _WIN32
-    if (m_impl->portHandle > 0) CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
+    if (m_impl->portHandle != -1) CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
 #else
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
@@ -471,7 +471,7 @@ void SerialCommunication::disconnect() {
 }
 
 bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
-    if (!m_impl->isConnected || m_impl->portHandle < 0 || data == nullptr || length == 0) {
+    if (!m_impl->isConnected || m_impl->portHandle == -1 || data == nullptr || length == 0) {
         m_impl->lastError = "Serial write rejected: invalid connection or buffer";
         return false;
     }
@@ -877,6 +877,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
 
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
+    std::lock_guard<std::mutex> lock(m_impl->readMutex);
     if (!writeToPort(data, len)) return false;
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     return true;
