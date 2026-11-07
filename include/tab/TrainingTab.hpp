@@ -125,6 +125,7 @@ struct ExerciseStats {
 class TrainingTab : public QWidget
 {
     Q_OBJECT
+    friend class TrainingTabProcessRestartRegression;
 
 public:
     explicit TrainingTab(QWidget *parent = nullptr);
