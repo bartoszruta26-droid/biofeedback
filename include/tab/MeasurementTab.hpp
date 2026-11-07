@@ -286,6 +286,9 @@ signals:
     void measurementStopped();
     void newForceSample(double force, double timestamp, bool isRaw = false);
     void repetitionCompleted(int seriesNum, int repNum, const RepetitionStats& stats);
+    void sharedRepetitionCompleted(double peakForceN, double durationSeconds,
+                                   double averageForceN, double impulseNs,
+                                   double targetAccuracyPercent);
     void seriesCompleted(int seriesNum, const SeriesStats& stats);
     void sessionFinished(const QVector<SeriesStats>& allStats);
     void arduinoConnectionStatus(bool connected, const QString& message);
