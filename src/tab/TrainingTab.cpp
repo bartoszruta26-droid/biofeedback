@@ -1449,31 +1449,37 @@ bool TrainingTab::saveExecutionCheckpoint()
 
 bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
 {
+    const auto reject = [](const QString& reason) {
+        qWarning().noquote() << "Checkpoint restore rejected at" << reason;
+        return false;
+    };
+    qWarning() << "Checkpoint restore started; version =" << checkpoint.value("format_version").toInt()
+               << "keys =" << checkpoint.keys();
     // Phase 1: parse and validate everything into temporary values. No live
     // session, analytics, timer, or widget state is changed in this phase.
     const int checkpointVersion = checkpoint.value("format_version").toInt();
     if ((checkpointVersion != 1 && checkpointVersion != 2) ||
         !checkpoint.value("exercise_plan").isArray() || !m_analyticsWidget)
-        return false;
+        return reject(QStringLiteral("validation-1"));
 
     const auto isFiniteNonNegative = [](double value) {
         return std::isfinite(value) && value >= 0.0;
     };
     const auto readUnsignedTimestamp = [](const QJsonValue& value, std::uint32_t& result) {
-        if (!value.isDouble()) return false;
+        if (!value.isDouble()) return reject(QStringLiteral("validation-2"));
         const double number = value.toDouble();
         if (!std::isfinite(number) || number < 0.0 ||
             number > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) ||
-            std::floor(number) != number) return false;
+            std::floor(number) != number) return reject(QStringLiteral("validation-3"));
         result = static_cast<std::uint32_t>(number);
         return true;
     };
 
     QVector<TrainingExercise> stagedPlan;
     const QJsonArray planValues = checkpoint.value("exercise_plan").toArray();
-    if (planValues.isEmpty() || planValues.size() > 256) return false;
+    if (planValues.isEmpty() || planValues.size() > 256) return reject(QStringLiteral("validation-4"));
     for (const QJsonValue& value : planValues) {
-        if (!value.isObject()) return false;
+        if (!value.isObject()) return reject(QStringLiteral("validation-5"));
         const QJsonObject item = value.toObject();
         TrainingExercise exercise;
         exercise.name = item.value("name").toString();
@@ -1487,7 +1493,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
             exercise.repsPerSeries > 1000 ||
             !isFiniteNonNegative(exercise.targetForce) || exercise.targetForce > 100000.0 ||
             !isFiniteNonNegative(exercise.restTime) || exercise.restTime > 86400.0)
-            return false;
+            return reject(QStringLiteral("validation-6"));
         stagedPlan.append(exercise);
     }
 
@@ -1497,7 +1503,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     if (exerciseIndex < 0 || exerciseIndex >= stagedPlan.size() ||
         seriesIndex < 0 || seriesIndex >= stagedPlan[exerciseIndex].seriesCount ||
         repetitionIndex < 0 || repetitionIndex >= stagedPlan[exerciseIndex].repsPerSeries)
-        return false;
+        return reject(QStringLiteral("validation-7"));
 
     const int savedStateValue = checkpoint.value("state").toInt(
         static_cast<int>(biofeedback::training::SessionState::Active));
@@ -1507,7 +1513,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         savedStateValue > static_cast<int>(biofeedback::training::SessionState::Resting) ||
         resumeStateValue < static_cast<int>(biofeedback::training::SessionState::Active) ||
         resumeStateValue > static_cast<int>(biofeedback::training::SessionState::Resting))
-        return false;
+        return reject(QStringLiteral("validation-8"));
 
     const auto savedState = static_cast<biofeedback::training::SessionState>(savedStateValue);
     auto resumeState = static_cast<biofeedback::training::SessionState>(resumeStateValue);
@@ -1518,13 +1524,13 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     if (savedState != biofeedback::training::SessionState::Active &&
         savedState != biofeedback::training::SessionState::Paused &&
         savedState != biofeedback::training::SessionState::Resting)
-        return false;
+        return reject(QStringLiteral("validation-9"));
 
     const int savedRestTarget = checkpoint.value("rest_target").toInt(
         static_cast<int>(biofeedback::training::RestTarget::NextSeries));
     if (savedRestTarget < static_cast<int>(biofeedback::training::RestTarget::NextSeries) ||
         savedRestTarget > static_cast<int>(biofeedback::training::RestTarget::NextExercise))
-        return false;
+        return reject(QStringLiteral("validation-10"));
     const auto restTarget = static_cast<biofeedback::training::RestTarget>(savedRestTarget);
 
     const double restMsValue = checkpoint.value("rest_remaining_ms").toDouble(0.0);
@@ -1533,37 +1539,37 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     if (!isFiniteNonNegative(restMsValue) || restMsValue > 86400000.0 ||
         !isFiniteNonNegative(sessionMsValue) || sessionMsValue > 9.0e15 ||
         !isFiniteNonNegative(activeMsValue) || activeMsValue > sessionMsValue)
-        return false;
+        return reject(QStringLiteral("validation-11"));
     const qint64 stagedRestMs = static_cast<qint64>(std::floor(restMsValue));
     const qint64 sessionMs = static_cast<qint64>(std::floor(sessionMsValue));
     const qint64 activeMs = static_cast<qint64>(std::floor(activeMsValue));
     if (resumeState == biofeedback::training::SessionState::Resting && stagedRestMs <= 0)
-        return false;
+        return reject(QStringLiteral("validation-12"));
     const qint64 effectiveRestMs = resumeState == biofeedback::training::SessionState::Resting
         ? stagedRestMs : 0;
 
     biofeedback::training::SessionStateMachine stagedStateMachine;
     if (!stagedStateMachine.restore(biofeedback::training::SessionState::Paused,
-                                    resumeState, restTarget)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan automatu sesji.", "ERROR"); return false; }
+                                    resumeState, restTarget)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan automatu sesji.", "ERROR"); return reject(QStringLiteral("validation-13")); }
 
     // Parse and validate the detector independently of the live detector.
     biofeedback::training::RepetitionDetector stagedDetector;
     stagedDetector.setTargetForce(stagedPlan[exerciseIndex].targetForce);
     const QJsonObject detectorObject = checkpoint.value("repetition_detector").toObject();
     const bool hasDetectorSnapshot = !detectorObject.isEmpty();
-    if (checkpointVersion >= 2 && !hasDetectorSnapshot) return false;
+    if (checkpointVersion >= 2 && !hasDetectorSnapshot) return reject(QStringLiteral("validation-14"));
     if (hasDetectorSnapshot && resumeState == biofeedback::training::SessionState::Active) {
         biofeedback::training::RepetitionDetectorSnapshot detectorSnapshot;
         const int detectorVersion = detectorObject.value("version").toInt(-1);
         if (detectorVersion != 1 || !detectorObject.value("samples").isArray())
-            return false;
+            return reject(QStringLiteral("validation-15"));
         detectorSnapshot.version = static_cast<std::uint32_t>(detectorVersion);
         detectorSnapshot.active = detectorObject.value("active").toBool(false);
         detectorSnapshot.waitingForRelease = detectorObject.value("waiting_for_release").toBool(false);
         if (!readUnsignedTimestamp(detectorObject.value("start_timestamp_ms"), detectorSnapshot.startTimestampMs) ||
             !readUnsignedTimestamp(detectorObject.value("last_timestamp_ms"), detectorSnapshot.lastTimestampMs) ||
             !readUnsignedTimestamp(detectorObject.value("peak_timestamp_ms"), detectorSnapshot.peakTimestampMs))
-            return false;
+            return reject(QStringLiteral("validation-16"));
         detectorSnapshot.peakForceN = detectorObject.value("peak_force_n").toDouble(
             std::numeric_limits<double>::quiet_NaN());
         detectorSnapshot.areaForceMs = detectorObject.value("area_force_ms").toDouble(
@@ -1574,28 +1580,28 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         const QJsonArray samples = detectorObject.value("samples").toArray();
         if (!std::isfinite(sampleCount) || sampleCount < 0.0 || sampleCount > 100000.0 ||
             std::floor(sampleCount) != sampleCount || samples.size() != static_cast<int>(sampleCount))
-            return false;
+            return reject(QStringLiteral("validation-17"));
         detectorSnapshot.sampleCount = static_cast<std::size_t>(sampleCount);
         detectorSnapshot.samples.reserve(static_cast<std::size_t>(samples.size()));
         for (const QJsonValue& value : samples) {
-            if (!value.isObject()) return false;
+            if (!value.isObject()) return reject(QStringLiteral("validation-18"));
             const QJsonObject sample = value.toObject();
             std::uint32_t timestamp = 0;
             const double force = sample.value("force_n").toDouble(
                 std::numeric_limits<double>::quiet_NaN());
             if (!readUnsignedTimestamp(sample.value("timestamp_ms"), timestamp) ||
-                !isFiniteNonNegative(force)) return false;
+                !isFiniteNonNegative(force)) return reject(QStringLiteral("validation-19"));
             detectorSnapshot.samples.push_back({timestamp, force});
         }
-        if (!stagedDetector.restore(detectorSnapshot)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan detektora.", "ERROR"); return false; }
+        if (!stagedDetector.restore(detectorSnapshot)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan detektora.", "ERROR"); return reject(QStringLiteral("validation-20")); }
     }
 
     // The statistics are already loaded from the recovered history entry.
     // Stage their shape before committing any of the execution state.
     const QVector<ExerciseStats> stagedStats = m_analyticsWidget->currentStats();
-    if (stagedStats.size() != stagedPlan.size()) { addDebugMessage(QString("Punkt kontrolny odrzucony: liczba zestawów statystyk (%1) różni się od planu (%2).").arg(stagedStats.size()).arg(stagedPlan.size()), "ERROR"); return false; }
+    if (stagedStats.size() != stagedPlan.size()) { addDebugMessage(QString("Punkt kontrolny odrzucony: liczba zestawów statystyk (%1) różni się od planu (%2).").arg(stagedStats.size()).arg(stagedPlan.size()), "ERROR"); return reject(QStringLiteral("validation-21")); }
     for (int index = 0; index < stagedPlan.size(); ++index) {
-        if (stagedStats[index].exerciseName != stagedPlan[index].name) { addDebugMessage(QString("Punkt kontrolny odrzucony: nazwa ćwiczenia %1 nie zgadza się z planem %2.").arg(stagedStats[index].exerciseName, stagedPlan[index].name), "ERROR"); return false; }
+        if (stagedStats[index].exerciseName != stagedPlan[index].name) { addDebugMessage(QString("Punkt kontrolny odrzucony: nazwa ćwiczenia %1 nie zgadza się z planem %2.").arg(stagedStats[index].exerciseName, stagedPlan[index].name), "ERROR"); return reject(QStringLiteral("validation-22")); }
     }
 
     std::vector<biofeedback::training::RepetitionRecord> stagedSeriesRepetitions;
