@@ -9,6 +9,7 @@
 #include <QRandomGenerator>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QSignalBlocker>
 #include <QPainter>
 #include <QPen>
 #include <QBrush>
