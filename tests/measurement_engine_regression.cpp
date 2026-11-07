@@ -42,12 +42,15 @@ int main()
     assert(!engine.addSample(invalid));
     assert(engine.rejectedSampleCount() == 1);
 
-    // A source change within an active repetition is rejected.
+    // Source changes discard partial work and require a fresh first sample.
     Sample start{2.0, 3.0, ForceUnit::Newton, SampleSource::Device, true};
     assert(!engine.addSample(start));
     Sample mixed{2.1, 5.0, ForceUnit::Newton, SampleSource::Replay, true};
     assert(!engine.addSample(mixed));
-    assert(engine.rejectedSampleCount() == 2);
+    assert(engine.rejectedSampleCount() == 3);
+    Sample afterSwitch{2.2, 4.0, ForceUnit::Newton, SampleSource::Replay, true};
+    assert(!engine.addSample(afterSwitch));
+    assert(engine.isInContraction());
 
     // Shared series aggregation and target-zone accuracy are produced by the engine.
     MeasurementEngine seriesEngine({2.0, 1.0, 5.0, 0.20, 2});
