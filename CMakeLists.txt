@@ -6,6 +6,9 @@ project(biofeedback VERSION 1.0.0 LANGUAGES CXX)
 # C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Register regression tests before declaring individual test targets.
+enable_testing()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Build type
@@ -246,8 +249,7 @@ file(COPY ${CMAKE_SOURCE_DIR}/config DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
 
-# Testing
-enable_testing()
+# Additional test definitions.
 add_subdirectory(tests OPTIONAL)
 
 # Documentation
