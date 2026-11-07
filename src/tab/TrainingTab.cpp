@@ -980,6 +980,12 @@ void TrainingTab::onTimerTick()
                         .arg(activeMinutes, 2, 10, QChar('0'))
                         .arg(activeRemainder, 2, 10, QChar('0')));
     updateProgressWidgets();
+    // Atomically keep a recent snapshot of current progress, including rest
+    // milliseconds and the in-flight repetition detector.
+    if (m_stateMachine.running() && !m_stateMachine.paused() &&
+        !saveExecutionCheckpoint()) {
+        addDebugMessage("Nie udało się zapisać bieżącego punktu kontrolnego.", "ERROR");
+    }
     if (m_sessionTime > 0 && m_sessionTime % 5 == 0 && m_sessionTime != m_lastCheckpointSeconds) {
         m_lastCheckpointSeconds = m_sessionTime;
         if (!saveExecutionCheckpoint())
