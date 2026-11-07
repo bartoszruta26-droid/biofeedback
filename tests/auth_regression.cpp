@@ -8,10 +8,15 @@
 
 namespace {
 const char* kUsersFile="/tmp/biofeedback_auth_regression_users.json";
+const char* kFirstRunFile="/tmp/biofeedback_auth_regression_first_run.json";
 void expect(bool ok,const std::string& message){if(!ok)throw std::runtime_error(message);}
 std::string readAll(){
  std::ifstream in(kUsersFile,std::ios::binary);
  return std::string((std::istreambuf_iterator<char>(in)),std::istreambuf_iterator<char>());
+}
+void writeEmptyUsersJson(){
+ std::ofstream out(kFirstRunFile);
+ out << "{\\n  \\"users\\": []\\n}\\n";
 }
 void writeUsersJson(){
  std::ofstream out(kUsersFile);
@@ -24,6 +29,26 @@ void writeUsersJson(){
 }
 int main(){
  try{
+  writeEmptyUsersJson();
+  biofeedback::Authentication firstRun(kFirstRunFile);
+  expect(firstRun.loadUsers(),"load empty first-run account store");
+  expect(!firstRun.hasUsers(),"first-run account store is empty");
+  expect(!firstRun.createInitialAdministrator("admin","short"),"weak initial administrator password rejected");
+  expect(firstRun.createInitialAdministrator("first-admin","first-run-strong-password-2026"),
+         "initial administrator can be created once");
+  expect(firstRun.hasUsers(),"first-run administrator persisted");
+  expect(!firstRun.createInitialAdministrator("second-admin","another-strong-password-2026"),
+         "initial administrator cannot be replaced");
+  expect(firstRun.login("first-admin","first-run-strong-password-2026"),
+         "first-run administrator can log in");
+  expect(!firstRun.requiresPasswordChange(),"new administrator starts with a strong password");
+  firstRun.logout();
+  biofeedback::Authentication firstRunReloaded(kFirstRunFile);
+  expect(firstRunReloaded.loadUsers(),"reload first-run administrator");
+  expect(firstRunReloaded.login("first-admin","first-run-strong-password-2026"),
+         "first-run administrator credentials persist");
+  std::remove(kFirstRunFile);
+
   writeUsersJson();
   biofeedback::Authentication auth(kUsersFile);
   expect(auth.loadUsers(),"loadUsers");
