@@ -19,10 +19,10 @@ int main() {
         expect(TuiModel::previous(Screen::Dashboard) == Screen::Settings, "previous should wrap");
         expect(std::string(TuiModel::info(Screen::Devices).title) == "Urządzenia",
                "device screen title should be localized");
-        std::cout << "OK: tui_model_regression\\n";
+        std::cout << "OK: tui_model_regression\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& error) {
-        std::cerr << "FAIL: " << error.what() << '\\n';
+        std::cerr << "FAIL: " << error.what() << '\n';
         return EXIT_FAILURE;
     }
 }
