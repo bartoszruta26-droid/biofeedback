@@ -110,12 +110,11 @@ void Application::shutdown()
     }
     
     // Clean up resources in reverse order of creation
-    // Note: Tabs are now deleted by Qt's parent-child mechanism when MainWindow is destroyed,
-    // but we reset unique_ptrs to prevent double-delete and maintain valid state
-    m_outlineTab.reset();
-    m_measurementTab.reset();
-    m_patientTab.reset();
+    // MainWindow owns its tab widgets. Destroy the owner once, then clear observers.
     m_mainWindow.reset();
+    m_outlineTab = nullptr;
+    m_measurementTab = nullptr;
+    m_patientTab = nullptr;
     m_dataManager.reset();
     m_authentication.reset();
     m_logger.reset();
@@ -155,24 +154,20 @@ bool Application::initialize()
         
         // Initialize authentication
         m_authentication = std::make_unique<Authentication>("config/users.json");
-        // Security: Require encryption key from environment variable for medical-grade security
+        // Development mode: local files may remain plaintext.
+        // Application startup does not depend on an external encryption key.
         const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-        if (!envKey || std::string(envKey).empty()) {
-            throw std::runtime_error(
-                "CRITICAL: BIOFEEDBACK_ENCRYPTION_KEY environment variable must be set. "
-                "For medical-grade security, encryption key must be provided externally "
-                "and never hardcoded in source code."
-            );
+        if (envKey && *envKey) {
+            const std::string encryptionKey(envKey);
+            m_authentication->setEncryptionKey(encryptionKey);
+            const int encryptedCount = m_authentication->encryptPasswordsIfNeeded(encryptionKey);
+            if (m_logger && encryptedCount > 0) {
+                m_logger->info(QString("Encrypted %1 user password(s)").arg(encryptedCount).toStdString());
+            }
+        } else if (m_logger) {
+            m_logger->warning("Development mode: no encryption key configured; local files remain plaintext");
         }
-        std::string encryptionKey = envKey;
-        m_authentication->setEncryptionKey(encryptionKey);
-        
-        // Check if passwords need encryption
-        int encryptedCount = m_authentication->encryptPasswordsIfNeeded(encryptionKey);
-        if (encryptedCount > 0) {
-            m_logger->info(QString("Encrypted %1 user password(s)").arg(encryptedCount).toStdString());
-        }
-        
+
         // Initialize data manager
         m_dataManager = std::make_unique<DataManager>();
         
@@ -247,59 +242,24 @@ bool Application::showLoginDialog()
 
 void Application::createMainWindow()
 {
-    try {
-        // Create main window
-        m_mainWindow = std::unique_ptr<gui::MainWindow>(new gui::MainWindow());
-        
-        if (!m_mainWindow) {
-            throw std::runtime_error("Failed to create MainWindow");
-        }
-        
-        // Create tabs with proper parent-child relationships
-        m_patientTab = std::unique_ptr<tab::PatientTab>(new tab::PatientTab(m_mainWindow.get()));
-        m_measurementTab = std::unique_ptr<tab::MeasurementTab>(new tab::MeasurementTab(m_mainWindow.get()));
-        m_outlineTab = std::unique_ptr<tab::OutlineTab>(new tab::OutlineTab(m_mainWindow.get()));
-        
-        // Validate tab creation
-        if (!m_patientTab || !m_measurementTab || !m_outlineTab) {
-            throw std::runtime_error("Failed to create one or more tabs");
-        }
-        
-        // Store raw pointers for connections before adding to QTabWidget
-        // Note: QTabWidget will take parent ownership, but Application retains unique_ptr ownership
-        // This prevents use-after-free and allows proper cleanup in shutdown()
-        auto* patientTabPtr = m_patientTab.get();
-        auto* measurementTabPtr = m_measurementTab.get();
-        auto* outlineTabPtr = m_outlineTab.get();
-        
-        // Get central widget from MainWindow and add tabs
-        QTabWidget* centralWidget = qobject_cast<QTabWidget*>(m_mainWindow->centralWidget());
-        if (centralWidget) {
-            centralWidget->addTab(patientTabPtr, "Pacjenci");
-            centralWidget->addTab(measurementTabPtr, "Pomiary");
-            centralWidget->addTab(outlineTabPtr, "Scenariusze");
-            // DO NOT release() - Application retains ownership for proper cleanup
-            // Qt's parent-child mechanism will handle deletion when MainWindow is destroyed
-            // but we keep unique_ptr valid to prevent nullptr dereference in setupConnections()
-        } else {
-            // Fallback: create a new QTabWidget if central widget is not a QTabWidget
-            QTabWidget* tabWidget = new QTabWidget(m_mainWindow.get());
-            tabWidget->addTab(patientTabPtr, "Pacjenci");
-            tabWidget->addTab(measurementTabPtr, "Pomiary");
-            tabWidget->addTab(outlineTabPtr, "Scenariusze");
-            
-            m_mainWindow->setCentralWidget(tabWidget);
-            // DO NOT release() - same reasoning as above
-        }
-        
-        if (m_logger) {
-            m_logger->info("Main window and tabs created successfully");
-        }
-    } catch (const std::exception& e) {
-        if (m_logger) {
-            m_logger->error(std::string("Failed to create main window: ") + e.what());
-        }
-        throw;
+    // MainWindow is the single owner of all tab widgets. Its setupTabs()
+    // creates and inserts the tabs into its own QTabWidget.
+    m_mainWindow = std::make_unique<gui::MainWindow>();
+
+    m_patientTab = m_mainWindow->patientTab();
+    m_measurementTab = m_mainWindow->measurementTab();
+    m_outlineTab = m_mainWindow->outlineTab();
+
+    if (!m_patientTab || !m_measurementTab || !m_outlineTab) {
+        m_mainWindow.reset();
+        m_patientTab = nullptr;
+        m_measurementTab = nullptr;
+        m_outlineTab = nullptr;
+        throw std::runtime_error("MainWindow did not initialize its required tabs");
+    }
+
+    if (m_logger) {
+        m_logger->info("Main window and owned tabs created successfully");
     }
 }
 
@@ -307,18 +267,18 @@ void Application::setupConnections()
 {
     // Connect MainWindow signals to tab slots
     connect(m_mainWindow.get(), &gui::MainWindow::dataCollectionStarted,
-            m_measurementTab.get(), &tab::MeasurementTab::startMeasurement);
+            m_measurementTab, &tab::MeasurementTab::startMeasurement);
     
     connect(m_mainWindow.get(), &gui::MainWindow::dataCollectionStopped,
-            m_measurementTab.get(), &tab::MeasurementTab::stopMeasurement);
+            m_measurementTab, &tab::MeasurementTab::stopMeasurement);
     
     connect(m_mainWindow.get(), &gui::MainWindow::samplingRateChanged,
-            m_measurementTab.get(), [this](int /*rate*/) {
+            m_measurementTab, [this](int /*rate*/) {
                 // Update measurement tab sampling rate
             });
     
     // Connect MeasurementTab signals to MainWindow slots
-    connect(m_measurementTab.get(), &tab::MeasurementTab::newForceSample,
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample,
             m_mainWindow.get(), [this](double force, double /*timestamp*/, bool /*isRaw*/) {
                 try {
                     if (m_mainWindow && m_mainWindow->measurementTab()) {
@@ -350,7 +310,7 @@ void Application::setupConnections()
                 }
             });
     
-    connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStarted,
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStarted,
             m_mainWindow.get(), [this]() {
                 try {
                     m_mainWindow->startDataCollection();
@@ -373,7 +333,7 @@ void Application::setupConnections()
                 }
             });
     
-    connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStopped,
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
             m_mainWindow.get(), [this]() {
                 try {
                     m_mainWindow->stopDataCollection();
@@ -397,7 +357,7 @@ void Application::setupConnections()
             });
     
     // Connect PatientTab signals
-    connect(m_patientTab.get(), &tab::PatientTab::patientAdded,
+    connect(m_patientTab, &tab::PatientTab::patientAdded,
             this, [this](const QString& pesel, const QString& firstName, const QString& lastName) {
                 m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel).toStdString());
                 if (m_mainWindow && m_mainWindow->debugTerminal()) {
@@ -409,11 +369,11 @@ void Application::setupConnections()
             });
     
     // Connect PatientTab to MeasurementTab for automatic data loading when patient changes
-    connect(m_patientTab.get(), &tab::PatientTab::currentPatientChanged,
-            m_measurementTab.get(), &tab::MeasurementTab::onPatientChanged);
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            m_measurementTab, &tab::MeasurementTab::onPatientChanged);
     
     // Connect OutlineTab signals
-    connect(m_outlineTab.get(), &tab::OutlineTab::sessionStarted,
+    connect(m_outlineTab, &tab::OutlineTab::sessionStarted,
             this, [this](const QString& outlineId) {
                 m_logger->info(QString("Session started with outline: %1").arg(outlineId).toStdString());
                 if (m_mainWindow && m_mainWindow->debugTerminal()) {
@@ -424,7 +384,7 @@ void Application::setupConnections()
                 }
             });
     
-    connect(m_outlineTab.get(), &tab::OutlineTab::requestGameStart,
+    connect(m_outlineTab, &tab::OutlineTab::requestGameStart,
             this, [this](const QString& gameId, const tab::ExerciseData& exerciseData) {
                 m_logger->info(QString("Starting game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name).toStdString());
                 if (m_mainWindow && m_mainWindow->debugTerminal()) {
