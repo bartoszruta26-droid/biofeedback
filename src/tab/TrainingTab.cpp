@@ -7,6 +7,7 @@
 #include <QFont>
 #include <QColor>
 #include <QStackedWidget>
+#include <cmath>
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
@@ -656,26 +657,29 @@ QVector<ExerciseStats> TrainingTab::getTrainingStats() const
 bool TrainingTab::exportResultsToCSV(const QString& filename)
 {
     QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-    
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
+
     QTextStream out(&file);
-    
-    // Nagłówek
-    out << "Ćwiczenie,Seria,Powtórzenie,Siła szczytowa,Czas do szczytu,Wynik\n";
-    
+    out << "Ćwiczenie,Seria,Powtórzenie,Czas_trwania_ms,Czas_do_szczytu_ms,"
+           "Siła_średnia_N,Siła_szczytowa_N,Próbki,Cel_osiągnięty\n";
+
     for (const auto& stats : m_exerciseStats) {
-        out << stats.exerciseName << ","
-            << stats.completedSeries << ","
-            << stats.completedReps << ","
-            << stats.avgPeakForce << ","
-            << stats.avgReactionTime << ","
-            << stats.consistencyScore << "\n";
+        for (const auto& item : stats.repetitions) {
+            const auto& rep = item.measurement;
+            const bool targetReached = item.seriesIndex > 0 &&
+                item.seriesIndex <= stats.series.size() &&
+                rep.peakForceN > 0.0;
+            out << '"' << stats.exerciseName.replace('"', "\"\"") << '"' << ","
+                << item.seriesIndex << "," << item.repetitionIndex << ","
+                << rep.durationMs << "," << rep.timeToPeakMs << ","
+                << QString::number(rep.meanForceN, 'f', 4) << ","
+                << QString::number(rep.peakForceN, 'f', 4) << ","
+                << rep.sampleCount << "," << (targetReached ? "tak" : "nie") << "\n";
+        }
     }
-    
+
     file.close();
-    return true;
+    return file.error() == QFile::NoError;
 }
 
 bool TrainingTab::importTrainingPlan(const QString& filename)
