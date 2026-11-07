@@ -23,8 +23,9 @@ struct SensorData {
     double calibratedValue;  ///< Wartość po kalibracji
     uint8_t crc;             ///< Suma kontrolna CRC
     bool isValid;            ///< Flagi poprawności danych
+    bool hasFrame;            ///< Czy odebrano ramkę (również z błędnym CRC)
     
-    SensorData() : timestamp(0), value(0), calibratedValue(0.0), crc(0), isValid(false) {}
+    SensorData() : timestamp(0), value(0), calibratedValue(0.0), crc(0), isValid(false), hasFrame(false) {}
 };
 
 /**
