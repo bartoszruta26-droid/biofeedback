@@ -321,9 +321,6 @@ private:
     QString serializeSessionToJSON(const MeasurementSession& session) const;
     MeasurementSession deserializeSessionFromJSON(const QString& json) const;
     
-    // Metody SerialCommunication
-    void connectToArduinoAsync();
-    
     // Konwersja jednostek
     double convertForce(double newtons, ForceUnit targetUnit) const;
     ForceUnit getCurrentUnit() const { return m_currentUnit; }
@@ -420,7 +417,6 @@ private:
     std::unique_ptr<sensor::MeasurementSerialAdapter> m_measurementAdapter;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
     sensor::SensorData m_lastSensorData;
-    bool m_hasArduinoConnection;
 };
 
 } // namespace tab
