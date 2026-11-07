@@ -7,6 +7,8 @@ header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
 analytics = Path("src/tab/TrainingAnalyticsWidget.cpp").read_text(encoding="utf-8")
 machine = Path("include/training/SessionStateMachine.hpp").read_text(encoding="utf-8")
 clock = Path("include/training/TrainingSessionClock.hpp").read_text(encoding="utf-8")
+restart_test = Path("tests/training_history_restart_regression.cpp").read_text(encoding="utf-8")
+cmake = Path("CMakeLists.txt").read_text(encoding="utf-8")
 
 checks = {
     "plan is persisted": '"exercise_plan"' in tab and '"series_count"' in tab and '"repetitions_per_series"' in tab,
@@ -34,6 +36,19 @@ checks = {
         "const QJsonArray repetitions = object.value(\"repetitions\").toArray();" in analytics and
         "const QJsonArray samples = repetitionObject.value(\"samples\").toArray();" in analytics and
         "record.measurement.samples.push_back(sample);" in analytics
+    ),
+    "restart-level test recreates the analytics widget": (
+        "TrainingAnalyticsWidget firstProcess;" in restart_test and
+        "TrainingAnalyticsWidget restartedProcess;" in restart_test and
+        "recoverPendingSession(recoveredEntry)" in restart_test
+    ),
+    "restart-level test verifies no duplicate history row": (
+        "document.array().size() == 1" in restart_test and
+        "repetition_count\").toInt() == 2" in restart_test
+    ),
+    "restart-level test is registered for offscreen Qt": (
+        "training_history_restart_regression" in cmake and
+        "QT_QPA_PLATFORM=offscreen" in cmake
     ),
     "checkpoint persists the full exercise and repetition history": (
         "entry.insert(\"exercises\", exerciseEntries);" in analytics and
