@@ -80,7 +80,11 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
     m_peakChart = new QtCharts::QChartView(m_tabs);
     m_peakChart->setRenderHint(QPainter::Antialiasing);
     m_peakChart->setMinimumHeight(260);
-    m_tabs->addTab(m_peakChart, tr("Wykres siły"));
+    m_forceTraceChart = new QtCharts::QChartView(m_tabs);
+    m_forceTraceChart->setRenderHint(QPainter::Antialiasing);
+    m_forceTraceChart->setMinimumHeight(260);
+    m_tabs->addTab(m_peakChart, tr("Siła szczytowa"));
+    m_tabs->addTab(m_forceTraceChart, tr("Przebieg siły"));
     m_tabs->addTab(m_seriesTable, tr("Analiza serii"));
     m_tabs->addTab(m_repetitionTable, tr("Powtórzenia"));
     m_tabs->addTab(m_historyTable, tr("Historia sesji"));
@@ -101,6 +105,7 @@ void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int 
     rebuildSeriesTable(stats);
     rebuildRepetitionTable(stats);
     rebuildPeakChart(stats);
+    rebuildForceTraceChart(stats);
 }
 
 void TrainingAnalyticsWidget::setHistoryFilePath(const QString& filePath) {
@@ -285,6 +290,7 @@ void TrainingAnalyticsWidget::onHistoryEntryActivated(int row, int /*column*/) {
     rebuildSeriesTable(restored);
     rebuildRepetitionTable(restored);
     rebuildPeakChart(restored);
+    rebuildForceTraceChart(restored);
     m_summaryLabel->setText(tr("Odtworzona sesja z %1 | %2 ćwiczeń, %3 powtórzeń | %4 N średnio, %5 N maksymalnie")
         .arg(entry.value("saved_at").toString())
         .arg(entry.value("exercise_count").toInt())
@@ -513,6 +519,49 @@ void TrainingAnalyticsWidget::rebuildPeakChart(const QVector<ExerciseStats>& sta
         series->attachAxis(axisY);
     }
     m_peakChart->setChart(chart);
+}
+
+void TrainingAnalyticsWidget::rebuildForceTraceChart(const QVector<ExerciseStats>& stats) {
+    auto* chart = new QtCharts::QChart();
+    chart->setTitle(tr("Przebieg siły w czasie — zapisane próbki powtórzeń"));
+    int traceCount = 0;
+    double maximumForce = 0.0;
+    double maximumDuration = 0.0;
+
+    for (const auto& exercise : stats) {
+        for (const auto& item : exercise.repetitions) {
+            const auto& repetition = item.measurement;
+            if (repetition.samples.size() < 2) continue;
+            auto* series = new QtCharts::QLineSeries(chart);
+            series->setName(QString("%1 · S%2 · P%3")
+                .arg(exercise.exerciseName).arg(item.seriesIndex).arg(item.repetitionIndex));
+            const std::uint32_t start = repetition.samples.front().timestampMs;
+            for (const auto& sample : repetition.samples) {
+                const std::uint32_t elapsedMs = sample.timestampMs - start;
+                const double elapsedSeconds = static_cast<double>(elapsedMs) / 1000.0;
+                series->append(elapsedSeconds, sample.forceN);
+                maximumDuration = std::max(maximumDuration, elapsedSeconds);
+                maximumForce = std::max(maximumForce, sample.forceN);
+            }
+            chart->addSeries(series);
+            ++traceCount;
+        }
+    }
+
+    chart->legend()->setVisible(traceCount > 0 && traceCount <= 8);
+    auto* axisX = new QtCharts::QValueAxis(chart);
+    axisX->setTitleText(tr("Czas od początku powtórzenia [s]"));
+    axisX->setRange(0.0, maximumDuration > 0.0 ? maximumDuration : 1.0);
+    auto* axisY = new QtCharts::QValueAxis(chart);
+    axisY->setTitleText(tr("Siła [N]"));
+    axisY->setRange(0.0, maximumForce > 0.0 ? maximumForce * 1.1 : 1.0);
+    chart->addAxis(axisX, Qt::AlignBottom);
+    chart->addAxis(axisY, Qt::AlignLeft);
+    for (auto* series : chart->series()) {
+        series->attachAxis(axisX);
+        series->attachAxis(axisY);
+    }
+    m_forceTraceChart->setChart(chart);
 }
 
 } // namespace tab
