@@ -99,10 +99,17 @@ int main() {
             (void)serial.getLastError();
         }
     });
+    std::thread errorReader([&]() {
+        for (int i = 0; i < 500; ++i) (void)serial.getLastError();
+    });
     std::thread watchdogWriter([&]() {
         for (int i = 0; i < 500; ++i) {
             serial.configureWatchdog(1000 + (i % 1000), true);
             serial.resetWatchdog();
+        }
+    });
+    std::thread watchdogReader([&]() {
+        for (int i = 0; i < 500; ++i) {
             if (serial.getTimeSinceLastActivity() < 0) metadataOk.store(false);
             (void)serial.isWatchdogOK();
         }
@@ -110,22 +117,30 @@ int main() {
     std::thread calibrationWriter([&]() {
         for (int i = 1; i <= 500; ++i) {
             serial.setCalibrationPoint(i, static_cast<double>(i) / 10.0);
-            (void)serial.convertToCalibrated(i);
-            (void)serial.getCalibrationScale();
-            (void)serial.getCalibrationOffset();
             serial.resetCalibration();
         }
     });
-    std::thread timestampWriter([&]() {
-        for (uint32_t i = 1; i <= 500; ++i) {
-            serial.syncTimestamp(i);
-            (void)serial.getTimestampOffset();
+    std::thread calibrationReader([&]() {
+        for (int i = 0; i < 500; ++i) {
+            (void)serial.convertToCalibrated(i);
+            (void)serial.getCalibrationScale();
+            (void)serial.getCalibrationOffset();
         }
     });
+    std::thread timestampWriter([&]() {
+        for (uint32_t i = 1; i <= 500; ++i) serial.syncTimestamp(i);
+    });
+    std::thread timestampReader([&]() {
+        for (int i = 0; i < 500; ++i) (void)serial.getTimestampOffset();
+    });
     errorWriter.join();
+    errorReader.join();
     watchdogWriter.join();
+    watchdogReader.join();
     calibrationWriter.join();
+    calibrationReader.join();
     timestampWriter.join();
+    timestampReader.join();
     if (!metadataOk.load()) {
         std::cerr << "Concurrent serial metadata regression failed\\n";
         serial.disconnect();
