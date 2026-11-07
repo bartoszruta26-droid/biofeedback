@@ -14,6 +14,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
+#include "measurement/Units.hpp"
 
 namespace tab {
 
@@ -936,7 +937,7 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 
     // Firmware reports calibrated mass-equivalent values in grams. Training
     // targets are expressed in newtons (SI), so convert exactly once here.
-    const double force = data.calibratedValue * 9.80665 / 1000.0;
+    const double force = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
     if (!std::isfinite(force) || force < 0.0) return;
     m_currentForce = force;
 
