@@ -3,6 +3,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(biofeedback VERSION 1.0.0 LANGUAGES CXX)
 
+find_package(Threads REQUIRED)
+
 # C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,7 +71,7 @@ target_include_directories(training_session_clock_regression PRIVATE ${CMAKE_SOU
 add_test(NAME training_session_clock_regression COMMAND training_session_clock_regression)
 
 add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
-target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement)
+target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement Threads::Threads)
 add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
 
 add_executable(measurement_training_pipeline_regression tests/measurement_training_pipeline_regression.cpp)
