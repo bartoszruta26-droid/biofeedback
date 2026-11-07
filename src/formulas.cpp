@@ -722,7 +722,21 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     
     std::vector<double> forces = extractForces(rep.samples);
     if (forces.size() < 3) return params;
-    
+    bool hasPreviousTimestamp = false;
+    std::uint32_t previousTimestamp = 0;
+    for (const auto& sample : rep.samples) {
+        if (!sample.isValid || !std::isfinite(sample.force)) continue;
+        if (hasPreviousTimestamp) {
+            const std::uint32_t delta = sample.timestamp - previousTimestamp;
+            if (delta == 0 || delta >= 0x80000000u) {
+                params.availability.fill(ParameterAvailability::InvalidInput);
+                return params;
+            }
+        }
+        previousTimestamp = sample.timestamp;
+        hasPreviousTimestamp = true;
+    }
+
     // Parametry siłowe
     params.F_peak = calculatePeakForce(forces);
     params.F_mean = calculateMeanForce(forces);
@@ -788,8 +802,23 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
             [](const SensorSample& sample) {
                 return sample.isValid && std::isfinite(sample.force);
             });
+        bool hasPreviousTimestamp = false;
+        std::uint32_t previousTimestamp = 0;
+        bool timestampsValid = true;
+        for (const auto& sample : rep.samples) {
+            if (!sample.isValid || !std::isfinite(sample.force)) continue;
+            if (hasPreviousTimestamp) {
+                const std::uint32_t delta = sample.timestamp - previousTimestamp;
+                if (delta == 0 || delta >= 0x80000000u) {
+                    timestampsValid = false;
+                    break;
+                }
+            }
+            previousTimestamp = sample.timestamp;
+            hasPreviousTimestamp = true;
+        }
         if (validSamples < 3 || durationMs == 0 || durationMs >= 0x80000000u ||
-            concentricMs > durationMs || eccentricMs > durationMs) {
+            concentricMs > durationMs || eccentricMs > durationMs || !timestampsValid) {
             params.availability.fill(ParameterAvailability::InvalidInput);
             return params;
         }
