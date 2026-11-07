@@ -45,6 +45,11 @@ int main()
     assert(loaded->zeroOffsetRaw == profile.zeroOffsetRaw);
     assert(loaded->scaleFactor == profile.scaleFactor);
 
+    profile.firmwareVersion = "1.2.1";
+    assert(sensor::CalibrationProfileStore::save(path, profile, &error));
+    const auto replaced = sensor::CalibrationProfileStore::load(path, "device-123", &error);
+    assert(replaced && replaced->firmwareVersion == "1.2.1");
+
     assert(!sensor::CalibrationProfileStore::load(path, "different-device", &error).has_value());
 
     profile.schemaVersion = 99;
