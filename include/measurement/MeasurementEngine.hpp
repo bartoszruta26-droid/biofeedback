@@ -16,6 +16,7 @@ enum class Quality {
     NonFiniteValue,
     MissingTimestamp,
     InvalidUnit,
+    InvalidSource,
     OutsideConfiguredRange
 };
 
@@ -63,7 +64,7 @@ public:
 
     static bool normalizeUnit(const std::string& inputUnit,
                               std::string& canonicalUnit,
-                              double& multiplier) noexcept;
+                              double& multiplier);
 
 private:
     MeasurementEngineConfig m_config;
