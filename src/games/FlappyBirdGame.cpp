@@ -29,6 +29,7 @@ FlappyBirdGame::FlappyBirdGame(QWidget *parent)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
     , m_currentForce(0.0)
+    , m_wasFlapping(false)
     , m_obstaclesPassed(0)
 {
 }
@@ -45,6 +46,7 @@ void FlappyBirdGame::initialize() {
     setDifficultyLevel(1);
     m_gameSpeed = 1.0f;
     m_currentForce = 0.0;
+    m_wasFlapping = false;
     m_obstaclesPassed = 0;
     
     // Inicjalizacja ptaka
@@ -179,6 +181,10 @@ void FlappyBirdGame::normalizeForceValue(double rawValue) {
 
 bool FlappyBirdGame::handleInput(double value) {
     normalizeForceValue(value);
+    const bool isPressing = m_currentForce > 0.1;
+    if (isPressing && !m_wasFlapping && isRunning())
+        m_birdVelocity.setY(static_cast<float>(m_currentForce) * m_flapForce);
+    m_wasFlapping = isPressing;
     return true;
 }
 
@@ -210,13 +216,6 @@ void FlappyBirdGame::spawnObstacle() {
 void FlappyBirdGame::updateBird(double deltaTime) {
     // Aplikowanie grawitacji
     m_birdVelocity.setY(m_birdVelocity.y() + m_gravity * deltaTime);
-    
-    // Aplikowanie siły z sensora (naciąg tensometru)
-    if (m_currentForce > 0.1) {
-        // Im większa siła, tym silniejsze odbicie w górę
-        float flapStrength = static_cast<float>(m_currentForce) * m_flapForce;
-        m_birdVelocity.setY(flapStrength);
-    }
     
     // Aktualizacja pozycji
     m_birdPos.setY(m_birdPos.y() + m_birdVelocity.y() * deltaTime);
