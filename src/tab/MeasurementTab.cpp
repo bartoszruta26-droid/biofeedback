@@ -1383,7 +1383,6 @@ void MeasurementTab::onReadSingleSample()
     // Odczyt z Arduino Nano z HX711 przez SerialCommunication
     if (m_serialPort && m_serialPort->isConnected()) {
         sensor::SensorData data = m_serialPort->readData(500);
-        if (m_measurementAdapter && data.hasFrame) m_measurementAdapter->processSample(data);
         if (data.isValid) {
             // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
             double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
@@ -1408,7 +1407,6 @@ void MeasurementTab::onTimerTick()
     if (m_serialPort && m_serialPort->isConnected()) {
         sensor::SensorData data;
         const bool sampleValid = m_serialPort->tryReadData(data);
-        if (m_measurementAdapter && data.hasFrame) m_measurementAdapter->processSample(data);
         if (sampleValid) {
             if (data.isValid) {
                 std::cout << "[DEBUG] onTimerTick: RAW DATA FROM ARDUINO - timestamp=" << data.timestamp 
