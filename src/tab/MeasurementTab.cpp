@@ -1921,6 +1921,9 @@ bool MeasurementTab::isArduinoConnected() const
 
 void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
+    // Always replace the last frame, including rejected frames, so manual
+    // capture can never reuse a stale calibrated sample.
+    m_lastSensorData = data;
     if (!data.isValid) {
         addDebugMessage(tr("Otrzymano nieprawidłową ramkę z czujnika"), "WARNING");
         return;
@@ -1929,8 +1932,6 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         addDebugMessage(tr("Ramka zawiera tylko dane RAW; oczekuję na skalibrowaną wartość w gramach."), "WARNING");
         return;
     }
-
-    m_lastSensorData = data;
     addDebugMessage(QString("HX711: RAW=%1 | skalibrowana masa=%2 g")
         .arg(data.value).arg(data.calibratedValue, 0, 'f', 2), "ARDUINO");
 
