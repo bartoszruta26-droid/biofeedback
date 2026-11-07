@@ -30,7 +30,7 @@ MeasurementSerialAdapter::MeasurementSerialAdapter(
             biofeedback::measurement::MeasurementInput input;
             input.deviceTimestampMs = data.timestamp;
             input.rawValue = data.value;
-            input.value = data.calibratedValue;
+            input.value = m_serial.convertToCalibrated(data.value);
             input.sensorValid = data.isValid;
             input.unit = unitCopy;
             input.source = sourceCopy;
