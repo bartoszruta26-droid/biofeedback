@@ -448,7 +448,7 @@ void ConfigManager::setDefaults() {
     m_loaded = true;
     
     logMessage(ConfigManagerLogLevel::INFO,
-              QString("Default configuration set (%1 keys)").arg(m_config.size()),
+              QString("Default configuration set (%1 keys)").arg(m_config.size()).toStdString(),
               "setDefaults");
 }
 
