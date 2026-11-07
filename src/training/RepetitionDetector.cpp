@@ -74,15 +74,15 @@ bool RepetitionDetector::process(std::uint32_t timestampMs, double forceN, bool 
     // Unsigned subtraction deliberately handles the 32-bit device clock wrap.
     const std::uint32_t deltaMs = timestampMs - m_lastTimestampMs;
     if (deltaMs == 0 || deltaMs > m_config.maximumSampleGapMs) {
+        // A missing/duplicated interval makes the contraction boundary unknown.
+        // Discard the partial repetition and wait for a fresh low-to-high edge.
         reset();
-        if (forceN >= activationThresholdN()) begin(timestampMs, forceN);
         return false;
     }
 
     const std::uint32_t durationMs = timestampMs - m_startTimestampMs;
     if (durationMs > m_config.maximumDurationMs) {
         reset();
-        if (forceN >= activationThresholdN()) begin(timestampMs, forceN);
         return false;
     }
 
