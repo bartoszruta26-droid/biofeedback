@@ -25,7 +25,7 @@ Dane plikowe są szyfrowane przez istniejący format wersjonowany `BFENC:v1:` op
 
 ## Zmiana ustawienia
 
-- Zmiana z `false` na `true`: nowe zapisy są szyfrowane. Istniejące pliki jawne pozostają jawne do chwili ich ponownego zapisania; przed użyciem produkcyjnym należy wykonać kontrolowaną migrację całego katalogu danych.
+- Zmiana z `false` na `true`: nowe zapisy są szyfrowane. Jawne pliki kont i dane pacjentów są odrzucane w trybie szyfrowania; przed włączeniem opcji należy wykonać kontrolowaną, zweryfikowaną migrację wszystkich istniejących plików. Nie ma automatycznego szyfrowania plików historycznych.
 - Zmiana z `true` na `false`: nowe zapisy są jawne. Pliki z prefiksem `BFENC:v1:` nadal są rozpoznawane i odszyfrowywane przy odczycie, o ile dostarczono ten sam klucz. Nie usuwać klucza, dopóki wszystkie pliki zaszyfrowane nie zostaną świadomie zmigrowane.
 - Brak klucza przy `enabled: true` zatrzymuje inicjalizację aplikacji.
 
