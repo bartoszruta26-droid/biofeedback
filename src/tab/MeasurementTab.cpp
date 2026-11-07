@@ -809,6 +809,8 @@ void MeasurementTab::stopMeasurement()
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
     
     std::cout << "[DEBUG] stopMeasurement: emit measurementStopped" << std::endl;
+    if (!m_completedSeriesStats.isEmpty())
+        emit sessionFinished(m_completedSeriesStats);
     emit measurementStopped();
     
     std::cout << "[DEBUG] stopMeasurement END" << std::endl;
@@ -842,7 +844,7 @@ void MeasurementTab::resetSession()
     m_forceBar->setValue(0);
     m_lblStatus->setText("Status: GOTOWY");
     m_lblStatus->setStyleSheet("color: blue; font-weight: bold;");
-    m_lblSeriesInfo->setText("Seria: 0/3 | Powtórzenia: 0/8");
+    m_lblSeriesInfo->setText("Seria: 1 | Powtórzenia: 0/8");
     m_seriesProgress->setValue(0);
     
     m_statsTable->setRowCount(0);
@@ -1007,17 +1009,10 @@ void MeasurementTab::consumeEngineSeries(const measurement::SeriesStats& source)
     emit seriesCompleted(m_currentSeries, target);
     ++m_currentSeries;
     m_currentRepInSeries = 0;
-    if (m_currentSeries > 3) {
-        stopMeasurement();
-        m_lblStatus->setText("Status: SESJA ZAKOŃCZONA");
-        m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
-        emit sessionFinished(m_completedSeriesStats);
-    } else {
-        SeriesStats next;
-        next.seriesNumber = m_currentSeries;
-        m_completedSeriesStats.append(next);
-        m_lblStatus->setText(QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
-    }
+    SeriesStats next;
+    next.seriesNumber = m_currentSeries;
+    m_completedSeriesStats.append(next);
+    m_lblStatus->setText(QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
     updateSeriesProgress();
 }
 
@@ -1054,10 +1049,10 @@ void MeasurementTab::updateSeriesProgress()
     std::cout << "[DEBUG] updateSeriesProgress: m_currentSeries=" << m_currentSeries 
               << " m_currentRepInSeries=" << m_currentRepInSeries << std::endl;
     
-    int totalReps = (m_currentSeries - 1) * 8 + m_currentRepInSeries;
-    m_seriesProgress->setValue(totalReps);
-    m_lblSeriesInfo->setText(QString("Seria: %1/3 | Powtórzenia: %2/8")
-                             .arg(qMin(m_currentSeries, 3))
+    m_seriesProgress->setRange(0, 8);
+    m_seriesProgress->setValue(m_currentRepInSeries);
+    m_lblSeriesInfo->setText(QString("Seria: %1 | Powtórzenia: %2/8")
+                             .arg(m_currentSeries)
                              .arg(m_currentRepInSeries));
 }
 
