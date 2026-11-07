@@ -22,4 +22,23 @@ if "m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition
 if "m_repetitionDetector.reset()" not in source:
     raise SystemExit("MeasurementTab must reset repetition state at session boundaries")
 
-print("MeasurementTab lifecycle and single-ingestion policy passed")
+# The realtime pipeline must use a monotonic session clock and keep UI-only
+# buffers bounded independently from the full JSON sample archive.
+for required in (
+    "QElapsedTimer m_sessionElapsedTimer",
+    "m_sessionElapsedTimer.elapsed() / 1000.0",
+    "constexpr int liveBufferCapacity = 10000",
+    "m_recordedSamples.append(recorded)",
+    'root["samples"] = samplesArray',
+    'const QJsonArray samplesArray = root["samples"].toArray()',
+    "deserializeSessionFromJSON(jsonContent, false)",
+    "currentSeries.reps.last().endTime -",
+    "currentSeries.reps.first().startTime",
+):
+    if required not in source and required not in header:
+        raise SystemExit(f"Missing realtime/archive invariant: {required}")
+
+if 'addDebugMessage(QString("HX711: RAW=' in source:
+    raise SystemExit("Per-sample debug logging must not run in the acquisition hot path")
+
+print("MeasurementTab lifecycle, monotonic timing and sample archive regression passed")
