@@ -543,6 +543,8 @@ void TrainingTab::startTraining()
     m_btnPauseResume->setText("Pauza");
     m_configBox->setEnabled(false);
     
+    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+        addDebugMessage("Nie udało się utworzyć początkowego punktu kontrolnego sesji.", "ERROR");
     emit trainingStarted();
 }
 
@@ -611,6 +613,8 @@ void TrainingTab::pauseTraining()
     
     m_btnPauseResume->setText("Wznów");
     
+    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+        addDebugMessage("Nie udało się zapisać punktu kontrolnego pauzy.", "ERROR");
     emit trainingPaused();
 }
 
@@ -631,6 +635,8 @@ void TrainingTab::resumeTraining()
     
     m_btnPauseResume->setText("Pauza");
     
+    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+        addDebugMessage("Nie udało się zapisać punktu kontrolnego wznowienia.", "ERROR");
     emit trainingResumed();
 }
 
@@ -1193,6 +1199,8 @@ void TrainingTab::onRepetitionDetected(
     } else {
         loadNextRep();
     }
+    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+        addDebugMessage("Nie udało się zapisać punktu kontrolnego powtórzenia.", "ERROR");
 }
 
 void TrainingTab::finishCurrentSeries()
