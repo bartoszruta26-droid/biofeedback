@@ -12,6 +12,8 @@
 
 #include "core/Authentication.hpp"
 #include "core/PasswordHasher.hpp"
+#include "data/Encryption.hpp"
+#include <openssl/crypto.h>
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -754,6 +756,13 @@ bool Authentication::loadUsers()
         content << file.rdbuf();
         std::string jsonContent = content.str();
         file.close();
+        if (jsonContent.rfind("BFENC:v1:", 0) == 0) {
+            if (fileEncryptionKey.empty()) {
+                AUTH_ERROR("Plik użytkowników jest zaszyfrowany, ale brak klucza deszyfrującego");
+                return false;
+            }
+            jsonContent = Encryption::decrypt(jsonContent, fileEncryptionKey);
+        }
         
         #if DEBUG_FILE_OPERATIONS
         AUTH_DEBUG(2, "Wczytano zawartość pliku, rozmiar: " << jsonContent.length() << " bajtów");
@@ -811,6 +820,20 @@ bool Authentication::loadUsers()
  * 
  * @return true jeśli zapisywanie powiodło się, false w przeciwnym razie
  */
+void Authentication::setFileEncryption(bool enabled, const std::string& key)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!key.empty() && key.size() < 32) {
+        fileEncryptionEnabled = false;
+        if (!fileEncryptionKey.empty()) OPENSSL_cleanse(fileEncryptionKey.data(), fileEncryptionKey.size());
+        fileEncryptionKey.clear();
+        return;
+    }
+    if (!fileEncryptionKey.empty()) OPENSSL_cleanse(fileEncryptionKey.data(), fileEncryptionKey.size());
+    fileEncryptionKey = key;
+    fileEncryptionEnabled = enabled && !fileEncryptionKey.empty();
+}
+
 bool Authentication::saveUsers()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -824,7 +847,11 @@ bool Authentication::saveUsers()
             output << "\n";
         }
         output << "    ]\n}\n";
-        return writeUsersAtomically(usersFilePath, output.str());
+        const std::string serialized = output.str();
+        if (fileEncryptionEnabled && fileEncryptionKey.empty()) return false;
+        const std::string payload = fileEncryptionEnabled
+            ? Encryption::encrypt(serialized, fileEncryptionKey) : serialized;
+        return writeUsersAtomically(usersFilePath, payload);
     } catch (...) { return false; }
 }
 
