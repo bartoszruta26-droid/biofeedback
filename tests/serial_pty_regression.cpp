@@ -1,6 +1,7 @@
 #include "sensor/SerialCommunication.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <iterator>
 #include <cerrno>
 #include <chrono>
@@ -142,7 +143,35 @@ int main() {
         return 1;
     }
 
+    // Keep a synchronous read in flight while disconnect is requested.
+    // Teardown must wait for readMutex rather than closing a live descriptor.
+    std::atomic<bool> readerStarted{false};
+    std::thread reader([&]() {
+        readerStarted.store(true, std::memory_order_release);
+        (void)serial.readData(250);
+    });
+    while (!readerStarted.load(std::memory_order_acquire)) {
+        std::this_thread::yield();
+    }
+    if (!readLine(master, command, 500) || command != "DATA\n") {
+        std::cerr << "PTY device did not receive concurrent DATA command\n";
+        reader.join();
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+    const auto disconnectStart = std::chrono::steady_clock::now();
     serial.disconnect();
+    const auto disconnectElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - disconnectStart).count();
+    reader.join();
+    if (serial.isConnected() || disconnectElapsed < 80 || disconnectElapsed > 1000) {
+        std::cerr << "Disconnect did not serialize with in-flight read: "
+                  << disconnectElapsed << " ms\n";
+        ::close(master);
+        return 1;
+    }
+
     ::close(master);
     std::cout << "SerialCommunication PTY integration checks passed\n";
     return 0;

@@ -458,15 +458,25 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 
 void SerialCommunication::disconnect() {
     stopAsyncReading();
-    if (!m_impl->isConnected) return;
+
+    // Serialize handle teardown with every synchronous read/write operation.
+    // readData(), sendCommand() and sendRawData() hold readMutex while using
+    // the native handle, so closing it before acquiring this lock can race
+    // with an in-flight system call (or close a descriptor reused elsewhere).
+    {
+        std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
+        if (!m_impl->isConnected) return;
 #ifdef _WIN32
-    if (m_impl->portHandle != -1) CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
+        if (m_impl->portHandle != -1) CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
 #else
-    if (m_impl->portHandle >= 0) close(m_impl->portHandle);
+        if (m_impl->portHandle >= 0) close(static_cast<int>(m_impl->portHandle));
 #endif
-    m_impl->portHandle = -1;
-    m_impl->isConnected = false;
-    m_impl->portName.clear();
+        m_impl->portHandle = -1;
+        m_impl->isConnected = false;
+        m_impl->portName.clear();
+    }
+    // Callbacks run after releasing readMutex so subscribers may safely
+    // query state or initiate a new operation without self-deadlocking.
     notifyConnectionCallbacks(false, "Disconnected");
 }
 
