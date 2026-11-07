@@ -23,6 +23,8 @@ if "bool TrainingAnalyticsWidget::beginSession()" not in widget:
     raise SystemExit("Training session must snapshot its history destination at start")
 if "m_activeSessionHistoryFilePath" not in save:
     raise SystemExit("Session save must use the original patient destination")
+if "rebuildForceTraceChart(restored)" not in widget or "rebuildForceTraceChart(stats)" not in widget:
+    raise SystemExit("Training analytics must render force-time traces for live and restored sessions")
 main = Path("src/gui/MainWindow.cpp").read_text(encoding="utf-8")
 if "MeasurementTab::measurementStarted" not in main or "MeasurementTab::measurementStopped" not in main:
     raise SystemExit("Patient switching must be locked during measurement acquisition")
