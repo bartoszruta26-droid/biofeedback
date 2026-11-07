@@ -751,6 +751,13 @@ void MeasurementTab::setEngineRepetitionsPerSeries(int repetitions)
     }
 }
 
+void MeasurementTab::setMeasurementPaused(bool paused)
+{
+    if (m_isPaused == paused) return;
+    m_isPaused = paused;
+    if (paused) m_measurementEngine.discardPartialRepetition();
+}
+
 bool MeasurementTab::isMeasurementActive() const
 {
     return m_isMeasuring;
@@ -1679,7 +1686,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     const double forceN = data.calibratedValue * 9.81 / 1000.0;
     addDebugMessage(QString("Arduino: RAW=%1 | CALIBRATED=%2 g")
         .arg(data.value).arg(data.calibratedValue, 0, 'f', 2), "ARDUINO");
-    if (!m_isMeasuring) return;
+    if (!m_isMeasuring || m_isPaused) return;
     m_sampleSource = measurement::SampleSource::Device;
     const double displayValue = m_showRawValues ? static_cast<double>(data.value)
                                                  : convertForce(forceN, m_currentUnit);
