@@ -18,6 +18,7 @@ command = source[command_start:command_end]
 checks = {
     "read helper is implemented": "int SerialCommunication::readFromPort(" in source,
     "Windows read timeout is applied per call": "readTimeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(timeout);" in read_helper,
+    "zero Windows timeout is nonblocking": "timeout == 0 ? MAXDWORD : 0" in read_helper,
     "Windows read timeout is restored": "SetCommTimeouts(handle, &originalTimeouts)" in read_helper,
     "Windows read buffer is bounded to int": "static_cast<size_t>(INT_MAX)" in read_helper,
     "POSIX read waits for input readiness": "descriptor.events = POLLIN;" in read_helper,
