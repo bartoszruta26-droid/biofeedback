@@ -21,6 +21,7 @@
 #include <memory>
 #include <vector>
 #include "training/RepetitionDetector.hpp"
+#include "training/TrainingSessionClock.hpp"
 #include "measurement/MeasurementEngine.hpp"
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -320,10 +321,9 @@ private:
     QTimer* m_restTimer;
     QElapsedTimer m_sessionClock;
     QElapsedTimer m_restClock;
-    qint64 m_activeExerciseTimeMs{0};
-    qint64 m_restDurationMs{0};
-    qint64 m_lastClockUpdateMs{0};
-    bool m_isTraining;
+    biofeedback::training::TrainingSessionClock m_trainingClock;
+qint64 m_restDurationMs{0};
+bool m_isTraining;
     bool m_isPaused;
     
     QVector<TrainingExercise> m_exercisePlan;
