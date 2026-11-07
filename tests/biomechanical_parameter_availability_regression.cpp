@@ -46,6 +46,8 @@ int main()
     assert(empty.availabilityAt(0) == ParameterAvailability::InsufficientData);
     assert(std::string(BiomechanicalParams::parameterName(0)) == "F_peak");
     assert(std::string(BiomechanicalParams::parameterName(64)) == "LPT");
+    assert(std::string(BiomechanicalParams::parameterUnit(0)) == "N");
+    assert(std::string(BiomechanicalParams::parameterUnit(65)).empty());
     assert(std::string(BiomechanicalParams::parameterName(65)).empty());
 
     std::set<std::string> names;
