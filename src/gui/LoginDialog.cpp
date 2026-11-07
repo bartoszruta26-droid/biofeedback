@@ -404,9 +404,11 @@ void LoginDialog::onUsernameTextChanged(const QString& text)
 
 void LoginDialog::onPasswordTextChanged(const QString& text)
 {
+    Q_UNUSED(text);
     m_statusLabel->hide();
+    const bool passwordReady = !m_passwordEdit->text().isEmpty();
     const bool confirmationReady = !m_firstRun || !m_confirmPasswordEdit->text().isEmpty();
-    m_loginButton->setEnabled(m_usersLoaded && !text.isEmpty() &&
+    m_loginButton->setEnabled(m_usersLoaded && passwordReady &&
                               !m_usernameEdit->text().trimmed().isEmpty() && confirmationReady);
 }
 
