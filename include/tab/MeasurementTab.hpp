@@ -396,6 +396,7 @@ private:
     QTableWidget* m_biomechTable;
     QDoubleSpinBox* m_elasticConstantInput;
     QDoubleSpinBox* m_patientMassInput;
+    QComboBox* m_biomechSeriesSelector;
     
     // Tabela surowych danych
     QGroupBox* m_rawBox;
