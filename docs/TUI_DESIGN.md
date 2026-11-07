@@ -66,3 +66,7 @@ The training screen supports configuration before starting:
 After each completed series, the TUI pauses repetition detection during the configured rest interval. The rest countdown is suspended while the session is paused. Completed repetitions are retained in memory and appended to the local CSV session history when the operator stops the session, exits the application, or completes the plan. The file is stored under the user's Biofeedback XDG application data directory with owner-only permissions.
 
 The Diagnostics screen reports valid and rejected sample counts, the last sample-quality classification, the last repetition's peak and mean force, duration and time-to-peak, and the history-file path. TUI session history is local and unencrypted; it does not include a patient identifier. It is not a substitute for the encrypted patient record workflow.
+
+## HX711 calibration requirement
+
+The TUI uses the shared measurement adapter with calibrated grams as its input. The advanced firmware reports whether its calibration is active. Raw binary frames without a confirmed `CAL:1` status are marked sensor-rejected by the physical-unit pipeline and cannot contribute to force-based repetitions. Calibrate with a known reference mass using `CAL:<grams>` after tare; the current firmware does not persist this flag through power cycles.
