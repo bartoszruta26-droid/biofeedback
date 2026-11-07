@@ -604,8 +604,10 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::milliseconds(timeout);
     int result = 0;
+    bool pollAttempted = false;
     for (;;) {
         const auto now = std::chrono::steady_clock::now();
+        if (now >= deadline && pollAttempted) break;
         int remainingMs = 0;
         if (now < deadline) {
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -617,6 +619,7 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
         pollfd descriptor{};
         descriptor.fd = fd;
         descriptor.events = POLLIN;
+        pollAttempted = true;
         const int ready = poll(&descriptor, 1, remainingMs);
         if (ready < 0 && errno == EINTR) continue;
         if (ready == 0) break;
