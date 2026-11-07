@@ -71,10 +71,12 @@ void ProtocolParser::feed(const uint8_t* data, std::size_t length) {
         if (calculateCrc8(packet, 8) != packet[8]) {
             m_buffer.erase(m_buffer.begin(), m_buffer.begin() + static_cast<std::ptrdiff_t>(packetStart + 1));
             ++m_crcErrors;
-            ++m_discardedBytes;
+            m_discardedBytes += packetStart + 1;
             continue;
         }
 
+        // Bytes preceding a CRC-valid frame are synchronization noise.
+        m_discardedBytes += packetStart;
         ProtocolFrame frame;
         frame.timestampMs = readU32Le(packet);
         const uint32_t rawBits = readU32Le(packet + 4);
