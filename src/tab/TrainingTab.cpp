@@ -480,6 +480,15 @@ void TrainingTab::startTraining()
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
+    for (auto& stats : m_exerciseStats) {
+        stats.startTime = std::chrono::steady_clock::now();
+        stats.peakForcePerRep.clear();
+        stats.avgPeakForce = 0.0;
+        stats.maxPeakForce = 0.0;
+        stats.minPeakForce = 0.0;
+        stats.duration = 0.0;
+        stats.completionRate = 0.0;
+    }
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
@@ -1004,9 +1013,9 @@ void TrainingTab::calculateExerciseStats()
         for (double peakForce : stats.peakForcePerRep) {
             totalPeakForce += peakForce;
         }
-        stats.averagePeakForce = totalPeakForce / static_cast<double>(stats.peakForcePerRep.size());
+        stats.avgPeakForce = totalPeakForce / static_cast<double>(stats.peakForcePerRep.size());
     } else {
-        stats.averagePeakForce = 0.0;
+        stats.avgPeakForce = 0.0;
     }
     
     // Maksymalna siła szczytowa
