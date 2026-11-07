@@ -37,7 +37,7 @@ for required in (
     "m_sampleJournalPendingWrites >= 32",
     "::fsync(m_sampleJournal.handle())",
     "recoverSampleJournals(dataDir)",
-    "recordType"] = "sample",
+    'record["recordType"] = "sample"',
     "void MeasurementTab::showCurrentMeasurementData()",
     "showCurrentMeasurementData();",
     "void MeasurementTab::updateBiomechanicalTable()",
