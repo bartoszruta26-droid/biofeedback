@@ -350,23 +350,31 @@ double Formulas::calculateRepFrequency(int numReps, double setDuration) {
 // ==================== Kategoria 3: Parametry Mocy i Energii ====================
 
 double Formulas::calculatePeakPower(double peakForce, const std::vector<SensorSample>& samples) const {
-    if (samples.size() < 3 || !std::isfinite(peakForce) || peakForce < 0.0 ||
+    if (samples.size() < 2 || !std::isfinite(peakForce) || peakForce < 0.0 ||
         !std::isfinite(k_elastic_) || k_elastic_ <= 0.0)
         return 0.0;
 
-    // Peak power must be evaluated sample-by-sample as F(t) * |v(t)|.
-    // Multiplying the maximum force by a velocity peak from another instant
-    // combines two unrelated extrema and systematically overestimates power.
+    // Estimate power on each measured interval using its mean force and
+    // force-derived extension velocity. This keeps force and velocity
+    // synchronous and also works for the minimum two-sample interval.
     double maxPower = 0.0;
-    for (std::size_t i = 1; i + 1 < samples.size(); ++i) {
-        if (!samples[i].isValid || !std::isfinite(samples[i].force) ||
-            samples[i].force < 0.0)
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
+        const auto& current = samples[i];
+        const auto& next = samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force) ||
+            current.force < 0.0 || next.force < 0.0)
             continue;
-        const double forceRate = calculateDerivative(samples, i);
-        const double velocity = std::abs(forceRate) / k_elastic_;
-        const double instantaneousPower = samples[i].force * velocity;
-        if (std::isfinite(instantaneousPower))
-            maxPower = std::max(maxPower, instantaneousPower);
+
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        const double meanForce = 0.5 * (current.force + next.force);
+        const double velocity = std::abs(next.force - current.force) /
+                                (k_elastic_ * dt);
+        const double intervalPower = meanForce * velocity;
+        if (std::isfinite(intervalPower))
+            maxPower = std::max(maxPower, intervalPower);
     }
     return maxPower;
 }
