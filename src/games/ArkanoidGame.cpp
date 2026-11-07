@@ -206,10 +206,21 @@ void ArkanoidGame::update(double deltaTime)
         const bool hitVerticalFace =
             previousPosition.y() + m_ballRadius <= brick.rect.top() ||
             previousPosition.y() - m_ballRadius >= brick.rect.bottom();
-        if (hitVerticalFace)
+        // Wypchnij piłkę poza klocek po odbiciu, aby ten sam kontakt
+        // nie został policzony ponownie w kolejnych krokach symulacji.
+        if (hitVerticalFace) {
+            if (previousPosition.y() <= brick.rect.top())
+                m_ballPosition.setY(brick.rect.top() - m_ballRadius - 0.1);
+            else
+                m_ballPosition.setY(brick.rect.bottom() + m_ballRadius + 0.1);
             m_ballVelocity.setY(-m_ballVelocity.y());
-        else
+        } else {
+            if (previousPosition.x() <= brick.rect.left())
+                m_ballPosition.setX(brick.rect.left() - m_ballRadius - 0.1);
+            else
+                m_ballPosition.setX(brick.rect.right() + m_ballRadius + 0.1);
             m_ballVelocity.setX(-m_ballVelocity.x());
+        }
 
         if (!hasActiveBricks())
             advanceLevel();
