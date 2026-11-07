@@ -158,13 +158,11 @@ void GalagaGame::updateFormation(double deltaTime)
 
     double left = width();
     double right = 0.0;
-    double bottom = 0.0;
     for (const Enemy& enemy : m_enemies) {
         if (!enemy.active)
             continue;
         left = qMin(left, enemy.rect.left());
         right = qMax(right, enemy.rect.right());
-        bottom = qMax(bottom, enemy.rect.bottom());
     }
 
     const double movement = m_enemyDirection * m_enemySpeed * deltaTime;
