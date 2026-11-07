@@ -819,14 +819,20 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
 
 void MainWindow::stopGame()
 {
-    if (m_currentGame) {
-        m_currentGame->stop();
-        m_gameStack->removeWidget(m_currentGame);
-        delete m_currentGame;
-        m_currentGame = nullptr;
-        m_gameStack->hide();
-        qDebug() << "Game stopped";
-    }
+    if (!m_currentGame)
+        return;
+
+    // Odłącz callback przed stop(): gameEnded może wywołać onGameFinished(),
+    // które również sprząta widget. Ustawienie wskaźnika na nullptr przed
+    // emisją sygnałów chroni przed rekurencyjnym i podwójnym usuwaniem.
+    games::GameEngine* game = m_currentGame;
+    m_currentGame = nullptr;
+    disconnect(game, nullptr, this, nullptr);
+    game->stop();
+    m_gameStack->removeWidget(game);
+    delete game;
+    m_gameStack->hide();
+    qDebug() << "Game stopped";
 }
 
 void MainWindow::forwardSensorToGame(double value)
