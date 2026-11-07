@@ -1083,7 +1083,7 @@ BiomechanicalParams Formulas::calculateSessionParams(const std::vector<SeriesDat
     for (std::size_t setIndex = 0; setIndex < ordered.size(); ++setIndex) {
         const SeriesData& set = *ordered[setIndex];
         const BiomechanicalParams setParams = calculateAllParams(set);
-        for (std::size_t metric = 0; metric < ParameterCount; ++metric) {
+        for (std::size_t metric = 0; metric < BiomechanicalParams::ParameterCount; ++metric) {
             if (setParams.availabilityAt(metric) == ParameterAvailability::InvalidInput) {
                 result.availability.fill(ParameterAvailability::InvalidInput);
                 return result;
