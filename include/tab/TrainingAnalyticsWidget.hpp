@@ -2,10 +2,12 @@
 
 #include <QWidget>
 #include <QVector>
+#include <QJsonArray>
 
 #include "tab/TrainingTab.hpp"
 
 class QLabel;
+class QPushButton;
 class QTableWidget;
 class QTabWidget;
 
@@ -20,15 +22,26 @@ class TrainingAnalyticsWidget final : public QWidget {
     Q_OBJECT
 public:
     explicit TrainingAnalyticsWidget(QWidget* parent = nullptr);
-    void setStats(const QVector<ExerciseStats>& stats);
+    void setStats(const QVector<ExerciseStats>& stats, int durationSeconds = 0);
+
+private slots:
+    void saveCurrentSession();
 
 private:
+    void loadHistory();
+    void rebuildHistoryTable();
     void rebuildSummary(const QVector<ExerciseStats>& stats);
     void rebuildSeriesTable(const QVector<ExerciseStats>& stats);
     void rebuildRepetitionTable(const QVector<ExerciseStats>& stats);
     void rebuildPeakChart(const QVector<ExerciseStats>& stats);
 
     QLabel* m_summaryLabel{nullptr};
+    QPushButton* m_saveHistoryButton{nullptr};
+    QTableWidget* m_historyTable{nullptr};
+    QVector<ExerciseStats> m_currentStats;
+    int m_durationSeconds{0};
+    QJsonArray m_historyEntries;
+    bool m_historyReadable{true};
     QTableWidget* m_seriesTable{nullptr};
     QTableWidget* m_repetitionTable{nullptr};
     QtCharts::QChartView* m_peakChart{nullptr};
