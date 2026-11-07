@@ -6,6 +6,9 @@
 #include <QJsonDocument>
 #include <QTemporaryDir>
 
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
 #include <cassert>
 #include <cmath>
 
