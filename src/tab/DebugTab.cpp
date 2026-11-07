@@ -48,7 +48,10 @@ DebugTab::DebugTab(QWidget *parent)
 
 DebugTab::~DebugTab()
 {
-    // Odłącz callback przy niszczeniu
+    if (m_serialPort && m_serialCallbackId != 0) {
+        m_serialPort->removeDataCallback(m_serialCallbackId);
+        m_serialCallbackId = 0;
+    }
     core::DebugManager::instance().unregisterDebugCallback();
 }
 
