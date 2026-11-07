@@ -16,6 +16,7 @@ std::string lowerAscii(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
         return static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
     });
+    return value;
 }
 }
 
