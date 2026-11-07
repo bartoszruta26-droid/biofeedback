@@ -522,6 +522,56 @@ void MainWindow::saveSettings()
     }
 }
 
+void MainWindow::refreshSerialPorts()
+{
+    if (!m_devicePortCombo) return;
+    const QString previousPort = m_devicePortCombo->currentData().toString();
+    m_devicePortCombo->clear();
+    const auto ports = sensor::SerialCommunication::scanAvailablePorts();
+    for (const auto& port : ports) {
+        const QString value = QString::fromStdString(port);
+        m_devicePortCombo->addItem(value, value);
+    }
+    if (ports.empty()) {
+        m_devicePortCombo->addItem(tr("Brak wykrytych portów"), QString());
+        return;
+    }
+    const int previousIndex = m_devicePortCombo->findData(previousPort);
+    if (previousIndex >= 0) m_devicePortCombo->setCurrentIndex(previousIndex);
+}
+
+void MainWindow::toggleSerialConnection()
+{
+    if (!m_serialPort) {
+        QMessageBox::warning(this, tr("Urządzenie"), tr("Usługa portu szeregowego nie jest dostępna."));
+        return;
+    }
+    if (m_serialPort->isConnected()) {
+        m_serialPort->disconnect();
+        updateConnectionStatus(false);
+        if (m_connectDeviceButton) m_connectDeviceButton->setText(tr("Połącz"));
+        addDebugMessage(tr("Rozłączono urządzenie pomiarowe"), "SERIAL");
+        return;
+    }
+
+    const QString port = m_devicePortCombo ? m_devicePortCombo->currentData().toString() : QString();
+    if (port.isEmpty()) {
+        QMessageBox::information(this, tr("Urządzenie"), tr("Najpierw wybierz wykryty port szeregowy."));
+        refreshSerialPorts();
+        return;
+    }
+    if (!m_serialPort->connect(port.toStdString(), DEFAULT_BAUD_RATE)) {
+        updateConnectionStatus(false);
+        QMessageBox::warning(this, tr("Połączenie"), tr("Nie udało się otworzyć portu %1.").arg(port));
+        addDebugMessage(tr("Nie udało się połączyć z %1").arg(port), "ERROR");
+        return;
+    }
+    m_serialPort->startAsyncReading();
+    updateConnectionStatus(true, port);
+    if (m_connectDeviceButton) m_connectDeviceButton->setText(tr("Rozłącz"));
+    addDebugMessage(tr("Uruchomiono odczyt z portu %1 przy %2 baud").arg(port).arg(DEFAULT_BAUD_RATE), "SERIAL");
+}
+
 void MainWindow::updateWeightDisplay(double weight)
 {
     const QString value = QString("%1 N").arg(weight, 0, 'f', 2);
