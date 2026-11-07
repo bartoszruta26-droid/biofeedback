@@ -22,8 +22,6 @@ jobs:
         run: python3 tests/measurement_tab_lifecycle_regression.py
       - name: Check training session clock cadence
         run: python3 tests/training_session_timer_regression.py
-      - name: Check deterministic training clock model
-        run: cmake -S . -B build-clock -DCMAKE_BUILD_TYPE=Debug && cmake --build build-clock --target training_session_clock_regression --parallel 2 && ./build-clock/training_session_clock_regression
       - name: Check single measurement reader
         run: python3 tests/measurement_single_reader_regression.py
       - name: Check game sensor ownership
@@ -39,7 +37,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build regression targets
-        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api measurement_engine_regression measurement_training_pipeline_regression repetition_detector_regression force_units_regression serial_pty_regression
+        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api measurement_engine_regression measurement_training_pipeline_regression training_session_clock_regression repetition_detector_regression force_units_regression serial_pty_regression
       - name: Smoke-test local HTTP API
         run: |
           ./build/biofeedback_api --port 18765 > /tmp/biofeedback-api.log 2>&1 &
