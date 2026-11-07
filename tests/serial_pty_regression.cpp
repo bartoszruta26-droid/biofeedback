@@ -148,6 +148,25 @@ int main() {
         return 1;
     }
 
+    // Concurrent connect() calls must serialize replacement of the native handle.
+    std::atomic<bool> concurrentConnectsOk{true};
+    std::vector<std::thread> connectors;
+    for (int i = 0; i < 4; ++i) {
+        connectors.emplace_back([&]() {
+            if (!serial.connect(slaveName, 115200)) {
+                concurrentConnectsOk.store(false, std::memory_order_release);
+            }
+        });
+    }
+    for (auto& connector : connectors) connector.join();
+    if (!concurrentConnectsOk.load(std::memory_order_acquire) ||
+        !serial.isConnected() || serial.getPortName() != slaveName) {
+        std::cerr << "Concurrent connect() calls left inconsistent connection state\\n";
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+
     std::string command;
     std::thread device([&]() {
         if (readLine(master, command, 1500) && command == "PING\n") {
