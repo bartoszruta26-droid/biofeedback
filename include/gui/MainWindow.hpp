@@ -308,6 +308,7 @@ private:
     // Połączenie szeregowe z Arduino - współdzielone między zakładkami
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
+    sensor::SerialCommunication::CallbackToken m_serialDataCallbackToken = 0;
 };
 
 } // namespace gui
