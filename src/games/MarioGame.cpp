@@ -501,37 +501,12 @@ void MarioGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication>
     
     m_serialPort = serial;
     
-    if (m_serialPort && m_serialPort->isConnected()) {
-        setupSensorListening();
-    }
-    
     m_ownSerial = false;
 }
 
 bool MarioGame::isSerialConnected() const
 {
     return m_serialPort && m_serialPort->isConnected();
-}
-
-void MarioGame::setupSensorListening()
-{
-    if (!m_serialPort) return;
-    
-    m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-        QMetaObject::invokeMethod(this, [this, data]() {
-            handleSensorInput(data.calibratedValue);
-        }, Qt::QueuedConnection);
-    });
-    
-    m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
-        QMetaObject::invokeMethod(this, [this, connected, message]() {
-            if (!connected) {
-                // Można wyświetlić komunikat o utracie połączenia
-            }
-        }, Qt::QueuedConnection);
-    });
-    
-    m_serialPort->startAsyncReading();
 }
 
 void MarioGame::cleanupSensorConnection()
