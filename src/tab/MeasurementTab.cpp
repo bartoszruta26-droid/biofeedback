@@ -380,7 +380,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repPeakForce(0)
     , m_repStartTime(0)
     , m_repPeakTime(0)
-    , m_contractionThreshold(5.0)  // 5 N próg detekcji
     , m_showRawValues(false)  // Domyślnie analizujemy skalibrowaną siłę
     , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
     , m_unitSelector(nullptr)
@@ -856,6 +855,7 @@ void MeasurementTab::resetSession()
     m_completedSeriesStats.clear();
     
     m_inContraction = false;
+    m_repetitionDetector.reset();
     m_repStartForce = 0;
     m_repPeakForce = 0;
     m_repStartTime = 0;
@@ -930,7 +930,7 @@ void MeasurementTab::simulateSensorData()
     // Usunięto ograniczenie do 0 - pozwalamy na wartości ujemne dla rozciągania
     // if (currentForce < 0) currentForce = 0;
     
-    readSingleSample(currentForce);
+    readSingleSample(currentForce, static_cast<std::uint32_t>(simTime * 1000.0));
 }
 
 void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs)
