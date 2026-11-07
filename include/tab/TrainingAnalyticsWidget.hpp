@@ -22,7 +22,9 @@ class TrainingAnalyticsWidget final : public QWidget {
     Q_OBJECT
 public:
     explicit TrainingAnalyticsWidget(QWidget* parent = nullptr);
-    void setStats(const QVector<ExerciseStats>& stats, int durationSeconds = 0);
+    void setStats(const QVector<ExerciseStats>& stats, int durationSeconds = 0,
+                  int activeDurationSeconds = 0);
+    void setSessionCompleted(bool completed);
     void setHistoryFilePath(const QString& filePath);
     bool beginSession();
 
@@ -44,6 +46,8 @@ private:
     QTableWidget* m_historyTable{nullptr};
     QVector<ExerciseStats> m_currentStats;
     int m_durationSeconds{0};
+    int m_activeDurationSeconds{0};
+    bool m_sessionCompleted{false};
     QJsonArray m_historyEntries;
     bool m_historyReadable{true};
     QString m_historyFilePath;
