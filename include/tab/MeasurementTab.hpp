@@ -150,6 +150,8 @@ struct RecordedMeasurementSample {
     double value{0.0};
     qint32 rawValue{0};
     bool hasRawValue{false};
+    double calibratedMassKg{0.0};
+    bool hasCalibratedMass{false};
     QString unit;
     QString source;
     QString quality;
@@ -224,7 +226,8 @@ public:
      * @brief Ręczne wczytanie pojedynczej próbki siły
      */
     void readSingleSample(double forceValue, std::uint32_t deviceTimestampMs = 0,
-                          std::int32_t rawValue = 0, bool hasRawValue = false);
+                          std::int32_t rawValue = 0, bool hasRawValue = false,
+                          double calibratedMassKg = 0.0, bool hasCalibratedMass = false);
     
     /**
      * @brief Analizuje serię i zwraca statystyki
