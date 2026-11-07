@@ -59,6 +59,7 @@ public:
      * @return true jeśli zapis powiódł się
      */
     bool saveUsers();
+    void setFileEncryption(bool enabled, const std::string& key = std::string());
     
     /**
      * @brief Loguje użytkownika
@@ -106,6 +107,8 @@ public:
 private:
     mutable std::mutex m_mutex;          ///< Mutex for thread-safe access to shared state
     std::string usersFilePath;
+    bool fileEncryptionEnabled{false};
+    std::string fileEncryptionKey;
     std::vector<UserData> users;
     UserData* currentUser{nullptr};
     

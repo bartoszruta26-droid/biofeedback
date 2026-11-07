@@ -153,22 +153,26 @@ bool Application::initialize()
         m_logger = std::make_unique<Logger>(*m_configManager);
         m_logger->info("Starting Biofeedback Application");
         
-        // Initialize authentication
-        m_authentication = std::make_unique<Authentication>("config/users.json");
-        // Security: Require encryption key from environment variable for medical-grade security
+        // File encryption is configurable. Development defaults to plaintext files;
+        // account passwords remain one-way PBKDF2 hashes regardless of this setting.
+        const bool encryptionEnabled = m_configManager->getBool("encryption.enabled", false);
         const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-        if (!envKey || std::string(envKey).size() < 32) {
+        const std::string encryptionKey = envKey ? std::string(envKey) : std::string();
+        if (encryptionEnabled && encryptionKey.size() < 32) {
             throw std::runtime_error(
-                 "CRITICAL: BIOFEEDBACK_ENCRYPTION_KEY must contain at least 32 bytes and be supplied externally. "
-                "For medical-grade security, encryption key must be provided externally "
-                "and never hardcoded in source code."
+                "Encryption is enabled in config/config.json but BIOFEEDBACK_ENCRYPTION_KEY "
+                "is missing or shorter than 32 bytes."
             );
         }
-        std::string encryptionKey = envKey;
-        
-        // Initialize data manager
+
+        // The administrator and regular-user database follows the same file policy.
+        m_authentication = std::make_unique<Authentication>("config/users.json");
+        m_authentication->setFileEncryption(encryptionEnabled, encryptionKey);
+
+        // Patient-linked files follow the same policy.
         m_dataManager = std::make_unique<DataManager>();
-        m_dataManager->setEncryptionKey(encryptionKey);
+        if (!encryptionKey.empty()) m_dataManager->setEncryptionKey(encryptionKey);
+        m_dataManager->setEncryptionEnabled(encryptionEnabled);
         
         // Store debug manager pointer for later use (we don't own it)
         // m_debugManager is not used as unique_ptr anymore since DebugManager is a singleton

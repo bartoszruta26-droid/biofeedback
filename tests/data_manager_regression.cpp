@@ -26,9 +26,10 @@ void expect(bool condition, const std::string& message) {
 
 int main() {
     try {
-        DataManager noKey;
-        PatientData deniedPatient; deniedPatient.id = "denied";
-        expect(!noKey.savePatientData(deniedPatient, kPatientFile, false), "patient write without key must fail closed");
+        DataManager noKey; // Default development mode: plaintext files, no key required.
+        PatientData developmentPatient; developmentPatient.id = "development";
+        expect(noKey.savePatientData(developmentPatient, kPatientFile, false), "plaintext development-mode patient write");
+        expect(noKey.loadPatientData(kPatientFile, false).id == "development", "plaintext development-mode patient read");
 
         DataManager dm;
         dm.setEncryptionKey("regression-key-material-32-bytes");
@@ -128,6 +129,27 @@ int main() {
         const std::string exportPayload = "protected-json-payload";
         expect(dm.exportToJson(exportPayload, kResultsFile), "szyfrowany eksport JSON");
         expect(dm.importFromJson(kResultsFile) == exportPayload, "odszyfrowany import JSON");
+
+        // Turning encryption off must not make existing BFENC files unreadable.
+        // The existing encrypted patient record remains readable with the same key.
+        dm.setEncryptionEnabled(false);
+        expect(dm.loadPatientData(kPatientFile, false).firstName == patient.firstName,
+               "encrypted patient data remains readable after disabling encryption");
+
+        // Explicitly switch the same manager to plaintext development mode.
+        patient.id = "p-plaintext";
+        expect(dm.savePatientData(patient, kPatientFile, false), "plaintext mode patient save");
+        std::ifstream plainPatientFile(kPatientFile, std::ios::binary);
+        std::string plainPatient((std::istreambuf_iterator<char>(plainPatientFile)), std::istreambuf_iterator<char>());
+        expect(plainPatient.find("BFENC:v1:") != 0, "patient file must be plaintext when encryption is disabled");
+        expect(dm.loadPatientData(kPatientFile, false).id == "p-plaintext", "plaintext mode patient read");
+
+        expect(dm.saveExerciseResults(results, kResultsFile, false), "plaintext mode exercise results save");
+        expect(dm.loadExerciseResults(kResultsFile, false).size() == 2, "plaintext mode exercise results read");
+        expect(dm.saveTrainingPlan(plan, kResultsFile, false), "plaintext mode training plan save");
+        expect(dm.loadTrainingPlan(kResultsFile, false).id == plan.id, "plaintext mode training plan read");
+        expect(dm.exportToJson(exportPayload, kResultsFile), "plaintext mode JSON export");
+        expect(dm.importFromJson(kResultsFile) == exportPayload, "plaintext mode JSON import");
 
 
         // Force a partial write to the temporary file. The existing destination

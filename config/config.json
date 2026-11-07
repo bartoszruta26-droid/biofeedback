@@ -12,9 +12,9 @@
         "max_backups": 7
     },
     "encryption": {
-        "enabled": true,
-        "algorithm": "AES-256-CBC",
-        "key_derivation": "PBKDF2",
+        "enabled": false,
+        "algorithm": "AES-256-GCM",
+        "key_derivation": "SHA-256 key normalization (32+ byte external secret)",
         "iterations": 100000
     },
     "ui": {

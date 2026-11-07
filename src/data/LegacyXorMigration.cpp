@@ -22,6 +22,24 @@
 namespace {
 constexpr std::size_t kMaximumLegacyFileSize = 100U * 1024U * 1024U;
 
+std::string sha256Hex(const std::string& value) {
+    unsigned char digest[EVP_MAX_MD_SIZE]{};
+    unsigned int digestLength = 0;
+    if (EVP_Digest(value.data(), value.size(), digest, &digestLength, EVP_sha256(), nullptr) != 1 ||
+        digestLength != 32) {
+        throw std::runtime_error("Nie udało się obliczyć SHA-256 danych migracji");
+    }
+    static constexpr char hex[] = "0123456789abcdef";
+    std::string result;
+    result.reserve(digestLength * 2);
+    for (unsigned int i = 0; i < digestLength; ++i) {
+        result.push_back(hex[digest[i] >> 4]);
+        result.push_back(hex[digest[i] & 0x0f]);
+    }
+    OPENSSL_cleanse(digest, sizeof(digest));
+    return result;
+}
+
 bool readRegularFile(const std::string& path, std::string& data, std::string& error) {
     const int fd = ::open(path.c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
     if (fd < 0) { error = "Nie można otworzyć pliku źródłowego: " + std::string(std::strerror(errno)); return false; }

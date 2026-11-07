@@ -229,10 +229,11 @@ public:
      * @return true jeśli szyfrowanie jest aktywne
      */
     bool isEncryptionEnabled() const;
+    void setEncryptionEnabled(bool enabled);
     
     // ==================== Zapis i odczyt danych pacjenta ====================
     /**
-     * @brief Zapisuje dane pacjenta wyłącznie w postaci AES-256-GCM
+     * @brief Zapisuje dane pacjenta zgodnie z encryption.enabled; przy wyłączonej opcji zapisuje JSON jawny
      * @param patient Dane pacjenta
      * @param filename Nazwa pliku
      * @param encrypt Parametr zachowany dla zgodności; szyfrowanie jest zawsze wymuszone
@@ -241,7 +242,7 @@ public:
     bool savePatientData(const PatientData& patient, const std::string& filename, bool encrypt = false);
     
     /**
-     * @brief Wczytuje dane pacjenta po obowiązkowej weryfikacji AES-256-GCM
+     * @brief Wczytuje dane pacjenta jawne lub AES-256-GCM zależnie od formatu pliku
      * @param filename Nazwa pliku
      * @param decrypt Parametr zachowany dla zgodności; deszyfrowanie jest zawsze wymuszone
      * @return Dane pacjenta (puste jeśli błąd)
