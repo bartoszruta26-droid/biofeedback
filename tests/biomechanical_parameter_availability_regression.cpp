@@ -61,7 +61,7 @@ int main()
     SeriesData series;
     series.seriesNumber = 1;
     series.startTime = 0;
-    series.endTime = 400;
+    series.endTime = 450;
 
     RepetitionData first;
     first.repNumber = 1;
@@ -79,16 +79,16 @@ int main()
 
     RepetitionData second;
     second.repNumber = 2;
-    second.startTime = 200;
-    second.peakTime = 300;
-    second.endTime = 400;
+    second.startTime = 250;
+    second.peakTime = 350;
+    second.endTime = 450;
     second.startForce = 0.0;
     second.peakForce = 25.0;
     second.endForce = 0.0;
     second.samples = {
-        SensorSample(200, 0.0),
-        SensorSample(300, 25.0),
-        SensorSample(400, 0.0)
+        SensorSample(250, 0.0),
+        SensorSample(350, 25.0),
+        SensorSample(450, 0.0)
     };
 
     const BiomechanicalParams repetitionResult = formulas.calculateRepParams(first);
@@ -101,6 +101,8 @@ int main()
 
     assert(result.availabilityAt(0) == ParameterAvailability::Available);
     assert(result.availabilityAt(4) == ParameterAvailability::Available);
+    assert(result.availabilityAt(14) == ParameterAvailability::Available);
+    assert(near(result.T_rest_rep, 0.05));
     assert(result.availabilityAt(20) == ParameterAvailability::Available);
     assert(result.availabilityAt(29) == ParameterAvailability::RequiresAdditionalSensor);
     assert(result.availabilityAt(39) == ParameterAvailability::RequiresAdditionalSensor);
