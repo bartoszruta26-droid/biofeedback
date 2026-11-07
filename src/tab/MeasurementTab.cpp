@@ -222,6 +222,8 @@ void ForcePlotWidget::clearData()
 {
     m_forces.clear();
     m_times.clear();
+    m_maxObservedForce = 0.0;
+    m_minObservedForce = 0.0;
     m_maxForce = 100.0;
     update();
 }
@@ -289,7 +291,8 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     
     // Linia docelowej siły
     if (m_targetForce > 0 && m_maxForce > 0) {
-        int targetY = margin + plotHeight - static_cast<int>((m_targetForce / m_maxForce) * plotHeight);
+        int targetY = margin + plotHeight - static_cast<int>(
+            ((m_targetForce + m_maxForce) / (2.0 * m_maxForce)) * plotHeight);
         painter.setPen(QPen(QColor(255, 100, 100), 2, Qt::DashLine));
         painter.drawLine(margin, targetY, margin + plotWidth, targetY);
         painter.setPen(QColor(255, 100, 100));
