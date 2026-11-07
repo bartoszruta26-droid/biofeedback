@@ -285,9 +285,10 @@ int PatientTab::findPatientByPesel(const QString& pesel)
 
 void PatientTab::addPatient(const QString& pesel, const QString& firstName,
                            const QString& lastName, const QDate& birthDate,
-                           const QString& gender)
+                           const QString& gender, const QString& notes)
 {
-    // Sprawdzenie czy PESEL już istnieje
+    // Preserve the form notes for interactive entry; explicit notes are used by storage reload.
+    const QString noteText = notes.isNull() ? m_notesEdit->toPlainText() : notes;
     int existingRow = findPatientByPesel(pesel);
     if (existingRow >= 0 && !m_isEditMode) {
         QMessageBox::warning(this, tr("Błąd"), 
@@ -308,6 +309,7 @@ void PatientTab::addPatient(const QString& pesel, const QString& firstName,
     m_patientTable->setItem(row, 2, new QTableWidgetItem(lastName));
     m_patientTable->setItem(row, 3, new QTableWidgetItem(birthDate.toString("yyyy-MM-dd")));
     m_patientTable->setItem(row, 4, new QTableWidgetItem(gender));
+    m_patientTable->setItem(row, 5, new QTableWidgetItem(noteText));
     
     if (m_isEditMode) {
         emit patientUpdated(row);
@@ -316,6 +318,7 @@ void PatientTab::addPatient(const QString& pesel, const QString& firstName,
     } else {
         emit patientAdded(pesel, firstName, lastName);
     }
+    emit patientRecordChanged(pesel, firstName, lastName, birthDate, gender, noteText);
     
     // Wyczyszczenie formularza po dodaniu
     if (!m_isEditMode) {
@@ -342,6 +345,8 @@ void PatientTab::clearAllPatients()
             QMessageBox::Yes | QMessageBox::No);
         
         if (reply == QMessageBox::Yes) {
+            for (int row = 0; row < m_patientTable->rowCount(); ++row)
+                emit patientRecordDeleted(m_patientTable->item(row, 0)->text());
             m_patientTable->setRowCount(0);
         }
     }
@@ -513,8 +518,10 @@ void PatientTab::deleteSelectedPatient()
         QMessageBox::Yes | QMessageBox::No);
     
     if (reply == QMessageBox::Yes) {
+        const QString deletedPesel = m_patientTable->item(currentRow, 0)->text();
         m_patientTable->removeRow(currentRow);
         emit patientRemoved(currentRow);
+        emit patientRecordDeleted(deletedPesel);
         
         // Wyczyszczenie formularza
         m_peselEdit->clear();
