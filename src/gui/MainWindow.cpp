@@ -7,6 +7,7 @@
 #include "tab/DebugTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
+#include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QApplication>
 #include <QSettings>
@@ -74,6 +75,15 @@ MainWindow::MainWindow(QWidget *parent)
             }, Qt::QueuedConnection);
         });
 
+    // MainWindow owns the serial-to-game bridge for the global game area.
+    m_serialDataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
+        if (!data.isValid) return;
+        const double forceNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
+        QMetaObject::invokeMethod(this, [this, forceNewtons]() {
+            forwardSensorToGame(forceNewtons);
+        }, Qt::QueuedConnection);
+    });
+
     setupUI();
     setupMenuBar();
     setupToolBar();
@@ -86,9 +96,11 @@ MainWindow::~MainWindow()
 {
     saveSettings();
     if (m_serialPort) {
+        m_serialPort->stopAsyncReading();
+        m_serialPort->removeDataCallback(m_serialDataCallbackToken);
+        m_serialDataCallbackToken = 0;
         m_serialPort->removeConnectionCallback(m_serialConnectionCallbackToken);
         m_serialConnectionCallbackToken = 0;
-        m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
     }
 }
@@ -719,7 +731,9 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
     
     // Create appropriate game based on ID
     if (gameId == "sin_game") {
-        m_currentGame = new games::SinGame(this);
+        auto* sinGame = new games::SinGame(this);
+        sinGame->setSerialConnection(m_serialPort);
+        m_currentGame = sinGame;
         
         // Connect game signals
         connect(m_currentGame, &games::GameEngine::gameEnded,
