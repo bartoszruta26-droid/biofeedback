@@ -116,6 +116,8 @@ int main()
     assert(result.availabilityAt(24) == ParameterAvailability::Available);
 
     Formulas uncalibrated;
+    assert(near(uncalibrated.getElasticConstant(), 0.0));
+    assert(near(uncalibrated.getPatientMass(), 0.0));
     const BiomechanicalParams withoutCalibration = uncalibrated.calculateAllParams(series);
     assert(withoutCalibration.availabilityAt(20) == ParameterAvailability::RequiresCalibration);
     assert(withoutCalibration.availabilityAt(24) == ParameterAvailability::RequiresCalibration);
