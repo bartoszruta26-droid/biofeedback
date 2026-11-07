@@ -32,6 +32,8 @@ jobs:
         run: python3 tests/training_history_regression.py
       - name: Check explicit training session state machine
         run: python3 tests/session_state_machine_regression.py
+      - name: Check training checkpoint recovery
+        run: python3 tests/training_checkpoint_recovery_regression.py
       - name: Install build dependencies
         run: |
           sudo apt-get update
