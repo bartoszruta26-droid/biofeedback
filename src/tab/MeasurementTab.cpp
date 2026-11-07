@@ -381,7 +381,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
-    , m_showRawValues(true)  // Domyślnie pokazujemy wartości surowe (Value z Arduino)
+    , m_showRawValues(false)  // Domyślnie pokazujemy skalibrowaną siłę w niutonach
     , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
     , m_unitSelector(nullptr)
     , m_trendsBox(nullptr)
@@ -493,8 +493,8 @@ void MeasurementTab::setupUI()
     // Przełącznik trybu Raw/Calibrated - zablokowany podczas aktywnej sesji
     m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
     m_btnToggleRaw->setCheckable(true);
-    m_btnToggleRaw->setChecked(true);  // Domyślnie włączone (wartości surowe)
-    m_btnToggleRaw->setEnabled(false);  // Domyślnie wyłączone
+    m_btnToggleRaw->setChecked(false);  // Domyślnie skalibrowana siła w niutonach
+    m_btnToggleRaw->setEnabled(true);   // Tryb można zmieniać poza aktywnym pomiarem
     m_btnToggleRaw->setMinimumHeight(35);
     m_btnToggleRaw->setFont(QFont("Arial", 9));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
@@ -507,7 +507,7 @@ void MeasurementTab::setupUI()
             m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
         }
     });
-    m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
     m_btnReset->setMinimumHeight(35);
