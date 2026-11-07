@@ -1,5 +1,6 @@
 #include "games/GameFactory.hpp"
 #include "games/TanGame.hpp"
+#include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
@@ -33,6 +34,7 @@ int main(int argc, char **argv)
         QStringLiteral("sin_game"),
         QStringLiteral("tan_game"),
         QStringLiteral("pong"),
+        QStringLiteral("arkanoid"),
         QStringLiteral("flappy_bird"),
         QStringLiteral("mario")
     };
@@ -54,6 +56,14 @@ int main(int argc, char **argv)
         REQUIRE(!game->isRunning());
     }
 
+    std::unique_ptr<games::GameEngine> arkanoid(games::createGame(QStringLiteral("arkanoid")));
+    auto* arkanoidGame = dynamic_cast<games::ArkanoidGame*>(arkanoid.get());
+    REQUIRE(arkanoidGame != nullptr);
+    arkanoidGame->setDifficultyLevel(5);
+    REQUIRE(arkanoidGame->getDifficultyLevel() == 5);
+    arkanoidGame->setDifficultyLevel(0);
+    REQUIRE(arkanoidGame->getDifficultyLevel() == 1);
+
     std::unique_ptr<games::GameEngine> tan(games::createGame(QStringLiteral("tan")));
     auto* tanGame = dynamic_cast<games::TanGame*>(tan.get());
     REQUIRE(tanGame != nullptr);
@@ -69,7 +79,6 @@ int main(int argc, char **argv)
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
 
-    REQUIRE(games::createGame(QStringLiteral("arkanoid")) == nullptr);
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
 }
