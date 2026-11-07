@@ -100,7 +100,7 @@ void saveTrainingSession(LiveData& live)
         const auto& rep = item.measurement;
         const bool achieved = rep.peakForceN >= live.trainingTargetForceN;
         out << "\"" << live.sessionStartedAt << "\","
-            << "\""<< live.exerciseName <<"\"," << item.seriesIndex << ","
+            << "\"" << QString::fromStdString(live.exerciseName) << "\"," << item.seriesIndex << ","
             << item.repetitionIndex << ","
             << QString::number(rep.peakForceN, 'f', 4) << ","
             << QString::number(rep.meanForceN, 'f', 4) << ","
