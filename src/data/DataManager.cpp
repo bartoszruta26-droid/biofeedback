@@ -60,16 +60,16 @@
 // ============================================================================
 
 /// Enable detailed debug logging for all data operations
-constexpr bool DEBUG_DATA_MANAGER = true;
+constexpr bool DEBUG_DATA_MANAGER = false;
 
 /// Enable verbose JSON parsing debug output
 constexpr bool DEBUG_JSON_PARSING = false;
 
 /// Enable encryption/decryption operation logging
-constexpr bool DEBUG_ENCRYPTION_OPS = true;
+constexpr bool DEBUG_ENCRYPTION_OPS = false;
 
 /// Enable file I/O operation debugging
-constexpr bool DEBUG_FILE_IO = true;
+constexpr bool DEBUG_FILE_IO = false;
 
 /// Maximum number of retry attempts for file operations
 // constexpr int MAX_FILE_RETRY_COUNT = 3;  // Defined in header
@@ -339,9 +339,9 @@ std::string PatientData::toJson() const {
 #endif
         
         return json.str();
-    } catch (const std::exception& e) {
-        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Failed to serialize PatientData: " 
-                  << e.what() << std::endl;
+    } catch (const std::exception&) {
+        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Failed to serialize PatientData" 
+                  << std::endl;
         return "{}"; // Return empty JSON object on error
     } catch (...) {
         std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [CRITICAL] Unknown exception during PatientData serialization" 
@@ -386,13 +386,13 @@ PatientData PatientData::fromJson(const std::string& json) {
         patient.medicalHistory = dm.extractStringValue(json, "medicalHistory");
         
 #if DEBUG_DATA_MANAGER
-        std::cout << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [DEBUG] PatientData parsed successfully. ID: " 
-                  << (patient.id.empty() ? "<empty>" : patient.id) << std::endl;
+        std::cout << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [DEBUG] PatientData parsed successfully" 
+                  << std::endl;
 #endif
         
-    } catch (const std::exception& e) {
-        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Exception during PatientData parsing: " 
-                  << e.what() << std::endl;
+    } catch (const std::exception&) {
+        std::cerr << "[" << getCurrentTimestamp() << "] [DATA_MANAGER] [ERROR] Exception during PatientData parsing" 
+                  << std::endl;
         // Return empty patient object on error
         patient = PatientData();
     } catch (...) {
@@ -528,8 +528,8 @@ TrainingPlan TrainingPlan::fromJson(const std::string& json) {
 DataManager::DataManager() 
     : encryptionKey()
     , encryptionEnabled(false)
-    , minimumLogLevel(DataManagerLogLevel::DEBUG)
-    , consoleOutputEnabled(true)
+    , minimumLogLevel(DataManagerLogLevel::WARNING)
+    , consoleOutputEnabled(false)
     , logMutex()
     , statistics() 
 {

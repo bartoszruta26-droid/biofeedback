@@ -1,0 +1,21 @@
+name: data-manager-privacy-policy
+
+on:
+  push:
+    branches:
+      - integration/all-work
+      - fix/data-manager-privacy-safe-logging
+  pull_request:
+    branches:
+      - integration/all-work
+
+permissions:
+  contents: read
+
+jobs:
+  data-manager-privacy-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify privacy-safe DataManager logging
+        run: python3 tests/data_manager_privacy_regression.py
