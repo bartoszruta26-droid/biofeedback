@@ -75,6 +75,37 @@ int main()
     assert(seriesResults.front().totalImpulseNs > 0.0);
     assert(seriesResults.front().targetAccuracyPercent > 0.0);
 
+    // Device acquisition and replay must produce identical analytics for identical samples.
+    auto runSource = [](SampleSource source) {
+        MeasurementEngine engine({2.0, 1.0, 5.0, 0.20, 8});
+        const double forces[] = {3.0, 5.0, 8.0, 5.0, 1.0};
+        std::optional<RepetitionStats> result;
+        double time = 0.0;
+        for (double force : forces) {
+            result = engine.addSample(Sample{time, force, ForceUnit::Newton, source, true});
+            time += 0.1;
+        }
+        return result;
+    };
+    const auto deviceResult = runSource(SampleSource::Device);
+    const auto replayResult = runSource(SampleSource::Replay);
+    assert(deviceResult && replayResult);
+    assert(deviceResult->source == SampleSource::Device);
+    assert(replayResult->source == SampleSource::Replay);
+    assert(std::abs(deviceResult->peakForceN - replayResult->peakForceN) < 1e-12);
+    assert(std::abs(deviceResult->impulseNs - replayResult->impulseNs) < 1e-12);
+
+    MeasurementEngine configurable({2.0, 1.0});
+    assert(configurable.setRepetitionsPerSeries(1));
+    const double oneRep[] = {3.0, 6.0, 1.0};
+    double configurableTime = 0.0;
+    for (double force : oneRep) {
+        configurable.addSample(Sample{configurableTime, force, ForceUnit::Newton,
+                                      SampleSource::Simulation, true});
+        configurableTime += 0.1;
+    }
+    assert(configurable.takeCompletedSeries().size() == 1);
+
     std::cout << "measurement_engine_regression: PASS\n";
     return 0;
 }
