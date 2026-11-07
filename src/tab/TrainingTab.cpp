@@ -1010,11 +1010,9 @@ void TrainingTab::calculateExerciseStats()
                              static_cast<double>(previousCount + 1);
     }
 
-    const int expectedReps = exercise.seriesCount * exercise.repsPerSeries;
-    const int completedReps = stats.completedSeries * exercise.repsPerSeries + stats.completedReps;
-    if (expectedReps > 0) {
-        stats.consistencyScore = qBound(0.0, 100.0 * completedReps / expectedReps, 100.0);
-    }
+    // Consistency requires a series of per-repetition samples; this model does not
+    // retain that series yet, so leave consistencyScore unchanged rather than
+    // mislabeling completion percentage as measurement consistency.
     stats.isCompleted = stats.completedSeries >= exercise.seriesCount;
 }
 void TrainingTab::startRestTimer()
