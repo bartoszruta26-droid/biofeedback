@@ -103,7 +103,7 @@ void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int 
     bool hasRepetitions = false;
     for (const auto& exercise : stats)
         hasRepetitions = hasRepetitions || !exercise.repetitions.isEmpty();
-    m_saveHistoryButton->setEnabled(hasRepetitions && m_historyReadable && !m_sessionSaved);
+    m_saveHistoryButton->setEnabled(hasRepetitions && m_historyReadable && !m_sessionSaved && !m_sessionInProgress);
     rebuildSummary(stats);
     rebuildSeriesTable(stats);
     rebuildRepetitionTable(stats);
@@ -144,6 +144,7 @@ bool TrainingAnalyticsWidget::beginSession() {
     m_activeSessionHistoryFilePath = m_historyFilePath;
     m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_sessionSaved = false;
+    m_sessionInProgress = true;
     m_sessionCompleted = false;
     m_saveHistoryButton->setEnabled(false);
     return true;
@@ -310,6 +311,7 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
 }
 
 bool TrainingAnalyticsWidget::saveSessionAutomatically() {
+    m_sessionInProgress = false;
     return persistCurrentSession(false, true);
 }
 
@@ -429,7 +431,7 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback, bool fina
     QSaveFile file(path);
     const QByteArray payload = QJsonDocument(updated).toJson(QJsonDocument::Indented);
     if (!file.open(QIODevice::WriteOnly)) {
-        m_saveHistoryButton->setEnabled(m_historyReadable && !m_sessionSaved);
+        m_saveHistoryButton->setEnabled(m_historyReadable && !m_sessionSaved && !m_sessionInProgress);
         if (showFeedback)
             QMessageBox::warning(this, tr("Historia treningów"),
                                  tr("Nie udało się otworzyć pliku historii: %1").arg(file.errorString()));
@@ -445,6 +447,7 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback, bool fina
     QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     m_historyEntries = updated;
     m_sessionSaved = finalize;
+    m_sessionInProgress = !finalize;
     if (finalize) {
         m_activeSessionHistoryFilePath.clear();
         m_activeSessionId.clear();
