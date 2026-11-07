@@ -26,6 +26,23 @@ checks = {
     "session clock restore is monotonic": "void restore(std::int64_t sessionMs, std::int64_t activeMs)" in clock,
     "recovery record is updated in place": "replacedActiveSession" in analytics,
     "checkpoint JSON is atomically persisted": "QSaveFile file(path)" in analytics and "!file.commit()" in analytics,
+    "checkpoint restore validates before mutating live state": (
+        "// Phase 1: parse and validate everything" in tab and
+        "// Phase 2: commit." in tab and
+        tab.index("// Phase 1: parse and validate everything") <
+        tab.index("// Phase 2: commit.")
+    ),
+    "checkpoint restore stages detector before commit": (
+        "biofeedback::training::RepetitionDetector stagedDetector" in tab and
+        "if (!stagedDetector.restore(detectorSnapshot)) return false;" in tab and
+        tab.index("if (!stagedDetector.restore(detectorSnapshot)) return false;") <
+        tab.index("// Phase 2: commit.")
+    ),
+    "version 2 requires a detector snapshot": "checkpointVersion >= 2 && !hasDetectorSnapshot" in tab,
+    "restored elapsed values are finite and ordered": (
+        "activeMsValue > sessionMsValue" in tab and
+        "restMsValue > 86400000.0" in tab
+    ),
     "no patient identifier is serialized": '"patient_pesel"' not in tab and '"patient_id"' not in tab,
 }
 failed = [name for name, ok in checks.items() if not ok]
