@@ -65,12 +65,15 @@ sensor::MeasurementSerialAdapter adapter(serial, engine, "hx711-main", "count");
 
 Dla urządzenia skalibrowanego do siły jednostkę należy ustawić jawnie jako `N`; nie należy automatycznie zakładać, że wskazanie HX711 oznacza kilogramy lub niutony.
 
-## Ograniczenia obecnego etapu
+## Stan integracji i ograniczenia obecnego etapu
 
+- Desktop Qt przekazuje odczyty z zakładki pomiarowej do silnika (zarówno próbki odczytane w cyklu UI, jak i ramki dostarczone callbackiem).
+- TUI korzysta z adaptera callbackowego; widok ostatniej próbki subskrybuje wspólny silnik.
+- WebUI i Android nie są jeszcze podłączone do silnika; ich integracja wymaga bezpiecznego API i strumienia WebSocket.
 - API HTTP nie udostępnia jeszcze próbek ani danych pacjentów.
 - WebSocket nie jest jeszcze serwerowo zaimplementowany.
 - WebUI i Android nie pobierają jeszcze próbek z silnika.
-- Adapter serialny przekazuje wartość `calibratedValue` istniejącego sterownika; nie zastępuje ani nie powiela jego kalibracji.
+- Adapter w trybie `count` przekazuje surowy odczyt ADC; w trybie jednostki skalibrowanej przekazuje `calibratedValue` sterownika. Nie zastępuje ani nie powiela kalibracji.
 - Znacznik czasu urządzenia jest przechowywany jako surowe 32 bity; rozwinięcie przepełnienia licznika firmware wymaga osobnego protokołu synchronizacji.
 - Zakres walidacji jest konfigurowany w jednostce kanonicznej; domyślnie jest szeroki i nie stanowi klinicznego zakresu referencyjnego.
 
