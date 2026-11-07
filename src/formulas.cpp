@@ -1025,7 +1025,6 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.setAvailability(14, interRepRestIntervals > 0
         ? ParameterAvailability::Available : ParameterAvailability::InsufficientData);
     params.setAvailability(16, ParameterAvailability::InsufficientData);
-    params.setAvailability(18, ParameterAvailability::RequiresCalibration);
     params.setAvailability(29, ParameterAvailability::RequiresAdditionalSensor);
     params.setAvailability(33, ParameterAvailability::InsufficientData);
     params.setAvailability(39, ParameterAvailability::RequiresAdditionalSensor);
