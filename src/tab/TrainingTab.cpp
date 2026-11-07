@@ -423,6 +423,7 @@ void TrainingTab::setupUI()
         if (m_restTimeRemaining <= 0) {
             m_restTimer->stop();
             m_inRestPeriod = false;
+            emit trainingPaused(m_isPaused);
             m_lblRestTimer->setText("");
             if (m_waitingForNextExercise) {
                 m_waitingForNextExercise = false;
@@ -525,6 +526,7 @@ void TrainingTab::startTraining()
     m_configBox->setEnabled(false);
     
     emit trainingStarted();
+    emit trainingPaused(false);
 }
 
 void TrainingTab::stopTraining()
@@ -538,6 +540,7 @@ void TrainingTab::stopTraining()
     m_isPaused = false;
     m_inRestPeriod = false;
     m_waitingForNextExercise = false;
+    emit trainingPaused(false);
     
     // Zatrzymanie gry jeśli aktywna
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -873,7 +876,8 @@ void TrainingTab::onSharedSeriesCompleted(int repetitionCount, double averagePea
                                            double totalImpulseNs, double targetAccuracyPercent,
                                            double consistencyScorePercent)
 {
-    if (!m_isTraining || m_currentExerciseIndex < 0 ||
+    if (!m_isTraining || m_isPaused || m_inRestPeriod ||
+        m_currentExerciseIndex < 0 ||
         m_currentExerciseIndex >= m_exerciseStats.size() || repetitionCount <= 0) return;
 
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
@@ -1037,6 +1041,7 @@ void TrainingTab::checkExerciseCompletion()
         // Odpoczynek między ćwiczeniami
         if (m_currentExerciseIndex < m_exercisePlan.size()) {
             m_inRestPeriod = true;
+            emit trainingPaused(true);
             m_waitingForNextExercise = true;
             m_restTimeRemaining = 120;  // 2 minuty odpoczynku między ćwiczeniami
             m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
@@ -1049,6 +1054,7 @@ void TrainingTab::checkExerciseCompletion()
         // Odpoczynek między seriami
         m_waitingForNextExercise = false;
         m_inRestPeriod = true;
+        emit trainingPaused(true);
         m_restTimeRemaining = static_cast<int>(ex.restTime);
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
         m_restTimer->start();
