@@ -153,6 +153,8 @@ int main()
     assert(result.availabilityAt(58) == ParameterAvailability::RequiresCalibration);
     assert(result.availabilityAt(64) == ParameterAvailability::RequiresHistory);
     assert(result.availabilityAt(24) == ParameterAvailability::Available);
+    assert(result.availabilityAt(45) == ParameterAvailability::Available);
+    assert(std::string(BiomechanicalParams::parameterUnit(45)) == "m/s");
 
     Formulas uncalibrated;
     assert(near(uncalibrated.getElasticConstant(), 0.0));
@@ -160,6 +162,7 @@ int main()
     const BiomechanicalParams withoutCalibration = uncalibrated.calculateAllParams(series);
     assert(withoutCalibration.availabilityAt(20) == ParameterAvailability::RequiresCalibration);
     assert(withoutCalibration.availabilityAt(24) == ParameterAvailability::RequiresCalibration);
+    assert(withoutCalibration.availabilityAt(45) == ParameterAvailability::RequiresCalibration);
 
     SeriesData undersampled = series;
     undersampled.reps[0].samples.clear();
