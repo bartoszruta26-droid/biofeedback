@@ -267,6 +267,7 @@ if(Qt5_FOUND)
         src/games/GameEngine.cpp
         src/games/SinGame.cpp
         src/games/TanGame.cpp
+        src/games/ArkanoidGame.cpp
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
@@ -275,6 +276,7 @@ if(Qt5_FOUND)
         include/games/GameEngine.hpp
         include/games/SinGame.hpp
         include/games/TanGame.hpp
+        include/games/ArkanoidGame.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
