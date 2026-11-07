@@ -390,6 +390,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_seriesProgress(nullptr)
     , m_statsBox(nullptr)
     , m_statsTable(nullptr)
+    , m_biomechBox(nullptr)
+    , m_biomechTable(nullptr)
     , m_rawBox(nullptr)
     , m_rawTable(nullptr)
     , m_isMeasuring(false)
@@ -655,7 +657,28 @@ void MeasurementTab::setupUI()
     statsLayout->addWidget(m_statsTable);
     m_statsBox->setLayout(statsLayout);
     m_mainLayout->addWidget(m_statsBox);
-    
+
+    // Pełna tabela 65 wskaźników; status oddziela wynik liczbowy od braku danych.
+    m_biomechBox = new QGroupBox("Parametry biomechaniczne (65)", this);
+    m_biomechBox->setFont(QFont("Arial", 11, QFont::Bold));
+    QVBoxLayout* biomechLayout = new QVBoxLayout();
+    m_biomechTable = new QTableWidget(this);
+    m_biomechTable->setColumnCount(4);
+    m_biomechTable->setHorizontalHeaderLabels(
+        {"Parametr", "Wartość", "Jednostka", "Dostępność"});
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
+    m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
+    m_biomechTable->setAlternatingRowColors(true);
+    m_biomechTable->setMaximumHeight(480);
+    m_biomechTable->setFont(QFont("Arial", 9));
+    biomechLayout->addWidget(m_biomechTable);
+    m_biomechBox->setLayout(biomechLayout);
+    m_mainLayout->addWidget(m_biomechBox);
+    updateBiomechanicalTable();
+
     // Tabela surowych danych
     m_rawBox = new QGroupBox("Surowe Dane (ostatnie 100 próbek)", this);
     m_rawBox->setFont(QFont("Arial", 11, QFont::Bold));
@@ -1203,6 +1226,7 @@ void MeasurementTab::calculateRepetitionStats()
         currentSeries.biomechanicalParams =
             biomechanicalFormulas.calculateAllParams(biomechanicalSeries);
     }
+        updateBiomechanicalTable();
     
     std::cout << "[DEBUG] calculateRepetitionStats: Before emit repetitionCompleted" << std::endl;
     
@@ -1289,6 +1313,50 @@ void MeasurementTab::calculateRepetitionStats()
     
     std::cout << "[DEBUG] calculateRepetitionStats: Before updateSeriesProgress" << std::endl;
     updateSeriesProgress();
+}
+
+void MeasurementTab::updateBiomechanicalTable()
+{
+    if (!m_biomechTable) return;
+    m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
+
+    const BiomechanicalParams* result = m_completedSeriesStats.isEmpty()
+        ? nullptr : &m_completedSeriesStats.last().biomechanicalParams;
+    const auto values = result ? result->values()
+                               : std::array<double, BiomechanicalParams::ParameterCount>{};
+
+    for (std::size_t i = 0; i < BiomechanicalParams::ParameterCount; ++i) {
+        const auto status = result
+            ? result->availabilityAt(i)
+            : ParameterAvailability::InsufficientData;
+        QString statusText;
+        switch (status) {
+        case ParameterAvailability::Available: statusText = tr("Obliczono"); break;
+        case ParameterAvailability::RequiresCalibration: statusText = tr("Wymaga kalibracji"); break;
+        case ParameterAvailability::RequiresAdditionalSensor: statusText = tr("Wymaga dodatkowego czujnika"); break;
+        case ParameterAvailability::RequiresHistory: statusText = tr("Wymaga historii"); break;
+        case ParameterAvailability::InvalidInput: statusText = tr("Nieprawidłowe dane"); break;
+        case ParameterAvailability::InsufficientData:
+        default: statusText = tr("Brak wystarczających danych"); break;
+        }
+
+        QString valueText = QString::fromUtf8("—");
+        if (result && status == ParameterAvailability::Available) {
+            if (std::isfinite(values[i]))
+                valueText = QString::number(values[i], 'g', 8);
+            else
+                statusText = tr("Nieprawidłowy wynik");
+        }
+
+        const int row = static_cast<int>(i);
+        m_biomechTable->setItem(row, 0,
+            new QTableWidgetItem(QString("%1. %2").arg(row + 1)
+                .arg(QString::fromLatin1(BiomechanicalParams::parameterName(i)))));
+        m_biomechTable->setItem(row, 1, new QTableWidgetItem(valueText));
+        m_biomechTable->setItem(row, 2,
+            new QTableWidgetItem(QString::fromUtf8(BiomechanicalParams::parameterUnit(i))));
+        m_biomechTable->setItem(row, 3, new QTableWidgetItem(statusText));
+    }
 }
 
 void MeasurementTab::updateStatsTable()
@@ -1674,6 +1742,7 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_patientId = session.patientId;
         m_completedSeriesStats = session.series;
         m_recordedSamples = session.samples;
+        updateBiomechanicalTable();
         m_sessionElapsedOffsetSeconds = m_recordedSamples.isEmpty()
             ? 0.0 : m_recordedSamples.last().elapsedTimeSeconds;
         m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
