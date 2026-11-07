@@ -1,0 +1,43 @@
+name: Linux desktop GUI build
+
+on:
+  push:
+    branches:
+      - fix/desktop-gui-full-build-2026-11-07
+  pull_request:
+    branches:
+      - main
+      - integration/all-work
+    paths:
+      - 'CMakeLists.txt'
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/desktop-gui-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-qt5-desktop:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install full desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config git \
+            qtbase5-dev qtbase5-dev-tools libqt5charts5-dev \
+            libserialport-dev nlohmann-json3-dev libssl-dev libncurses-dev
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: Build complete desktop application and test targets
+        run: cmake --build build --parallel 2
+      - name: Run registered regression tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Verify desktop executable
+        run: test -x build/biofeedback
