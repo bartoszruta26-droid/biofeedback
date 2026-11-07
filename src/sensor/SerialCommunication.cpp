@@ -172,7 +172,8 @@ public:
     double scaleFactor = 1.0;
     bool isCalibrated = false;
     ArduinoInfo arduinoInfo;
-    DataCallback dataCallback;
+    std::vector<DataCallback> dataCallbacks;
+    std::mutex callbackMutex;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
     std::thread asyncThread;
@@ -517,8 +518,9 @@ SensorData SerialCommunication::readData(int timeout) {
     auto start = std::chrono::steady_clock::now();
     bool gotBinaryData = false;
     
+    const int effectiveTimeoutMs = std::max(1, timeout);
     while (std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::steady_clock::now() - start).count() < 2000) {
+           std::chrono::steady_clock::now() - start).count() < effectiveTimeoutMs) {
         int rd = 0;
 #ifdef _WIN32
         DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
@@ -560,6 +562,7 @@ SensorData SerialCommunication::readData(int timeout) {
                                     data.timestamp = timestamp;
                                     data.value = value;
                                     data.crc = crc;
+                                    data.calibratedValue = convertToCalibrated(value);
                                     data.isValid = true;
                                     gotBinaryData = true;
                                 }
@@ -627,7 +630,11 @@ SensorData SerialCommunication::readData(int timeout) {
 }
 
 bool SerialCommunication::tryReadData(SensorData& data) { data = readData(100); return data.isValid; }
-void SerialCommunication::setDataCallback(DataCallback cb) { m_impl->dataCallback = cb; }
+void SerialCommunication::setDataCallback(DataCallback cb) {
+    if (!cb) return;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataCallbacks.push_back(std::move(cb));
+}
 void SerialCommunication::setConnectionCallback(ConnectionCallback cb) { m_impl->connectionCallback = cb; }
 
 void SerialCommunication::startAsyncReading() {
@@ -636,7 +643,16 @@ void SerialCommunication::startAsyncReading() {
     m_impl->asyncThread = std::thread([this]() {
         while (m_impl->asyncReading && m_impl->isConnected) {
             SensorData d = readData(100);
-            if (d.isValid && m_impl->dataCallback) m_impl->dataCallback(d);
+            if (d.isValid) {
+                std::vector<DataCallback> callbacks;
+                {
+                    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+                    callbacks = m_impl->dataCallbacks;
+                }
+                for (const auto& callback : callbacks) {
+                    if (callback) callback(d);
+                }
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
         }
     });
@@ -658,10 +674,15 @@ int SerialCommunication::getTimeSinceLastActivity() const {
 
 double SerialCommunication::tare(int samples) { if (m_impl->isConnected) sendCommand("TARE", true); m_impl->zeroOffset = 0.0; return 0.0; }
 void SerialCommunication::setCalibrationPoint(int32_t raw, double known) { if (raw != 0) { m_impl->scaleFactor = known/raw; m_impl->isCalibrated = true; } }
-bool SerialCommunication::calibrate(int32_t, int32_t, double knownWeight) {
-    if (!m_impl->isConnected) return false;
-    std::string r = sendCommand("CAL:" + std::to_string(knownWeight), true);
-    m_impl->isCalibrated = (r.find("Calibrated!") != std::string::npos);
+bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight) {
+    const int64_t span = static_cast<int64_t>(rawSpan) - static_cast<int64_t>(rawZero);
+    if (span == 0 || !std::isfinite(knownWeight) || knownWeight <= 0.0) {
+        return false;
+    }
+
+    m_impl->zeroOffset = static_cast<double>(rawZero);
+    m_impl->scaleFactor = knownWeight / static_cast<double>(span);
+    m_impl->isCalibrated = std::isfinite(m_impl->scaleFactor);
     return m_impl->isCalibrated;
 }
 double SerialCommunication::convertToCalibrated(int32_t raw) const { return (raw - m_impl->zeroOffset) * m_impl->scaleFactor; }
@@ -732,6 +753,9 @@ bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
 
 void SerialCommunication::setVerbose(bool v) { m_impl->verbose = v; }
 std::string SerialCommunication::getLastError() const { return m_impl->lastError; }
-void SerialCommunication::setCRCPolynomial(uint8_t) {}
+void SerialCommunication::setCRCPolynomial(uint8_t) {
+    // CRC-8 polynomial is part of the currently fixed Arduino wire protocol (0x07).
+    // Runtime polynomial changes are intentionally unsupported until firmware negotiation exists.
+}
 
 } // namespace sensor
