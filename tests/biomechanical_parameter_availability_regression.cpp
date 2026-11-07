@@ -91,6 +91,11 @@ int main()
         SensorSample(400, 0.0)
     };
 
+    const BiomechanicalParams repetitionResult = formulas.calculateRepParams(first);
+    assert(repetitionResult.availabilityAt(0) == ParameterAvailability::Available);
+    assert(repetitionResult.availabilityAt(20) == ParameterAvailability::RequiresCalibration);
+    assert(repetitionResult.availabilityAt(64) == ParameterAvailability::InsufficientData);
+
     series.reps = {first, second};
     const BiomechanicalParams result = formulas.calculateAllParams(series);
 
