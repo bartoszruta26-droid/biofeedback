@@ -14,7 +14,6 @@ MarioGame::MarioGame(QWidget *parent)
     , m_timeSinceLastObstacle(0.0)
     , m_obstacleSpawnInterval(2.0)
     , m_sensorThreshold(30.0)
-    , m_chargeStartTime(0.0)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
 {
@@ -267,8 +266,7 @@ bool MarioGame::handleInput(double value)
         return true;
     } else if (isPressing && m_player.isCharging) {
         // Kontynuacja ładowania
-        double currentTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
-        double chargeDuration = currentTime - m_chargeStartTime;
+        const double chargeDuration = m_chargeClock.isValid() ? m_chargeClock.elapsed() / 1000.0 : 0.0;
         m_player.chargeLevel = qMin(1.0, chargeDuration / MAX_CHARGE_TIME);
     }
     
@@ -422,7 +420,7 @@ void MarioGame::renderBackground(QPainter& painter)
     painter.setBrush(QColor(0x00, 0xA8, 0x00));
     painter.setPen(QColor(0x00, 0xA8, 0x00));
     for (int i = 0; i < 3; ++i) {
-        double x = fmod(-QTime::currentTime().msecsSinceStartOfDay() / 50.0 + i * 300, width() + 200) - 100;
+        double x = fmod(-static_cast<double>(m_monotonicClock.isValid() ? m_monotonicClock.elapsed() : 0) / 50.0 + i * 300, width() + 200) - 100;
         QVector<QPoint> hill = {
             QPoint(x, height() * GROUND_Y_RATIO),
             QPoint(x + 100, height() * GROUND_Y_RATIO - 60),
