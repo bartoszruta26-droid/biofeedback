@@ -54,6 +54,9 @@ target_link_libraries(auth_regression PRIVATE biofeedback_core)
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 
+add_test(NAME auth_regression COMMAND auth_regression)
+add_test(NAME data_manager_regression COMMAND data_manager_regression)
+
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
 if(Qt5_FOUND)
