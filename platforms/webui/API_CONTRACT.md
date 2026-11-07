@@ -90,6 +90,20 @@ np. `{"code":"DEVICE_BUSY","message":"Urządzenie jest zajęte"}`.
 ## Stan implementacji
 
 Klient JavaScript jest zaimplementowany w `api-client.js` i pokryty testami
-Node.js. Serwer API, autoryzacja HTTP oraz adapter WebSocket nie są jeszcze
-zaimplementowane. Przykłady JSON są kontraktem docelowym, a nie danymi
-pochodzącymi z działającej usługi.
+Node.js. W repozytorium znajduje się także `biofeedback_api`, lokalny serwer
+Qt Network udostępniający `GET /healthz` oraz `GET /api/v1/status`.
+Domyślnie nasłuchuje wyłącznie na `127.0.0.1:8765`.
+
+Pozostałe endpointy (urządzenia, pacjenci, sesje) i kanały WebSocket są
+zarezerwowane w kontrakcie, ale nie są jeszcze wdrożone. Serwer zwraca
+jawny błąd dla nieobsługiwanych operacji. Nie należy wystawiać go poza
+interfejs lokalny ani traktować jako gotowego interfejsu klinicznego.
+
+Uruchomienie:
+
+    cmake -S . -B build
+    cmake --build build --target biofeedback_api
+    ./build/biofeedback_api
+
+Przykłady JSON powyżej są schematem kontraktu; rzeczywista odpowiedź statusu
+jest generowana przez lokalny serwer.
