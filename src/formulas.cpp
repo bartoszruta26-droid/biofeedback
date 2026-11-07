@@ -1015,6 +1015,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
         ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration;
     for (std::size_t index : {6u, 7u, 20u, 21u, 22u, 23u, 28u, 56u})
         params.setAvailability(index, elasticStatus);
+    params.setAvailability(0, ParameterAvailability::Available);
+    params.setAvailability(1, ParameterAvailability::Available);
     params.setAvailability(2, ParameterAvailability::Available);
     params.setAvailability(3, ParameterAvailability::Available);
     params.setAvailability(18, elasticStatus);
