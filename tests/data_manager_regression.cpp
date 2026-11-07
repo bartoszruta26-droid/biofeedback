@@ -130,8 +130,13 @@ int main() {
         expect(dm.exportToJson(exportPayload, kResultsFile), "szyfrowany eksport JSON");
         expect(dm.importFromJson(kResultsFile) == exportPayload, "odszyfrowany import JSON");
 
-        // Explicitly switch the same manager to plaintext development mode.
+        // Turning encryption off must not make existing BFENC files unreadable.
+        // The existing encrypted patient record remains readable with the same key.
         dm.setEncryptionEnabled(false);
+        expect(dm.loadPatientData(kPatientFile, false).firstName == patient.firstName,
+               "encrypted patient data remains readable after disabling encryption");
+
+        // Explicitly switch the same manager to plaintext development mode.
         patient.id = "p-plaintext";
         expect(dm.savePatientData(patient, kPatientFile, false), "plaintext mode patient save");
         std::ifstream plainPatientFile(kPatientFile, std::ios::binary);
