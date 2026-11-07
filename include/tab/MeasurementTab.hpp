@@ -96,6 +96,7 @@ private:
  * @brief Statystyki pojedynczego powtórzenia (naciągnięcia)
  */
 struct RepetitionStats {
+    int metricsVersion{1};
     int repNumber;              // Numer powtórzenia
     double peakForce;           // Maksymalny skurcz [N]
     double timeToPeak;          // Czas do osiągnięcia szczytu [s]
@@ -121,6 +122,7 @@ struct RepetitionStats {
  * @brief Statystyki całej serii (8 powtórzeń)
  */
 struct SeriesStats {
+    int metricsVersion{1};
     int seriesNumber;                   // Numer serii (1-3)
     QVector<RepetitionStats> reps;      // Lista powtórzeń
     double avgPeakForce;                // Średnia siła szczytowa serii
@@ -144,6 +146,7 @@ struct SeriesStats {
  * @brief Dane sesji pomiarowej do trendów długoterminowych
  */
 struct MeasurementSession {
+    int metricsVersion{1};
     QString sessionId;                  // Unikalny identyfikator sesji
     QString patientId;                  // ID pacjenta
     QString date;                       // Data pomiaru
@@ -293,7 +296,7 @@ signals:
     void sharedRepetitionCompleted(double peakForceN, double durationSeconds,
                                    double timeToPeakSeconds, double averageForceN,
                                    double impulseNs, double targetAccuracyPercent);
-    void sharedSeriesCompleted(int repetitionCount, double averagePeakForceN,
+    void sharedSeriesCompleted(int metricsVersion, int repetitionCount, double averagePeakForceN,
                                double maximumPeakForceN, double minimumPeakForceN,
                                double averageTimeToPeakSeconds, double averageForceN,
                                double averageRepetitionDurationSeconds, double totalImpulseNs,
