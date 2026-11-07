@@ -206,6 +206,7 @@ if(Qt5_FOUND)
         src/games/SinGame.cpp
         src/games/TanGame.cpp
         src/games/ArkanoidGame.cpp
+        src/games/GalagaGame.cpp
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
@@ -237,6 +238,7 @@ if(Qt5_FOUND)
         include/games/SinGame.hpp
         include/games/TanGame.hpp
         include/games/ArkanoidGame.hpp
+        include/games/GalagaGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -268,6 +270,7 @@ if(Qt5_FOUND)
         src/games/SinGame.cpp
         src/games/TanGame.cpp
         src/games/ArkanoidGame.cpp
+        src/games/GalagaGame.cpp
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
@@ -277,6 +280,7 @@ if(Qt5_FOUND)
         include/games/SinGame.hpp
         include/games/TanGame.hpp
         include/games/ArkanoidGame.hpp
+        include/games/GalagaGame.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
@@ -326,6 +330,7 @@ if(Qt5_FOUND)
         src/games/SinGame.cpp
         src/games/TanGame.cpp
         src/games/ArkanoidGame.cpp
+        src/games/GalagaGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
@@ -338,6 +343,7 @@ if(Qt5_FOUND)
         include/games/SinGame.hpp
         include/games/TanGame.hpp
         include/games/ArkanoidGame.hpp
+        include/games/GalagaGame.hpp
         include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
