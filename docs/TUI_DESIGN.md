@@ -19,6 +19,11 @@ Docelowo oba interfejsy korzystają z tych samych usług aplikacyjnych i Measure
 - Home/End — pierwszy lub ostatni moduł.
 - Q lub Esc — wyjście.
 
+Tryby bez interfejsu curses:
+- `biofeedback_tui --status` — tekstowy status aplikacji.
+- `biofeedback_tui --list-ports` — lista wykrytych nazw portów; nie otwiera połączenia.
+- `biofeedback_tui --version` i `--help` — informacje o programie.
+
 ## Zakres wersji 0.1
 To szkielet nawigacyjny z jawnym statusem demonstracyjnym. Nie odczytuje
 czujnika, nie tworzy fikcyjnych kart pacjentów i nie zapisuje danych klinicznych.
