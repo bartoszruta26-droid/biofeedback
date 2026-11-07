@@ -146,6 +146,7 @@ int main()
                 (0.25 * 0.05) / 0.15));
     assert(repetitionResult.availabilityAt(0) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(20) == ParameterAvailability::Available);
+    assert(repetitionResult.availabilityAt(62) == ParameterAvailability::RequiresHistory);
     assert(repetitionResult.availabilityAt(64) == ParameterAvailability::InsufficientData);
 
     series.reps = {first, second};
