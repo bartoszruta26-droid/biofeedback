@@ -20,5 +20,18 @@ int main(){
  assert(s.complete() && s.state()==SessionState::Completed && s.canStart());
  assert(s.start() && s.state()==SessionState::Active);
  assert(s.interrupt() && s.state()==SessionState::Interrupted);
+
+ // A process restart restores an in-progress workout as paused. The caller
+ // explicitly resumes into the exact prior phase, including an active rest.
+ SessionStateMachine recovered;
+ assert(recovered.restore(SessionState::Paused, SessionState::Active));
+ assert(recovered.running() && recovered.paused() && !recovered.resting());
+ assert(recovered.resume() && recovered.state()==SessionState::Active);
+ assert(recovered.beginRest());
+ assert(recovered.restore(SessionState::Paused, SessionState::Resting));
+ assert(recovered.running() && recovered.paused() && recovered.resting());
+ assert(recovered.resume() && recovered.state()==SessionState::Resting);
+ assert(!recovered.restore(SessionState::Paused, SessionState::Completed));
+ assert(!recovered.restore(static_cast<SessionState>(99), SessionState::Active));
  return 0;
 }
