@@ -1,7 +1,6 @@
 #include "games/MarioGame.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QPaintEvent>
-#include <QTime>
 #include <cmath>
 
 namespace games {
@@ -14,7 +13,6 @@ MarioGame::MarioGame(QWidget *parent)
     , m_timeSinceLastObstacle(0.0)
     , m_obstacleSpawnInterval(2.0)
     , m_sensorThreshold(30.0)
-    , m_chargeStartTime(0.0)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
 {
@@ -94,8 +92,9 @@ void MarioGame::update(double deltaTime)
     updatePlayer(deltaTime);
     
     // Generowanie i aktualizacja przeszkód
-    generateObstacles();
+    generateObstacles(deltaTime);
     updateObstacles(deltaTime);
+    if (!isRunning()) return;
     
     // Aktualizacja chmurek
     for (auto& cloud : m_clouds) {
@@ -124,18 +123,38 @@ void MarioGame::updatePlayer(double deltaTime)
     // Aktualizacja pozycji
     m_player.body.setY(m_player.body.y() + m_player.velocityY * deltaTime);
     
-    // Kolizja z ziemią
-    if (m_player.body.bottom() >= groundY) {
+    // Dziura jest rzeczywistą przerwą w podłożu: podczas przelotu nad nią
+    // gracz nie może zostać automatycznie przyciągnięty do poziomu ziemi.
+    bool overGap = false;
+    for (const auto& obstacle : m_obstacles) {
+        if (obstacle.type == Obstacle::GAP &&
+            m_player.body.right() > obstacle.rect.left() &&
+            m_player.body.left() < obstacle.rect.right()) {
+            overGap = true;
+            break;
+        }
+    }
+
+    if (!overGap && m_player.body.bottom() >= groundY) {
+        const bool landed = !m_player.isOnGround;
         m_player.body.setBottom(groundY);
         m_player.velocityY = 0.0;
         m_player.isJumping = false;
         m_player.isOnGround = true;
-        m_player.chargeLevel = 0.0;
-        m_player.isCharging = false;
+        if (landed) {
+            m_player.chargeLevel = 0.0;
+            m_player.isCharging = false;
+        }
     } else {
         m_player.isOnGround = false;
     }
-    
+
+    // Ładowanie skoku korzysta z czasu symulacji, więc pauza nie nalicza
+    // dodatkowego czasu i nie wymaga zegara ściennego.
+    if (m_player.isCharging && m_player.isOnGround) {
+        m_player.chargeLevel = qMin(1.0, m_player.chargeLevel + deltaTime / MAX_CHARGE_TIME);
+    }
+
     // Animacja biegu
     if (m_player.isOnGround && !m_player.isCharging) {
         m_player.frameTimer += deltaTime;
@@ -146,9 +165,9 @@ void MarioGame::updatePlayer(double deltaTime)
     }
 }
 
-void MarioGame::generateObstacles()
+void MarioGame::generateObstacles(double deltaTime)
 {
-    m_timeSinceLastObstacle += 0.016; // Zakładamy ~60 FPS
+    m_timeSinceLastObstacle += qMax(0.0, deltaTime);
     
     if (m_timeSinceLastObstacle >= m_obstacleSpawnInterval) {
         m_timeSinceLastObstacle = 0.0;
@@ -218,6 +237,7 @@ void MarioGame::updateObstacles(double deltaTime)
         // Wykrywanie kolizji
         if (checkCollision(m_player, obs)) {
             stop();
+            return;
         }
     }
 }
@@ -227,11 +247,9 @@ bool MarioGame::checkCollision(const Player& player, const Obstacle& obstacle)
     // Dla dziur sprawdzamy czy gracz jest nad dziurą i nie skacze
     if (obstacle.type == Obstacle::GAP) {
         double playerCenterX = player.body.center().x();
-        if (playerCenterX > obstacle.rect.left() && 
-            playerCenterX < obstacle.rect.right() &&
-            player.isOnGround) {
-            return true;
-        }
+        Q_UNUSED(playerCenterX);
+        // Upadek przez dziurę jest rozstrzygany po przekroczeniu dolnej
+        // krawędzi ekranu, a nie natychmiast przy wejściu na jej obszar.
         return false;
     }
     
@@ -247,16 +265,12 @@ bool MarioGame::handleInput(double value)
     if (isPressing && !m_player.isCharging && m_player.isOnGround) {
         // Rozpoczęcie ładowania skoku
         m_player.isCharging = true;
-        m_player.frame = 0; // Zatrzymanie animacji biegu
-        m_chargeStartTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
+        m_player.chargeLevel = 0.0;
+        m_player.frame = 0;
     } else if (!isPressing && m_player.isCharging && m_player.isOnGround) {
         // Zwolnienie tensometru - wykonanie skoku
-        double currentTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
-        double chargeDuration = currentTime - m_chargeStartTime;
-        
-        // Obliczenie siły skoku na podstawie czasu ładowania
-        double chargeRatio = qMin(1.0, chargeDuration / MAX_CHARGE_TIME);
-        double jumpForce = JUMP_FORCE * (0.3 + 0.7 * chargeRatio);
+        const double chargeRatio = qBound(0.0, m_player.chargeLevel, 1.0);
+        const double jumpForce = JUMP_FORCE * (0.3 + 0.7 * chargeRatio);
         
         m_player.velocityY = -jumpForce;
         m_player.isJumping = true;
@@ -265,11 +279,6 @@ bool MarioGame::handleInput(double value)
         m_player.chargeLevel = 0.0;
         
         return true;
-    } else if (isPressing && m_player.isCharging) {
-        // Kontynuacja ładowania
-        double currentTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
-        double chargeDuration = currentTime - m_chargeStartTime;
-        m_player.chargeLevel = qMin(1.0, chargeDuration / MAX_CHARGE_TIME);
     }
     
     return false;
@@ -383,7 +392,13 @@ void MarioGame::renderObstacles(QPainter& painter)
     
     // Rysowanie ziemi (z przerwami na dziury)
     painter.fillRect(QRectF(0, groundY, width(), height() - groundY), COLOR_GROUND);
-    
+    // Narysuj otwory ponownie po podłożu, aby były widoczne również wizualnie.
+    for (const auto& obs : m_obstacles) {
+        if (obs.type == Obstacle::GAP) {
+            painter.fillRect(obs.rect, Qt::black);
+        }
+    }
+
     // Detale ziemi (prosty wzór)
     painter.setPen(QColor(0xA0, 0x30, 0x00));
     for (double x = 0; x < width(); x += 40) {
@@ -422,7 +437,7 @@ void MarioGame::renderBackground(QPainter& painter)
     painter.setBrush(QColor(0x00, 0xA8, 0x00));
     painter.setPen(QColor(0x00, 0xA8, 0x00));
     for (int i = 0; i < 3; ++i) {
-        double x = fmod(-QTime::currentTime().msecsSinceStartOfDay() / 50.0 + i * 300, width() + 200) - 100;
+        double x = fmod(-m_gameElapsedMs / 50.0 + i * 300, width() + 200) - 100;
         QVector<QPoint> hill = {
             QPoint(x, height() * GROUND_Y_RATIO),
             QPoint(x + 100, height() * GROUND_Y_RATIO - 60),
