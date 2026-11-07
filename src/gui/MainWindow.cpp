@@ -66,6 +66,11 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     saveSettings();
+    // Stop the shared serial reader before Qt destroys child tabs whose
+    // callbacks are registered with this device service.
+    if (m_serialPort) {
+        m_serialPort->stopAsyncReading();
+    }
 }
 
 void MainWindow::setupUI()
