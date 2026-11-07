@@ -242,6 +242,21 @@ if(Qt5_FOUND)
     # Create executable
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+    # GameEngine lifecycle, monotonic timing and cross-thread sensor dispatch.
+    add_executable(game_engine_regression
+        tests/game_engine_regression.cpp
+        src/games/GameEngine.cpp
+        include/games/GameEngine.hpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(game_engine_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(game_engine_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(game_engine_regression PRIVATE Qt5::Core Qt5::Widgets)
+    add_test(NAME game_engine_regression COMMAND game_engine_regression)
+    set_tests_properties(game_engine_regression PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
     # Process-restart regression for durable analytics and checkpoint history.
     add_executable(training_history_restart_regression
         tests/training_history_restart_regression.cpp
