@@ -93,7 +93,7 @@ int main()
 
     const BiomechanicalParams repetitionResult = formulas.calculateRepParams(first);
     assert(repetitionResult.availabilityAt(0) == ParameterAvailability::Available);
-    assert(repetitionResult.availabilityAt(20) == ParameterAvailability::RequiresCalibration);
+    assert(repetitionResult.availabilityAt(20) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(64) == ParameterAvailability::InsufficientData);
 
     series.reps = {first, second};
@@ -101,13 +101,19 @@ int main()
 
     assert(result.availabilityAt(0) == ParameterAvailability::Available);
     assert(result.availabilityAt(4) == ParameterAvailability::Available);
-    assert(result.availabilityAt(20) == ParameterAvailability::RequiresCalibration);
+    assert(result.availabilityAt(20) == ParameterAvailability::Available);
     assert(result.availabilityAt(29) == ParameterAvailability::RequiresAdditionalSensor);
     assert(result.availabilityAt(39) == ParameterAvailability::RequiresAdditionalSensor);
     assert(result.availabilityAt(52) == ParameterAvailability::RequiresAdditionalSensor);
     assert(result.availabilityAt(53) == ParameterAvailability::RequiresHistory);
     assert(result.availabilityAt(58) == ParameterAvailability::RequiresCalibration);
     assert(result.availabilityAt(64) == ParameterAvailability::RequiresHistory);
+    assert(result.availabilityAt(24) == ParameterAvailability::Available);
+
+    Formulas uncalibrated;
+    const BiomechanicalParams withoutCalibration = uncalibrated.calculateAllParams(series);
+    assert(withoutCalibration.availabilityAt(20) == ParameterAvailability::RequiresCalibration);
+    assert(withoutCalibration.availabilityAt(24) == ParameterAvailability::RequiresCalibration);
 
     SeriesData undersampled = series;
     undersampled.reps[0].samples.clear();
