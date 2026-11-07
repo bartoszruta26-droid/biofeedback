@@ -172,7 +172,6 @@ file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
 
 # Additional test targets
-enable_testing()
 add_subdirectory(tests OPTIONAL)
 
 # Documentation
