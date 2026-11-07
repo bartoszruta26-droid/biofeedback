@@ -633,7 +633,7 @@ void TrainingTab::resumeTraining()
 
 bool TrainingTab::isTrainingActive() const
 {
-    return m_stateMachine.state() == biofeedback::training::SessionState::Active;
+    return m_stateMachine.running() && !m_stateMachine.paused();
 }
 
 bool TrainingTab::isTrainingPaused() const
