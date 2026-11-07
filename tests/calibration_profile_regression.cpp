@@ -41,6 +41,7 @@ int main()
     assert(loaded.has_value());
     assert(loaded->schemaVersion == sensor::CalibrationProfile::CurrentSchemaVersion);
     assert(loaded->deviceId == profile.deviceId);
+    assert(loaded->unit == "g");
     assert(loaded->zeroOffsetRaw == profile.zeroOffsetRaw);
     assert(loaded->scaleFactor == profile.scaleFactor);
 
