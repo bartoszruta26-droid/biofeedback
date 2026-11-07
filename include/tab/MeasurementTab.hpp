@@ -373,7 +373,7 @@ private:
     QPushButton* m_btnToggleRaw;      // Przełącznik trybu Raw/Calibrated
     QPushButton* m_btnReset;
     
-    // Wybór jednostki siły (must be after m_currentUnit for init order)
+    // Wybór jednostki siły
     QComboBox* m_unitSelector;
     
     // Panel żywy z wykresem
@@ -418,7 +418,7 @@ private:
     QVector<double> m_currentRepForces;
     QVector<double> m_currentRepTimes;
     
-    // Aktualna jednostka wyświetlania (must be before m_unitSelector for init order)
+    // Aktualna jednostka wyświetlania
     ForceUnit m_currentUnit;
     
     // Tryb wyświetlania: raw value vs calibrated
