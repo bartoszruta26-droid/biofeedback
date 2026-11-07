@@ -9,6 +9,7 @@ machine = Path("include/training/SessionStateMachine.hpp").read_text(encoding="u
 clock = Path("include/training/TrainingSessionClock.hpp").read_text(encoding="utf-8")
 restart_test = Path("tests/training_history_restart_regression.cpp").read_text(encoding="utf-8")
 cmake = Path("CMakeLists.txt").read_text(encoding="utf-8")
+process_restart_test = Path("tests/training_tab_process_restart_regression.cpp").read_text(encoding="utf-8")
 
 checks = {
     "plan is persisted": '"exercise_plan"' in tab and '"series_count"' in tab and '"repetitions_per_series"' in tab,
@@ -36,6 +37,32 @@ checks = {
         "const QJsonArray repetitions = object.value(\"repetitions\").toArray();" in analytics and
         "const QJsonArray samples = repetitionObject.value(\"samples\").toArray();" in analytics and
         "record.measurement.samples.push_back(sample);" in analytics
+    ),
+    "full TrainingTab restart test launches separate OS processes": (
+        "QProcess process;" in process_restart_test and
+        "process.start(executable, {stage, root});" in process_restart_test and
+        "std::_Exit(0);" in process_restart_test
+    ),
+    "full TrainingTab restart test verifies plan, cursor and detector samples": (
+        "m_exercisePlan.size() == 2" in process_restart_test and
+        "m_currentExerciseIndex == 1" in process_restart_test and
+        "m_currentSeriesIndex == 0" in process_restart_test and
+        "m_currentRepIndex == 1" in process_restart_test and
+        "detector.samples.size() == 2" in process_restart_test
+    ),
+    "full TrainingTab restart test continues an in-flight repetition exactly once": (
+        "training.onRepetitionDetected(completed);" in process_restart_test and
+        "m_exerciseStats[1].completedReps == 1" in process_restart_test and
+        "m_exerciseStats[1].repetitions.size() == 1" in process_restart_test
+    ),
+    "full TrainingTab restart test preserves exact paused rest milliseconds over repeated crashes": (
+        "m_restDurationMs == 12345" in process_restart_test and
+        "verify-rest-again" in process_restart_test and
+        "m_stateMachine.resting()" in process_restart_test
+    ),
+    "full TrainingTab process restart test is registered in CTest": (
+        "training_tab_process_restart_regression" in cmake and
+        "training_tab_process_restart_regression" in Path(".github/workflows/security-regression.yml").read_text(encoding="utf-8")
     ),
     "restart-level test recreates the analytics widget": (
         "TrainingAnalyticsWidget firstProcess;" in restart_test and
