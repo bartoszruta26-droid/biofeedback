@@ -741,6 +741,16 @@ void MeasurementTab::setTargetForce(double force)
     m_forcePlot->setTargetForce(force);
 }
 
+void MeasurementTab::setEngineRepetitionsPerSeries(int repetitions)
+{
+    if (repetitions < 1 || repetitions > 1000) return;
+    m_engineRepetitionsPerSeries = repetitions;
+    if (!m_measurementEngine.setRepetitionsPerSeries(static_cast<std::size_t>(repetitions))) {
+        // Configuration changes are accepted only between contractions.
+        return;
+    }
+}
+
 bool MeasurementTab::isMeasurementActive() const
 {
     return m_isMeasuring;
@@ -837,6 +847,7 @@ void MeasurementTab::resetSession()
     m_completedSeriesStats.clear();
     m_measurementEngine.reset();
     m_measurementEngine.setTargetForceN(m_targetForce);
+    m_measurementEngine.setRepetitionsPerSeries(static_cast<std::size_t>(m_engineRepetitionsPerSeries));
     
     m_inContraction = false;
     m_repStartForce = 0;
@@ -944,6 +955,12 @@ void MeasurementTab::readSingleSample(double forceValue, double forceInNewtons)
         consumeEngineRepetition(*completedRepetition);
         for (const auto& series : m_measurementEngine.takeCompletedSeries())
             consumeEngineSeries(series);
+        emit sharedRepetitionCompleted(completedRepetition->peakForceN,
+                                       completedRepetition->durationSeconds,
+                                       completedRepetition->timeToPeakSeconds,
+                                       completedRepetition->averageForceN,
+                                       completedRepetition->impulseNs,
+                                       completedRepetition->targetAccuracyPercent);
     }
 
     if (m_rawTable) {
