@@ -62,7 +62,7 @@ for required in (
     "m_completedSeriesStats.last().seriesNumber == m_currentSeries",
     "currentSeries.seriesNumber = m_currentSeries",
     "m_currentSeries > 3",
-    "stopMeasurement();\n            m_lblStatus->setText(tr(\"Status: SESJA ZAKOŃCZONA\"))",
+    "stopMeasurement();\\n            emit sessionFinished(m_completedSeriesStats);",
     "biomechanicalData.samples.emplace_back",
     "series.biomechanicalParams.assignValues(seriesValues)",
     "calculateAllParams(biomechanicalSeries)",
