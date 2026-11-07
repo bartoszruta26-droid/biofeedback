@@ -1123,6 +1123,7 @@ void TrainingTab::loadNextExercise()
     if (gameIndex >= 0) m_gameTypeCombo->setCurrentIndex(gameIndex);
     configureGameForExercise();
     loadNextSeries();
+    saveExecutionCheckpoint();
 }
 
 void TrainingTab::loadNextSeries()
@@ -1166,6 +1167,7 @@ void TrainingTab::loadNextSeries()
         m_currentGame->start();
     }
     updateProgressWidgets();
+    saveExecutionCheckpoint();
 }
 
 void TrainingTab::loadNextRep()
@@ -1363,6 +1365,7 @@ void TrainingTab::startRestTimer()
     m_restClock.start();
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
     if (!m_isPaused) m_restTimer->start();
+    saveExecutionCheckpoint();
 }
 
 
@@ -1400,7 +1403,8 @@ QJsonObject TrainingTab::buildExecutionCheckpoint() const
 
 bool TrainingTab::saveExecutionCheckpoint()
 {
-    if (!m_analyticsWidget || !m_isTraining) return false;
+    if (!m_analyticsWidget) return false;
+    if (!m_isTraining) return true;
     updateSessionClocks();
     m_analyticsWidget->setExecutionState(buildExecutionCheckpoint());
     return m_analyticsWidget->saveSessionCheckpoint();
@@ -1450,6 +1454,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         resumeState != biofeedback::training::SessionState::Resting) return false;
 
     m_exercisePlan = plan;
+    m_analyticsWidget->setExecutionState(checkpoint);
     m_exerciseStats = m_analyticsWidget->currentStats();
     while (m_exerciseStats.size() < m_exercisePlan.size()) {
         ExerciseStats stats;
