@@ -1269,7 +1269,6 @@ void TrainingTab::finishCurrentSeries()
     // and the rest target have been staged.
     const bool exerciseWillFinish = (m_currentSeriesIndex + 1 >= exercise.seriesCount);
     const int nextSeriesIndex = exerciseWillFinish ? 0 : m_currentSeriesIndex + 1;
-    const int nextExerciseIndex = exerciseWillFinish ? m_currentExerciseIndex + 1 : m_currentExerciseIndex;
     m_currentSeriesIndex = nextSeriesIndex;
     m_currentRepIndex = 0;
     m_repetitionDetector.reset();
