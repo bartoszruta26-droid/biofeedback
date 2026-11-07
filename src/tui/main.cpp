@@ -11,7 +11,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileDevice>
-#include <QTextStream>"
+#include <QTextStream>
 
 #include <ncurses.h>
 
@@ -300,7 +300,7 @@ void drawModule(tui::Screen screen,
             std::lock_guard<std::mutex> lock(live.mutex);
             validSamples = live.validSampleCount;
             invalidSamples = live.invalidSampleCount;
-            quality = QString::fromStdString(live.lastSampleQuality);
+            quality = live.lastSampleQuality;
             peak = live.lastPeakForceN;
             mean = live.lastMeanForceN;
             duration = live.lastRepDurationMs;
