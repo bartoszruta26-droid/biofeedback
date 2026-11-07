@@ -267,7 +267,7 @@ void TrainingAnalyticsWidget::onHistoryEntryActivated(int row, int /*column*/) {
         exercise.avgReactionTime = object.value("average_time_to_peak_seconds").toDouble();
         exercise.consistencyScore = object.value("consistency_score_percent").toDouble();
         exercise.gameScore = object.value("game_points").toInt();
-        exercise.isCompleted = true;
+        exercise.isCompleted = object.value("is_completed").toBool(false);
 
         const QJsonArray series = object.value("series").toArray();
         for (const QJsonValue& seriesValue : series) {
@@ -396,6 +396,7 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback, bool fina
         exerciseEntry.insert("average_time_to_peak_seconds", exercise.avgReactionTime);
         exerciseEntry.insert("consistency_score_percent", exercise.consistencyScore);
         exerciseEntry.insert("game_points", exercise.gameScore);
+        exerciseEntry.insert("is_completed", exercise.isCompleted);
 
         QJsonArray seriesEntries;
         for (int index = 0; index < exercise.series.size(); ++index) {
