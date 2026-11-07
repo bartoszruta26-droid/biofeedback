@@ -451,6 +451,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
+    closeSampleJournal();
     if (m_measurementEngine && m_measurementCallbackToken) {
         m_measurementEngine->unsubscribe(m_measurementCallbackToken);
         m_measurementCallbackToken = 0;
@@ -498,6 +499,7 @@ bool MeasurementTab::openSampleJournal()
         QJsonObject header;
         header["recordType"] = "header";
         header["schemaVersion"] = 1;
+        header["firstSequence"] = static_cast<qint64>(m_recordedSamples.size()) + 1;
         header["sessionId"] = m_activeSessionId;
         header["patientId"] = m_patientId;
         header["date"] = QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
@@ -607,6 +609,8 @@ bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
                 session.patientMassKg = object["patientMassKg"].toDouble();
                 if (session.sessionId.isEmpty() || session.patientId != m_patientId)
                     { malformed = true; break; }
+                expectedSequence = object["firstSequence"].toVariant().toULongLong();
+                if (expectedSequence == 0) expectedSequence = 1;
                 validHeader = true;
                 continue;
             }
@@ -1127,6 +1131,11 @@ void MeasurementTab::resetSession()
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
     m_recordedSamples.clear();
+    closeSampleJournal();
+    m_sampleJournalPath.clear();
+    m_activeSessionId.clear();
+    m_sampleJournalPendingWrites = 0;
+    m_sampleJournalFailed = false;
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
@@ -1242,10 +1251,10 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
-    if (m_sampleJournal.isOpen() && !appendSampleJournal(recorded)) {
-        if (!m_sampleJournalFailed && m_lblStatus)
+    if (m_sampleJournal.isOpen()) {
+        const bool wasFailed = m_sampleJournalFailed;
+        if (!appendSampleJournal(recorded) && !wasFailed && m_lblStatus)
             m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA"));
-        m_sampleJournalFailed = true;
     }
 
     if (m_rawBox)
@@ -2040,6 +2049,10 @@ bool MeasurementTab::importFromJSON(const QString& filename)
     if (!session.sessionId.isEmpty()) {
         m_patientSessions.append(session);
         m_patientId = session.patientId;
+        m_sampleJournalPath.clear();
+        m_activeSessionId.clear();
+        m_sampleJournalPendingWrites = 0;
+        m_sampleJournalFailed = false;
         m_completedSeriesStats = session.series;
         m_recordedSamples = session.samples;
         if (m_elasticConstantInput) {
