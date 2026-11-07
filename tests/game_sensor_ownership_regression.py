@@ -24,5 +24,9 @@ if "gramsToNewtons(data.calibratedValue)" not in training:
     raise SystemExit("TrainingTab must convert firmware grams to newtons")
 if "!data.isValid" not in training:
     raise SystemExit("TrainingTab must reject invalid sensor frames")
+if "if (!m_serialPort || !m_serialPort->isConnected())" not in training:
+    raise SystemExit("TrainingTab must refuse to start without a connected sensor")
+if "gameId == \"sin_game\" && (!m_serialPort || !m_serialPort->isConnected())" not in main_window:
+    raise SystemExit("Global biofeedback game must require a connected sensor")
 
 print("Game sensor ownership and SI force policy passed")
