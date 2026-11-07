@@ -314,6 +314,6 @@ int main(int argc, char** argv)
 
     endwin();
     serial.disconnect();
-    serial.removeDataCallback(dataToken);
+    measurementEngine->unsubscribe(measurementToken);
     return EXIT_SUCCESS;
 }
