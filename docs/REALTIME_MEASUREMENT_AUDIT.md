@@ -46,6 +46,10 @@ W repozytorium istnieją `BiomechanicalParams` i `Formulas::calculateAllParams()
 
 Aktualna tabela zakładki pokazuje 12 parametrów powtórzenia, a struktura serii przechowuje tylko wybrany zestaw statystyk. Nie ma jeszcze kompletnego połączenia `MeasurementTab -> SeriesData -> Formulas -> 65 parametrów -> UI/JSON/CSV`.
 
+Przegląd przypisań w `Formulas::calculateAllParams()` wykazał również pola, których ta funkcja w ogóle nie wyznacza: `F_min`, `F_range`, `T_rep`, `T_rest_rep`, `T_rest_set`, `v_avg`, `eta`, `FI_inter`, `BPR`, `F_grand_mean`, `I_total`, `V_training`, `INT`, `D_training`, `SEI`, `FMC` i `ISI`. Część z nich wymaga danych z kolejnych powtórzeń/serii, część danych historycznych lub dodatkowych czujników. Wartości zerowe z konstruktora `BiomechanicalParams::reset()` nie są dowodem, że parametr wynosi zero.
+
+Konstruktor `Formulas` ma domyślne założenia `k_elastic=100 N/m` i `patientMass=70 kg`. Zakładka pomiarowa nie przekazuje obecnie jawnie indywidualnej kalibracji taśmy i aktualnej masy pacjenta do tego silnika. Wyniki zależne od tych wartości nie mogą być traktowane jako spersonalizowane pomiary, dopóki konfiguracja nie zostanie jawnie podana i zapisana w sesji.
+
 Dodatkowo część obecnego kodu `calculateAllParams()` podstawia wartości zastępcze zamiast danych pomiarowych:
 - TRI używa historycznego maksimum ustawionego sztucznie na 110% bieżącego maksimum;
 - FRI zakłada stały limit czujnika 500 N;
