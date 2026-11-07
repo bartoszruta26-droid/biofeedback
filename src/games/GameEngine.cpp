@@ -42,10 +42,12 @@ GameEngine::~GameEngine()
 
 void GameEngine::start()
 {
-    if (m_isRunning && !m_isPaused) {
-        return; // Gra już trwa
+    if (m_isRunning) {
+        if (m_isPaused)
+            resume();
+        return;
     }
-    
+
     // Reset stanu gry
     reset();
     
