@@ -47,7 +47,7 @@ int main() {
     detector.reset();
     assert(!detector.process(0xfffffff0u, 15.0, true, rep));
     assert(!detector.process(0x00000090u, 25.0, true, rep));
-    assert(!detector.process(0x00000130u, 4.0, true, rep));
+    assert(detector.process(0x00000130u, 4.0, true, rep));
     assert(rep.durationMs == 320);
 
     std::vector<RepetitionRecord> series{
