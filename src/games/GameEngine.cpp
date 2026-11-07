@@ -16,6 +16,7 @@ GameEngine::GameEngine(QWidget *parent)
     , m_gameTimer(new QTimer(this))
     , m_lastFrameTime(0)
     , m_accumulatedSessionMs(0)
+    , m_simulationAccumulator(0.0)
     , m_sensorValue(0.0)
 {
     // Konfiguracja timera gry - 60 FPS (ok. 16ms)
@@ -56,6 +57,7 @@ void GameEngine::start()
     m_isPaused = false;
     m_monotonicClock.start();
     m_lastFrameTime = 0;
+    m_simulationAccumulator = 0.0;
     
     // Uruchomienie timera
     m_gameTimer->start();
@@ -114,6 +116,7 @@ void GameEngine::resume()
     // Aktualizacja czasu ostatniej klatki
     m_monotonicClock.start();
     m_lastFrameTime = 0;
+    m_simulationAccumulator = 0.0;
     
     // Wznowienie timera
     m_gameTimer->start();
@@ -174,6 +177,7 @@ void GameEngine::reset()
     m_accumulatedSessionMs = 0;
     m_monotonicClock.invalidate();
     m_lastFrameTime = 0;
+    m_simulationAccumulator = 0.0;
     
     // Wymuszenie odświeżenia widoku
     QWidget::update();
@@ -195,10 +199,19 @@ void GameEngine::gameLoop()
         deltaTime = 0.0;
     deltaTime = qMin(deltaTime, 0.1);
     
-    // Aktualizacja logiki gry
-    update(deltaTime);
-    
-    // Odświeżenie widoku (wywoła paintEvent)
+    // Fixed-step simulation keeps collision and movement behaviour independent
+    // of GUI timer jitter. The frame delta is capped above to bound catch-up work.
+    constexpr double fixedStep = 1.0 / 120.0;
+    m_simulationAccumulator += deltaTime;
+    int steps = 0;
+    while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
+        update(fixedStep);
+        m_simulationAccumulator -= fixedStep;
+        ++steps;
+    }
+    if (steps == 12 && m_simulationAccumulator >= fixedStep)
+        m_simulationAccumulator = 0.0;
+
     QWidget::update();
 }
 
