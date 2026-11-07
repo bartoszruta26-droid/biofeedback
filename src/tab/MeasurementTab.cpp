@@ -745,7 +745,7 @@ void MeasurementTab::loadAllHistoricalMeasurements()
             QString jsonContent = in.readAll();
             file.close();
             
-            MeasurementSession session = deserializeSessionFromJSON(jsonContent);
+            MeasurementSession session = deserializeSessionFromJSON(jsonContent, false);
             if (!session.sessionId.isEmpty()) {
                 // Sprawdź czy sesja już istnieje (unikaj duplikatów)
                 bool exists = false;
@@ -1849,7 +1849,7 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
     return doc.toJson(QJsonDocument::Indented);
 }
 
-MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& json) const
+MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& json, bool includeSamples) const
 {
     MeasurementSession session;
     
@@ -1861,22 +1861,24 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
     session.patientId = root["patientId"].toString();
     session.date = root["date"].toString();
 
-    const QJsonArray samplesArray = root["samples"].toArray();
-    session.samples.reserve(samplesArray.size());
-    for (const auto& sampleValue : samplesArray) {
-        const QJsonObject sampleObj = sampleValue.toObject();
-        RecordedMeasurementSample sample;
-        sample.sequence = static_cast<quint64>(sampleObj["sequence"].toVariant().toULongLong());
-        sample.timestampUnixMs = sampleObj["timestampUnixMs"].toVariant().toLongLong();
-        sample.deviceTimestampMs = static_cast<quint32>(sampleObj["deviceTimestampMs"].toVariant().toULongLong());
-        sample.elapsedTimeSeconds = sampleObj["elapsedTimeSeconds"].toDouble();
-        sample.value = sampleObj["value"].toDouble();
-        sample.rawValue = sampleObj["rawValue"].toInt();
-        sample.hasRawValue = sampleObj["hasRawValue"].toBool();
-        sample.unit = sampleObj["unit"].toString();
-        sample.source = sampleObj["source"].toString();
-        sample.quality = sampleObj["quality"].toString();
-        session.samples.append(sample);
+    if (includeSamples) {
+        const QJsonArray samplesArray = root["samples"].toArray();
+        session.samples.reserve(samplesArray.size());
+        for (const auto& sampleValue : samplesArray) {
+            const QJsonObject sampleObj = sampleValue.toObject();
+            RecordedMeasurementSample sample;
+            sample.sequence = static_cast<quint64>(sampleObj["sequence"].toVariant().toULongLong());
+            sample.timestampUnixMs = sampleObj["timestampUnixMs"].toVariant().toLongLong();
+            sample.deviceTimestampMs = static_cast<quint32>(sampleObj["deviceTimestampMs"].toVariant().toULongLong());
+            sample.elapsedTimeSeconds = sampleObj["elapsedTimeSeconds"].toDouble();
+            sample.value = sampleObj["value"].toDouble();
+            sample.rawValue = sampleObj["rawValue"].toInt();
+            sample.hasRawValue = sampleObj["hasRawValue"].toBool();
+            sample.unit = sampleObj["unit"].toString();
+            sample.source = sampleObj["source"].toString();
+            sample.quality = sampleObj["quality"].toString();
+            session.samples.append(sample);
+        }
     }
 
     QJsonArray seriesArray = root["series"].toArray();
