@@ -296,6 +296,7 @@ void FlappyBirdGame::update(double deltaTime) {
     
     // Aktualizacja ptaka
     updateBird(deltaTime);
+    if (!isRunning()) return;
     
     // Aktualizacja przeszkód
     updateObstacles(deltaTime);
