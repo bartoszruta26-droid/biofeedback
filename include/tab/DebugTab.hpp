@@ -14,6 +14,9 @@
 #include <QString>
 #include <QFont>
 #include <QScrollBar>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QColor>
 #include <memory>
 #include <mutex>
 #include <functional>
