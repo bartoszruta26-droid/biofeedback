@@ -476,9 +476,9 @@ void MeasurementTab::ensureSessionClockStarted()
     
     if (m_sessionStartTime <= 0.0) {
         m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-        std::cout << "[DEBUG] ensureSessionClockStarted: Started clock, m_sessionStartTime=" << m_sessionStartTime << std::endl;
-    } else {
-        std::cout << "[DEBUG] ensureSessionClockStarted: Clock already running" << std::endl;
+        m_sessionElapsedTimer.start();
+    } else if (!m_sessionElapsedTimer.isValid()) {
+        m_sessionElapsedTimer.start();
     }
 }
 
@@ -870,6 +870,7 @@ void MeasurementTab::resetSession()
     m_currentRepInSeries = 0;
     m_totalReps = 0;
     m_sessionStartTime = 0;
+    m_sessionElapsedTimer.invalidate();
     
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
@@ -958,32 +959,19 @@ void MeasurementTab::simulateSensorData()
 
 void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs)
 {
-    std::cout << "[DEBUG] readSingleSample START: forceValue=" << forceValue 
-              << " m_completedSeriesStats.size()=" << m_completedSeriesStats.size() << std::endl;
-    
-    // Safety check - ensure series is initialized
-    if (m_completedSeriesStats.isEmpty()) {
-        std::cout << "[DEBUG] readSingleSample: No series initialized, calling ensureCurrentSeriesInitialized" << std::endl;
+    if (!std::isfinite(forceValue)) return;
+
+    if (m_completedSeriesStats.isEmpty())
         ensureCurrentSeriesInitialized();
-    }
-    
-    // Safety check - ensure session clock is started
-    if (m_sessionStartTime <= 0.0) {
-        std::cout << "[DEBUG] readSingleSample: Session clock not started, calling ensureSessionClockStarted" << std::endl;
+    if (m_sessionStartTime <= 0.0 || !m_sessionElapsedTimer.isValid())
         ensureSessionClockStarted();
-    }
 
-    std::cout << "[DEBUG] readSingleSample After checks: m_completedSeriesStats.size()=" 
-              << m_completedSeriesStats.size() << " m_sessionStartTime=" << m_sessionStartTime << std::endl;
+    // Elapsed time must be monotonic even when the system wall clock is
+    // corrected while a measurement is running.
+    const double currentTime = m_sessionElapsedTimer.elapsed() / 1000.0;
 
-    double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0 - m_sessionStartTime;
-    
-    std::cout << "[DEBUG] readSingleSample: currentTime=" << currentTime << std::endl;
-    
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
-    // These vectors back the on-screen table and current-value display, not the
-    // durable session archive. Keep their working set bounded during long runs.
     constexpr int liveBufferCapacity = 10000;
     if (m_rawForceBuffer.size() > liveBufferCapacity)
         m_rawForceBuffer.remove(0, m_rawForceBuffer.size() - liveBufferCapacity);
@@ -992,9 +980,6 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(false);
     if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 
-    // Repetition boundaries and all derived biomechanics use the same
-    // detector implementation as TrainingTab. A missing device timestamp
-    // breaks continuity rather than inventing an interval.
     if (!m_showRawValues) {
         biofeedback::training::RepetitionRecord repetition;
         if (deviceTimestampMs == 0) {
@@ -1018,37 +1003,14 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
             m_currentRepTimes.clear();
         }
     }
-    
-    std::cout << "[DEBUG] readSingleSample: Data prepared for display - rawForceBuffer.size()=" 
-              << m_rawForceBuffer.size() << " currentRepForces.size()=" << m_currentRepForces.size() << std::endl;
-    
-    std::cout << "[DEBUG] readSingleSample Before emit newForceSample, force=" << forceValue 
-              << " timestamp=" << currentTime << std::endl;
-    
-    try {
-        // Emit signal with all three parameters to match the signal definition
-        emit newForceSample(forceValue, currentTime, m_showRawValues);
-        std::cout << "[DEBUG] readSingleSample: Signal emitted successfully" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "[ERROR] readSingleSample: Exception while emitting signal: " << e.what() << std::endl;
-    } catch (...) {
-        std::cerr << "[ERROR] readSingleSample: Unknown exception while emitting signal" << std::endl;
-    }
-    
-    std::cout << "[DEBUG] readSingleSample Before updateLiveDisplay" << std::endl;
-    updateLiveDisplay(forceValue);
-    std::cout << "[DEBUG] readSingleSample: updateLiveDisplay completed" << std::endl;
-    
 
-    
-    std::cout << "[DEBUG] readSingleSample END" << std::endl;
-    
-    // Aktualizuj tabelę surowych danych (ostatnie 100) - safety check for null pointer
-    if (m_rawTable != nullptr) {
-        if (m_rawTable->rowCount() >= 100) {
+    emit newForceSample(forceValue, currentTime, m_showRawValues);
+    updateLiveDisplay(forceValue);
+
+    if (m_rawTable) {
+        if (m_rawTable->rowCount() >= 100)
             m_rawTable->removeRow(0);
-        }
-        int row = m_rawTable->rowCount();
+        const int row = m_rawTable->rowCount();
         m_rawTable->insertRow(row);
         m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
         const double displayedSample = m_showRawValues
@@ -1056,55 +1018,29 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
             : (m_currentUnit == ForceUnit::Kilograms ? forceValue / 9.80665 : forceValue);
         m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(displayedSample, 'f', 2)));
         m_rawTable->scrollToBottom();
-    } else {
-        std::cerr << "[ERROR] readSingleSample: m_rawTable is null!" << std::endl;
     }
 }
 
 void MeasurementTab::updateLiveDisplay(double force)
 {
-    std::cout << "[DEBUG] updateLiveDisplay START: force=" << force 
-              << " m_showRawValues=" << m_showRawValues << " m_currentUnit=" << static_cast<int>(m_currentUnit) << std::endl;
-    
-    // Wyświetl siłę w aktualnie wybranej jednostce
+    if (!std::isfinite(force)) return;
+
     double displayForce = force;
     QString unitLabel = "N";
-    
-    if (!m_showRawValues) {
-        switch (m_currentUnit) {
-            case ForceUnit::Kilograms:
-                displayForce = force / 9.80665;  // N -> kgf
-                unitLabel = "kgf";
-                std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
-                break;
-            case ForceUnit::Raw:
-                // Nie powinno się zdarzyć, bo raw jest obsługiwane osobno
-                displayForce = force;
-                unitLabel = "ADC";
-                std::cout << "[DEBUG] updateLiveDisplay: Raw mode, displayForce=" << displayForce << std::endl;
-                break;
-            case ForceUnit::Newtons:
-            default:
-                displayForce = force;
-                unitLabel = "N";
-                std::cout << "[DEBUG] updateLiveDisplay: Newtons mode, displayForce=" << displayForce << std::endl;
-                break;
-        }
-    } else {
+    if (m_showRawValues) {
         unitLabel = "ADC";
-        std::cout << "[DEBUG] updateLiveDisplay: showRawValues=true, displayForce=" << displayForce << std::endl;
+    } else if (m_currentUnit == ForceUnit::Kilograms) {
+        displayForce = force / 9.80665;
+        unitLabel = "kgf";
     }
-    
-    std::cout << "[DEBUG] updateLiveDisplay: Before updating UI components" << std::endl;
-    m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
+
+    m_lblCurrentForce->setText(
+        QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
     m_forceBar->setValue(static_cast<int>(displayForce));
     m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
-    m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
-    
-    double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
-    std::cout << "[DEBUG] updateLiveDisplay: Before addSample, force=" << force << " time=" << lastTime << std::endl;
+
+    const double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
     m_forcePlot->addSample(force, lastTime);
-    std::cout << "[DEBUG] updateLiveDisplay END" << std::endl;
 }
 
 void MeasurementTab::calculateRepetitionStats()
