@@ -563,11 +563,32 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     }
 
 #ifdef _WIN32
+    HANDLE handle = reinterpret_cast<HANDLE>(m_impl->portHandle);
+    COMMTIMEOUTS originalTimeouts{};
+    if (!GetCommTimeouts(handle, &originalTimeouts)) {
+        m_impl->lastError = "Serial read timeout configuration unavailable";
+        return -1;
+    }
+
+    COMMTIMEOUTS readTimeouts = originalTimeouts;
+    readTimeouts.ReadIntervalTimeout = timeout == 0 ? MAXDWORD : 0;
+    readTimeouts.ReadTotalTimeoutMultiplier = 0;
+    readTimeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(timeout);
+    if (!SetCommTimeouts(handle, &readTimeouts)) {
+        m_impl->lastError = "Serial read timeout configuration failed";
+        return -1;
+    }
+
     DWORD bytesRead = 0;
-    if (!ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buffer,
-                  static_cast<DWORD>(std::min(maxLength,
-                      static_cast<size_t>(std::numeric_limits<DWORD>::max()))),
-                  &bytesRead, nullptr)) {
+    const DWORD requested = static_cast<DWORD>(std::min(
+        maxLength, static_cast<size_t>(INT_MAX)));
+    const BOOL readSucceeded = ReadFile(handle, buffer, requested, &bytesRead, nullptr);
+    const BOOL restoreSucceeded = SetCommTimeouts(handle, &originalTimeouts);
+    if (!restoreSucceeded) {
+        m_impl->lastError = "Serial read completed but timeout settings could not be restored";
+        return -1;
+    }
+    if (!readSucceeded) {
         m_impl->lastError = "Serial read failed";
         return -1;
     }
@@ -583,8 +604,10 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::milliseconds(timeout);
     int result = 0;
+    bool pollAttempted = false;
     for (;;) {
         const auto now = std::chrono::steady_clock::now();
+        if (now >= deadline && pollAttempted) break;
         int remainingMs = 0;
         if (now < deadline) {
             const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -596,6 +619,7 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
         pollfd descriptor{};
         descriptor.fd = fd;
         descriptor.events = POLLIN;
+        pollAttempted = true;
         const int ready = poll(&descriptor, 1, remainingMs);
         if (ready < 0 && errno == EINTR) continue;
         if (ready == 0) break;
