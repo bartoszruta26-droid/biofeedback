@@ -45,8 +45,22 @@ std::optional<RepetitionStats> MeasurementEngine::addSample(const Sample& sample
 {
     if (!sample.valid || sample.unit != ForceUnit::Newton ||
         !std::isfinite(sample.timestampSeconds) || !std::isfinite(sample.force) ||
-        sample.force < 0.0 || sample.timestampSeconds <= m_lastTimestampSeconds ||
-        (m_lastSource && sample.source != *m_lastSource && m_inContraction)) {
+        sample.force < 0.0) {
+        ++m_rejectedSamples;
+        return std::nullopt;
+    }
+
+    if (m_lastSource && sample.source != *m_lastSource) {
+        // Never combine sources inside a repetition or partially completed series.
+        m_repetition.clear();
+        m_currentSeries.clear();
+        m_inContraction = false;
+        m_lastTimestampSeconds = -1.0;
+        m_lastSource = sample.source;
+        ++m_rejectedSamples;
+        return std::nullopt;
+    }
+    if (sample.timestampSeconds <= m_lastTimestampSeconds) {
         ++m_rejectedSamples;
         return std::nullopt;
     }
