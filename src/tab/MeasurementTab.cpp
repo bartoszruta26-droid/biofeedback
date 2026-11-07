@@ -418,7 +418,10 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
-    // Qt automatycznie czyści widgety z parentem
+    m_stopConnectionThread.store(true);
+    if (m_connectionThread.joinable()) {
+        m_connectionThread.join();
+    }
 }
 
 void MeasurementTab::ensureCurrentSeriesInitialized()
@@ -752,8 +755,6 @@ void MeasurementTab::startMeasurement()
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
-    m_timer->start();
-    
     std::cout << "[DEBUG] startMeasurement: Locking Raw/Calibrated button" << std::endl;
     
     // Zablokuj przycisk zmiany trybu Raw/Calibrated podczas pomiaru
@@ -784,7 +785,6 @@ void MeasurementTab::stopMeasurement()
         return;
     }
     
-    m_timer->stop();
     m_isMeasuring = false;
     
     // Jeśli trwa powtórzenie, zakończ je
@@ -1373,64 +1373,26 @@ void MeasurementTab::onToggleMeasurement()
 
 void MeasurementTab::onReadSingleSample()
 {
-    // Odczyt z Arduino Nano z HX711 przez SerialCommunication
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data = m_serialPort->readData(500);
-        if (data.isValid) {
-            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-            readSingleSample(valueToUse);
-            m_lastSensorData = data;
-        } else {
-            // Jeśli dane nie są poprawne, wyświetl komunikat
-            m_lblStatus->setText("Status: BŁĄD ODCZYTU");
-            m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
-        }
-    } else {
-        // Brak podłączonego Arduino - wyświetl komunikat
-        m_lblStatus->setText("Status: BRAK ARDUINO NANO Z HX711");
-        m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
-        emit arduinoConnectionStatus(false, "Nie wykryto Arduino Nano z HX711. Sprawdź połączenie USB.");
+    // Nie wykonuj synchronicznego odczytu portu w wątku GUI.
+    // Przycisk ręczny wykorzystuje ostatnią próbkę odebraną przez czytnik asynchroniczny.
+    if (m_lastSensorData.isValid) {
+        const double valueToUse = m_showRawValues
+            ? static_cast<double>(m_lastSensorData.value)
+            : m_lastSensorData.calibratedValue;
+        readSingleSample(valueToUse);
+        return;
     }
+
+    m_lblStatus->setText(m_serialPort && m_serialPort->isConnected()
+        ? "Status: OCZEKIWANIE NA PRÓBKĘ"
+        : "Status: BRAK ARDUINO NANO Z HX711");
+    m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
 }
 
 void MeasurementTab::onTimerTick()
 {
-    // Pobieranie danych z prawdziwego Arduino zamiast symulacji
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data;
-        if (m_serialPort->tryReadData(data)) {
-            if (data.isValid) {
-                std::cout << "[DEBUG] onTimerTick: RAW DATA FROM ARDUINO - timestamp=" << data.timestamp 
-                          << " value=" << data.value << " calibratedValue=" << data.calibratedValue 
-                          << " isValid=" << data.isValid << " crc=" << static_cast<int>(data.crc) << std::endl;
-                
-                m_lastSensorData = data;
-                // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-                double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-                std::cout << "[DEBUG] onTimerTick: valueToUse after conversion=" << valueToUse 
-                          << " m_showRawValues=" << m_showRawValues << std::endl;
-                
-                // Safety check before calling readSingleSample
-                try {
-                    std::cout << "[DEBUG] onTimerTick: About to call readSingleSample with value=" << valueToUse << std::endl;
-                    readSingleSample(valueToUse);
-                    std::cout << "[DEBUG] onTimerTick: readSingleSample completed successfully" << std::endl;
-                } catch (const std::exception& e) {
-                    std::cerr << "[ERROR] onTimerTick: Exception in readSingleSample: " << e.what() << std::endl;
-                } catch (...) {
-                    std::cerr << "[ERROR] onTimerTick: Unknown exception in readSingleSample" << std::endl;
-                }
-            } else {
-                std::cout << "[DEBUG] onTimerTick: Received invalid data" << std::endl;
-            }
-        } else {
-            std::cout << "[DEBUG] onTimerTick: tryReadData returned false" << std::endl;
-        }
-    } else {
-        std::cout << "[DEBUG] onTimerTick: Serial port not connected" << std::endl;
-    }
-    // Jeśli Arduino nie jest podłączone, nie wykonujemy symulacji - czekamy na podłączenie
+    // Akwizycja działa w SerialCommunication::startAsyncReading().
+    // Ten slot pozostaje pusty dla zgodności z istniejącym układem UI.
 }
 
 void MeasurementTab::onSelectionChanged()
@@ -1967,13 +1929,14 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 void MeasurementTab::connectToArduinoAsync()
 {
     // Uruchomienie wątku do automatycznego łączenia z Arduino
-    std::thread([this]() {
+    m_stopConnectionThread.store(false);
+    m_connectionThread = std::thread([this]() {
         std::cout << "[MeasurementTab] Searching for Arduino Nano with HX711..." << std::endl;
         
         bool connected = false;
         int retryCount = 0;
         
-        while (!connected) {
+        while (!connected && !m_stopConnectionThread.load()) {
             auto ports = sensor::SerialCommunication::scanAvailablePorts();
             
             if (ports.empty()) {
@@ -1982,6 +1945,7 @@ void MeasurementTab::connectToArduinoAsync()
                 }
             } else {
                 for (const auto& port : ports) {
+                    if (m_stopConnectionThread.load()) break;
                     std::cout << "[MeasurementTab] Trying port: " << port << std::endl;
                     
                     sensor::SerialConfig config;
@@ -2003,6 +1967,7 @@ void MeasurementTab::connectToArduinoAsync()
                             
                             m_hasArduinoConnection = true;
                             connected = true;
+                            m_serialPort->startAsyncReading();
                             
                             // Emituj sygnał w głównym wątku
                             QMetaObject::invokeMethod(this, [this, info]() {
@@ -2025,10 +1990,12 @@ void MeasurementTab::connectToArduinoAsync()
                     std::cerr << "[MeasurementTab] Arduino not found. Retrying... (" << retryCount << ")" << std::endl;
                     std::cerr << "[MeasurementTab] Please connect Arduino Nano with HX711 to USB port." << std::endl;
                 }
-                std::this_thread::sleep_for(std::chrono::seconds(2));
+                for (int i = 0; i < 20 && !m_stopConnectionThread.load(); ++i) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
             }
         }
-    }).detach();
+    });
 }
 
 // ============================================================================
