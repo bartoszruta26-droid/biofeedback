@@ -9,6 +9,7 @@
 #include <QGroupBox>
 #include <QProgressBar>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QVector>
 #include <QString>
 #include <QPainter>
@@ -244,6 +245,7 @@ private slots:
     void onPauseResumeClicked();
     void onExerciseSelected(int index);
     void onTimerTick();
+    void updateSessionClocks();
 
     void onGameEnded(int score);
     void onGameStarted();
@@ -316,6 +318,10 @@ private:
     // Logika i dane
     QTimer* m_timer;
     QTimer* m_restTimer;
+    QElapsedTimer m_sessionClock;
+    QElapsedTimer m_restClock;
+    qint64 m_activeExerciseTimeMs{0};
+    qint64 m_lastClockUpdateMs{0};
     bool m_isTraining;
     bool m_isPaused;
     
