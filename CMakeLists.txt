@@ -143,6 +143,7 @@ if(Qt5_FOUND)
     set(HEADERS
         include/core/Application.hpp
         include/core/Logger.hpp
+        include/core/DebugManager.hpp
         include/core/ConfigManager.hpp
         include/core/Authentication.hpp
         include/gui/MainWindow.hpp
