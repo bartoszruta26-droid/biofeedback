@@ -585,7 +585,10 @@ void TrainingTab::pauseTraining()
     if (!m_isTraining || m_isPaused) return;
     
     updateSessionClocks();
-    if (m_inRestPeriod) updateRestDisplay();
+    if (m_inRestPeriod) {
+        updateRestDisplay();
+        m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
+    }
     m_isPaused = true;
     m_restTimer->stop();
     
@@ -604,6 +607,7 @@ void TrainingTab::resumeTraining()
     
     m_isPaused = false;
     if (m_inRestPeriod) {
+        m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
         m_restClock.restart();
         m_restTimer->start();
     }
@@ -1101,6 +1105,7 @@ void TrainingTab::loadNextSeries()
             m_inRestPeriod = true;
             m_restAdvancesExercise = true;
             m_restTimeRemaining = 120;
+            m_restDurationMs = 120000;
             m_restClock.start();
             m_lblRestTimer->setText(QString("Odpoczynek przed kolejnym ćwiczeniem: %1 s")
                                     .arg(m_restTimeRemaining));
@@ -1236,7 +1241,8 @@ void TrainingTab::finishCurrentSeries()
         m_restTimeRemaining = 120;
     } else {
         m_restAdvancesExercise = false;
-        m_restTimeRemaining = static_cast<int>(exercise.restTime);
+        m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
+        m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
     }
 
     updateProgressWidgets();
@@ -1296,6 +1302,7 @@ void TrainingTab::startRestTimer()
         return;
     updateSessionClocks();
     m_restTimeRemaining = qMax(0, static_cast<int>(m_exercisePlan[m_currentExerciseIndex].restTime));
+    m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
     m_inRestPeriod = m_restTimeRemaining > 0;
     if (!m_inRestPeriod) {
         advanceAfterRest();
@@ -1310,7 +1317,7 @@ void TrainingTab::updateRestDisplay()
 {
     if (!m_restClock.isValid()) return;
     const qint64 remainingMs = qMax<qint64>(
-        0, static_cast<qint64>(m_restTimeRemaining) * 1000 - m_restClock.elapsed());
+        0, m_restDurationMs - m_restClock.elapsed());
     m_restTimeRemaining = static_cast<int>((remainingMs + 999) / 1000);
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
 }
