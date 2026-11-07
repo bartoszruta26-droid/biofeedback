@@ -1387,7 +1387,8 @@ void MeasurementTab::updateBiomechanicalTable()
     int selectedSeriesNumber = m_completedSeriesStats.isEmpty()
         ? 0 : m_completedSeriesStats.last().seriesNumber;
     if (m_biomechSeriesSelector) {
-        const int previous = m_biomechSeriesSelector->currentData().toInt();
+        const QVariant previousData = m_biomechSeriesSelector->currentData();
+        const int previous = previousData.isValid() ? previousData.toInt() : -1;
         const QSignalBlocker blocker(m_biomechSeriesSelector);
         m_biomechSeriesSelector->clear();
         for (int i = 0; i < m_completedSeriesStats.size(); ++i) {
