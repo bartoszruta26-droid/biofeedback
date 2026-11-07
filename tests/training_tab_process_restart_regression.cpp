@@ -63,10 +63,18 @@ private:
 
     static void answerRecoveryPrompt()
     {
-        QTimer::singleShot(0, []() {
+        // QMessageBox::question() enters its own event loop. Poll until the
+        // modal dialog is actually active instead of assuming a zero-delay
+        // callback runs after the dialog has been constructed.
+        auto* timer = new QTimer(QApplication::instance());
+        QObject::connect(timer, &QTimer::timeout, timer, [timer]() {
             auto* dialog = qobject_cast<QMessageBox*>(QApplication::activeModalWidget());
-            if (dialog) dialog->done(QMessageBox::Yes);
+            if (!dialog) return;
+            timer->stop();
+            dialog->done(QMessageBox::Yes);
+            timer->deleteLater();
         });
+        timer->start(10);
     }
 
     static int seedActive(const QString& root)
