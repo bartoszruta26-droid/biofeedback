@@ -23,6 +23,7 @@
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
+#include "training/RepetitionDetector.hpp"
 #include "core/DebugManager.hpp"
 
 namespace tab {
@@ -204,7 +205,7 @@ public:
     /**
      * @brief Ręczne wczytanie pojedynczej próbki siły
      */
-    void readSingleSample(double forceValue);
+    void readSingleSample(double forceValue, std::uint32_t deviceTimestampMs = 0);
     
     /**
      * @brief Analizuje serię i zwraca statystyki
@@ -399,6 +400,7 @@ private:
     double m_repStartTime;
     double m_repPeakTime;
     double m_contractionThreshold;
+    biofeedback::training::RepetitionDetector m_repetitionDetector;
     
     // Wyniki
     QVector<SeriesStats> m_completedSeriesStats;
