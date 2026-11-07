@@ -81,3 +81,11 @@ The Training tab instantiates the selected Pong, Flappy Bird, Mario Run or sinus
 Patient charts are reloaded from the local application data directory at startup and saved through DataManager when added or edited. The patient JSON file follows the application's encryption setting (`encryption.enabled`) and is written with owner-only permissions. The directory name uses a SHA-256 digest rather than displaying the PESEL value; this is path obfuscation/pseudonymization, not anonymization.
 
 Selecting a patient switches the desktop session-history view to that patient's data directory. Patient switching is disabled while a training session is active to prevent accidental cross-patient attribution. The session-history JSON is an explicit opt-in summary and is owner-only but is not encrypted by the analytics widget. Do not treat filesystem permissions or a hashed directory name as a substitute for encrypted backups and appropriate access controls.
+
+## HX711 calibration and serial-frame validity
+
+The advanced Arduino firmware transmits a CRC-protected binary raw frame and a text record containing calibrated mass in grams. The text record now includes an explicit `CAL:1` or `CAL:0` flag. A binary frame can be valid as raw sensor data while still being unsuitable for force or movement calculations. Desktop measurement, training and games require `hasCalibratedValue=true`; RAW diagnostic capture remains separate.
+
+The firmware starts with `is_calibrated=false`. Calibration must be performed with a known reference mass after tare, using the serial command `CAL:<known_weight_in_grams>` (for example, `CAL:500` with a 500 g reference mass). The calibration flag is volatile in the current firmware and must be re-established after a firmware reset or power cycle. A successful parser regression covers binary-plus-text responses, text-only calibrated responses and explicitly uncalibrated responses.
+
+The UI converts calibrated grams to newtons using standard gravity (9.80665 m/s²). The kgf display is a presentation conversion only; movement metrics remain stored in SI units. This software protocol check does not verify the physical load cell, mounting geometry, calibration accuracy, hysteresis, linearity or repeatability. Those require controlled reference loads and hardware acceptance testing.
