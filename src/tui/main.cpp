@@ -366,7 +366,7 @@ void draw(std::size_t selected,
     if (active == static_cast<std::size_t>(tui::Screen::Devices)) {
         drawText(LINES - 3, 2, "LEWO/PRAWO: port   C: polacz   D: rozlacz   R: skanuj   Q: wyjscie");
     } else if (active == static_cast<std::size_t>(tui::Screen::Training)) {
-        drawText(LINES - 3, 2, "S: start/stop P: pauza +/-: cel [ ]: serie , .: powt. Q: wyjscie");
+        drawText(LINES - 3, 2, "S: start/stop P: pauza E: cwiczenie +/-: cel [ ]: serie , .: powt. ;: odpoczynek - / apostrof +");
     } else {
         drawText(LINES - 3, 2, "GORA/DOL: wybor   ENTER: otworz   HOME/END: skrajne   Q: wyjscie");
     }
