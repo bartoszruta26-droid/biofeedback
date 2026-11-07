@@ -756,7 +756,12 @@ bool Authentication::loadUsers()
         content << file.rdbuf();
         std::string jsonContent = content.str();
         file.close();
-        if (jsonContent.rfind("BFENC:v1:", 0) == 0) {
+        const bool encryptedUsersFile = jsonContent.rfind("BFENC:v1:", 0) == 0;
+        if (fileEncryptionEnabled && !encryptedUsersFile) {
+            AUTH_ERROR("Szyfrowanie pliku kont jest włączone, ale plik jest jawny; wymagana jest kontrolowana migracja");
+            return false;
+        }
+        if (encryptedUsersFile) {
             if (fileEncryptionKey.empty()) {
                 AUTH_ERROR("Plik użytkowników jest zaszyfrowany, ale brak klucza deszyfrującego");
                 return false;
