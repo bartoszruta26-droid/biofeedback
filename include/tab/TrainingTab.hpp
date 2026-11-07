@@ -20,6 +20,7 @@
 #include <memory>
 #include <vector>
 #include "training/RepetitionDetector.hpp"
+#include "measurement/MeasurementEngine.hpp"
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
@@ -184,6 +185,7 @@ public:
      * @brief Podłącza obiekt SerialCommunication
      */
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    void setMeasurementEngine(std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine);
     
     /**
      * @brief Podłącza silnik gry
@@ -242,12 +244,13 @@ private slots:
     void onPauseResumeClicked();
     void onExerciseSelected(int index);
     void onTimerTick();
-    void onSensorDataReceived(const sensor::SensorData& data);
+
     void onGameEnded(int score);
     void onGameStarted();
     void onScoreChanged(int score);
 
 private:
+    void onMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void setupUI();
     void updateDisplay();
     void updateProgressWidgets();
@@ -334,7 +337,8 @@ private:
     double m_peakForceInRep;
     
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
-    sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
+    biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken = 0;
     
     // Pomocnicze
     QString getExerciseDisplayName(int index) const;
