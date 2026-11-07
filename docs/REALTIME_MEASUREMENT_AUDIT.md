@@ -40,6 +40,7 @@ Ważne rozróżnienie: wykres zakładki MeasurementTab jest realizowany przez `F
 - Naprawiono agregację mocy szczytowej: maksimum jest wybierane spośród mocy poszczególnych powtórzeń, a nie obliczane z maksimum siły z całej serii i próbek ostatniego powtórzenia.
 - Oddzielono impuls siły [N·s] od pracy mechanicznej [J] w statystykach serii.
 - Całkowanie impulsu wykorzystuje rzeczywiste odstępy między znacznikami czasu i metodę trapezów, z odrzucaniem nieprawidłowych segmentów oraz obsługą przepełnienia zegara urządzenia.
+- Wszystkie podstawowe funkcje czasu (czas powtórzenia, faz, serii i przerw) odrzucają cofnięte/niejednoznaczne przedziały i poprawnie obsługują pojedyncze przepełnienie 32-bitowego zegara urządzenia.
 - Pochodne, wskaźnik płynności i czas pod napięciem ignorują nieprawidłowe próbki oraz odstępy czasu cofnięte lub niejednoznaczne.
 - Dodano test CTest `biomechanical_parameter_availability_regression`, obejmujący całkowanie przy nierównomiernym próbkowaniu, nieprawidłowe próbki, przepełnienie znacznika czasu, kompletność nazw/jednostek i statusy zależne od kalibracji/czujników/historii.
 
