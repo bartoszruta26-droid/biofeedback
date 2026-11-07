@@ -81,6 +81,7 @@ private:
     double m_targetForce;
     double m_maxTimeWindow;
     double m_maxForce;
+    double m_minForce;
     ForceUnit m_unit;
     QString getUnitLabel() const;
 };
