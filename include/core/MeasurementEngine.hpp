@@ -9,6 +9,9 @@ namespace biofeedback::measurement {
 enum class SampleSource { Device, Simulation, Replay };
 enum class ForceUnit { Newton };
 
+// Increment when any metric definition or aggregation semantics change.
+inline constexpr int CurrentMetricsVersion = 1;
+
 struct Sample {
     double timestampSeconds{0.0};
     double force{0.0};
@@ -18,6 +21,7 @@ struct Sample {
 };
 
 struct RepetitionStats {
+    int metricsVersion{CurrentMetricsVersion};
     SampleSource source{SampleSource::Device};
     std::size_t sampleCount{0};
     double startSeconds{0.0};
@@ -30,16 +34,19 @@ struct RepetitionStats {
     double standardDeviationN{0.0};
     double percentile95ForceN{0.0};
     double timeToPeakSeconds{0.0};
+    // Trapezoidal integral of force over time (N·s).
     double impulseNs{0.0};
     double riseRateNPerSecond{0.0};
     double fallRateNPerSecond{0.0};
     double timeInTop8PercentSeconds{0.0};
     double timeInBottom8PercentSeconds{0.0};
     double timeInTargetZoneSeconds{0.0};
+    // Percentage of contraction duration spent inside target ± tolerance.
     double targetAccuracyPercent{0.0};
 };
 
 struct SeriesStats {
+    int metricsVersion{CurrentMetricsVersion};
     std::size_t repetitionCount{0};
     std::vector<RepetitionStats> repetitions;
     double averagePeakForceN{0.0};
@@ -49,11 +56,13 @@ struct SeriesStats {
     double averageForceN{0.0};
     double averageTimeToPeakSeconds{0.0};
     double averageRepetitionDurationSeconds{0.0};
+    // 100 * (first repetition peak - last repetition peak) / first peak.
     double fatigueIndexPercent{0.0};
     double totalImpulseNs{0.0};
     double averageRiseRateNPerSecond{0.0};
     double averageFallRateNPerSecond{0.0};
     double seriesSpeedRepsPerSecond{0.0};
+    // 100 * (1 - population-CV of repetition peaks), clamped to [0, 100].
     double consistencyScorePercent{0.0};
     double targetAccuracyPercent{0.0};
 };
