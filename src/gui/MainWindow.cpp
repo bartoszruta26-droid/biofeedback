@@ -123,10 +123,11 @@ void MainWindow::setupTabs()
     
     // Udostępnij połączenie szeregowe wszystkim zakładkom
     if (m_serialPort) {
-        m_measurementTab->setSerialConnection(m_serialPort);
+        // Register every consumer before MeasurementTab starts device discovery.
         m_outlineTab->setSerialConnection(m_serialPort);
         m_trainingTab->setSerialConnection(m_serialPort);
         m_debugTab->setSerialConnection(m_serialPort);
+        m_measurementTab->setSerialConnection(m_serialPort);
     }
     
     // Add tabs to widget - DebugTab jako ostatnia zakładka
