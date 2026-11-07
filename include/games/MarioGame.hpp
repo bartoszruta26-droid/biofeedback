@@ -170,11 +170,6 @@ public:
     
 private:
     /**
-     * @brief Inicjalizuje nasłuchiwanie danych z sensora
-     */
-    void setupSensorListening();
-    
-    /**
      * @brief Odłącza się od sensora
      */
     void cleanupSensorConnection();
