@@ -17,6 +17,7 @@
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/ProtocolParser.hpp"
+#include "sensor/CalibrationProfile.hpp"
 #include "core/DebugManager.hpp"
 #include <chrono>
 #include <cstring>
@@ -33,6 +34,7 @@
 #include <climits>
 #include <cstdio>
 #include <stdexcept>
+#include <QDateTime>
 #include <system_error>
 
 // ============================================================================
@@ -175,6 +177,11 @@ public:
     double zeroOffset = 0.0;
     double scaleFactor = 1.0;
     bool isCalibrated = false;
+    mutable std::mutex calibrationMutex;
+    int tareSampleCount = 0;
+    double calibrationReferenceValue = 0.0;
+    int32_t calibrationReferenceRaw = 0;
+    std::string calibrationCreatedAtUtc;
     ArduinoInfo arduinoInfo;
     std::vector<DataCallback> dataCallbacks;
     std::mutex callbackMutex;
@@ -526,8 +533,12 @@ SensorData SerialCommunication::readData(int timeout) {
         data.timestamp = frame.timestampMs;
         data.value = frame.rawValue;
         data.crc = frame.crc;
-        data.calibratedValue = m_impl->isCalibrated
-            ? convertToCalibrated(frame.rawValue) : 0.0;
+        {
+            std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+            data.calibratedValue = m_impl->isCalibrated
+                ? (static_cast<double>(frame.rawValue) - m_impl->zeroOffset) * m_impl->scaleFactor
+                : 0.0;
+        }
         data.isValid = true;
     };
     if (auto queuedFrame = m_impl->protocolParser.takeFrame()) {
@@ -675,7 +686,11 @@ double SerialCommunication::tare(int samples) {
     const double zero = (readings.size() % 2 == 0)
         ? (static_cast<double>(readings[middle - 1]) + static_cast<double>(readings[middle])) * 0.5
         : static_cast<double>(readings[middle]);
-    m_impl->zeroOffset = zero;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        m_impl->zeroOffset = zero;
+        m_impl->tareSampleCount = samples;
+    }
     m_impl->lastError.clear();
     return zero;
 }
@@ -705,12 +720,83 @@ bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double kno
         return false;
     }
 
-    m_impl->zeroOffset = static_cast<double>(rawZero);
-    m_impl->scaleFactor = knownWeight / static_cast<double>(span);
-    m_impl->isCalibrated = std::isfinite(m_impl->scaleFactor);
+    const double scale = knownWeight / static_cast<double>(span);
+    if (!std::isfinite(scale) || scale <= 0.0) return false;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        m_impl->zeroOffset = static_cast<double>(rawZero);
+        m_impl->scaleFactor = scale;
+        m_impl->isCalibrated = true;
+        m_impl->calibrationReferenceRaw = rawSpan;
+        m_impl->calibrationReferenceValue = knownWeight;
+        m_impl->calibrationCreatedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
+    }
+    return true;
+}
+double SerialCommunication::convertToCalibrated(int32_t raw) const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    return (static_cast<double>(raw) - m_impl->zeroOffset) * m_impl->scaleFactor;
+}
+std::string SerialCommunication::getCalibrationDeviceId() const {
+    const ArduinoInfo info = getArduinoInfo();
+    if (!info.serialNumber.empty()) return "serial:" + info.serialNumber;
+    if (info.boardId != 0) return "board:" + std::to_string(info.boardId);
+    if (info.deviceName.empty()) return {};
+    return "device:" + info.deviceName + "|" + info.firmwareVersion + "|" + getPortName();
+}
+
+bool SerialCommunication::saveCalibrationProfile(const std::string& path, std::string* error) const {
+    CalibrationProfile profile;
+    profile.deviceId = getCalibrationDeviceId();
+    if (profile.deviceId.empty()) {
+        if (error) *error = "Connected device has no stable identifier";
+        return false;
+    }
+    const ArduinoInfo info = getArduinoInfo();
+    profile.firmwareVersion = info.firmwareVersion;
+    profile.sensorModel = info.deviceName.empty() ? "HX711" : info.deviceName;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        if (!m_impl->isCalibrated) {
+            if (error) *error = "Cannot save an uncalibrated device";
+            return false;
+        }
+        profile.zeroOffsetRaw = m_impl->zeroOffset;
+        profile.scaleFactor = m_impl->scaleFactor;
+        profile.referenceValue = m_impl->calibrationReferenceValue;
+        profile.referenceRaw = m_impl->calibrationReferenceRaw;
+        profile.sampleCount = std::max(1, m_impl->tareSampleCount);
+        profile.createdAtUtc = m_impl->calibrationCreatedAtUtc;
+    }
+    return CalibrationProfileStore::save(path, profile, error);
+}
+
+bool SerialCommunication::loadCalibrationProfile(const std::string& path, std::string* error) {
+    const std::string deviceId = getCalibrationDeviceId();
+    if (deviceId.empty()) {
+        if (error) *error = "Connected device has no stable identifier";
+        return false;
+    }
+    const auto profile = CalibrationProfileStore::load(path, deviceId, error);
+    if (!profile) return false;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        m_impl->zeroOffset = profile->zeroOffsetRaw;
+        m_impl->scaleFactor = profile->scaleFactor;
+        m_impl->isCalibrated = true;
+        m_impl->calibrationReferenceRaw = profile->referenceRaw;
+        m_impl->calibrationReferenceValue = profile->referenceValue;
+        m_impl->tareSampleCount = profile->sampleCount;
+        m_impl->calibrationCreatedAtUtc = profile->createdAtUtc;
+    }
+    return true;
+}
+
+bool SerialCommunication::isCalibrated() const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
     return m_impl->isCalibrated;
 }
-double SerialCommunication::convertToCalibrated(int32_t raw) const { return (raw - m_impl->zeroOffset) * m_impl->scaleFactor; }
+
 double SerialCommunication::getCalibrationScale() const { return m_impl->scaleFactor; }
 int32_t SerialCommunication::getCalibrationOffset() const { return static_cast<int32_t>(m_impl->zeroOffset); }
 void SerialCommunication::resetCalibration() { m_impl->zeroOffset = 0.0; m_impl->scaleFactor = 1.0; m_impl->isCalibrated = false; }
