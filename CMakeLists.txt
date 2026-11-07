@@ -114,6 +114,7 @@ if(Qt5_FOUND)
         src/main.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
+        src/core/DebugManager.cpp
         src/core/PasswordHasher.cpp
         src/core/ConfigManager.cpp
         src/core/Authentication.cpp
@@ -126,6 +127,8 @@ if(Qt5_FOUND)
         src/tab/TrainingTab.cpp
         src/tab/DebugTab.cpp
         src/sensor/SerialCommunication.cpp
+        src/sensor/ProtocolParser.cpp
+        src/sensor/CalibrationProfile.cpp
         src/data/DataManager.cpp
         src/data/Encryption.cpp
         src/games/GameEngine.cpp
@@ -151,6 +154,8 @@ if(Qt5_FOUND)
         include/tab/TrainingTab.hpp
         include/tab/DebugTab.hpp
         include/sensor/SerialCommunication.hpp
+        include/sensor/ProtocolParser.hpp
+        include/sensor/CalibrationProfile.hpp
         include/data/DataManager.hpp
         include/data/Encryption.hpp
         include/games/GameEngine.hpp
