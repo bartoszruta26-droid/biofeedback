@@ -183,6 +183,7 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
     }
 
     QJsonObject entry;
+    entry.insert("schema_version", 2);
     entry.insert("saved_at", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
     entry.insert("duration_seconds", m_durationSeconds);
     entry.insert("exercise_count", exerciseCount);
@@ -191,6 +192,56 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
     entry.insert("average_peak_force_n", weightedPeak / repetitions);
     entry.insert("maximum_peak_force_n", maximumPeak);
     entry.insert("game_points", gamePoints);
+
+    // Persist the complete measured session, not only its summary row.
+    QJsonArray exerciseEntries;
+    for (const auto& exercise : m_currentStats) {
+        QJsonObject exerciseEntry;
+        exerciseEntry.insert("exercise_name", exercise.exerciseName);
+        exerciseEntry.insert("completed_series", exercise.completedSeries);
+        exerciseEntry.insert("completed_repetitions", exercise.completedReps);
+        exerciseEntry.insert("average_peak_force_n", exercise.avgPeakForce);
+        exerciseEntry.insert("maximum_peak_force_n", exercise.maxPeakForce);
+        exerciseEntry.insert("average_time_to_peak_seconds", exercise.avgReactionTime);
+        exerciseEntry.insert("consistency_score_percent", exercise.consistencyScore);
+        exerciseEntry.insert("game_points", exercise.gameScore);
+
+        QJsonArray seriesEntries;
+        for (int index = 0; index < exercise.series.size(); ++index) {
+            const auto& series = exercise.series[index];
+            QJsonObject seriesEntry;
+            seriesEntry.insert("series_index", index + 1);
+            seriesEntry.insert("repetition_count", static_cast<qint64>(series.repetitionCount));
+            seriesEntry.insert("average_peak_force_n", series.averagePeakForceN);
+            seriesEntry.insert("maximum_peak_force_n", series.maximumPeakForceN);
+            seriesEntry.insert("average_duration_ms", series.averageDurationMs);
+            seriesEntry.insert("average_time_to_peak_ms", series.averageTimeToPeakMs);
+            seriesEntry.insert("target_achievement_percent", series.targetAchievementPercent);
+            seriesEntry.insert("peak_force_cv_percent", series.peakForceCoefficientOfVariationPercent);
+            seriesEntries.append(seriesEntry);
+        }
+        exerciseEntry.insert("series", seriesEntries);
+
+        QJsonArray repetitionEntries;
+        for (const auto& record : exercise.repetitions) {
+            const auto& measurement = record.measurement;
+            QJsonObject repetitionEntry;
+            repetitionEntry.insert("series_index", record.seriesIndex);
+            repetitionEntry.insert("repetition_index", record.repetitionIndex);
+            repetitionEntry.insert("start_timestamp_ms", static_cast<qint64>(measurement.startTimestampMs));
+            repetitionEntry.insert("end_timestamp_ms", static_cast<qint64>(measurement.endTimestampMs));
+            repetitionEntry.insert("duration_ms", static_cast<qint64>(measurement.durationMs));
+            repetitionEntry.insert("time_to_peak_ms", static_cast<qint64>(measurement.timeToPeakMs));
+            repetitionEntry.insert("peak_force_n", measurement.peakForceN);
+            repetitionEntry.insert("mean_force_n", measurement.meanForceN);
+            repetitionEntry.insert("sample_count", static_cast<qint64>(measurement.sampleCount));
+            repetitionEntries.append(repetitionEntry);
+        }
+        exerciseEntry.insert("repetitions", repetitionEntries);
+        exerciseEntries.append(exerciseEntry);
+    }
+    entry.insert("exercises", exerciseEntries);
+
     QJsonArray updated = m_historyEntries;
     updated.append(entry);
 
@@ -214,7 +265,7 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
     m_historyEntries = updated;
     rebuildHistoryTable();
     QMessageBox::information(this, tr("Historia treningów"),
-                             tr("Podsumowanie sesji zapisano lokalnie. Dane nie zawierają identyfikatora pacjenta."));
+                             tr("Pełny zapis sesji (ćwiczenia, serie i powtórzenia) zapisano lokalnie. Dane nie zawierają identyfikatora pacjenta."));
 }
 
 void TrainingAnalyticsWidget::rebuildSummary(const QVector<ExerciseStats>& stats) {
