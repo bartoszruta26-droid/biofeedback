@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - integration/all-work
+      - 'sync/**'
       - feature/configurable-file-encryption
   pull_request:
     branches:
