@@ -583,8 +583,7 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::milliseconds(timeout);
     int result = 0;
-    bool finished = false;
-    while (!finished) {
+    for (;;) {
         const auto now = std::chrono::steady_clock::now();
         int remainingMs = 0;
         if (now < deadline) {
