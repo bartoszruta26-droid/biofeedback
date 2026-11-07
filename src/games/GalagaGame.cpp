@@ -178,9 +178,12 @@ void GalagaGame::updateFormation(double deltaTime)
             if (enemy.active) enemy.rect.translate(movement, 0.0);
     }
 
-    if (bottom + 12.0 >= m_ship.top() - 12.0) {
+    double updatedBottom = 0.0;
+    for (const Enemy& enemy : m_enemies)
+        if (enemy.active) updatedBottom = qMax(updatedBottom, enemy.rect.bottom());
+
+    if (updatedBottom >= m_ship.top() - 12.0)
         stop();
-    }
 }
 
 void GalagaGame::loseLife()
