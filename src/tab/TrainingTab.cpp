@@ -553,25 +553,25 @@ void TrainingTab::stopTraining(bool completed)
     updateSessionClocks();
     if (completed) m_stateMachine.complete();
     else m_stateMachine.interrupt();
+    m_timer->stop();
+    m_restTimer->stop();
+
+    // Stop the game before snapshotting analytics: gameEnded may add final points.
+    if (m_currentGame && m_currentGame->isRunning())
+        m_currentGame->stop();
+
     refreshAnalytics();
     if (m_analyticsWidget) {
         m_analyticsWidget->setSessionCompleted(completed);
         if (!m_analyticsWidget->saveSessionAutomatically())
             addDebugMessage("Nie udało się automatycznie zapisać sesji treningowej; sesja pozostaje do ponownego zapisu.", "ERROR");
     }
-    m_timer->stop();
-    m_restTimer->stop();
-    
+
     m_isTraining = false;
     m_isPaused = false;
     m_inRestPeriod = false;
     m_restAdvancesExercise = false;
     m_repetitionDetector.reset();
-    
-    // Zatrzymanie gry jeśli aktywna
-    if (m_currentGame && m_currentGame->isRunning()) {
-        m_currentGame->stop();
-    }
     
     // Aktualizacja UI
     m_btnStartStop->setText("Start");
