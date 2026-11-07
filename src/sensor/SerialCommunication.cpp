@@ -554,6 +554,86 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
     return true;
 }
 
+
+int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int timeout) {
+    if (!m_impl->isConnected || m_impl->portHandle == -1 ||
+        buffer == nullptr || maxLength == 0 || timeout < 0) {
+        m_impl->lastError = "Serial read rejected: invalid connection, buffer, or timeout";
+        return -1;
+    }
+
+#ifdef _WIN32
+    DWORD bytesRead = 0;
+    if (!ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buffer,
+                  static_cast<DWORD>(std::min(maxLength,
+                      static_cast<size_t>(std::numeric_limits<DWORD>::max()))),
+                  &bytesRead, nullptr)) {
+        m_impl->lastError = "Serial read failed";
+        return -1;
+    }
+    return static_cast<int>(bytesRead);
+#else
+    const int fd = static_cast<int>(m_impl->portHandle);
+    const int originalFlags = fcntl(fd, F_GETFL);
+    if (originalFlags < 0 || fcntl(fd, F_SETFL, originalFlags | O_NONBLOCK) < 0) {
+        m_impl->lastError = "Serial read configuration failed";
+        return -1;
+    }
+
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(timeout);
+    int result = 0;
+    bool finished = false;
+    while (!finished) {
+        const auto now = std::chrono::steady_clock::now();
+        int remainingMs = 0;
+        if (now < deadline) {
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                deadline - now);
+            remainingMs = static_cast<int>(std::max<int64_t>(
+                1, std::min<int64_t>(remaining.count(), INT_MAX)));
+        }
+
+        pollfd descriptor{};
+        descriptor.fd = fd;
+        descriptor.events = POLLIN;
+        const int ready = poll(&descriptor, 1, remainingMs);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready == 0) break;
+        if (ready < 0 ||
+            (descriptor.revents & (POLLERR | POLLNVAL)) != 0) {
+            m_impl->lastError = "Serial read failed";
+            result = -1;
+            break;
+        }
+        if ((descriptor.revents & POLLHUP) != 0 &&
+            (descriptor.revents & POLLIN) == 0) {
+            m_impl->lastError = "Serial port closed during read";
+            result = -1;
+            break;
+        }
+        if ((descriptor.revents & POLLIN) == 0) continue;
+
+        const ssize_t bytesRead = read(fd, buffer, maxLength);
+        if (bytesRead > 0) {
+            result = static_cast<int>(bytesRead);
+            break;
+        }
+        if (bytesRead == 0) break;
+        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
+        m_impl->lastError = "Serial read failed";
+        result = -1;
+        break;
+    }
+
+    if (fcntl(fd, F_SETFL, originalFlags) < 0) {
+        m_impl->lastError = "Serial read completed but port flags could not be restored";
+        return -1;
+    }
+    return result;
+#endif
+}
+
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
 std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? m_impl->portName : ""; }
 int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
@@ -612,23 +692,26 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
     }
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     
-    // Read response - look for binary packet followed by text
-    char buf[256];
+    // Read response within the caller-provided total deadline.
+    uint8_t buf[256];
+    constexpr size_t MaxResponseBytes = 4096;
     std::vector<uint8_t> rawData;
-    auto start = std::chrono::steady_clock::now();
+    rawData.reserve(512);
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(std::max(timeout, 0));
     bool gotBinaryData = false;
-    
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::steady_clock::now() - start).count() < 2000) {
-        int rd = 0;
-#ifdef _WIN32
-        DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
-#else
-        rd = read(m_impl->portHandle, buf, 255);
-#endif
+
+    while (rawData.size() < MaxResponseBytes &&
+           std::chrono::steady_clock::now() < deadline) {
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now());
+        const int rd = readFromPort(buf, std::min(sizeof(buf), MaxResponseBytes - rawData.size()),
+                                    static_cast<int>(std::max<int64_t>(1, remaining.count())));
+        if (rd < 0) break;
         if (rd > 0) {
             for (int i = 0; i < rd; ++i) {
-                rawData.push_back(static_cast<uint8_t>(buf[i]));
+                if (rawData.size() >= MaxResponseBytes) break;
+                rawData.push_back(buf[i]);
                 
                 // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
                 // followed by end markers 0xAA 0x55
@@ -707,7 +790,6 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
                 break;
             }
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     
     data.hasFrame = !rawData.empty();
@@ -889,17 +971,24 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
     }
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     if (!waitForResponse) return "";
-    std::string resp; char buf[256];
-    auto start = std::chrono::steady_clock::now();
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() < 2000) {
-        int rd = 0;
-#ifdef _WIN32
-        DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
-#else
-        rd = read(m_impl->portHandle, buf, 255);
-#endif
-        if (rd > 0) { buf[rd] = 0; resp += buf; if (resp.find("[DATA_SENT]")!=std::string::npos || resp.find("OK")!=std::string::npos || resp.find("FORCE:")!=std::string::npos) break; }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    constexpr size_t MaxResponseBytes = 4096;
+    std::string resp;
+    resp.reserve(512);
+    uint8_t buf[256];
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (resp.size() < MaxResponseBytes &&
+           std::chrono::steady_clock::now() < deadline) {
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now());
+        const int rd = readFromPort(buf, std::min(sizeof(buf), MaxResponseBytes - resp.size()),
+                                    static_cast<int>(std::max<int64_t>(1, remaining.count())));
+        if (rd < 0) break;
+        if (rd > 0) {
+            resp.append(reinterpret_cast<const char*>(buf), static_cast<size_t>(rd));
+            if (resp.find("[DATA_SENT]") != std::string::npos ||
+                resp.find("OK") != std::string::npos ||
+                resp.find("FORCE:") != std::string::npos) break;
+        }
     }
     if (m_impl->verbose && !resp.empty()) std::cout << "[SerialComm] " << resp << std::endl;
     return resp;
