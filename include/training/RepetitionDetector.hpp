@@ -42,6 +42,23 @@ struct SeriesSummary {
     double targetAchievementPercent{0.0};
 };
 
+// Serializable, versioned snapshot of the detector's in-flight repetition.
+// The device timestamp is retained so the detector can continue without
+// fabricating a new activation edge after a process restart.
+struct RepetitionDetectorSnapshot {
+    std::uint32_t version{1};
+    bool active{false};
+    bool waitingForRelease{false};
+    std::uint32_t startTimestampMs{0};
+    std::uint32_t lastTimestampMs{0};
+    std::uint32_t peakTimestampMs{0};
+    double peakForceN{0.0};
+    double areaForceMs{0.0};
+    double previousForceN{0.0};
+    std::size_t sampleCount{0};
+    std::vector<ForceSample> samples;
+};
+
 class RepetitionDetector final {
 public:
     explicit RepetitionDetector(RepDetectorConfig config = {});
@@ -53,6 +70,8 @@ public:
     bool isActive() const noexcept { return m_active; }
     double activationThresholdN() const noexcept;
     double releaseThresholdN() const noexcept;
+    RepetitionDetectorSnapshot snapshot() const;
+    bool restore(const RepetitionDetectorSnapshot& snapshot) noexcept;
 
 private:
     void begin(std::uint32_t timestampMs, double forceN);
