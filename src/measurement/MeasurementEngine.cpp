@@ -111,8 +111,8 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
         {
             std::lock_guard<std::mutex> lock(entry->mutex);
             if (!entry->active) continue;
-            ++entry->inFlight;
             callback = entry->callback;
+            ++entry->inFlight;
         }
         try { callback(sample); } catch (...) { /* Subscriber errors do not stop acquisition. */ }
         {
