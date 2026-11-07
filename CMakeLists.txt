@@ -420,6 +420,10 @@ if(TARGET game_engine_regression)
     add_test(NAME game_engine_regression COMMAND game_engine_regression)
     set_tests_properties(game_engine_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
+if(TARGET game_factory_regression)
+    add_test(NAME game_factory_regression COMMAND game_factory_regression)
+    set_tests_properties(game_factory_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
 add_subdirectory(tests OPTIONAL)
 
 # Documentation
