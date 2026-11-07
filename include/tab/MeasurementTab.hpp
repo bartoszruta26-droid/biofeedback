@@ -142,11 +142,26 @@ struct SeriesStats {
 /**
  * @brief Dane sesji pomiarowej do trendów długoterminowych
  */
+struct RecordedMeasurementSample {
+    quint64 sequence{0};
+    qint64 timestampUnixMs{0};
+    quint32 deviceTimestampMs{0};
+    double elapsedTimeSeconds{0.0};
+    double value{0.0};
+    qint32 rawValue{0};
+    bool hasRawValue{false};
+    QString unit;
+    QString source;
+    QString quality;
+};
+
+/** Full sample stream retained for lossless session export/import. */
 struct MeasurementSession {
     QString sessionId;                  // Unikalny identyfikator sesji
     QString patientId;                  // ID pacjenta
     QString date;                       // Data pomiaru
     QVector<SeriesStats> series;        // Serie z tej sesji
+    QVector<RecordedMeasurementSample> samples; // Pełny przebieg próbkowania
     
     MeasurementSession() {}
 };
@@ -208,7 +223,8 @@ public:
     /**
      * @brief Ręczne wczytanie pojedynczej próbki siły
      */
-    void readSingleSample(double forceValue, std::uint32_t deviceTimestampMs = 0);
+    void readSingleSample(double forceValue, std::uint32_t deviceTimestampMs = 0,
+                          std::int32_t rawValue = 0, bool hasRawValue = false);
     
     /**
      * @brief Analizuje serię i zwraca statystyki
@@ -385,6 +401,7 @@ private:
     // Bufory danych
     QVector<double> m_rawForceBuffer;
     QVector<double> m_timeBuffer;
+    QVector<RecordedMeasurementSample> m_recordedSamples;
     
     // Bufor bieżącego powtórzenia
     QVector<double> m_currentRepForces;
