@@ -103,7 +103,7 @@ void saveTrainingSession(LiveData& live)
             << QString::number(rep.peakForceN, 'f', 4) << ","
             << QString::number(rep.meanForceN, 'f', 4) << ","
             << rep.durationMs << "," << rep.timeToPeakMs << ","
-            << rep.sampleCount << ","
+            << static_cast<qulonglong>(rep.sampleCount) << ","
             << QString::number(live.trainingTargetForceN, 'f', 2) << ","
             << (achieved ? "tak" : "nie") << "\n";
     }
@@ -308,14 +308,14 @@ void drawModule(tui::Screen screen,
         }
         drawText(8, x + 2, "Interfejs terminalowy: aktywny");
         drawText(10, x + 2, serial.isConnected() ? "Adapter szeregowy: polaczony" : "Adapter szeregowy: rozlaczony");
-        drawText(12, x + 2, "Probki poprawne: " + std::to_string(validSamples) +
+        drawText(11, x + 2, "Probki poprawne: " + std::to_string(validSamples) +
                  " | odrzucone: " + std::to_string(invalidSamples));
-        drawText(14, x + 2, "Jakosc ostatniej probki: " + quality.toStdString());
-        drawText(16, x + 2, "Ostatnie powtorzenie: szczyt " + std::to_string(peak) +
-                 " N | srednia " + std::to_string(mean) + " N");
-        drawText(18, x + 2, "Czas: " + std::to_string(duration) + " ms | do szczytu: " +
+        drawText(13, x + 2, "Jakosc ostatniej probki: " + quality.toStdString());
+        drawText(15, x + 2, "Ostatnie powtorzenie: szczyt " + std::to_string(peak) +
+                 " N | srednia " + std::to_string(mean) + " N | czas " +
+                 std::to_string(duration) + " ms | do szczytu " +
                  std::to_string(timeToPeak) + " ms");
-        drawText(20, x + 2, "Historia sesji: " + tuiSessionFilePath().toStdString());
+        drawText(17, x + 2, "Historia: " + tuiSessionFilePath().toStdString());
         break;
     }
     case tui::Screen::Settings:
@@ -412,7 +412,7 @@ int main(int argc, char** argv)
         std::lock_guard<std::mutex> lock(live.mutex);
         live.latest = sample;
         live.hasSample = true;
-        live.lastSampleQuality = biofeedback::measurement::qualityName(sample.quality);
+        live.lastSampleQuality = QString::fromLatin1(biofeedback::measurement::qualityName(sample.quality));
         if (!sample.isValid() || sample.unit != "kg") {
             ++live.invalidSampleCount;
             return;
@@ -560,6 +560,8 @@ int main(int argc, char** argv)
                 if (live.trainingActive) {
                     live.trainingPaused = !live.trainingPaused;
                     live.trainingMessage = live.trainingPaused ? "Trening wstrzymany." : "Trening wznowiony.";
+                    if (!live.trainingPaused && live.trainingResting)
+                        live.lastRestTickMs = QDateTime::currentMSecsSinceEpoch();
                     live.repetitionDetector.reset();
                 }
             }
@@ -630,7 +632,7 @@ int main(int argc, char** argv)
         }
         {
             std::lock_guard<std::mutex> lock(live.mutex);
-            if (live.trainingResting) {
+            if (live.trainingResting && !live.trainingPaused) {
                 const qint64 now = QDateTime::currentMSecsSinceEpoch();
                 const qint64 elapsedSeconds = (now - live.lastRestTickMs) / 1000;
                 if (elapsedSeconds > 0) {
