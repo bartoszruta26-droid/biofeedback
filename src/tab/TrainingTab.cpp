@@ -1116,6 +1116,7 @@ void TrainingTab::loadNextSeries()
             emit trainingFinished(completed);
         } else {
             m_inRestPeriod = true;
+            m_stateMachine.beginRest();
             m_restAdvancesExercise = true;
             m_restTimeRemaining = 120;
             m_restDurationMs = 120000;
