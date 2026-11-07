@@ -30,7 +30,7 @@ int main()
     const std::vector<SensorSample> invalid{
         SensorSample(0, 10.0),
         SensorSample(100, 20.0),
-        SensorSample(90, 30.0),
+        SensorSample(),
         SensorSample(200, 40.0)
     };
     assert(near(formulas.calculateImpulse(invalid), 1.5));
