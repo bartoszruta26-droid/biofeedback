@@ -37,6 +37,7 @@ private:
     void rebuildSeriesTable(const QVector<ExerciseStats>& stats);
     void rebuildRepetitionTable(const QVector<ExerciseStats>& stats);
     void rebuildPeakChart(const QVector<ExerciseStats>& stats);
+    void rebuildForceTraceChart(const QVector<ExerciseStats>& stats);
 
     QLabel* m_summaryLabel{nullptr};
     QPushButton* m_saveHistoryButton{nullptr};
@@ -52,6 +53,7 @@ private:
     QTableWidget* m_seriesTable{nullptr};
     QTableWidget* m_repetitionTable{nullptr};
     QtCharts::QChartView* m_peakChart{nullptr};
+    QtCharts::QChartView* m_forceTraceChart{nullptr};
     QTabWidget* m_tabs{nullptr};
 };
 
