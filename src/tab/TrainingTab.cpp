@@ -533,6 +533,8 @@ void TrainingTab::stopTraining()
     m_isTraining = false;
     m_isPaused = false;
     m_inRestPeriod = false;
+    m_restAdvancesExercise = false;
+    m_repetitionDetector.reset();
     
     // Zatrzymanie gry jeśli aktywna
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -933,6 +935,7 @@ void TrainingTab::loadNextExercise()
     m_currentSeriesRepetitions.clear();
     const auto& exercise = m_exercisePlan[m_currentExerciseIndex];
     m_repetitionDetector.setTargetForce(exercise.targetForce);
+    m_progressWidget->setTargetForce(exercise.targetForce);
     m_lblTargetForce->setText(QString("%1 N").arg(exercise.targetForce, 0, 'f', 1));
     const int gameIndex = m_gameTypeCombo->findData(exercise.gameType);
     if (gameIndex >= 0) m_gameTypeCombo->setCurrentIndex(gameIndex);
@@ -1055,6 +1058,19 @@ void TrainingTab::finishCurrentSeries()
                 return all;
               }(), exercise.targetForce).peakForceCoefficientOfVariationPercent;
     stats.consistencyScore = qMax(0.0, 100.0 - cv);
+    m_statsSummaryLabel->setText(
+        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\\n"
+                "Ostatnia seria: średni szczyt %4 N, maksymalny %5 N\\n"
+                "Czas powtórzenia: %6 ms | czas do szczytu: %7 ms\\n"
+                "Trafienia w cel: %8% | zmienność szczytu (CV): %9%")
+            .arg(stats.completedReps).arg(stats.completedSeries)
+            .arg(exercise.seriesCount)
+            .arg(summary.averagePeakForceN, 0, 'f', 2)
+            .arg(summary.maximumPeakForceN, 0, 'f', 2)
+            .arg(summary.averageDurationMs, 0, 'f', 0)
+            .arg(summary.averageTimeToPeakMs, 0, 'f', 0)
+            .arg(summary.targetAchievementPercent, 0, 'f', 0)
+            .arg(summary.peakForceCoefficientOfVariationPercent, 0, 'f', 1));
     emit seriesCompleted(m_currentExerciseIndex, completedSeriesIndex);
 
     if (m_currentGame && m_currentGame->isRunning()) m_currentGame->stop();
