@@ -186,11 +186,6 @@ void GalagaGame::updateFormation(double deltaTime)
 void GalagaGame::loseLife()
 {
     --m_lives;
-    m_projectiles.erase(
-        std::remove_if(m_projectiles.begin(), m_projectiles.end(),
-                       [](const Projectile& p) { return p.fromEnemy; }),
-        m_projectiles.end());
-
     if (m_lives <= 0) {
         stop();
         return;
@@ -202,6 +197,7 @@ void GalagaGame::loseLife()
 
 void GalagaGame::updateProjectiles(double deltaTime)
 {
+    bool lifeLostThisFrame = false;
     for (auto it = m_projectiles.begin(); it != m_projectiles.end();) {
         it->position += it->velocity * deltaTime;
         const QRectF projectileBounds(it->position.x() - 2.5,
@@ -210,8 +206,10 @@ void GalagaGame::updateProjectiles(double deltaTime)
         bool remove = projectileBounds.bottom() < 0.0 ||
                       projectileBounds.top() > height();
 
-        if (it->fromEnemy && !remove && projectileBounds.intersects(m_ship)) {
+        if (it->fromEnemy && !remove && !lifeLostThisFrame &&
+            projectileBounds.intersects(m_ship)) {
             remove = true;
+            lifeLostThisFrame = true;
             loseLife();
             if (!isRunning())
                 return;
@@ -234,6 +232,13 @@ void GalagaGame::updateProjectiles(double deltaTime)
 
     if (!isRunning())
         return;
+
+    if (lifeLostThisFrame) {
+        m_projectiles.erase(
+            std::remove_if(m_projectiles.begin(), m_projectiles.end(),
+                           [](const Projectile& p) { return p.fromEnemy; }),
+            m_projectiles.end());
+    }
 
     if (!hasActiveEnemies())
         advanceLevel();
