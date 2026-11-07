@@ -147,7 +147,6 @@ int main()
                 (0.25 * 0.05) / 0.15));
     assert(repetitionResult.availabilityAt(0) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(20) == ParameterAvailability::Available);
-    assert(repetitionResult.availabilityAt(62) == ParameterAvailability::RequiresHistory);
     assert(repetitionResult.availabilityAt(64) == ParameterAvailability::InsufficientData);
 
     series.reps = {first, second};
@@ -170,6 +169,7 @@ int main()
     assert(result.availabilityAt(24) == ParameterAvailability::Available);
     assert(result.availabilityAt(45) == ParameterAvailability::Available);
     assert(std::string(BiomechanicalParams::parameterUnit(45)) == "m/s");
+    assert(result.availabilityAt(62) == ParameterAvailability::RequiresHistory);
 
     Formulas uncalibrated;
     assert(near(uncalibrated.getElasticConstant(), 0.0));
