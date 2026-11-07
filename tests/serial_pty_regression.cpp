@@ -222,7 +222,7 @@ int main() {
         packet[8] = crc;
         packet[9] = 0xAA;
         packet[10] = 0x55;
-        const std::string text = "FORCE:123.45g,RAW:4567,TS:5678ms\\r\\n[DATA_SENT]\\r\\n";
+        const std::string text = "FORCE:123.45g,RAW:4567,TS:5678ms\r\n[DATA_SENT]\r\n";
         std::vector<uint8_t> response(std::begin(packet), std::end(packet));
         response.insert(response.end(), text.begin(), text.end());
         (void)::write(master, response.data(), response.size());
@@ -234,7 +234,7 @@ int main() {
         calibrated.value != 4567) {
         std::cerr << "Binary + calibrated text frame was not parsed correctly: valid="
                   << calibrated.isValid << ", calibrated=" << calibrated.hasCalibratedValue
-                  << ", grams=" << calibrated.calibratedValue << ", raw=" << calibrated.value << '\\n';
+                  << ", grams=" << calibrated.calibratedValue << ", raw=" << calibrated.value << '\n';
         serial.disconnect();
         ::close(master);
         return 1;
@@ -243,15 +243,15 @@ int main() {
     // Text-only firmware remains supported but is explicitly marked calibrated.
     std::thread textOnlyDevice([&]() {
         std::string dataCommand;
-        if (!readLine(master, dataCommand, 500) || dataCommand != "DATA\\n") return;
-        const std::string text = "FORCE:25.00g,RAW:999,TS:6789ms\\r\\n";
+        if (!readLine(master, dataCommand, 500) || dataCommand != "DATA\n") return;
+        const std::string text = "FORCE:25.00g,RAW:999,TS:6789ms\r\n";
         (void)::write(master, text.data(), text.size());
     });
     const sensor::SensorData textOnly = serial.readData(500);
     textOnlyDevice.join();
     if (!textOnly.isValid || !textOnly.hasCalibratedValue ||
         std::abs(textOnly.calibratedValue - 25.0) > 1e-6 || textOnly.value != 999) {
-        std::cerr << "Text-only calibrated frame was not parsed correctly\\n";
+        std::cerr << "Text-only calibrated frame was not parsed correctly\n";
         serial.disconnect();
         ::close(master);
         return 1;
