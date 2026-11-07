@@ -1000,6 +1000,7 @@ void MeasurementTab::consumeEngineRepetition(const measurement::RepetitionStats&
 {
     if (m_completedSeriesStats.isEmpty()) ensureCurrentSeriesInitialized();
     m_currentRepStats = RepetitionStats{};
+    m_currentRepStats.metricsVersion = source.metricsVersion;
     m_currentRepStats.repNumber = m_currentRepInSeries + 1;
     m_currentRepStats.peakForce = source.peakForceN;
     m_currentRepStats.timeToPeak = source.timeToPeakSeconds;
@@ -1025,6 +1026,7 @@ void MeasurementTab::consumeEngineSeries(const measurement::SeriesStats& source)
 {
     if (m_completedSeriesStats.isEmpty()) ensureCurrentSeriesInitialized();
     SeriesStats& target = m_completedSeriesStats.last();
+    target.metricsVersion = source.metricsVersion;
     target.seriesNumber = m_currentSeries;
     target.avgPeakForce = source.averagePeakForceN;
     target.medianPeakForce = source.medianPeakForceN;
@@ -1554,6 +1556,7 @@ void MeasurementTab::updateTrendsView()
 QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session) const
 {
     QJsonObject root;
+    root["metricsVersion"] = session.metricsVersion;
     root["sessionId"] = session.sessionId;
     root["patientId"] = session.patientId;
     root["date"] = session.date;
@@ -1561,6 +1564,7 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
     QJsonArray seriesArray;
     for (const auto& series : session.series) {
         QJsonObject seriesObj;
+        seriesObj["metricsVersion"] = series.metricsVersion;
         seriesObj["seriesNumber"] = series.seriesNumber;
         seriesObj["avgPeakForce"] = series.avgPeakForce;
         seriesObj["medianPeakForce"] = series.medianPeakForce;
@@ -1575,6 +1579,7 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
         QJsonArray repsArray;
         for (const auto& rep : series.reps) {
             QJsonObject repObj;
+            repObj["metricsVersion"] = rep.metricsVersion;
             repObj["repNumber"] = rep.repNumber;
             repObj["peakForce"] = rep.peakForce;
             repObj["timeToPeak"] = rep.timeToPeak;
@@ -1607,6 +1612,7 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
     if (doc.isNull()) return session;
     
     QJsonObject root = doc.object();
+    session.metricsVersion = root["metricsVersion"].toInt(0);
     session.sessionId = root["sessionId"].toString();
     session.patientId = root["patientId"].toString();
     session.date = root["date"].toString();
@@ -1615,6 +1621,7 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
     for (const auto& seriesVal : seriesArray) {
         QJsonObject seriesObj = seriesVal.toObject();
         SeriesStats series;
+        series.metricsVersion = seriesObj["metricsVersion"].toInt(session.metricsVersion);
         series.seriesNumber = seriesObj["seriesNumber"].toInt();
         series.avgPeakForce = seriesObj["avgPeakForce"].toDouble();
         series.medianPeakForce = seriesObj["medianPeakForce"].toDouble();
@@ -1630,6 +1637,7 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
         for (const auto& repVal : repsArray) {
             QJsonObject repObj = repVal.toObject();
             RepetitionStats rep;
+            rep.metricsVersion = repObj["metricsVersion"].toInt(series.metricsVersion);
             rep.repNumber = repObj["repNumber"].toInt();
             rep.peakForce = repObj["peakForce"].toDouble();
             rep.timeToPeak = repObj["timeToPeak"].toDouble();
