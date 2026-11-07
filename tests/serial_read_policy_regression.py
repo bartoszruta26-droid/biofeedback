@@ -30,7 +30,7 @@ checks = {
     "POSIX read restores descriptor flags": "fcntl(fd, F_SETFL, originalFlags)" in read_helper,
     "readData rejects negative timeout": 'm_impl->setLastError("Serial read rejected: negative timeout");' in read_data,
     "readData honors caller timeout": "std::chrono::milliseconds(std::max(timeout, 0))" in read_data,
-    "empty reads do not refresh watchdog activity": "if (!rawData.empty()) {\n        m_impl->lastActivityTime" in read_data,
+    "empty reads do not refresh watchdog activity": "if (!rawData.empty()) {\n        m_impl->markActivity();" in read_data,
     "readData uses shared read helper": "readFromPort(buf" in read_data,
     "readData response is bounded": "constexpr size_t MaxResponseBytes = 4096;" in read_data,
     "readData no longer calls platform read directly": "ReadFile(" not in read_data and "read(m_impl->portHandle" not in read_data,
