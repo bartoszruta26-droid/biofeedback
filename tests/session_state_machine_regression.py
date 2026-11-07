@@ -9,6 +9,10 @@ analytics = Path("src/tab/TrainingAnalyticsWidget.cpp").read_text(encoding="utf-
 machine = Path("include/training/SessionStateMachine.hpp").read_text(encoding="utf-8")
 checks = {
     "state machine owned by TrainingTab": "SessionStateMachine m_stateMachine" in header,
+    "parallel training flags removed": all(flag not in header and flag not in source for flag in ("m_isTraining", "m_isPaused", "m_inRestPeriod")),
+    "running state comes from state machine": "m_stateMachine.running()" in source,
+    "pause state comes from state machine": "m_stateMachine.paused()" in source,
+    "rest state comes from state machine": "m_stateMachine.resting()" in source,
     "start guarded by state machine": "if (!m_stateMachine.canStart()) return;" in source,
     "active transition on start": "if (!m_stateMachine.start()) return;" in source,
     "pause transition": "!m_stateMachine.pause()" in source,
