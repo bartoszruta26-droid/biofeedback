@@ -1465,7 +1465,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     const auto isFiniteNonNegative = [](double value) {
         return std::isfinite(value) && value >= 0.0;
     };
-    const auto readUnsignedTimestamp = [](const QJsonValue& value, std::uint32_t& result) {
+    const auto readUnsignedTimestamp = [&reject](const QJsonValue& value, std::uint32_t& result) {
         if (!value.isDouble()) return reject(QStringLiteral("validation-2"));
         const double number = value.toDouble();
         if (!std::isfinite(number) || number < 0.0 ||
