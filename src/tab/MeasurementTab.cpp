@@ -192,30 +192,35 @@ QString ForcePlotWidget::getUnitLabel() const
 
 void ForcePlotWidget::addSample(double force, double time)
 {
-    std::cout << "[DEBUG] ForcePlotWidget::addSample ENTER: force=" << force << " time=" << time 
-              << " m_forces.size()=" << m_forces.size() << std::endl;
-    
+    if (!std::isfinite(force) || !std::isfinite(time) || m_maxTimeWindow <= 0.0)
+        return;
+
+    // The live trace is ordered by the session clock. Reject a clock regression
+    // instead of drawing a backwards segment or corrupting the visible window.
+    if (!m_times.isEmpty() && time < m_times.last())
+        return;
+
     m_forces.append(force);
     m_times.append(time);
-    
-    // Keep raw extrema separate from the display range. Applying the margin
-    // to an already-expanded range on every sample caused exponential growth.
-    m_maxObservedForce = std::max(m_maxObservedForce, force);
-    m_minObservedForce = std::min(m_minObservedForce, force);
-    const double observedMagnitude = std::max(
-        std::abs(m_maxObservedForce), std::abs(m_minObservedForce));
-    m_maxForce = std::max(5.0, observedMagnitude * 1.2);
-    std::cout << "[DEBUG] ForcePlotWidget::addSample: Display range=" << m_maxForce << std::endl;
-    
-    // Usuń stare dane poza oknem czasowym
-    while (!m_times.isEmpty() && (time - m_times.first()) > m_maxTimeWindow) {
+
+    const double cutoff = time - m_maxTimeWindow;
+    while (!m_times.isEmpty() && m_times.first() < cutoff) {
         m_forces.removeFirst();
         m_times.removeFirst();
     }
-    
-    std::cout << "[DEBUG] ForcePlotWidget::addSample: Before update(), m_forces.size()=" << m_forces.size() << std::endl;
+
+    // Recompute the scale from the visible window. Historical peaks that have
+    // left the window must not keep compressing the current trace.
+    m_maxObservedForce = 0.0;
+    m_minObservedForce = 0.0;
+    for (double sample : m_forces) {
+        m_maxObservedForce = std::max(m_maxObservedForce, sample);
+        m_minObservedForce = std::min(m_minObservedForce, sample);
+    }
+    const double observedMagnitude = std::max(
+        std::abs(m_maxObservedForce), std::abs(m_minObservedForce));
+    m_maxForce = std::max(5.0, observedMagnitude * 1.2);
     update();
-    std::cout << "[DEBUG] ForcePlotWidget::addSample EXIT" << std::endl;
 }
 
 void ForcePlotWidget::clearData()
@@ -236,7 +241,25 @@ void ForcePlotWidget::setTargetForce(double force)
 
 void ForcePlotWidget::setMaxTimeWindow(double seconds)
 {
-    m_maxTimeWindow = seconds;
+    if (std::isfinite(seconds) && seconds > 0.0) {
+        m_maxTimeWindow = seconds;
+        if (!m_times.isEmpty()) {
+            const double cutoff = m_times.last() - m_maxTimeWindow;
+            while (!m_times.isEmpty() && m_times.first() < cutoff) {
+                m_forces.removeFirst();
+                m_times.removeFirst();
+            }
+            m_maxObservedForce = 0.0;
+            m_minObservedForce = 0.0;
+            for (double sample : m_forces) {
+                m_maxObservedForce = std::max(m_maxObservedForce, sample);
+                m_minObservedForce = std::min(m_minObservedForce, sample);
+            }
+            m_maxForce = std::max(5.0, std::max(
+                std::abs(m_maxObservedForce), std::abs(m_minObservedForce)) * 1.2);
+        }
+        update();
+    }
 }
 
 void ForcePlotWidget::paintEvent(QPaintEvent *event)
@@ -959,6 +982,13 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
+    // These vectors back the on-screen table and current-value display, not the
+    // durable session archive. Keep their working set bounded during long runs.
+    constexpr int liveBufferCapacity = 10000;
+    if (m_rawForceBuffer.size() > liveBufferCapacity)
+        m_rawForceBuffer.remove(0, m_rawForceBuffer.size() - liveBufferCapacity);
+    if (m_timeBuffer.size() > liveBufferCapacity)
+        m_timeBuffer.remove(0, m_timeBuffer.size() - liveBufferCapacity);
     if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(false);
     if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 
@@ -1124,6 +1154,9 @@ void MeasurementTab::calculateRepetitionStats()
     
     // Czas trwania
     m_currentRepStats.duration = m_currentRepTimes.last() - m_repStartTime;
+    const double repetitionEndTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
+    m_currentRepStats.endTime = repetitionEndTime;
+    m_currentRepStats.startTime = repetitionEndTime - m_currentRepStats.duration;
     
     // Czas w górnych 8% siły
     double thresholdTop = m_repPeakForce * 0.92;
@@ -1222,13 +1255,14 @@ void MeasurementTab::calculateRepetitionStats()
                   << currentSeries.reps.size() << std::endl;
         
         // Szybkość serii - zabezpieczenie przed pustym wektorem
-        double seriesDuration = 0;
-        if (!currentSeries.reps.isEmpty()) {
-            seriesDuration = currentSeries.reps.last().duration - currentSeries.reps.first().duration;
-        }
-        if (seriesDuration > 0) {
+        // Cadence is repetitions divided by elapsed wall/session time from the
+        // first repetition start to the final repetition end. Subtracting the
+        // individual repetition durations was dimensionally wrong and usually
+        // produced zero or an inflated value.
+        const double seriesDuration = currentSeries.reps.last().endTime -
+                                      currentSeries.reps.first().startTime;
+        if (seriesDuration > 0.0)
             currentSeries.seriesSpeed = currentSeries.reps.size() / seriesDuration;
-        }
         
         // Wskaźnik powtarzalności (odwrotność odchylenia standardowego)
         double variance = 0;
@@ -1500,7 +1534,8 @@ bool MeasurementTab::exportToCSV(const QString& filename)
     
     // Nagłówek
     out << "Pacjent,Seria,Powtorzenie,Szczyt_N,CzasDoSzczytu_s,RiseRate_N_s,FallRate_N_s,"
-        << "Duration_s,TimeInTop8_s,TimeInBottom8_s,Impuls_Ns,AvgForce_N,MedianForce_N,ModeForce_N\n";
+        << "Duration_s,StartTime_s,EndTime_s,TimeInTop8_s,TimeInBottom8_s,Impuls_Ns,"
+        << "AvgForce_N,MedianForce_N,ModeForce_N\n";
     
     // Dane
     for (const auto& series : m_completedSeriesStats) {
@@ -1513,6 +1548,8 @@ bool MeasurementTab::exportToCSV(const QString& filename)
                 << rep.riseRate << ","
                 << rep.fallRate << ","
                 << rep.duration << ","
+                << rep.startTime << ","
+                << rep.endTime << ","
                 << rep.timeInTop8pct << ","
                 << rep.timeInBottom8pct << ","
                 << rep.areaUnderCurve << ","
@@ -1563,12 +1600,18 @@ bool MeasurementTab::importFromCSV(const QString& filename)
             stats.riseRate = parts[5].toDouble();
             stats.fallRate = parts[6].toDouble();
             stats.duration = parts[7].toDouble();
-            stats.timeInTop8pct = parts[8].toDouble();
-            stats.timeInBottom8pct = parts[9].toDouble();
-            stats.areaUnderCurve = parts[10].toDouble();
-            stats.avgForce = parts[11].toDouble();
-            stats.medianForce = parts[12].toDouble();
-            stats.modeForce = parts[13].toDouble();
+            const bool hasTimeBounds = parts.size() >= 16;
+            const int metricOffset = hasTimeBounds ? 2 : 0;
+            if (hasTimeBounds) {
+                stats.startTime = parts[8].toDouble();
+                stats.endTime = parts[9].toDouble();
+            }
+            stats.timeInTop8pct = parts[8 + metricOffset].toDouble();
+            stats.timeInBottom8pct = parts[9 + metricOffset].toDouble();
+            stats.areaUnderCurve = parts[10 + metricOffset].toDouble();
+            stats.avgForce = parts[11 + metricOffset].toDouble();
+            stats.medianForce = parts[12 + metricOffset].toDouble();
+            stats.modeForce = parts[13 + metricOffset].toDouble();
             stats.isValid = true;
             
             m_completedSeriesStats[seriesNum - 1].reps.append(stats);
@@ -1809,6 +1852,8 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
             repObj["riseRate"] = rep.riseRate;
             repObj["fallRate"] = rep.fallRate;
             repObj["duration"] = rep.duration;
+            repObj["startTime"] = rep.startTime;
+            repObj["endTime"] = rep.endTime;
             repObj["timeInTop8pct"] = rep.timeInTop8pct;
             repObj["timeInBottom8pct"] = rep.timeInBottom8pct;
             repObj["areaUnderCurve"] = rep.areaUnderCurve;
@@ -1864,6 +1909,8 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
             rep.riseRate = repObj["riseRate"].toDouble();
             rep.fallRate = repObj["fallRate"].toDouble();
             rep.duration = repObj["duration"].toDouble();
+            rep.startTime = repObj["startTime"].toDouble();
+            rep.endTime = repObj["endTime"].toDouble();
             rep.timeInTop8pct = repObj["timeInTop8pct"].toDouble();
             rep.timeInBottom8pct = repObj["timeInBottom8pct"].toDouble();
             rep.areaUnderCurve = repObj["areaUnderCurve"].toDouble();
@@ -1923,8 +1970,8 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         addDebugMessage(tr("Ramka zawiera tylko dane RAW; oczekuję na skalibrowaną wartość w gramach."), "WARNING");
         return;
     }
-    addDebugMessage(QString("HX711: RAW=%1 | skalibrowana masa=%2 g")
-        .arg(data.value).arg(data.calibratedValue, 0, 'f', 2), "ARDUINO");
+    // Per-frame logging at the sensor's sample rate floods the debug channel
+    // and adds synchronous UI work to the acquisition hot path.
 
     if (!m_isMeasuring) return;
 
