@@ -153,9 +153,8 @@ std::vector<double> Formulas::extractForces(const std::vector<SensorSample>& sam
     std::vector<double> forces;
     forces.reserve(samples.size());
     for (const auto& s : samples) {
-        if (s.isValid) {
+        if (s.isValid && std::isfinite(s.force))
             forces.push_back(s.force);
-        }
     }
     return forces;
 }
@@ -241,10 +240,14 @@ double Formulas::calculateSetPeakForce(const std::vector<double>& repPeakForces)
 }
 
 double Formulas::calculateWork(const std::vector<SensorSample>& samples) const {
-    if (samples.size() < 2) return 0.0;
+    if (samples.size() < 2 || !std::isfinite(k_elastic_) || k_elastic_ <= 0.0)
+        return 0.0;
     double work = 0.0;
-    for (size_t i = 0; i < samples.size() - 1; ++i) {
-        double dF = samples[i + 1].force - samples[i].force;
+    for (size_t i = 0; i + 1 < samples.size(); ++i) {
+        if (!samples[i].isValid || !samples[i + 1].isValid ||
+            !std::isfinite(samples[i].force) || !std::isfinite(samples[i + 1].force))
+            continue;
+        const double dF = samples[i + 1].force - samples[i].force;
         work += samples[i].force * dF;
     }
     return work / k_elastic_;
@@ -318,7 +321,10 @@ double Formulas::calculateAvgRepTime(const std::vector<double>& repTimes) {
 }
 
 double Formulas::calculateVelocity(double forceRange, double repDuration) const {
-    return (repDuration > 0) ? forceRange / (k_elastic_ * repDuration) : 0.0;
+    if (!std::isfinite(forceRange) || !std::isfinite(repDuration) ||
+        !std::isfinite(k_elastic_) || k_elastic_ <= 0.0 || repDuration <= 0.0)
+        return 0.0;
+    return forceRange / (k_elastic_ * repDuration);
 }
 
 double Formulas::calculateRepFrequency(int numReps, double setDuration) {
@@ -328,11 +334,14 @@ double Formulas::calculateRepFrequency(int numReps, double setDuration) {
 // ==================== Kategoria 3: Parametry Mocy i Energii ====================
 
 double Formulas::calculatePeakPower(double peakForce, const std::vector<SensorSample>& samples) const {
-    if (samples.empty()) return 0.0;
+    if (samples.size() < 3 || !std::isfinite(peakForce) ||
+        !std::isfinite(k_elastic_) || k_elastic_ <= 0.0)
+        return 0.0;
     double maxVel = 0.0;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        double vel = std::abs(calculateDerivative(samples, i)) / k_elastic_;
-        if (vel > maxVel) maxVel = vel;
+    for (size_t i = 1; i + 1 < samples.size(); ++i) {
+        const double velocity = std::abs(calculateDerivative(samples, i)) / k_elastic_;
+        if (std::isfinite(velocity))
+            maxVel = std::max(maxVel, velocity);
     }
     return peakForce * maxVel;
 }
@@ -350,7 +359,8 @@ double Formulas::calculateTotalEnergy(const std::vector<double>& setWorks) {
 }
 
 double Formulas::calculateNormalizedPower(double power) const {
-    return (patient_mass_ > 0) ? power / patient_mass_ : 0.0;
+    return (std::isfinite(power) && std::isfinite(patient_mass_) && patient_mass_ > 0.0)
+        ? power / patient_mass_ : 0.0;
 }
 
 double Formulas::calculateRFD(double peakForce, double startForce, double concTime) {
@@ -367,7 +377,8 @@ double Formulas::calculateMaxRFD(const std::vector<double>& repRFDs) {
 }
 
 double Formulas::calculateElasticEnergy(double peakForce) const {
-    return (k_elastic_ > 0) ? (peakForce * peakForce) / (2.0 * k_elastic_) : 0.0;
+    return (std::isfinite(peakForce) && std::isfinite(k_elastic_) && k_elastic_ > 0.0)
+        ? (peakForce * peakForce) / (2.0 * k_elastic_) : 0.0;
 }
 
 double Formulas::calculateEfficiency(double work, double metabolicEstimate) const {
@@ -419,10 +430,16 @@ double Formulas::calculateTimeVariance(const std::vector<double>& repTimes) {
 double Formulas::calculateSmoothnessIndex(const std::vector<SensorSample>& samples) const {
     if (samples.size() < 3) return 0.0;
     double sum = 0.0;
-    for (size_t i = 1; i < samples.size() - 1; ++i) {
-        sum += std::abs(calculateSecondDerivative(samples, i));
+    std::size_t validDerivatives = 0;
+    for (size_t i = 1; i + 1 < samples.size(); ++i) {
+        if (!samples[i - 1].isValid || !samples[i].isValid || !samples[i + 1].isValid)
+            continue;
+        const double derivative = calculateSecondDerivative(samples, i);
+        if (!std::isfinite(derivative)) continue;
+        sum += std::abs(derivative);
+        ++validDerivatives;
     }
-    return sum / (samples.size() - 2);
+    return validDerivatives > 0 ? sum / static_cast<double>(validDerivatives) : 0.0;
 }
 
 double Formulas::calculateEntropy(const std::vector<double>& forces, int numBins) {
@@ -502,25 +519,33 @@ double Formulas::calculateAvgTUT(const std::vector<std::vector<SensorSample>>& r
     if (repSamples.empty()) return 0.0;
     
     double totalTUT = 0.0;
+    std::size_t validRepetitions = 0;
     for (const auto& reps : repSamples) {
-        if (reps.empty()) continue;
-        
+        if (reps.size() < 2) continue;
+
         double maxF = 0.0;
-        for (const auto& s : reps) {
-            if (s.force > maxF) maxF = s.force;
+        for (const auto& sample : reps) {
+            if (sample.isValid && std::isfinite(sample.force))
+                maxF = std::max(maxF, sample.force);
         }
-        double threshold = maxF * thresholdFactor;
-        
+        if (maxF <= 0.0) continue;
+        const double threshold = maxF * thresholdFactor;
+
         double tut = 0.0;
         for (size_t i = 1; i < reps.size(); ++i) {
-            if (reps[i].force > threshold) {
-                tut += (reps[i].timestamp - reps[i-1].timestamp) / 1000.0;
-            }
+            if (!reps[i - 1].isValid || !reps[i].isValid ||
+                reps[i - 1].force <= threshold || reps[i].force <= threshold)
+                continue;
+            const std::uint32_t deltaMs = reps[i].timestamp - reps[i - 1].timestamp;
+            if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+            tut += static_cast<double>(deltaMs) / 1000.0;
         }
         totalTUT += tut;
+        ++validRepetitions;
     }
-    
-    return totalTUT / repSamples.size();
+
+    return validRepetitions > 0
+        ? totalTUT / static_cast<double>(validRepetitions) : 0.0;
 }
 
 double Formulas::calculateTotalTUT(const std::vector<std::vector<SensorSample>>& repSamples,
@@ -530,15 +555,20 @@ double Formulas::calculateTotalTUT(const std::vector<std::vector<SensorSample>>&
         if (reps.empty()) continue;
         
         double maxF = 0.0;
-        for (const auto& s : reps) {
-            if (s.force > maxF) maxF = s.force;
+        for (const auto& sample : reps) {
+            if (sample.isValid && std::isfinite(sample.force))
+                maxF = std::max(maxF, sample.force);
         }
-        double threshold = maxF * thresholdFactor;
-        
+        if (maxF <= 0.0) continue;
+        const double threshold = maxF * thresholdFactor;
+
         for (size_t i = 1; i < reps.size(); ++i) {
-            if (reps[i].force > threshold) {
-                totalTUT += (reps[i].timestamp - reps[i-1].timestamp) / 1000.0;
-            }
+            if (!reps[i - 1].isValid || !reps[i].isValid ||
+                reps[i - 1].force <= threshold || reps[i].force <= threshold)
+                continue;
+            const std::uint32_t deltaMs = reps[i].timestamp - reps[i - 1].timestamp;
+            if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+            totalTUT += static_cast<double>(deltaMs) / 1000.0;
         }
     }
     
