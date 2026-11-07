@@ -77,3 +77,23 @@ Po zielonym CI:
 3. Flappy Bird — fizyka impulsu, luki, kolizje i punktacja.
 4. Mario — ładowanie skoku, platformy, dziury, kolizje i progresja.
 5. Następnie TanGame, Arkanoid, Galaga, Archer, Scored Earth i Car Race — każda gra jako osobny zakres z testami.
+
+
+## 7. Uzupełniające poprawki — PR #204
+
+W kolejnym etapie zachowano istniejącą symulację stałokrokową 1/120 s i uzupełniono jej obsługę:
+- licznik kroków symulacji i licznik odrzuconych wejść;
+- statystyki obejmujące nazwę gry, stan, wynik, czas, liczbę kroków i błędne próbki;
+- bezpieczne kolejkowanie wejścia przez QPointer;
+- odrzucanie NaN/Inf i nasycanie wyniku do zakresu int;
+- start() podczas pauzy wznawia sesję, bez ponownej inicjalizacji.
+
+Poprawki gier:
+- SinGame: faza jest przesuwana z uwzględnieniem częstotliwości przestrzennej; dodano histerezę i ograniczenie punktacji za wejście w strefę.
+- PongGame: pozycja paletek jest ograniczona również przy małym oknie. Stały krok silnika ogranicza przenikanie piłki przez paletki.
+- FlappyBirdGame: sterowanie tensometrem działa jako impuls na narastającym zboczu siły; geometria luk uwzględnia ich faktyczną wysokość i promień ptaka; odrzucono nieprawidłowy mnożnik prędkości.
+- MarioGame: ładowanie skoku jest akumulowane przez deltaTime symulacji, zatem pauza go nie nalicza; otwory są rzeczywistymi przerwami w podłożu, widocznymi również po renderowaniu gruntu; aktualizacja przerywa się po zakończeniu gry.
+
+Rozszerzono game_engine_regression o testy statystyk, NaN, przepełnienia wyniku, startu w aktywnej sesji i wznowienia przez start() oraz resume(). Test działa również w konfiguracji Release, ponieważ używa jawnego mechanizmu REQUIRE zamiast assert.
+
+Target testowy linkuje DebugManager.cpp i Threads::Threads oraz jest jawnie budowany w workflow security-regression. Status kompilacji i testów należy ocenić na podstawie przebiegu CI PR #204; testy sprzętowe Arduino/HX711 i walidacja kliniczna pozostają odrębnym zadaniem.
