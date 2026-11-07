@@ -59,6 +59,7 @@ private:
 
     RepDetectorConfig m_config;
     bool m_active{false};
+    bool m_waitingForRelease{false};
     std::uint32_t m_startTimestampMs{0};
     std::uint32_t m_lastTimestampMs{0};
     std::uint32_t m_peakTimestampMs{0};
