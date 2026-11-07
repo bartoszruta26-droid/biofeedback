@@ -25,7 +25,7 @@ A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live fo
 
 Pierwsze uruchomienie GUI prowadzi przez utworzenie konta administratora z hasłem o długości co najmniej 12 znaków; nie ma zaszytego domyślnego loginu ani hasła. Konfiguracja, konta i dane pacjentów trafiają do katalogów użytkownika XDG.
 
-Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać rzeczywiste próbki z podłączonego czujnika. WebUI i Android pozostają warstwami prezentacji w trybie podglądu do czasu wdrożenia API. Żaden interfejs nie tworzy fikcyjnych danych pacjentów.
+Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać rzeczywiste próbki z podłączonego, skalibrowanego czujnika (wykres tekstowy). Desktop GUI prezentuje wykres siły, trendy pomiarowe oraz analizę serii i powtórzeń. WebUI i Android pozostają trybami podglądu: ich wykresy są celowo pustymi stanami, ponieważ nie mają jeszcze strumienia pomiarowego ani wspólnego API sesji. Nie należy traktować tych dwóch interfejsów jako gotowych do rejestracji treningu. Żaden interfejs nie tworzy fikcyjnych danych pacjentów.
 
 ## Hardware Requirements
 
