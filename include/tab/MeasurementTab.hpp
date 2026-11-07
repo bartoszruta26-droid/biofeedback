@@ -98,6 +98,8 @@ struct RepetitionStats {
     double riseRate;            // Szybkość narastania siły [N/s]
     double fallRate;            // Szybkość opadania siły [N/s]
     double duration;            // Czas trwania powtórzenia [s]
+    double startTime;            // Czas rozpoczęcia od początku sesji [s]
+    double endTime;              // Czas zakończenia od początku sesji [s]
     double timeInTop8pct;       // Czas w górnych 8% siły [s]
     double timeInBottom8pct;    // Czas w dolnych 8% siły [s]
     double areaUnderCurve;      // Pole pod krzywą (impuls) [N·s]
@@ -107,7 +109,7 @@ struct RepetitionStats {
     bool isValid;
     
     RepetitionStats() : repNumber(0), peakForce(0), timeToPeak(0), 
-                        riseRate(0), fallRate(0), duration(0),
+                        riseRate(0), fallRate(0), duration(0), startTime(0), endTime(0),
                         timeInTop8pct(0), timeInBottom8pct(0),
                         areaUnderCurve(0), avgForce(0), medianForce(0),
                         modeForce(0), isValid(false) {}
