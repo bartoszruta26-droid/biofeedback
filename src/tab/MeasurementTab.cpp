@@ -937,9 +937,12 @@ void MeasurementTab::readSingleSample(double forceValue)
     
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
-    
-    m_currentRepForces.append(forceValue);
-    m_currentRepTimes.append(currentTime);
+
+    // ADC counts are diagnostic only and must never be interpreted as newtons.
+    if (!m_showRawValues) {
+        m_currentRepForces.append(forceValue);
+        m_currentRepTimes.append(currentTime);
+    }
     
     std::cout << "[DEBUG] readSingleSample: Data prepared for display - rawForceBuffer.size()=" 
               << m_rawForceBuffer.size() << " currentRepForces.size()=" << m_currentRepForces.size() << std::endl;
@@ -961,9 +964,11 @@ void MeasurementTab::readSingleSample(double forceValue)
     updateLiveDisplay(forceValue);
     std::cout << "[DEBUG] readSingleSample: updateLiveDisplay completed" << std::endl;
     
-    std::cout << "[DEBUG] readSingleSample Before detectRepetitions" << std::endl;
-    detectRepetitions();
-    std::cout << "[DEBUG] readSingleSample: detectRepetitions completed" << std::endl;
+    if (!m_showRawValues) {
+        std::cout << "[DEBUG] readSingleSample Before detectRepetitions" << std::endl;
+        detectRepetitions();
+        std::cout << "[DEBUG] readSingleSample: detectRepetitions completed" << std::endl;
+    }
     
     std::cout << "[DEBUG] readSingleSample END" << std::endl;
     
