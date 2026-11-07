@@ -9,7 +9,6 @@
 #include <QTableWidget>
 #include <QGroupBox>
 #include <QProgressBar>
-#include <QTimer>
 #include <QVector>
 #include <QString>
 #include <QPainter>
@@ -300,7 +299,6 @@ public slots:
 private slots:
     void onToggleMeasurement();
     void onReadSingleSample();
-    void onTimerTick();
     void onSelectionChanged();
 
 private:
@@ -366,7 +364,6 @@ private:
     QTableWidget* m_rawTable;
     
     // Logika i dane
-    QTimer* m_timer;
     bool m_isMeasuring;
     QString m_patientId;
     
