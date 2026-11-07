@@ -350,16 +350,25 @@ double Formulas::calculateRepFrequency(int numReps, double setDuration) {
 // ==================== Kategoria 3: Parametry Mocy i Energii ====================
 
 double Formulas::calculatePeakPower(double peakForce, const std::vector<SensorSample>& samples) const {
-    if (samples.size() < 3 || !std::isfinite(peakForce) ||
+    if (samples.size() < 3 || !std::isfinite(peakForce) || peakForce < 0.0 ||
         !std::isfinite(k_elastic_) || k_elastic_ <= 0.0)
         return 0.0;
-    double maxVel = 0.0;
-    for (size_t i = 1; i + 1 < samples.size(); ++i) {
-        const double velocity = std::abs(calculateDerivative(samples, i)) / k_elastic_;
-        if (std::isfinite(velocity))
-            maxVel = std::max(maxVel, velocity);
+
+    // Peak power must be evaluated sample-by-sample as F(t) * |v(t)|.
+    // Multiplying the maximum force by a velocity peak from another instant
+    // combines two unrelated extrema and systematically overestimates power.
+    double maxPower = 0.0;
+    for (std::size_t i = 1; i + 1 < samples.size(); ++i) {
+        if (!samples[i].isValid || !std::isfinite(samples[i].force) ||
+            samples[i].force < 0.0)
+            continue;
+        const double forceRate = calculateDerivative(samples, i);
+        const double velocity = std::abs(forceRate) / k_elastic_;
+        const double instantaneousPower = samples[i].force * velocity;
+        if (std::isfinite(instantaneousPower))
+            maxPower = std::max(maxPower, instantaneousPower);
     }
-    return peakForce * maxVel;
+    return maxPower;
 }
 
 double Formulas::calculateAvgPower(double work, double duration) {
@@ -770,7 +779,20 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     params.T_conc = calculateConcentricTime(rep.startTime, rep.peakTime);
     params.T_ecc = calculateEccentricTime(rep.peakTime, rep.endTime);
     params.R_CE = calculateCERatio(params.T_conc, params.T_ecc);
-    params.v_avg = calculateVelocity(params.F_range, params.T_rep);
+    params.v_avg = 0.0;
+    if (std::isfinite(k_elastic_) && k_elastic_ > 0.0 && params.T_rep > 0.0) {
+        double totalForceTravel = 0.0;
+        for (std::size_t i = 0; i + 1 < rep.samples.size(); ++i) {
+            const auto& current = rep.samples[i];
+            const auto& next = rep.samples[i + 1];
+            if (!current.isValid || !next.isValid ||
+                !std::isfinite(current.force) || !std::isfinite(next.force))
+                continue;
+            totalForceTravel += std::abs(next.force - current.force);
+        }
+        // Mean absolute extension velocity over the complete repetition path.
+        params.v_avg = totalForceTravel / (k_elastic_ * params.T_rep);
+    }
     
     // Praca i impuls
     params.W_total = calculateWork(rep.samples);
@@ -853,6 +875,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     std::vector<double> repTimes;
     std::vector<double> repRFDs;
     std::vector<double> repPeakPowers;
+    std::vector<double> repMeanVelocities;
     std::vector<std::vector<SensorSample>> allRepSamples;
     
     // Oblicz parametry dla każdego powtórzenia
@@ -865,6 +888,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
         repTimes.push_back(repParams.T_rep);
         repRFDs.push_back(repParams.RFD);
         repPeakPowers.push_back(repParams.P_peak);
+        repMeanVelocities.push_back(repParams.v_avg);
         allRepSamples.push_back(rep.samples);
         
         params.W_total += repParams.W_total;
@@ -889,7 +913,9 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.T_set = calculateSetDuration(series.startTime, series.endTime);
     params.T_rep_avg = calculateAvgRepTime(repTimes);
     params.f_rep = calculateRepFrequency(series.reps.size(), params.T_set);
-    params.v_avg = calculateVelocity(params.F_range, params.T_rep_avg);
+    // Set mean absolute velocity is the mean of each repetition's
+    // measured force-path distance converted through the elastic constant.
+    params.v_avg = calculateMeanForce(repMeanVelocities);
 
     double totalInterRepRest = 0.0;
     std::size_t interRepRestIntervals = 0;
