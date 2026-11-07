@@ -41,6 +41,8 @@ for required in (
     'expectedSequence = object["firstSequence"].toVariant().toULongLong()',
     "Prefer a finalized JSON session over its still-present journal",
     "if (file.atEnd()) break;",
+    "Materialize the recovered stream as a normal, selectable JSON",
+    "QSaveFile recoveredFile(recoveredPath)",
     'record["recordType"] = "sample"',
     "void MeasurementTab::showCurrentMeasurementData()",
     "showCurrentMeasurementData();",
