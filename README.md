@@ -12,7 +12,7 @@ A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live fo
   - **Flappy Bird** - Classic flapping game controlled by strain gauge
   - **Pong** - Retro tennis game with biofeedback paddle control
   - **Mario Run** - 4-bit endless runner with charge-based jumping mechanics
-- **Data Security**: JSON storage with optional encryption for sensitive medical data
+- **Data Security**: PBKDF2 password hashing, first-run administrator setup, per-user account storage, and optional encryption for sensitive records
 - **Medical Standards**: Comprehensive logging, data validation, and audit trails
 
 ## Interfejsy użytkownika
@@ -21,6 +21,8 @@ A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live fo
 - **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia; podgląd siły oraz podstawowy trening 3×8. Zobacz `docs/TUI_DESIGN.md`.
 - **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
 - **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
+
+Pierwsze uruchomienie GUI prowadzi przez utworzenie konta administratora z hasłem o długości co najmniej 12 znaków; nie ma zaszytego domyślnego loginu ani hasła. Konfiguracja, konta i dane pacjentów trafiają do katalogów użytkownika XDG.
 
 Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać rzeczywiste próbki z podłączonego czujnika. WebUI i Android pozostają warstwami prezentacji w trybie podglądu do czasu wdrożenia API. Żaden interfejs nie tworzy fikcyjnych danych pacjentów.
 
