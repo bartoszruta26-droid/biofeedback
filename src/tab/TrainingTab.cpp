@@ -1462,14 +1462,25 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         repetitionIndex < 0 || repetitionIndex >= plan[exerciseIndex].repsPerSeries)
         return false;
 
-    const auto savedState = static_cast<biofeedback::training::SessionState>(
-        checkpoint.value("state").toInt(static_cast<int>(biofeedback::training::SessionState::Active)));
-    auto resumeState = static_cast<biofeedback::training::SessionState>(
-        checkpoint.value("resume_state").toInt(static_cast<int>(biofeedback::training::SessionState::Active)));
+    const int savedStateValue = checkpoint.value("state").toInt(
+        static_cast<int>(biofeedback::training::SessionState::Active));
+    const int resumeStateValue = checkpoint.value("resume_state").toInt(
+        static_cast<int>(biofeedback::training::SessionState::Active));
+    if (savedStateValue < static_cast<int>(biofeedback::training::SessionState::Idle) ||
+        savedStateValue > static_cast<int>(biofeedback::training::SessionState::Interrupted) ||
+        resumeStateValue < static_cast<int>(biofeedback::training::SessionState::Active) ||
+        resumeStateValue > static_cast<int>(biofeedback::training::SessionState::Resting))
+        return false;
+    const auto savedState = static_cast<biofeedback::training::SessionState>(savedStateValue);
+    auto resumeState = static_cast<biofeedback::training::SessionState>(resumeStateValue);
     if (savedState == biofeedback::training::SessionState::Resting)
         resumeState = biofeedback::training::SessionState::Resting;
     else if (savedState != biofeedback::training::SessionState::Paused)
         resumeState = biofeedback::training::SessionState::Active;
+    if (savedState == biofeedback::training::SessionState::Idle ||
+        savedState == biofeedback::training::SessionState::Completed ||
+        savedState == biofeedback::training::SessionState::Interrupted)
+        return false;
     if (resumeState != biofeedback::training::SessionState::Active &&
         resumeState != biofeedback::training::SessionState::Resting) return false;
 
