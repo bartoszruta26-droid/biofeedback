@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <map>
+#include <mutex>
 
 // Default baud rate for serial communication
 #define DEFAULT_BAUD_RATE 115200
