@@ -185,14 +185,12 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_analyticsWidget(nullptr)
     , m_timer(nullptr)
     , m_restTimer(nullptr)
-    , m_isTraining(false)
-    , m_isPaused(false)
     , m_currentExerciseIndex(0)
     , m_currentSeriesIndex(0)
     , m_currentRepIndex(0)
     , m_sessionTime(0)
     , m_restTimeRemaining(0)
-    , m_inRestPeriod(false)
+    , m_stateMachine.resting()(false)
     , m_restAdvancesExercise(false)
     , m_repetitionDetector()
     , m_currentSeriesRepetitions()
@@ -512,8 +510,6 @@ void TrainingTab::startTraining()
         return;
     }
     if (!m_stateMachine.start()) return;
-    m_isTraining = true;
-    m_isPaused = false;
     m_sessionTime = 0;
     m_sessionElapsedOffsetMs = 0;
     m_lastCheckpointSeconds = -1;
@@ -523,7 +519,6 @@ void TrainingTab::startTraining()
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
-    m_inRestPeriod = false;
     m_restAdvancesExercise = false;
     m_currentSeriesRepetitions.clear();
     m_repetitionDetector.reset();
@@ -554,7 +549,7 @@ void TrainingTab::startTraining()
 
 void TrainingTab::stopTraining(bool completed)
 {
-    if (!m_isTraining) return;
+    if (!m_stateMachine.running()) return;
 
     updateSessionClocks();
     if (completed) m_stateMachine.complete();
@@ -573,9 +568,6 @@ void TrainingTab::stopTraining(bool completed)
             addDebugMessage("Nie udało się automatycznie zapisać sesji treningowej; sesja pozostaje do ponownego zapisu.", "ERROR");
     }
 
-    m_isTraining = false;
-    m_isPaused = false;
-    m_inRestPeriod = false;
     m_restAdvancesExercise = false;
     m_repetitionDetector.reset();
     
@@ -598,7 +590,7 @@ void TrainingTab::stopTraining(bool completed)
 
 void TrainingTab::pauseTraining()
 {
-    if (!m_isTraining || !m_stateMachine.pause()) return;
+    if (!m_stateMachine.running() || !m_stateMachine.pause()) return;
 
     updateSessionClocks();
     if (m_inRestPeriod && m_restClock.isValid()) {
@@ -608,7 +600,6 @@ void TrainingTab::pauseTraining()
         m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
     }
-    m_isPaused = true;
     m_restTimer->stop();
     
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -626,7 +617,6 @@ void TrainingTab::resumeTraining()
 {
     if (!m_isTraining || !m_stateMachine.resume()) return;
 
-    m_isPaused = false;
     if (m_inRestPeriod) {
         // m_restDurationMs already contains the exact frozen remainder.
         m_restClock.restart();
@@ -682,7 +672,7 @@ void TrainingTab::setMeasurementEngine(
 void TrainingTab::setCurrentPatientContext(const QString& patientPesel,
                                              const QString& patientDataPath)
 {
-    if (m_isTraining) return;
+    if (m_stateMachine.running()) return;
     m_currentPatientPesel = patientPesel;
     m_currentPatientDataPath = patientDataPath;
     if (m_analyticsWidget) {
@@ -951,7 +941,7 @@ void TrainingTab::onStartStopClicked()
 
 void TrainingTab::onPauseResumeClicked()
 {
-    if (m_isPaused) {
+    if (m_stateMachine.paused()) {
         resumeTraining();
     } else {
         pauseTraining();
@@ -978,7 +968,7 @@ void TrainingTab::onTimerTick()
 {
     if (!m_isTraining) return;
     updateSessionClocks();
-    if (m_inRestPeriod && !m_isPaused) updateRestDisplay();
+    if (m_inRestPeriod && !m_stateMachine.paused()) updateRestDisplay();
 
     const int activeSeconds = static_cast<int>(m_trainingClock.activeSeconds());
     const int activeMinutes = activeSeconds / 60;
@@ -1002,7 +992,7 @@ void TrainingTab::updateSessionClocks()
 {
     if (!m_isTraining || !m_sessionClock.isValid()) return;
     const qint64 elapsedMs = m_sessionClock.elapsed();
-    m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_isPaused && !m_inRestPeriod);
+    m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_stateMachine.paused() && !m_inRestPeriod);
     m_sessionTime = static_cast<int>(m_trainingClock.sessionSeconds());
 }
 
@@ -1013,7 +1003,7 @@ void TrainingTab::onMeasurementSample(
 
     // MeasurementEngine normalizes firmware grams to kilograms. Convert the
     // canonical mass-equivalent value to SI force exactly once for biomechanics.
-    if (m_isPaused || m_inRestPeriod || !sample.isValid() || sample.unit != "kg" ||
+    if (m_stateMachine.paused() || m_inRestPeriod || !sample.isValid() || sample.unit != "kg" ||
         m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) {
         biofeedback::training::RepetitionRecord discarded;
         m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
@@ -1144,7 +1134,6 @@ void TrainingTab::loadNextSeries()
             stopTraining(true);
             emit trainingFinished(completed);
         } else {
-            m_inRestPeriod = true;
             m_stateMachine.beginRest();
             m_restAdvancesExercise = true;
             m_restTimeRemaining = 120;
@@ -1296,7 +1285,6 @@ void TrainingTab::finishCurrentSeries()
     updateProgressWidgets();
     if (m_restTimeRemaining > 0) {
         updateSessionClocks();
-        m_inRestPeriod = true;
         m_stateMachine.beginRest();
         m_restClock.start();
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
@@ -1356,8 +1344,7 @@ void TrainingTab::startRestTimer()
     updateSessionClocks();
     m_restTimeRemaining = qMax(0, static_cast<int>(m_exercisePlan[m_currentExerciseIndex].restTime));
     m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
-    m_inRestPeriod = m_restTimeRemaining > 0;
-    if (!m_inRestPeriod) {
+    if (m_restTimeRemaining <= 0) {
         advanceAfterRest();
         return;
     }
@@ -1469,7 +1456,6 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     m_restDurationMs = qMax<qint64>(0, static_cast<qint64>(
         checkpoint.value("rest_remaining_ms").toDouble()));
     m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
-    m_inRestPeriod = resumeState == biofeedback::training::SessionState::Resting;
     m_isTraining = true;
     m_isPaused = true;
 
