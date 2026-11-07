@@ -2,10 +2,18 @@
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
-#include <cassert>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
 #include <limits>
 #include <thread>
+
+#define REQUIRE(condition) do { \
+    if (!(condition)) { \
+        std::fprintf(stderr, "GameEngine regression failed at %s:%d: %s\\n", __FILE__, __LINE__, #condition); \
+        std::abort(); \
+    } \
+} while (false)
 
 class TestGame final : public games::GameEngine {
 public:
@@ -41,44 +49,44 @@ int main(int argc, char **argv)
 
     // Start while active must not reset or reinitialize the running session.
     game.start();
-    assert(game.isRunning() && !game.isPaused());
+    REQUIRE(game.isRunning() && !game.isPaused());
     waitForEvents(70);
     const QString runningStats = game.getGameStats();
-    assert(runningStats.contains(QStringLiteral("state=running")));
-    assert(runningStats.contains(QStringLiteral("frames=")));
+    REQUIRE(runningStats.contains(QStringLiteral("state=running")));
+    REQUIRE(runningStats.contains(QStringLiteral("frames=")));
 
     game.pause();
-    assert(game.isPaused());
+    REQUIRE(game.isPaused());
     const QString pausedStats = game.getGameStats();
-    assert(pausedStats.contains(QStringLiteral("state=paused")));
+    REQUIRE(pausedStats.contains(QStringLiteral("state=paused")));
     game.start();
-    assert(game.isPaused()); // start() must not silently discard a paused session
+    REQUIRE(game.isPaused()); // start() must not silently discard a paused session
     game.resume();
-    assert(game.isRunning() && !game.isPaused());
+    REQUIRE(game.isRunning() && !game.isPaused());
     waitForEvents(40);
-    assert(game.lastDelta() >= 0.0 && game.lastDelta() <= 0.1);
+    REQUIRE(game.lastDelta() >= 0.0 && game.lastDelta() <= 0.1);
 
     // A sensor callback from a worker thread is queued to the widget thread.
     std::thread worker([&game]() { game.handleSensorInput(42.5); });
     worker.join();
     waitForEvents(10);
-    assert(std::abs(game.lastInput() - 42.5) < 1e-9);
+    REQUIRE(std::abs(game.lastInput() - 42.5) < 1e-9);
 
     const int inputsBeforeInvalid = game.inputCount();
     game.handleSensorInput(std::numeric_limits<double>::quiet_NaN());
-    assert(game.inputCount() == inputsBeforeInvalid);
-    assert(game.getGameStats().contains(QStringLiteral("invalid_inputs=1")));
+    REQUIRE(game.inputCount() == inputsBeforeInvalid);
+    REQUIRE(game.getGameStats().contains(QStringLiteral("invalid_inputs=1")));
 
     game.award(std::numeric_limits<int>::max());
     game.award(1); // score arithmetic must saturate instead of overflowing
-    assert(game.getScore() == std::numeric_limits<int>::max());
+    REQUIRE(game.getScore() == std::numeric_limits<int>::max());
 
     game.stop();
-    assert(!game.isRunning() && !game.isPaused());
+    REQUIRE(!game.isRunning() && !game.isPaused());
     game.resetGameStats();
     const QString resetStats = game.getGameStats();
-    assert(resetStats.contains(QStringLiteral("elapsed_ms=0")));
-    assert(resetStats.contains(QStringLiteral("frames=0")));
-    assert(resetStats.contains(QStringLiteral("invalid_inputs=0")));
+    REQUIRE(resetStats.contains(QStringLiteral("elapsed_ms=0")));
+    REQUIRE(resetStats.contains(QStringLiteral("frames=0")));
+    REQUIRE(resetStats.contains(QStringLiteral("invalid_inputs=0")));
     return 0;
 }
