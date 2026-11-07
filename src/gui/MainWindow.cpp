@@ -582,6 +582,8 @@ void MainWindow::updateWeightDisplay(double weight)
 void MainWindow::updateConnectionStatus(bool connected, const QString& deviceName)
 {
     m_isConnected = connected;
+    m_currentDevice = connected ? deviceName : QString();
+    if (m_connectDeviceButton) m_connectDeviceButton->setText(connected ? tr("Rozłącz") : tr("Połącz"));
     
     const QString device = deviceName.isEmpty() ? tr("Urządzenie") : deviceName;
     if (connected) {
