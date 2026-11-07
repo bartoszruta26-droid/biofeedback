@@ -16,7 +16,7 @@ std::string readAll(){
 }
 void writeEmptyUsersJson(){
  std::ofstream out(kFirstRunFile);
- out << "{\\n  \\"users\\": []\\n}\\n";
+ out << "{\n  \"users\": []\n}\n";
 }
 void writeUsersJson(){
  std::ofstream out(kUsersFile);
