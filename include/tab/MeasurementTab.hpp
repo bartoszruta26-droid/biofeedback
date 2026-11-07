@@ -419,7 +419,7 @@ private:
     // Połączenie szeregowe z Arduino
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SensorData m_lastSensorData;
-    std::atomic<bool> m_hasArduinoConnection{false};
+    bool m_hasArduinoConnection;
 };
 
 } // namespace tab

@@ -23,7 +23,6 @@
 #include <cmath>
 #include <utility>
 #include <algorithm>
-#include <limits>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -168,7 +167,7 @@ bool SerialCommunication::verifyCRC8(const uint8_t* data, size_t length) {
 class SerialCommunication::Impl {
 public:
     int portHandle = -1;
-    std::atomic<bool> isConnected{false};
+    bool isConnected = false;
     int baudRate = DEFAULT_BAUD_RATE;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
@@ -646,57 +645,8 @@ int SerialCommunication::getTimeSinceLastActivity() const {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count();
 }
 
-double SerialCommunication::tare(int samples) {
-    if (!m_impl->isConnected || samples <= 0 || samples > 1000) {
-        m_impl->lastError = "Tare requires a connected device and 1..1000 samples";
-        return std::numeric_limits<double>::quiet_NaN();
-    }
-
-    std::vector<int32_t> readings;
-    readings.reserve(static_cast<std::size_t>(samples));
-    for (int i = 0; i < samples; ++i) {
-        const SensorData sample = readData(300);
-        if (!sample.isValid) {
-            m_impl->lastError = "Tare aborted: invalid or missing sensor sample";
-            return std::numeric_limits<double>::quiet_NaN();
-        }
-        readings.push_back(sample.value);
-    }
-
-    // Median is more resistant than a mean to isolated HX711 spikes.
-    std::sort(readings.begin(), readings.end());
-    double zero = 0.0;
-    const std::size_t middle = readings.size() / 2;
-    if (readings.size() % 2 == 0) {
-        zero = (static_cast<double>(readings[middle - 1]) +
-                static_cast<double>(readings[middle])) * 0.5;
-    } else {
-        zero = static_cast<double>(readings[middle]);
-    }
-    m_impl->zeroOffset = zero;
-    m_impl->lastError.clear();
-    return zero;
-}
-
-void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
-    if (!std::isfinite(known) || known <= 0.0) {
-        m_impl->lastError = "Calibration reference must be finite and positive";
-        return;
-    }
-    const double delta = static_cast<double>(raw) - m_impl->zeroOffset;
-    if (!std::isfinite(delta) || delta == 0.0) {
-        m_impl->lastError = "Calibration point must differ from the tare baseline";
-        return;
-    }
-    const double scale = known / delta;
-    if (!std::isfinite(scale) || scale == 0.0) {
-        m_impl->lastError = "Calibration scale is not finite";
-        return;
-    }
-    m_impl->scaleFactor = scale;
-    m_impl->isCalibrated = true;
-    m_impl->lastError.clear();
-}
+double SerialCommunication::tare(int samples) { if (m_impl->isConnected) sendCommand("TARE", true); m_impl->zeroOffset = 0.0; return 0.0; }
+void SerialCommunication::setCalibrationPoint(int32_t raw, double known) { if (raw != 0) { m_impl->scaleFactor = known/raw; m_impl->isCalibrated = true; } }
 bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight) {
     const int64_t span = static_cast<int64_t>(rawSpan) - static_cast<int64_t>(rawZero);
     if (span == 0 || !std::isfinite(knownWeight) || knownWeight <= 0.0) {
