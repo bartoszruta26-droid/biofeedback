@@ -1,5 +1,6 @@
 #include "tab/TrainingTab.hpp"
 #include "tab/TrainingAnalyticsWidget.hpp"
+#include "measurement/Units.hpp"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTextStream>
@@ -172,6 +173,7 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_lblRestTimer(nullptr)
     , m_gameBox(nullptr)
     , m_currentGame(nullptr)
+    , m_activeGameType("none")
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
     , m_statsSummaryLabel(nullptr)
@@ -262,6 +264,7 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Pong", "pong");
     m_gameTypeCombo->addItem("Flappy Bird", "flappy");
     m_gameTypeCombo->addItem("Mario", "mario");
+    m_gameTypeCombo->addItem("Sinusoidalna", "sin");
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_gameTypeCombo);
@@ -369,7 +372,7 @@ void TrainingTab::setupUI()
     gameLayout->setSpacing(0);
     
     // Placeholder dla gry - będzie zastąpiony przez rzeczywisty widget gry
-    QLabel* gamePlaceholder = new QLabel("Wybierz grę i rozpocznij trening", this);
+    QLabel* gamePlaceholder = new QLabel("Wybierz grę i rozpocznij trening", m_gameBox);
     gamePlaceholder->setAlignment(Qt::AlignCenter);
     gamePlaceholder->setMinimumHeight(400);
     gamePlaceholder->setStyleSheet("background-color: #1a1a1a; color: #888; font-size: 18px; border: 2px solid #333;");
@@ -491,6 +494,12 @@ void TrainingTab::startTraining()
 {
     if (m_exercisePlan.isEmpty()) {
         QMessageBox::warning(this, "Brak planu", "Dodaj ćwiczenia przed rozpoczęciem treningu.");
+        return;
+    }
+
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        QMessageBox::warning(this, "Brak urządzenia",
+                             "Podłącz skalibrowany czujnik HX711 przed rozpoczęciem treningu.");
         return;
     }
     
@@ -628,36 +637,83 @@ void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunicatio
 void TrainingTab::setGameEngine(games::GameEngine* game)
 {
     m_currentGame = game;
-    
-    if (m_currentGame) {
-        // Podłączenie sygnałów gry
-        connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
-        connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
-        connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
-        
-        // Jeśli mamy SerialCommunication, podłącz go do gry
-        if (m_serialPort) {
-            // Spróbuj rzutować na konkretny typ gry i podłącz SerialCommunication
-            auto pongGame = dynamic_cast<games::PongGame*>(m_currentGame);
-            if (pongGame) {
-                pongGame->setSerialConnection(m_serialPort);
+    if (!m_currentGame) return;
+
+    m_currentGame->setParent(m_gameBox);
+    m_currentGame->setMinimumHeight(400);
+    if (m_gameBox->layout() && m_gameBox->layout()->indexOf(m_currentGame) < 0) {
+        while (QLayoutItem* item = m_gameBox->layout()->takeAt(0)) {
+            if (QWidget* widget = item->widget()) {
+                widget->hide();
+                widget->deleteLater();
             }
-            
-            auto flappyGame = dynamic_cast<games::FlappyBirdGame*>(m_currentGame);
-            if (flappyGame) {
-                flappyGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto marioGame = dynamic_cast<games::MarioGame*>(m_currentGame);
-            if (marioGame) {
-                marioGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto sinGame = dynamic_cast<games::SinGame*>(m_currentGame);
-            if (sinGame) {
-                sinGame->setSerialConnection(m_serialPort);
-            }
+            delete item;
         }
+        m_gameBox->layout()->addWidget(m_currentGame);
+    }
+
+    disconnect(m_currentGame, nullptr, this, nullptr);
+    connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
+    connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
+    connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
+
+    if (m_serialPort) {
+        if (auto* game = dynamic_cast<games::PongGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::FlappyBirdGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::MarioGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::SinGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+    }
+}
+
+void TrainingTab::configureGameForExercise()
+{
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size())
+        return;
+
+    QString type = m_exercisePlan[m_currentExerciseIndex].gameType.trimmed().toLower();
+    if (type == "sinusoidal" || type == "sin_game" || type == "sinus")
+        type = "sin";
+    if (type.isEmpty()) type = "none";
+    if (type == m_activeGameType && (type == "none" || m_currentGame)) return;
+
+    if (m_currentGame) {
+        if (m_currentGame->isRunning()) m_currentGame->stop();
+        if (m_gameBox->layout()) m_gameBox->layout()->removeWidget(m_currentGame);
+        delete m_currentGame;
+        m_currentGame = nullptr;
+    }
+    if (m_gameBox->layout()) {
+        while (QLayoutItem* item = m_gameBox->layout()->takeAt(0)) {
+            if (QWidget* widget = item->widget()) delete widget;
+            delete item;
+        }
+    }
+
+    m_activeGameType = type;
+    games::GameEngine* selectedGame = nullptr;
+    if (type == "pong") selectedGame = new games::PongGame(m_gameBox);
+    else if (type == "flappy" || type == "flappy_bird")
+        selectedGame = new games::FlappyBirdGame(m_gameBox);
+    else if (type == "mario" || type == "mario_run")
+        selectedGame = new games::MarioGame(m_gameBox);
+    else if (type == "sin")
+        selectedGame = new games::SinGame(m_gameBox);
+
+    if (selectedGame) {
+        m_gameBox->layout()->addWidget(selectedGame);
+        setGameEngine(selectedGame);
+    } else {
+        auto* placeholder = new QLabel(
+            type == "none" ? tr("Trening bez gry") : tr("Nieznany typ gry: %1").arg(type),
+            m_gameBox);
+        placeholder->setAlignment(Qt::AlignCenter);
+        placeholder->setMinimumHeight(400);
+        placeholder->setStyleSheet("background-color:#1a1a1a;color:#888;font-size:18px;");
+        m_gameBox->layout()->addWidget(placeholder);
     }
 }
 
@@ -857,7 +913,7 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 
     // Firmware reports calibrated mass-equivalent values in grams. Training
     // targets are expressed in newtons (SI), so convert exactly once here.
-    const double force = data.calibratedValue * 9.80665 / 1000.0;
+    const double force = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
     if (!std::isfinite(force) || force < 0.0) return;
     m_currentForce = force;
 
@@ -869,8 +925,11 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
         ? static_cast<int>((force / targetForce) * 100.0) : 0;
     m_forceBar->setValue(qBound(0, barValue, 100));
 
-    if (m_currentGame && m_currentGame->isRunning())
-        m_currentGame->handleSensorInput(force);
+    if (m_currentGame && m_currentGame->isRunning()) {
+        const double gameInput = targetForce > 0.0
+            ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
+        m_currentGame->handleSensorInput(gameInput);
+    }
 
     biofeedback::training::RepetitionRecord repetition;
     if (m_repetitionDetector.process(data.timestamp, force, true, repetition))
@@ -879,9 +938,12 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     emit newForceSample(force);
 }
 
-void TrainingTab::onGameEnded(int /*score*/)
+void TrainingTab::onGameEnded(int score)
 {
-    // Game score is separate from sensor-derived repetition completion.
+    if (m_currentExerciseIndex >= 0 && m_currentExerciseIndex < m_exerciseStats.size()) {
+        m_exerciseStats[m_currentExerciseIndex].gameScore += score;
+        refreshAnalytics();
+    }
 }
 
 void TrainingTab::onGameStarted()
@@ -948,6 +1010,7 @@ void TrainingTab::loadNextExercise()
     m_lblTargetForce->setText(QString("%1 N").arg(exercise.targetForce, 0, 'f', 1));
     const int gameIndex = m_gameTypeCombo->findData(exercise.gameType);
     if (gameIndex >= 0) m_gameTypeCombo->setCurrentIndex(gameIndex);
+    configureGameForExercise();
     loadNextSeries();
 }
 
