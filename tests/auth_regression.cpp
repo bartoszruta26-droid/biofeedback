@@ -17,7 +17,7 @@ void writeUsersJson(){
  std::ofstream out(kUsersFile);
  out << "{\n  \"users\": [\n"
  " {\"username\":\"admin\",\"password\":\"legacy-admin\",\"role\":\"administrator\",\"encrypted\":false},\n"
- " {\"username\":\"doctor\\\"x\",\"password\":\"legacy\\\"pass\",\"role\":\"therapist\",\"encrypted\":false},\n"
+ " {\"username\":\"doctor\"x\",\"password\":\"legacy\"pass\",\"role\":\"therapist\",\"encrypted\":false},\n"
  " {\"username\":\"brace-user\",\"password\":\"token-with-}-inside\",\"role\":\"tester\",\"encrypted\":false}\n"
  " ]\n}\n";
 }
@@ -38,7 +38,7 @@ int main(){
   expect(!auth.login("admin","wrong-password"),"wrong password rejected");
   expect(!auth.login("admin","legacy-admin"),"legacy password rejected after migration");
   expect(auth.login("admin","new-admin-password-2026"),"PBKDF2 login");
-  expect(auth.login("doctor\\\"x","legacy\\\"pass"),"escaped username legacy login");
+  expect(auth.login("doctor\"x","legacy\"pass"),"escaped username legacy login");
   expect(auth.requiresPasswordChange(),"second account migration gate");
   expect(auth.changePassword("new-doctor-password-2026"),"second password change");
   expect(auth.login("brace-user","token-with-}-inside"),"brace legacy login");
