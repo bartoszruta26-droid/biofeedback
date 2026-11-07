@@ -239,12 +239,14 @@ int main() {
     std::atomic<bool> snapshotsValid{true};
     std::thread snapshots([&]() {
         while (!stopSnapshots.load(std::memory_order_acquire)) {
-            const bool connected = serial.isConnected();
             const std::string name = serial.getPortName();
             const int baud = serial.getBaudRate();
+            (void)serial.isConnected();
             (void)serial.getArduinoInfo();
-            if (baud != 115200 || (connected && name != slaveName) ||
-                (!connected && !name.empty())) {
+            // These independent getters are individually synchronized, not an
+            // atomic multi-field snapshot. Accept the old or cleared port name
+            // during teardown, then assert the final disconnected state below.
+            if (baud != 115200 || (!name.empty() && name != slaveName)) {
                 snapshotsValid.store(false, std::memory_order_release);
             }
         }
@@ -256,7 +258,8 @@ int main() {
     stopSnapshots.store(true, std::memory_order_release);
     snapshots.join();
     reader.join();
-    if (serial.isConnected() || !snapshotsValid.load(std::memory_order_acquire) ||
+    if (serial.isConnected() || !serial.getPortName().empty() ||
+        !snapshotsValid.load(std::memory_order_acquire) ||
         disconnectElapsed < 80 || disconnectElapsed > 1000) {
         std::cerr << "Disconnect did not serialize with in-flight read: "
                   << disconnectElapsed << " ms\n";
