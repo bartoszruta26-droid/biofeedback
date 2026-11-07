@@ -621,6 +621,8 @@ SensorData SerialCommunication::readData(int timeout) {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     
+    data.hasFrame = !rawData.empty();
+
     if (m_impl->verbose && data.isValid) {
         std::cout << "[SerialComm] Data: TS=" << data.timestamp 
                   << ", Value=" << data.value 
@@ -716,7 +718,7 @@ void SerialCommunication::startAsyncReading() {
     m_impl->asyncThread = std::thread([this]() {
         while (m_impl->asyncReading && m_impl->isConnected) {
             SensorData d = readData(100);
-            if (d.isValid) notifyDataCallbacks(d);
+            if (d.hasFrame) notifyDataCallbacks(d);
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
         }
     });
