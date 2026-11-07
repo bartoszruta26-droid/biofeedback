@@ -411,12 +411,14 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback) {
     QSaveFile file(path);
     const QByteArray payload = QJsonDocument(updated).toJson(QJsonDocument::Indented);
     if (!file.open(QIODevice::WriteOnly)) {
+        m_saveHistoryButton->setEnabled(m_historyReadable && !m_sessionSaved);
         if (showFeedback)
             QMessageBox::warning(this, tr("Historia treningów"),
                                  tr("Nie udało się otworzyć pliku historii: %1").arg(file.errorString()));
         return false;
     }
     if (file.write(payload) != payload.size() || !file.commit()) {
+        m_saveHistoryButton->setEnabled(m_historyReadable && !m_sessionSaved);
         if (showFeedback)
             QMessageBox::warning(this, tr("Historia treningów"),
                                  tr("Nie udało się zapisać historii: %1").arg(file.errorString()));
