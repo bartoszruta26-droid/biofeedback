@@ -109,12 +109,11 @@ void Application::shutdown()
         m_logger->info("Application shutdown complete");
     }
     
-    // Clean up resources in reverse order of creation
-    // Note: Tabs are now deleted by Qt's parent-child mechanism when MainWindow is destroyed,
-    // but we reset unique_ptrs to prevent double-delete and maintain valid state
-    m_outlineTab.reset();
-    m_measurementTab.reset();
-    m_patientTab.reset();
+    // Tabs are owned by MainWindow/QTabWidget. Clear aliases before destroying
+    // the sole owner to avoid retaining dangling pointers during shutdown.
+    m_outlineTab = nullptr;
+    m_measurementTab = nullptr;
+    m_patientTab = nullptr;
     m_mainWindow.reset();
     m_dataManager.reset();
     m_authentication.reset();
@@ -253,41 +252,14 @@ void Application::createMainWindow()
             throw std::runtime_error("Failed to create MainWindow");
         }
         
-        // Create tabs with proper parent-child relationships
-        m_patientTab = std::unique_ptr<tab::PatientTab>(new tab::PatientTab(m_mainWindow.get()));
-        m_measurementTab = std::unique_ptr<tab::MeasurementTab>(new tab::MeasurementTab(m_mainWindow.get()));
-        m_outlineTab = std::unique_ptr<tab::OutlineTab>(new tab::OutlineTab(m_mainWindow.get()));
-        
-        // Validate tab creation
+        // MainWindow creates and owns the complete tab set. Application keeps
+        // non-owning pointers only for signal/slot wiring.
+        m_patientTab = m_mainWindow->patientTab();
+        m_measurementTab = m_mainWindow->measurementTab();
+        m_outlineTab = m_mainWindow->outlineTab();
+
         if (!m_patientTab || !m_measurementTab || !m_outlineTab) {
-            throw std::runtime_error("Failed to create one or more tabs");
-        }
-        
-        // Store raw pointers for connections before adding to QTabWidget
-        // Note: QTabWidget will take parent ownership, but Application retains unique_ptr ownership
-        // This prevents use-after-free and allows proper cleanup in shutdown()
-        auto* patientTabPtr = m_patientTab.get();
-        auto* measurementTabPtr = m_measurementTab.get();
-        auto* outlineTabPtr = m_outlineTab.get();
-        
-        // Get central widget from MainWindow and add tabs
-        QTabWidget* centralWidget = qobject_cast<QTabWidget*>(m_mainWindow->centralWidget());
-        if (centralWidget) {
-            centralWidget->addTab(patientTabPtr, "Pacjenci");
-            centralWidget->addTab(measurementTabPtr, "Pomiary");
-            centralWidget->addTab(outlineTabPtr, "Scenariusze");
-            // DO NOT release() - Application retains ownership for proper cleanup
-            // Qt's parent-child mechanism will handle deletion when MainWindow is destroyed
-            // but we keep unique_ptr valid to prevent nullptr dereference in setupConnections()
-        } else {
-            // Fallback: create a new QTabWidget if central widget is not a QTabWidget
-            QTabWidget* tabWidget = new QTabWidget(m_mainWindow.get());
-            tabWidget->addTab(patientTabPtr, "Pacjenci");
-            tabWidget->addTab(measurementTabPtr, "Pomiary");
-            tabWidget->addTab(outlineTabPtr, "Scenariusze");
-            
-            m_mainWindow->setCentralWidget(tabWidget);
-            // DO NOT release() - same reasoning as above
+            throw std::runtime_error("MainWindow did not initialize the required tabs");
         }
         
         if (m_logger) {
