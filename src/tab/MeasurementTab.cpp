@@ -401,7 +401,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
     m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
-        m_serialPort, m_measurementEngine, "desktop-hx711", "count");
+        *m_serialPort, m_measurementEngine, "desktop-hx711", "count");
     m_lastSensorData = sensor::SensorData();
     
     // Próba automatycznego podłączenia do Arduino w tle
@@ -1916,7 +1916,7 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
     m_serialPort = serial;
     if (m_serialPort && m_measurementEngine) {
         m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
-            m_serialPort, m_measurementEngine, "desktop-hx711", "count");
+            *m_serialPort, m_measurementEngine, "desktop-hx711", "count");
     }
     if (m_serialPort) {
         m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
