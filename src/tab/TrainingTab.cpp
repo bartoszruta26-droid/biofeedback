@@ -11,6 +11,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
+#include "measurement/Units.hpp"
 
 namespace tab {
 
@@ -815,15 +816,16 @@ void TrainingTab::onTimerTick()
 
 void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
-    if (!m_isTraining || m_isPaused) return;
-    
-    double force = data.calibratedValue;
+    if (!m_isTraining || m_isPaused || !data.isValid) return;
+
+    // Firmware reports calibrated mass-equivalent values in grams; training targets use N.
+    const double force = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
     m_currentForce = force;
-    
-    // Dodaj dane z Arduino do terminala debugowania
-    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
+
+    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 g | FORCE=%3 N")
         .arg(data.value)
-        .arg(data.calibratedValue);
+        .arg(data.calibratedValue, 0, 'f', 2)
+        .arg(force, 0, 'f', 3);
     addDebugMessage(arduinoDebug, "ARDUINO");
     
     // Śledzenie siły szczytowej w powtórzeniu
