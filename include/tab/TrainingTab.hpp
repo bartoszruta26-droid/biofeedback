@@ -87,6 +87,10 @@ struct ExerciseStats {
     double minPeakForce;
     double duration;
     double completionRate;
+    double averageForceN;
+    double totalImpulseNs;
+    double targetAccuracyPercent;
+    double averageRepetitionDurationSeconds;
     QVector<double> peakForcePerRep;
     std::chrono::steady_clock::time_point startTime;
     bool isCompleted;
@@ -94,7 +98,8 @@ struct ExerciseStats {
     ExerciseStats() : completedSeries(0), completedReps(0), avgPeakForce(0),
                       maxPeakForce(0), avgReactionTime(0), consistencyScore(0),
                       minPeakForce(0), duration(0), completionRate(0),
-                      isCompleted(false) { startTime = std::chrono::steady_clock::now(); }
+                      averageForceN(0), totalImpulseNs(0), targetAccuracyPercent(0),
+                      averageRepetitionDurationSeconds(0), isCompleted(false) { startTime = std::chrono::steady_clock::now(); }
 };
 
 /**
@@ -211,6 +216,12 @@ public:
      */
     void addDebugMessage(const QString& message, const QString& type = "INFO");
 
+    // Receives only validated Newton samples and repetition events from MeasurementEngine.
+    void onSharedForceSample(double forceN, double timestampSeconds, bool isRaw);
+    void onSharedRepetitionCompleted(double peakForceN, double durationSeconds,
+                                     double timeToPeakSeconds, double averageForceN,
+                                     double impulseNs, double targetAccuracyPercent);
+
 signals:
     void trainingStarted();
     void trainingStopped();
@@ -232,7 +243,6 @@ private slots:
     void onPauseResumeClicked();
     void onExerciseSelected(int index);
     void onTimerTick();
-    void onSensorDataReceived(const sensor::SensorData& data);
     void onGameEnded(int score);
     void onGameStarted();
     void onScoreChanged(int score);
