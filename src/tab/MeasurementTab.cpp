@@ -389,6 +389,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_trendsContent(nullptr)
     , m_chkShowTrends(nullptr)
     , m_serialPort(nullptr)
+    , m_hasArduinoConnection(false)
 {
     // Inicjalizacja wskaźników przycisków JSON
     m_btnSaveJSON = nullptr;
@@ -1929,7 +1930,7 @@ bool MeasurementTab::isArduinoConnected() const
 void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
     // MeasurementSerialAdapter ingests each serial sample through its own callback.
-    // Do not ingest it again here: this callback is responsible only for UI updates.
+    // This callback is responsible only for updating the UI.
     std::cout << "[DEBUG] onSensorDataReceived: data.isValid=" << data.isValid 
               << " m_isMeasuring=" << m_isMeasuring << std::endl;
     
@@ -1973,10 +1974,8 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         }
     } else {
         std::cout << "[DEBUG] onSensorDataReceived: Received invalid data" << std::endl;
-        addDebor(std::chrono::seconds(2));
-            }
-        }
-    }).detach();
+        addDebugMessage("Otrzymano nieprawidłowe dane z Arduino", "WARNING");
+    }
 }
 
 // ============================================================================
