@@ -503,7 +503,11 @@ void TrainingTab::startTraining()
         return;
     }
 
-    if (m_analyticsWidget) m_analyticsWidget->beginSession();
+    if (m_analyticsWidget && !m_analyticsWidget->beginSession()) {
+        QMessageBox::warning(this, tr("Niezapisana sesja"),
+                             tr("Zapisz poprzednią sesję treningową przed rozpoczęciem kolejnej."));
+        return;
+    }
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
