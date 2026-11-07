@@ -25,6 +25,7 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
+    src/sensor/ProtocolParser.cpp
     src/core/Logger.cpp
     src/core/PasswordHasher.cpp
     src/core/Authentication.cpp
