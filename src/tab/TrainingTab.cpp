@@ -493,6 +493,7 @@ void TrainingTab::setCurrentExerciseIndex(int index)
 
 void TrainingTab::startTraining()
 {
+    if (!m_stateMachine.canStart()) return;
     if (m_exercisePlan.isEmpty()) {
         QMessageBox::warning(this, "Brak planu", "Dodaj ćwiczenia przed rozpoczęciem treningu.");
         return;
@@ -508,6 +509,7 @@ void TrainingTab::startTraining()
                              tr("Zapisz poprzednią sesję treningową przed rozpoczęciem kolejnej."));
         return;
     }
+    if (!m_stateMachine.start()) return;
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
@@ -547,10 +549,16 @@ void TrainingTab::startTraining()
 void TrainingTab::stopTraining(bool completed)
 {
     if (!m_isTraining) return;
-    
+
     updateSessionClocks();
+    if (completed) m_stateMachine.complete();
+    else m_stateMachine.interrupt();
     refreshAnalytics();
-    if (m_analyticsWidget) m_analyticsWidget->setSessionCompleted(completed);
+    if (m_analyticsWidget) {
+        m_analyticsWidget->setSessionCompleted(completed);
+        if (!m_analyticsWidget->saveSessionAutomatically())
+            addDebugMessage("Nie udało się automatycznie zapisać sesji treningowej; sesja pozostaje do ponownego zapisu.", "ERROR");
+    }
     m_timer->stop();
     m_restTimer->stop();
     
@@ -584,8 +592,8 @@ void TrainingTab::stopTraining(bool completed)
 
 void TrainingTab::pauseTraining()
 {
-    if (!m_isTraining || m_isPaused) return;
-    
+    if (!m_isTraining || !m_stateMachine.pause()) return;
+
     updateSessionClocks();
     if (m_inRestPeriod) {
         updateRestDisplay();
@@ -605,8 +613,8 @@ void TrainingTab::pauseTraining()
 
 void TrainingTab::resumeTraining()
 {
-    if (!m_isTraining || !m_isPaused) return;
-    
+    if (!m_isTraining || !m_stateMachine.resume()) return;
+
     m_isPaused = false;
     if (m_inRestPeriod) {
         m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
@@ -625,12 +633,12 @@ void TrainingTab::resumeTraining()
 
 bool TrainingTab::isTrainingActive() const
 {
-    return m_isTraining && !m_isPaused;
+    return m_stateMachine.state() == biofeedback::training::SessionState::Active;
 }
 
 bool TrainingTab::isTrainingPaused() const
 {
-    return m_isPaused;
+    return m_stateMachine.paused();
 }
 
 void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
@@ -1252,6 +1260,7 @@ void TrainingTab::finishCurrentSeries()
     if (m_restTimeRemaining > 0) {
         updateSessionClocks();
         m_inRestPeriod = true;
+        m_stateMachine.beginRest();
         m_restClock.start();
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
         if (!m_isPaused) m_restTimer->start();
@@ -1267,6 +1276,8 @@ void TrainingTab::advanceAfterRest()
     if (m_restTimeRemaining > 0) return;
     updateSessionClocks();
     m_restTimer->stop();
+    if (m_stateMachine.resting() && !m_stateMachine.paused())
+        m_stateMachine.endRest();
     m_inRestPeriod = false;
     m_lblRestTimer->clear();
     if (m_restAdvancesExercise) {
@@ -1311,6 +1322,7 @@ void TrainingTab::startRestTimer()
         advanceAfterRest();
         return;
     }
+    m_stateMachine.beginRest();
     m_restClock.start();
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
     if (!m_isPaused) m_restTimer->start();
