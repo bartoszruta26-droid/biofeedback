@@ -1413,8 +1413,8 @@ void MeasurementTab::onReadSingleSample()
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
         return;
     }
-    if (!m_lastSensorData.isValid) {
-        m_lblStatus->setText(tr("Status: OCZEKIWANIE NA POPRAWNĄ PRÓBKĘ"));
+    if (!m_lastSensorData.isValid || (!m_showRawValues && !m_lastSensorData.hasCalibratedValue)) {
+        m_lblStatus->setText(tr("Status: OCZEKIWANIE NA SKALIBROWANĄ PRÓBKĘ"));
         m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
         return;
     }
@@ -1923,6 +1923,10 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
     if (!data.isValid) {
         addDebugMessage(tr("Otrzymano nieprawidłową ramkę z czujnika"), "WARNING");
+        return;
+    }
+    if (!m_showRawValues && !data.hasCalibratedValue) {
+        addDebugMessage(tr("Ramka zawiera tylko dane RAW; oczekuję na skalibrowaną wartość w gramach."), "WARNING");
         return;
     }
 
