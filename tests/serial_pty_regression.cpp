@@ -202,6 +202,61 @@ int main() {
         return 1;
     }
 
+    // The production HX711 firmware sends a binary frame followed by a
+    // calibrated FORCE text record in the same DATA response.
+    std::thread calibratedDevice([&]() {
+        std::string dataCommand;
+        if (!readLine(master, dataCommand, 500) || dataCommand != "DATA\n") return;
+        uint8_t packet[11]{};
+        const uint32_t deviceTimestamp = 1234;
+        const int32_t rawValue = 4567;
+        std::memcpy(packet, &deviceTimestamp, sizeof(deviceTimestamp));
+        std::memcpy(packet + 4, &rawValue, sizeof(rawValue));
+        uint8_t crc = 0xFF;
+        for (int i = 0; i < 8; ++i) {
+            crc ^= packet[i];
+            for (int bit = 0; bit < 8; ++bit)
+                crc = (crc & 0x80) ? static_cast<uint8_t>((crc << 1) ^ 0x07)
+                                   : static_cast<uint8_t>(crc << 1);
+        }
+        packet[8] = crc;
+        packet[9] = 0xAA;
+        packet[10] = 0x55;
+        const std::string text = "FORCE:123.45g,RAW:4567,TS:5678ms\\r\\n[DATA_SENT]\\r\\n";
+        std::vector<uint8_t> response(std::begin(packet), std::end(packet));
+        response.insert(response.end(), text.begin(), text.end());
+        (void)::write(master, response.data(), response.size());
+    });
+    const sensor::SensorData calibrated = serial.readData(700);
+    calibratedDevice.join();
+    if (!calibrated.isValid || !calibrated.hasCalibratedValue ||
+        std::abs(calibrated.calibratedValue - 123.45) > 1e-6 ||
+        calibrated.value != 4567) {
+        std::cerr << "Binary + calibrated text frame was not parsed correctly: valid="
+                  << calibrated.isValid << ", calibrated=" << calibrated.hasCalibratedValue
+                  << ", grams=" << calibrated.calibratedValue << ", raw=" << calibrated.value << '\\n';
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+
+    // Text-only firmware remains supported but is explicitly marked calibrated.
+    std::thread textOnlyDevice([&]() {
+        std::string dataCommand;
+        if (!readLine(master, dataCommand, 500) || dataCommand != "DATA\\n") return;
+        const std::string text = "FORCE:25.00g,RAW:999,TS:6789ms\\r\\n";
+        (void)::write(master, text.data(), text.size());
+    });
+    const sensor::SensorData textOnly = serial.readData(500);
+    textOnlyDevice.join();
+    if (!textOnly.isValid || !textOnly.hasCalibratedValue ||
+        std::abs(textOnly.calibratedValue - 25.0) > 1e-6 || textOnly.value != 999) {
+        std::cerr << "Text-only calibrated frame was not parsed correctly\\n";
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+
     const uint8_t raw[] = {0xA5, 0x00, 0x5A, 0xFF};
     if (!serial.sendRawData(raw, sizeof(raw))) {
         std::cerr << "PTY raw write failed: " << serial.getLastError() << '\n';
