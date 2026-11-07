@@ -160,12 +160,29 @@ int main() {
         ::close(master);
         return 1;
     }
+    std::atomic<bool> stopSnapshots{false};
+    std::atomic<bool> snapshotsValid{true};
+    std::thread snapshots([&]() {
+        while (!stopSnapshots.load(std::memory_order_acquire)) {
+            const bool connected = serial.isConnected();
+            const std::string name = serial.getPortName();
+            const int baud = serial.getBaudRate();
+            (void)serial.getArduinoInfo();
+            if (baud != 115200 || (connected && name != slaveName) ||
+                (!connected && !name.empty())) {
+                snapshotsValid.store(false, std::memory_order_release);
+            }
+        }
+    });
     const auto disconnectStart = std::chrono::steady_clock::now();
     serial.disconnect();
     const auto disconnectElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now() - disconnectStart).count();
+    stopSnapshots.store(true, std::memory_order_release);
+    snapshots.join();
     reader.join();
-    if (serial.isConnected() || disconnectElapsed < 80 || disconnectElapsed > 1000) {
+    if (serial.isConnected() || !snapshotsValid.load(std::memory_order_acquire) ||
+        disconnectElapsed < 80 || disconnectElapsed > 1000) {
         std::cerr << "Disconnect did not serialize with in-flight read: "
                   << disconnectElapsed << " ms\n";
         ::close(master);
