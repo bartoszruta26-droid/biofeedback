@@ -145,6 +145,60 @@ int main()
     assert(result.availabilityAt(58) != ParameterAvailability::Available);
     assert(result.availabilityAt(64) != ParameterAvailability::Available);
 
+
+    // Session metrics use distinct sets, not a single set's proxy values.
+    SeriesData set1 = series;
+    set1.seriesNumber = 1;
+    SeriesData set2 = series;
+    set2.seriesNumber = 2;
+    SeriesData set3 = series;
+    set3.seriesNumber = 3;
+    const auto shiftAndScale = [](SeriesData& set, std::uint32_t offset, double scale) {
+        set.startTime += offset;
+        set.endTime += offset;
+        for (auto& rep : set.reps) {
+            rep.startTime += offset;
+            rep.peakTime += offset;
+            rep.endTime += offset;
+            rep.startForce *= scale;
+            rep.peakForce *= scale;
+            rep.endForce *= scale;
+            for (auto& sample : rep.samples) {
+                sample.timestamp += offset;
+                sample.force *= scale;
+            }
+        }
+    };
+    shiftAndScale(set2, 1000u, 1.1);
+    shiftAndScale(set3, 2000u, 0.75);
+    const BiomechanicalParams sessionResult =
+        formulas.calculateSessionParams({set3, set1, set2});
+    assert(sessionResult.availabilityAt(16) == ParameterAvailability::Available);
+    assert(near(sessionResult.T_rest_set, 0.55));
+    assert(sessionResult.availabilityAt(33) == ParameterAvailability::Available);
+    assert(sessionResult.FI_inter > 0.0);
+    assert(sessionResult.availabilityAt(40) == ParameterAvailability::Available);
+    assert(sessionResult.F_grand_mean > 0.0);
+    assert(sessionResult.availabilityAt(41) == ParameterAvailability::Available);
+    assert(sessionResult.I_total > 0.0);
+    assert(sessionResult.availabilityAt(42) == ParameterAvailability::Available);
+    assert(sessionResult.V_training > 0.0);
+    assert(sessionResult.availabilityAt(44) == ParameterAvailability::Available);
+    assert(sessionResult.D_training > 0.0);
+    assert(sessionResult.availabilityAt(55) == ParameterAvailability::Available);
+    assert(sessionResult.availabilityAt(57) == ParameterAvailability::Available);
+    assert(sessionResult.availabilityAt(60) == ParameterAvailability::Available);
+
+    const BiomechanicalParams oneSetSession = formulas.calculateSessionParams({set1});
+    assert(oneSetSession.availabilityAt(33) == ParameterAvailability::InsufficientData);
+    assert(oneSetSession.availabilityAt(60) == ParameterAvailability::InsufficientData);
+    const BiomechanicalParams uncalibratedSession =
+        uncalibrated.calculateSessionParams({set1, set2, set3});
+    assert(uncalibratedSession.availabilityAt(57) ==
+           ParameterAvailability::RequiresCalibration);
+    assert(uncalibratedSession.availabilityAt(55) ==
+           ParameterAvailability::RequiresCalibration);
+
     std::cout << "Biomechanical parameter availability and timestamp integration passed\n";
     return 0;
 }
