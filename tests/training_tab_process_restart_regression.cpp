@@ -68,10 +68,25 @@ private:
         // callback runs after the dialog has been constructed.
         auto* timer = new QTimer(QApplication::instance());
         QObject::connect(timer, &QTimer::timeout, timer, [timer]() {
-            auto* dialog = qobject_cast<QMessageBox*>(QApplication::activeModalWidget());
+            QMessageBox* dialog = qobject_cast<QMessageBox*>(QApplication::activeModalWidget());
+            if (!dialog) {
+                // Offscreen platform plugins do not always expose the modal
+                // message box through activeModalWidget(). Search visible
+                // top-level widgets as a deterministic fallback.
+                for (QWidget* widget : QApplication::topLevelWidgets()) {
+                    auto* candidate = qobject_cast<QMessageBox*>(widget);
+                    if (candidate && candidate->isVisible()) {
+                        dialog = candidate;
+                        break;
+                    }
+                }
+            }
             if (!dialog) return;
             timer->stop();
-            dialog->done(QMessageBox::Yes);
+            if (QAbstractButton* yes = dialog->button(QMessageBox::Yes))
+                yes->click();
+            else
+                dialog->done(static_cast<int>(QMessageBox::Yes));
             timer->deleteLater();
         });
         timer->start(10);
