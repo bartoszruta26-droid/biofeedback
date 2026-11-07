@@ -54,21 +54,8 @@ void FlappyBirdGame::initialize() {
     m_obstacles.clear();
     m_obstacleSpawnTimer = 0.0f;
     
-    // Jeśli mamy podłączonego seriala, ustaw callbacki
-    if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
-        
-        m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
-            QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(bool, connected),
-                                     Q_ARG(std::string, message));
-        });
-    }
+    // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
+
 }
 
 void FlappyBirdGame::setDifficultyLevel(int level) {
