@@ -85,7 +85,7 @@ private:
     void updatePlayer(double deltaTime);
 
     // Generowanie przeszkód
-    void generateObstacles();
+    void generateObstacles(double deltaTime);
 
     // Aktualizacja przeszkód
     void updateObstacles(double deltaTime);
@@ -149,7 +149,7 @@ private:
     
     // Tensometr
     double m_sensorThreshold;      // Próg aktywacji
-    double m_chargeStartTime;      // Czas rozpoczęcia ładowania
+
     
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
