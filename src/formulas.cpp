@@ -91,16 +91,40 @@ std::vector<double> Formulas::extractTimes(const std::vector<SensorSample>& samp
 
 double Formulas::calculateDerivative(const std::vector<SensorSample>& samples, size_t index) const {
     if (index == 0 || index >= samples.size() - 1) return 0.0;
-    double df = samples[index + 1].force - samples[index - 1].force;
-    double dt = (samples[index + 1].timestamp - samples[index - 1].timestamp) / 1000.0;
-    return (dt > 0) ? df / dt : 0.0;
+    const auto& before = samples[index - 1];
+    const auto& current = samples[index];
+    const auto& after = samples[index + 1];
+    if (!before.isValid || !current.isValid || !after.isValid ||
+        !std::isfinite(before.force) || !std::isfinite(after.force))
+        return 0.0;
+
+    const std::uint32_t deltaMs = after.timestamp - before.timestamp;
+    if (deltaMs == 0 || deltaMs >= 0x80000000u) return 0.0;
+    const double dt = static_cast<double>(deltaMs) / 1000.0;
+    return (after.force - before.force) / dt;
 }
 
 double Formulas::calculateSecondDerivative(const std::vector<SensorSample>& samples, size_t index) const {
-    if (index == 0 || index >= samples.size() - 2) return 0.0;
-    double d2f = samples[index + 1].force - 2.0 * samples[index].force + samples[index - 1].force;
-    double dt2 = std::pow((samples[index + 1].timestamp - samples[index].timestamp) / 1000.0, 2);
-    return (dt2 > 0) ? d2f / dt2 : 0.0;
+    if (index == 0 || index >= samples.size() - 1) return 0.0;
+    const auto& before = samples[index - 1];
+    const auto& current = samples[index];
+    const auto& after = samples[index + 1];
+    if (!before.isValid || !current.isValid || !after.isValid ||
+        !std::isfinite(before.force) || !std::isfinite(current.force) ||
+        !std::isfinite(after.force))
+        return 0.0;
+
+    const std::uint32_t leftMs = current.timestamp - before.timestamp;
+    const std::uint32_t rightMs = after.timestamp - current.timestamp;
+    if (leftMs == 0 || rightMs == 0 ||
+        leftMs >= 0x80000000u || rightMs >= 0x80000000u)
+        return 0.0;
+
+    const double left = static_cast<double>(leftMs) / 1000.0;
+    const double right = static_cast<double>(rightMs) / 1000.0;
+    const double leftSlope = (current.force - before.force) / left;
+    const double rightSlope = (after.force - current.force) / right;
+    return 2.0 * (rightSlope - leftSlope) / (left + right);
 }
 
 // ==================== Kategoria 1: Parametry Siłowe ====================
@@ -148,10 +172,26 @@ double Formulas::calculateAvgWorkPerRep(double totalWork, int numReps) {
 }
 
 double Formulas::calculateImpulse(const std::vector<SensorSample>& samples) const {
-    if (samples.empty()) return 0.0;
+    if (samples.size() < 2) return 0.0;
+
+    // Integrate the measured force against each actual device timestamp.
+    // A configured nominal sample rate is not a substitute for observed dt:
+    // USB/serial buffering and dropped frames make the interval non-uniform.
     double impulse = 0.0;
-    for (const auto& s : samples) {
-        impulse += s.force * dt_;
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
+        const auto& current = samples[i];
+        const auto& next = samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force))
+            continue;
+
+        // Unsigned subtraction handles a single uint32 device-clock wrap.
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u)
+            continue;
+
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        impulse += 0.5 * (current.force + next.force) * dt;
     }
     return impulse;
 }
