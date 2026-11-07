@@ -23,6 +23,12 @@ if "bool TrainingAnalyticsWidget::beginSession()" not in widget:
     raise SystemExit("Training session must snapshot its history destination at start")
 if "m_activeSessionHistoryFilePath" not in save:
     raise SystemExit("Session save must use the original patient destination")
+if "saveSessionAutomatically" not in save:
+    raise SystemExit("Interrupted sessions must be saved automatically")
+if "repetitions > 0 ? weightedPeak / repetitions : 0.0" not in save:
+    raise SystemExit("Sessions interrupted before the first repetition must be persisted")
+if "m_saveHistoryButton->setEnabled(m_historyReadable && !m_sessionSaved)" not in save:
+    raise SystemExit("Failed automatic saves must expose a retry action")
 if "rebuildForceTraceChart(restored)" not in widget or "rebuildForceTraceChart(stats)" not in widget:
     raise SystemExit("Training analytics must render force-time traces for live and restored sessions")
 main = Path("src/gui/MainWindow.cpp").read_text(encoding="utf-8")
