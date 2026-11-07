@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check serial diagnostics defaults
         run: python3 tests/serial_diagnostics_policy_regression.py
+      - name: Check measurement tab lifecycle
+        run: python3 tests/measurement_tab_lifecycle_regression.py
       - name: Install build dependencies
         run: |
           sudo apt-get update
