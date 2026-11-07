@@ -13,6 +13,8 @@ manual_end = source.index("void MeasurementTab::onSelectionChanged()", manual_st
 manual = source[manual_start:manual_end]
 if "m_lastSensorData" not in manual or "readSingleSample(value, m_lastSensorData.timestamp)" not in manual:
     raise SystemExit("Manual capture must reuse the latest asynchronous frame and device timestamp")
+if "if (m_isMeasuring)" not in manual or "AKTYWNY POMIAR ZAPISUJE PRÓBKI AUTOMATYCZNIE" not in manual:
+    raise SystemExit("Manual capture must not replay a sample while the asynchronous session is recording")
 
 receiver_start = source.index("void MeasurementTab::onSensorDataReceived")
 receiver_end = source.index("// MeasurementTab - Konwersja jednostek", receiver_start)
