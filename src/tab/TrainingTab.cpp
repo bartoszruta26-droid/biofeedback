@@ -1503,8 +1503,9 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         return false;
     m_repetitionDetector.reset();
     const QJsonObject detectorObject = checkpoint.value("repetition_detector").toObject();
-    if (!detectorObject.isEmpty()) {
-        biofeedback::training::RepetitionDetectorSnapshot detectorSnapshot;
+    biofeedback::training::RepetitionDetectorSnapshot detectorSnapshot;
+    const bool hasDetectorSnapshot = !detectorObject.isEmpty();
+    if (hasDetectorSnapshot) {
         detectorSnapshot.version = static_cast<std::uint32_t>(detectorObject.value("version").toInt(1));
         detectorSnapshot.active = detectorObject.value("active").toBool(false);
         detectorSnapshot.waitingForRelease = detectorObject.value("waiting_for_release").toBool(false);
@@ -1514,7 +1515,10 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         detectorSnapshot.peakForceN = detectorObject.value("peak_force_n").toDouble();
         detectorSnapshot.areaForceMs = detectorObject.value("area_force_ms").toDouble();
         detectorSnapshot.previousForceN = detectorObject.value("previous_force_n").toDouble();
-        detectorSnapshot.sampleCount = static_cast<std::size_t>(qMax(0.0, detectorObject.value("sample_count").toDouble()));
+        const double sampleCount = detectorObject.value("sample_count").toDouble(-1.0);
+        if (!std::isfinite(sampleCount) || sampleCount < 0.0 || sampleCount > 100000.0 ||
+            std::floor(sampleCount) != sampleCount) return false;
+        detectorSnapshot.sampleCount = static_cast<std::size_t>(sampleCount);
         const QJsonArray samples = detectorObject.value("samples").toArray();
         for (const QJsonValue& value : samples) {
             if (!value.isObject()) return false;
@@ -1524,10 +1528,11 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
                 sample.value("force_n").toDouble()
             });
         }
-        if (!m_repetitionDetector.restore(detectorSnapshot)) return false;
+        if (detectorSnapshot.sampleCount != detectorSnapshot.samples.size())
+            return false;
     }
     if (resumeState == biofeedback::training::SessionState::Resting)
-        m_repetitionDetector.reset();
+        detectorSnapshot = biofeedback::training::RepetitionDetectorSnapshot{};
     m_currentSeriesRepetitions.clear();
     for (const auto& record : m_exerciseStats[m_currentExerciseIndex].repetitions) {
         if (record.seriesIndex == m_currentSeriesIndex + 1)
@@ -1549,8 +1554,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         m_currentGame->pause();
     }
     m_repetitionDetector.setTargetForce(m_exercisePlan[m_currentExerciseIndex].targetForce);
-    if (!detectorObject.isEmpty() && resumeState == biofeedback::training::SessionState::Active) {
-        // Restore the detector already parsed and validated above.
+    if (hasDetectorSnapshot && resumeState == biofeedback::training::SessionState::Active) {
         if (!m_repetitionDetector.restore(detectorSnapshot)) return false;
     }
     updateProgressWidgets();
