@@ -21,7 +21,7 @@ nie tworzy odrębnego parsera danych czujnika.
 - Strzałki góra/dół — wybór modułu.
 - Enter — otwarcie wybranego modułu.
 - W module Urządzenia: strzałki lewo/prawo — wybór portu.
-- W module Trening: S — start/stop, P — pauza/wznowienie, + / - — cel siły.
+- W module Trening: S — start/stop, P — pauza/wznowienie, + / - — cel siły, [ / ] — serie, , / . — powtórzenia.
 - C — połączenie z wybranym portem przy domyślnej prędkości.
 - D — rozłączenie.
 - R — ponowne skanowanie portów.
