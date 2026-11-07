@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -26,8 +28,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -62,6 +67,7 @@ private val sections = listOf(
 @Composable
 private fun BiofeedbackApp() {
     var selected by remember { mutableIntStateOf(0) }
+    var moreMenuExpanded by remember { mutableStateOf(false) }
     Scaffold(
         containerColor = Canvas,
         bottomBar = {
@@ -82,10 +88,36 @@ private fun BiofeedbackApp() {
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             item {
-                Column(Modifier.padding(top = 22.dp, bottom = 6.dp)) {
-                    Text("BIOFEEDBACK", color = Teal, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                    Text(sections[selected].label, color = Navy, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                    Text("Mobilny panel systemu terapeutycznego", color = Muted, fontSize = 13.sp)
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("BIOFEEDBACK", color = Teal, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Text(
+                            when (selected) {
+                                5 -> "Diagnostyka"
+                                6 -> "Ustawienia"
+                                else -> sections[selected].label
+                            },
+                            color = Navy, fontSize = 28.sp, fontWeight = FontWeight.Bold
+                        )
+                        Text("Mobilny panel systemu terapeutycznego", color = Muted, fontSize = 13.sp)
+                    }
+                    Box {
+                        Text("⋮", modifier = Modifier.clickable { moreMenuExpanded = true }.padding(12.dp), color = Navy, fontSize = 24.sp)
+                        DropdownMenu(expanded = moreMenuExpanded, onDismissRequest = { moreMenuExpanded = false }) {
+                            DropdownMenuItem(text = { Text("Diagnostyka") }, onClick = {
+                                selected = 5
+                                moreMenuExpanded = false
+                            })
+                            DropdownMenuItem(text = { Text("Ustawienia") }, onClick = {
+                                selected = 6
+                                moreMenuExpanded = false
+                            })
+                        }
+                    }
                 }
             }
             item {
@@ -108,6 +140,8 @@ private fun BiofeedbackApp() {
                 2 -> item { EmptyModule("Pacjenci", "Repozytorium kart nie jest podłączone. Aplikacja nie tworzy fikcyjnych rekordów.") }
                 3 -> item { EmptyModule("Trening", "Moduł oczekuje na wspólne usługi treningowe i sesyjne.") }
                 4 -> item { EmptyModule("Urządzenia", "Brak połączenia. Aplikacja nie wysyła komend sprzętowych w trybie podglądu.") }
+                5 -> item { DiagnosticsModule() }
+                6 -> item { SettingsModule() }
             }
             item { Spacer(Modifier.height(8.dp)) }
         }
@@ -162,4 +196,41 @@ private fun EmptyModule(title: String, description: String) {
             Text(description, color = Muted, fontSize = 12.sp)
         }
     }
+}
+
+@Composable
+private fun DiagnosticsModule() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
+    ) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("Stan usług", color = Navy, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            DiagnosticRow("Interfejs Android", "Aktywny", true)
+            DiagnosticRow("Serwer API", "Niepodłączony", false)
+            DiagnosticRow("Strumień pomiarowy", "Niepodłączony", false)
+            DiagnosticRow("Adapter sprzętowy", "Niepodłączony", false)
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticRow(label: String, state: String, active: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = Navy, fontSize = 12.sp)
+        Text(state, color = if (active) Teal else Muted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun SettingsModule() {
+    EmptyModule(
+        "Ustawienia aplikacji",
+        "Wersja rozwojowa. Konfiguracja serwera API, kont użytkowników i parametrów urządzenia zostanie udostępniona po wdrożeniu wspólnej warstwy usług."
+    )
 }
