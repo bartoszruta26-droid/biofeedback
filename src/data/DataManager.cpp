@@ -634,17 +634,27 @@ bool DataManager::isEncryptionEnabled() const {
     return encryptionEnabled;
 }
 
+void DataManager::setEncryptionEnabled(bool enabled) {
+    if (enabled && encryptionKey.empty()) {
+        encryptionEnabled = false;
+        logMessage(DataManagerLogLevel::ERROR, "Encryption cannot be enabled without a configured key", "DataManager::setEncryptionEnabled");
+        return;
+    }
+    encryptionEnabled = enabled;
+}
+
 // ============================================================================
 // PATIENT DATA METHODS
 // ============================================================================
 
 bool DataManager::savePatientData(const PatientData& patient, const std::string& filename, bool encrypt) {
     (void)encrypt;
-    if (!encryptionEnabled || encryptionKey.empty()) { ++statistics.errors; return false; }
+    if (encryptionEnabled && encryptionKey.empty()) { ++statistics.errors; return false; }
     try {
-        const std::string ciphertext = Encryption::encrypt(patient.toJson(), encryptionKey);
-        const bool ok = writeFile(filename, ciphertext);
-        if (ok) { ++statistics.filesWritten; ++statistics.encryptionOps; ++statistics.jsonSerializeOps; }
+        const std::string serialized = patient.toJson();
+        const std::string payload = encryptionEnabled ? Encryption::encrypt(serialized, encryptionKey) : serialized;
+        const bool ok = writeFile(filename, payload);
+        if (ok) { ++statistics.filesWritten; if (encryptionEnabled) ++statistics.encryptionOps; ++statistics.jsonSerializeOps; }
         else ++statistics.errors;
         return ok;
     } catch (...) { ++statistics.errors; return false; }
@@ -652,14 +662,15 @@ bool DataManager::savePatientData(const PatientData& patient, const std::string&
 
 PatientData DataManager::loadPatientData(const std::string& filename, bool decrypt) {
     (void)decrypt;
-    if (!encryptionEnabled || encryptionKey.empty()) { ++statistics.errors; return PatientData(); }
+    if (encryptionEnabled && encryptionKey.empty()) { ++statistics.errors; return PatientData(); }
     try {
-        const std::string ciphertext = readFile(filename);
-        if (ciphertext.empty()) return PatientData();
-        const std::string plaintext = Encryption::decrypt(ciphertext, encryptionKey);
+        const std::string stored = readFile(filename);
+        if (stored.empty()) return PatientData();
+        const std::string plaintext = stored.rfind("BFENC:v1:", 0) == 0
+            ? Encryption::decrypt(stored, encryptionKey) : stored;
         PatientData patient = PatientData::fromJson(plaintext);
         if (patient.id.empty()) { ++statistics.errors; return PatientData(); }
-        ++statistics.filesRead; ++statistics.decryptionOps; ++statistics.jsonParseOps;
+        ++statistics.filesRead; if (stored.rfind("BFENC:v1:", 0) == 0) ++statistics.decryptionOps; ++statistics.jsonParseOps;
         return patient;
     } catch (...) { ++statistics.errors; return PatientData(); }
 }
@@ -719,7 +730,7 @@ std::vector<Exercise> DataManager::loadExercises(const std::string& filename, bo
 
 bool DataManager::saveExerciseResults(const std::vector<ExerciseResult>& results, const std::string& filename, bool encrypt) {
     (void)encrypt;
-    if (!encryptionEnabled || encryptionKey.empty()) return false;
+    if (encryptionEnabled && encryptionKey.empty()) return false;
     try {
         std::ostringstream json; json << "[\n";
         for (std::size_t i=0;i<results.size();++i) {
@@ -728,7 +739,8 @@ bool DataManager::saveExerciseResults(const std::vector<ExerciseResult>& results
             json << "\n";
         }
         json << "]";
-        return writeFile(filename, Encryption::encrypt(json.str(), encryptionKey));
+        const std::string serialized = json.str();
+        return writeFile(filename, encryptionEnabled ? Encryption::encrypt(serialized, encryptionKey) : serialized);
     } catch (...) { ++statistics.errors; return false; }
 }
 
@@ -750,18 +762,20 @@ std::vector<ExerciseResult> DataManager::loadExerciseResults(const std::string& 
 
 bool DataManager::saveTrainingPlan(const TrainingPlan& plan, const std::string& filename, bool encrypt) {
     (void)encrypt;
-    if (!encryptionEnabled || encryptionKey.empty()) return false;
-    try { return writeFile(filename, Encryption::encrypt(plan.toJson(), encryptionKey)); }
+    if (encryptionEnabled && encryptionKey.empty()) return false;
+    try { const std::string serialized = plan.toJson(); return writeFile(filename, encryptionEnabled ? Encryption::encrypt(serialized, encryptionKey) : serialized); }
     catch (...) { ++statistics.errors; return false; }
 }
 
 TrainingPlan DataManager::loadTrainingPlan(const std::string& filename, bool decrypt) {
     (void)decrypt;
-    if (!encryptionEnabled || encryptionKey.empty()) return TrainingPlan();
+    if (encryptionEnabled && encryptionKey.empty()) return TrainingPlan();
     try {
         const std::string encrypted=readFile(filename);
         if(encrypted.empty())return TrainingPlan();
-        return TrainingPlan::fromJson(Encryption::decrypt(encrypted,encryptionKey));
+        const std::string plaintext = encrypted.rfind("BFENC:v1:", 0) == 0
+            ? Encryption::decrypt(encrypted, encryptionKey) : encrypted;
+        return TrainingPlan::fromJson(plaintext);
     } catch (...) { ++statistics.errors; return TrainingPlan(); }
 }
 
@@ -793,14 +807,14 @@ std::vector<std::string> DataManager::listFiles(const std::string& directory) co
 }
 
 bool DataManager::exportToJson(const std::string& data, const std::string& filename) {
-    if (!encryptionEnabled || encryptionKey.empty()) return false;
-    try { return writeFile(filename, Encryption::encrypt(data, encryptionKey)); }
+    if (encryptionEnabled && encryptionKey.empty()) return false;
+    try { return writeFile(filename, encryptionEnabled ? Encryption::encrypt(data, encryptionKey) : data); }
     catch (...) { ++statistics.errors; return false; }
 }
 
 std::string DataManager::importFromJson(const std::string& filename) {
-    if (!encryptionEnabled || encryptionKey.empty()) return "";
-    try { const std::string value=readFile(filename); return value.empty() ? "" : Encryption::decrypt(value, encryptionKey); }
+    if (encryptionEnabled && encryptionKey.empty()) return "";
+    try { const std::string value=readFile(filename); return value.empty() ? "" : (value.rfind("BFENC:v1:", 0) == 0 ? Encryption::decrypt(value, encryptionKey) : value); }
     catch (...) { ++statistics.errors; return ""; }
 }
 
