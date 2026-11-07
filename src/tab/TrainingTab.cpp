@@ -1017,8 +1017,8 @@ void TrainingTab::onRepetitionDetected(
     const auto seriesSummary = biofeedback::training::summarizeSeries(
         m_currentSeriesRepetitions, m_exercisePlan[m_currentExerciseIndex].targetForce);
     m_statsSummaryLabel->setText(
-        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\\n"
-                "Ostatnie: szczyt %4 N, średnia %5 N, czas %6 ms, czas do szczytu %7 ms\\n"
+        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\n"
+                "Ostatnie: szczyt %4 N, średnia %5 N, czas %6 ms, czas do szczytu %7 ms\n"
                 "Seria: średni szczyt %8 N, maksymalny %9 N")
             .arg(stats.completedReps).arg(stats.completedSeries)
             .arg(m_exercisePlan[m_currentExerciseIndex].seriesCount)
@@ -1059,9 +1059,9 @@ void TrainingTab::finishCurrentSeries()
               }(), exercise.targetForce).peakForceCoefficientOfVariationPercent;
     stats.consistencyScore = qMax(0.0, 100.0 - cv);
     m_statsSummaryLabel->setText(
-        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\\n"
-                "Ostatnia seria: średni szczyt %4 N, maksymalny %5 N\\n"
-                "Czas powtórzenia: %6 ms | czas do szczytu: %7 ms\\n"
+        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\n"
+                "Ostatnia seria: średni szczyt %4 N, maksymalny %5 N\n"
+                "Czas powtórzenia: %6 ms | czas do szczytu: %7 ms\n"
                 "Trafienia w cel: %8% | zmienność szczytu (CV): %9%")
             .arg(stats.completedReps).arg(stats.completedSeries)
             .arg(exercise.seriesCount)
