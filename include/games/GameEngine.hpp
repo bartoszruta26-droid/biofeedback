@@ -5,9 +5,6 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QString>
-#include <QMutex>
-#include <atomic>
-#include <memory>
 #include "core/DebugManager.hpp"
 
 namespace games {
@@ -209,6 +206,8 @@ protected:
     double m_simulationAccumulator;
     
     // Wartość wejściowa z sensora
+    quint64 m_frameCount;
+    quint64 m_invalidInputCount;
     double m_sensorValue;
 };
 
