@@ -11,6 +11,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/TanGame.hpp"
+#include "games/ArkanoidGame.hpp"
 #include "games/GameFactory.hpp"
 #include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -803,6 +804,8 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
     else if (auto* game = dynamic_cast<games::SinGame*>(selectedGame))
         game->setSerialConnection(m_serialPort);
     else if (auto* game = dynamic_cast<games::TanGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::ArkanoidGame*>(selectedGame))
         game->setSerialConnection(m_serialPort);
 
     m_currentGame = selectedGame;
