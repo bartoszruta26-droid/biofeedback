@@ -2300,16 +2300,18 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
             rep.biomechanicalData.startForce = biomechanicalInput["startForce"].toDouble();
             rep.biomechanicalData.peakForce = biomechanicalInput["peakForce"].toDouble();
             rep.biomechanicalData.endForce = biomechanicalInput["endForce"].toDouble();
-            const QJsonArray biomechanicalSamples = biomechanicalInput["samples"].toArray();
-            rep.biomechanicalData.samples.reserve(
-                static_cast<std::size_t>(biomechanicalSamples.size()));
-            for (const auto& sampleValue : biomechanicalSamples) {
-                const QJsonObject sampleObject = sampleValue.toObject();
-                SensorSample sample(
-                    static_cast<std::uint32_t>(sampleObject["timestamp"].toVariant().toULongLong()),
-                    sampleObject["force"].toDouble());
-                sample.isValid = sampleObject["isValid"].toBool();
-                rep.biomechanicalData.samples.push_back(sample);
+            if (includeSamples) {
+                const QJsonArray biomechanicalSamples = biomechanicalInput["samples"].toArray();
+                rep.biomechanicalData.samples.reserve(
+                    static_cast<std::size_t>(biomechanicalSamples.size()));
+                for (const auto& sampleValue : biomechanicalSamples) {
+                    const QJsonObject sampleObject = sampleValue.toObject();
+                    SensorSample sample(
+                        static_cast<std::uint32_t>(sampleObject["timestamp"].toVariant().toULongLong()),
+                        sampleObject["force"].toDouble());
+                    sample.isValid = sampleObject["isValid"].toBool();
+                    rep.biomechanicalData.samples.push_back(sample);
+                }
             }
             series.reps.append(rep);
         }
