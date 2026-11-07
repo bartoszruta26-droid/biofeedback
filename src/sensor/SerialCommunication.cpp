@@ -563,11 +563,32 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     }
 
 #ifdef _WIN32
+    HANDLE handle = reinterpret_cast<HANDLE>(m_impl->portHandle);
+    COMMTIMEOUTS originalTimeouts{};
+    if (!GetCommTimeouts(handle, &originalTimeouts)) {
+        m_impl->lastError = "Serial read timeout configuration unavailable";
+        return -1;
+    }
+
+    COMMTIMEOUTS readTimeouts = originalTimeouts;
+    readTimeouts.ReadIntervalTimeout = 0;
+    readTimeouts.ReadTotalTimeoutMultiplier = 0;
+    readTimeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(timeout);
+    if (!SetCommTimeouts(handle, &readTimeouts)) {
+        m_impl->lastError = "Serial read timeout configuration failed";
+        return -1;
+    }
+
     DWORD bytesRead = 0;
-    if (!ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buffer,
-                  static_cast<DWORD>(std::min(maxLength,
-                      static_cast<size_t>(std::numeric_limits<DWORD>::max()))),
-                  &bytesRead, nullptr)) {
+    const DWORD requested = static_cast<DWORD>(std::min(
+        maxLength, static_cast<size_t>(INT_MAX)));
+    const BOOL readSucceeded = ReadFile(handle, buffer, requested, &bytesRead, nullptr);
+    const BOOL restoreSucceeded = SetCommTimeouts(handle, &originalTimeouts);
+    if (!restoreSucceeded) {
+        m_impl->lastError = "Serial read completed but timeout settings could not be restored";
+        return -1;
+    }
+    if (!readSucceeded) {
         m_impl->lastError = "Serial read failed";
         return -1;
     }
