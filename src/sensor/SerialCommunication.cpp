@@ -172,6 +172,7 @@ public:
     int portHandle = -1;
     std::atomic<bool> isConnected{false};
     int baudRate = DEFAULT_BAUD_RATE;
+    std::string portName;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
     double zeroOffset = 0.0;
@@ -419,6 +420,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         int fl = fcntl(fd, F_GETFL); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
         m_impl->portHandle = fd;
 #endif
+        m_impl->portName = portName;
         m_impl->isConnected = true;
         m_impl->lastActivityTime = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
@@ -462,11 +464,11 @@ void SerialCommunication::disconnect() {
 #else
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
-    m_impl->portHandle = -1; m_impl->isConnected = false;
+    m_impl->portHandle = -1; m_impl->isConnected = false; m_impl->portName.clear();
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
-std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? "Unknown" : ""; }
+std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? m_impl->portName : ""; }
 int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
@@ -752,8 +754,7 @@ double SerialCommunication::convertToCalibrated(int32_t raw) const {
 std::string SerialCommunication::getCalibrationDeviceId() const {
     const ArduinoInfo info = getArduinoInfo();
     if (!info.serialNumber.empty()) return "serial:" + info.serialNumber;
-    if (info.boardId != 0) return "board:" + std::to_string(info.boardId);
-    if (info.deviceName.empty()) return {};
+    if (info.deviceName.empty() || info.firmwareVersion.empty() || getPortName().empty()) return {};
     return "device:" + info.deviceName + "|" + info.firmwareVersion + "|" + getPortName();
 }
 
