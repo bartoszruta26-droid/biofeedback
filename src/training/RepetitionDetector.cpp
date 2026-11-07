@@ -66,10 +66,18 @@ bool RepetitionDetector::process(std::uint32_t timestampMs, double forceN, bool 
                                  RepetitionRecord& completed) {
     if (!valid || !std::isfinite(forceN) || forceN < 0.0) {
         reset();
+        m_waitingForRelease = true;
         return false;
     }
 
     if (!m_active) {
+        // After a data gap or invalid sample, require a confirmed baseline
+        // before re-arming. Otherwise a sustained contraction could be
+        // counted again from its middle as a new, truncated repetition.
+        if (m_waitingForRelease) {
+            if (forceN <= releaseThresholdN()) m_waitingForRelease = false;
+            return false;
+        }
         if (forceN >= activationThresholdN()) begin(timestampMs, forceN);
         return false;
     }
@@ -80,12 +88,14 @@ bool RepetitionDetector::process(std::uint32_t timestampMs, double forceN, bool 
         // A missing/duplicated interval makes the contraction boundary unknown.
         // Discard the partial repetition and wait for a fresh low-to-high edge.
         reset();
+        m_waitingForRelease = true;
         return false;
     }
 
     const std::uint32_t durationMs = timestampMs - m_startTimestampMs;
     if (durationMs > m_config.maximumDurationMs) {
         reset();
+        m_waitingForRelease = true;
         return false;
     }
 
