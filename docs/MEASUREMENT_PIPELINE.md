@@ -24,7 +24,7 @@ MeasurementEngine
 - `timestampUnixMs`: czas odebrania próbki przez hosta w UTC, w milisekundach od epoki Unix.
 - `deviceTimestampMs`: surowy znacznik czasu urządzenia (32-bitowy, milisekundy); nie zastępuje czasu hosta.
 - `rawValue`: surowy odczyt przetwornika.
-- `value`, `unit`: wartość po kalibracji, przeliczona do jednostki kanonicznej.
+- `value`, `unit`: wartość przekazana przez adapter, przeliczona do jednostki kanonicznej.
 - `source`: identyfikator adaptera/źródła.
 - `quality`: stan jakości, nigdy nie jest domyślnie prezentowany jako pomiar prawidłowy.
 
@@ -53,7 +53,7 @@ Próbki odrzucone są zachowywane w historii i przekazywane subskrybentom ze sta
 
 ## Integracja z portem szeregowym
 
-`sensor::MeasurementSerialAdapter` rejestruje wielokrotny callback w istniejącym `SerialCommunication`, mapuje `SensorData` do `MeasurementInput` i przekazuje próbkę do silnika. Adapter odłącza callback przy niszczeniu i ignoruje callbacki będące w locie po zamknięciu adaptera.
+`sensor::MeasurementSerialAdapter` rejestruje wielokrotny callback w istniejącym `SerialCommunication`, mapuje `SensorData` do `MeasurementInput` i przekazuje próbkę do silnika. Adapter odłącza callback przy niszczeniu; callback, który rozpoczął przetwarzanie przed odłączeniem, może jeszcze zakończyć bieżącą próbkę.
 
 Przykład:
 
@@ -72,7 +72,6 @@ Dla urządzenia skalibrowanego do siły jednostkę należy ustawić jawnie jako 
 - WebUI i Android nie są jeszcze podłączone do silnika; ich integracja wymaga bezpiecznego API i strumienia WebSocket.
 - API HTTP nie udostępnia jeszcze próbek ani danych pacjentów.
 - WebSocket nie jest jeszcze serwerowo zaimplementowany.
-- WebUI i Android nie pobierają jeszcze próbek z silnika.
 - Adapter w trybie `count` przekazuje surowy odczyt ADC; w trybie jednostki skalibrowanej przekazuje `calibratedValue` sterownika. Nie zastępuje ani nie powiela kalibracji.
 - Znacznik czasu urządzenia jest przechowywany jako surowe 32 bity; rozwinięcie przepełnienia licznika firmware wymaga osobnego protokołu synchronizacji.
 - Zakres walidacji jest konfigurowany w jednostce kanonicznej; domyślnie jest szeroki i nie stanowi klinicznego zakresu referencyjnego.
