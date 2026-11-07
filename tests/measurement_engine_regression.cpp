@@ -39,6 +39,9 @@ int main() {
     input.unit = "not-a-unit";
     assert(engine.ingest(input).quality == Quality::InvalidUnit);
     input.unit = "N";
+    input.source.clear();
+    assert(engine.ingest(input).quality == Quality::InvalidSource);
+    input.source = "sensor-test";
     input.sensorValid = false;
     assert(engine.ingest(input).quality == Quality::SensorRejected);
     input.sensorValid = true;
@@ -50,15 +53,15 @@ int main() {
     input.value = 101.0;
     assert(engine.ingest(input).quality == Quality::OutsideConfiguredRange);
 
-    assert(callbackCount == 7);
+    assert(callbackCount == 8);
     const auto history = engine.history();
     assert(history.size() == 2);
-    assert(history.front().sequence == 6);
-    assert(history.back().sequence == 7);
+    assert(history.front().sequence == 7);
+    assert(history.back().sequence == 8);
 
     engine.unsubscribe(token);
     engine.ingest(input);
-    assert(callbackCount == 7);
+    assert(callbackCount == 8);
     engine.clearHistory();
     assert(engine.history().empty());
     return 0;
