@@ -703,27 +703,37 @@ double Formulas::calculateBRC(double minForce, double baselineForce) {
 
 double Formulas::calculateCEI(const std::vector<SensorSample>& samples, double peakForce,
                                uint32_t peakTime, uint32_t endTime) const {
-    if (samples.empty() || peakForce <= 0) return 0.0;
-    
-    // Znajdź próbki w fazie ekscentrycznej (od peakTime do endTime)
-    std::vector<SensorSample> eccentricSamples;
-    for (const auto& s : samples) {
-        if (s.timestamp >= peakTime && s.timestamp <= endTime) {
-            eccentricSamples.push_back(s);
-        }
+    const std::uint32_t eccentricDurationMs = endTime - peakTime;
+    if (samples.size() < 2 || !std::isfinite(peakForce) || peakForce <= 0.0 ||
+        eccentricDurationMs == 0 || eccentricDurationMs >= 0x80000000u)
+        return 0.0;
+
+    const double eccentricDurationSeconds =
+        static_cast<double>(eccentricDurationMs) / 1000.0;
+    double normalizedForceTime = 0.0;
+
+    // Integrate only contiguous, valid sample pairs inside the eccentric phase.
+    // Never let an invalid/NaN sample create a fabricated force contribution
+    // or bridge a missing interval.
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
+        const auto& current = samples[i];
+        const auto& next = samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force) ||
+            current.force < 0.0 || next.force < 0.0 ||
+            current.timestamp < peakTime || next.timestamp > endTime)
+            continue;
+
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        const double meanNormalizedForce =
+            0.5 * (current.force + next.force) / peakForce;
+        normalizedForceTime += meanNormalizedForce * dt;
     }
-    
-    if (eccentricSamples.size() < 2) return 0.0;
-    
-    double integral = 0.0;
-    for (size_t i = 0; i < eccentricSamples.size() - 1; ++i) {
-        double avgF = (eccentricSamples[i].force + eccentricSamples[i+1].force) / 2.0;
-        double dt = (eccentricSamples[i+1].timestamp - eccentricSamples[i].timestamp) / 1000.0;
-        integral += (avgF / peakForce) * dt;
-    }
-    
-    double tEcc = (endTime - peakTime) / 1000.0;
-    return (tEcc > 0) ? integral / tEcc : 0.0;
+
+    return normalizedForceTime / eccentricDurationSeconds;
 }
 
 double Formulas::calculateLPT(double currentCTS, double previousCTS) {
