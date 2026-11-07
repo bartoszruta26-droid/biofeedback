@@ -134,6 +134,7 @@ bool TrainingAnalyticsWidget::recoverPendingSession(QJsonObject& recoveredEntry)
         onHistoryEntryActivated(row, 0);
         m_activeSessionId = candidate.value("session_id").toString();
         m_activeSessionHistoryFilePath = m_historyFilePath;
+        m_executionState = candidate.value("execution_state").toObject();
         m_sessionSaved = false;
         m_sessionInProgress = true;
         recoveredEntry = candidate;
@@ -161,6 +162,8 @@ void TrainingAnalyticsWidget::setHistoryFilePath(const QString& filePath) {
     m_historyReadable = true;
     m_currentStats.clear();
     m_durationSeconds = 0;
+    m_executionState = QJsonObject();
+    m_sessionInProgress = false;
     m_sessionSaved = false;
     setStats({}, 0);
     loadHistory();
@@ -174,6 +177,7 @@ bool TrainingAnalyticsWidget::beginSession() {
         return false;
     m_activeSessionHistoryFilePath = m_historyFilePath;
     m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_executionState = QJsonObject();
     m_sessionSaved = false;
     m_sessionInProgress = true;
     m_sessionCompleted = false;
