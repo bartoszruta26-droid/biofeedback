@@ -61,8 +61,6 @@ void TrendsPlotWidget::clearData()
     m_avgForces.clear();
     m_maxForces.clear();
     m_maxForce = 5.0;
-    m_maxObservedForce = 0.0;
-    m_minObservedForce = 0.0;
     update();
 }
 
