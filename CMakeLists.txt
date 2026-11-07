@@ -205,6 +205,7 @@ if(Qt5_FOUND)
         src/games/GameEngine.cpp
         src/games/SinGame.cpp
         src/games/TanGame.cpp
+        src/games/ArkanoidGame.cpp
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
@@ -235,6 +236,7 @@ if(Qt5_FOUND)
         include/games/GameEngine.hpp
         include/games/SinGame.hpp
         include/games/TanGame.hpp
+        include/games/ArkanoidGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -321,6 +323,7 @@ if(Qt5_FOUND)
         src/games/MarioGame.cpp
         src/games/SinGame.cpp
         src/games/TanGame.cpp
+        src/games/ArkanoidGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
@@ -332,6 +335,7 @@ if(Qt5_FOUND)
         include/games/MarioGame.hpp
         include/games/SinGame.hpp
         include/games/TanGame.hpp
+        include/games/ArkanoidGame.hpp
         include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
