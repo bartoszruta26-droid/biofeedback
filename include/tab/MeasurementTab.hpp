@@ -304,6 +304,7 @@ private slots:
     void onSelectionChanged();
 
 private:
+    void onMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void ensureCurrentSeriesInitialized();
     void ensureSessionClockStarted();
     void setupUI();
@@ -414,6 +415,7 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
     std::unique_ptr<sensor::MeasurementSerialAdapter> m_measurementAdapter;
+    biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken = 0;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
     sensor::SensorData m_lastSensorData;
 };
