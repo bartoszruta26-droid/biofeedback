@@ -1,0 +1,29 @@
+name: patient-log-privacy-regression
+
+on:
+  push:
+    branches:
+      - integration/all-work
+      - fix/privacy-safe-patient-logs
+    paths:
+      - "src/core/Application.cpp"
+      - "tests/privacy_log_regression.py"
+      - ".github/workflows/patient-log-privacy.yml"
+  pull_request:
+    branches:
+      - integration/all-work
+    paths:
+      - "src/core/Application.cpp"
+      - "tests/privacy_log_regression.py"
+      - ".github/workflows/patient-log-privacy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  patient-log-privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify patient identity is excluded from logs
+        run: python3 tests/privacy_log_regression.py

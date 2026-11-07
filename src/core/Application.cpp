@@ -360,14 +360,14 @@ void Application::setupConnections()
             });
     
     // Connect PatientTab signals
+    // Patient identity fields are intentionally unnamed: they must never enter logs.
     connect(m_patientTab, &tab::PatientTab::patientAdded,
-            this, [this](const QString& pesel, const QString& firstName, const QString& lastName) {
-                m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel).toStdString());
+            this, [this](const QString&, const QString&, const QString&) {
+                if (m_logger) {
+                    m_logger->info("Patient record created");
+                }
                 if (m_mainWindow && m_mainWindow->debugTerminal()) {
-                    m_mainWindow->addDebugMessage(
-                        QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel),
-                        "INFO"
-                    );
+                    m_mainWindow->addDebugMessage("Patient record created", "INFO");
                 }
             });
     
