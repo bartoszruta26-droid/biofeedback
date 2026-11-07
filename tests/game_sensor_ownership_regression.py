@@ -20,12 +20,12 @@ if "addDataCallback(" not in main or "forwardSensorToGame(normalizedGameInput)" 
     raise SystemExit("MainWindow must own and route the global game input")
 if "gramsToNewtons(data.calibratedValue)" not in main:
     raise SystemExit("Global game input must convert calibrated grams to SI force")
-if "gramsToNewtons(data.calibratedValue)" not in training:
-    raise SystemExit("TrainingTab must convert calibrated grams to SI force")
-if "!data.isValid" not in training:
-    raise SystemExit("TrainingTab must reject invalid sensor frames")
-if "!data.hasCalibratedValue" not in training:
-    raise SystemExit("TrainingTab must reject raw-only binary frames")
+if "setMeasurementEngine" not in training or "m_measurementEngine->subscribe" not in training:
+    raise SystemExit("TrainingTab must consume the shared MeasurementEngine stream")
+if "sample.value * biofeedback::measurement::standardGravityMetersPerSecondSquared" not in training:
+    raise SystemExit("TrainingTab must convert canonical kilograms to SI force")
+if "!sample.isValid()" not in training or 'sample.unit != "kg"' not in training:
+    raise SystemExit("TrainingTab must reject invalid or non-mass canonical samples")
 if "if (!m_serialPort || !m_serialPort->isConnected())" not in training:
     raise SystemExit("Training must refuse to start without a connected sensor")
 if "m_sensorThreshold(30.0)" not in Path("src/games/MarioGame.cpp").read_text(encoding="utf-8"):
