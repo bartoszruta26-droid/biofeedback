@@ -725,7 +725,7 @@ void MainWindow::onUpdateTimerTimeout()
 void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerciseData)
 {
     qDebug() << "Starting game:" << gameId << "for exercise:" << exerciseData.name;
-    if (!m_serialPort || !m_serialPort->isConnected()) {
+    if (gameId == "sin_game" && (!m_serialPort || !m_serialPort->isConnected())) {
         QMessageBox::warning(this, tr("Brak urządzenia"),
                              tr("Podłącz skalibrowany czujnik HX711 przed uruchomieniem gry."));
         return;
