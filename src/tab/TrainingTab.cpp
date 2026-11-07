@@ -1357,7 +1357,7 @@ void TrainingTab::startRestTimer()
 QJsonObject TrainingTab::buildExecutionCheckpoint() const
 {
     QJsonObject state;
-    state.insert("format_version", 1);
+    state.insert("format_version", 2);
     state.insert("state", static_cast<int>(m_stateMachine.state()));
     state.insert("resume_state", static_cast<int>(m_stateMachine.resumeState()));
     state.insert("current_exercise_index", m_currentExerciseIndex);
@@ -1370,6 +1370,28 @@ QJsonObject TrainingTab::buildExecutionCheckpoint() const
     if (m_stateMachine.resting() && !m_stateMachine.paused() && m_restClock.isValid())
         remainingRestMs = qMax<qint64>(0, m_restDurationMs - m_restClock.elapsed());
     state.insert("rest_remaining_ms", static_cast<double>(remainingRestMs));
+
+    const auto detectorSnapshot = m_repetitionDetector.snapshot();
+    QJsonObject detector;
+    detector.insert("version", static_cast<int>(detectorSnapshot.version));
+    detector.insert("active", detectorSnapshot.active);
+    detector.insert("waiting_for_release", detectorSnapshot.waitingForRelease);
+    detector.insert("start_timestamp_ms", static_cast<double>(detectorSnapshot.startTimestampMs));
+    detector.insert("last_timestamp_ms", static_cast<double>(detectorSnapshot.lastTimestampMs));
+    detector.insert("peak_timestamp_ms", static_cast<double>(detectorSnapshot.peakTimestampMs));
+    detector.insert("peak_force_n", detectorSnapshot.peakForceN);
+    detector.insert("area_force_ms", detectorSnapshot.areaForceMs);
+    detector.insert("previous_force_n", detectorSnapshot.previousForceN);
+    detector.insert("sample_count", static_cast<double>(detectorSnapshot.sampleCount));
+    QJsonArray inFlightSamples;
+    for (const auto& sample : detectorSnapshot.samples) {
+        QJsonObject value;
+        value.insert("timestamp_ms", static_cast<double>(sample.timestampMs));
+        value.insert("force_n", sample.forceN);
+        inFlightSamples.append(value);
+    }
+    detector.insert("samples", inFlightSamples);
+    state.insert("repetition_detector", detector);
 
     QJsonArray plan;
     for (const auto& exercise : m_exercisePlan) {
@@ -1397,7 +1419,8 @@ bool TrainingTab::saveExecutionCheckpoint()
 
 bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
 {
-    if (checkpoint.value("format_version").toInt() != 1 ||
+    const int checkpointVersion = checkpoint.value("format_version").toInt();
+    if ((checkpointVersion != 1 && checkpointVersion != 2) ||
         !checkpoint.value("exercise_plan").isArray()) return false;
 
     QVector<TrainingExercise> plan;
@@ -1463,8 +1486,35 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     m_trainingClock.restore(sessionMs, activeMs);
     m_sessionTime = static_cast<int>(sessionMs / 1000);
     m_sessionClock.start();
-    m_stateMachine.restore(biofeedback::training::SessionState::Paused, resumeState);
+    if (!m_stateMachine.restore(biofeedback::training::SessionState::Paused, resumeState))
+        return false;
     m_repetitionDetector.reset();
+    const QJsonObject detectorObject = checkpoint.value("repetition_detector").toObject();
+    if (!detectorObject.isEmpty()) {
+        biofeedback::training::RepetitionDetectorSnapshot detectorSnapshot;
+        detectorSnapshot.version = static_cast<std::uint32_t>(detectorObject.value("version").toInt(1));
+        detectorSnapshot.active = detectorObject.value("active").toBool(false);
+        detectorSnapshot.waitingForRelease = detectorObject.value("waiting_for_release").toBool(false);
+        detectorSnapshot.startTimestampMs = static_cast<std::uint32_t>(detectorObject.value("start_timestamp_ms").toDouble());
+        detectorSnapshot.lastTimestampMs = static_cast<std::uint32_t>(detectorObject.value("last_timestamp_ms").toDouble());
+        detectorSnapshot.peakTimestampMs = static_cast<std::uint32_t>(detectorObject.value("peak_timestamp_ms").toDouble());
+        detectorSnapshot.peakForceN = detectorObject.value("peak_force_n").toDouble();
+        detectorSnapshot.areaForceMs = detectorObject.value("area_force_ms").toDouble();
+        detectorSnapshot.previousForceN = detectorObject.value("previous_force_n").toDouble();
+        detectorSnapshot.sampleCount = static_cast<std::size_t>(qMax(0.0, detectorObject.value("sample_count").toDouble()));
+        const QJsonArray samples = detectorObject.value("samples").toArray();
+        for (const QJsonValue& value : samples) {
+            if (!value.isObject()) return false;
+            const QJsonObject sample = value.toObject();
+            detectorSnapshot.samples.push_back({
+                static_cast<std::uint32_t>(sample.value("timestamp_ms").toDouble()),
+                sample.value("force_n").toDouble()
+            });
+        }
+        if (!m_repetitionDetector.restore(detectorSnapshot)) return false;
+    }
+    if (resumeState == biofeedback::training::SessionState::Resting)
+        m_repetitionDetector.reset();
     m_currentSeriesRepetitions.clear();
     for (const auto& record : m_exerciseStats[m_currentExerciseIndex].repetitions) {
         if (record.seriesIndex == m_currentSeriesIndex + 1)
