@@ -91,7 +91,7 @@ struct ExerciseStats {
     double totalImpulseNs;
     double targetAccuracyPercent;
     double averageRepetitionDurationSeconds;
-    QVector<double> peakForcePerRep;
+    int aggregatedReps;
     std::chrono::steady_clock::time_point startTime;
     bool isCompleted;
     
@@ -99,7 +99,7 @@ struct ExerciseStats {
                       maxPeakForce(0), avgReactionTime(0), consistencyScore(0),
                       minPeakForce(0), duration(0), completionRate(0),
                       averageForceN(0), totalImpulseNs(0), targetAccuracyPercent(0),
-                      averageRepetitionDurationSeconds(0), isCompleted(false) { startTime = std::chrono::steady_clock::now(); }
+                      averageRepetitionDurationSeconds(0), aggregatedReps(0), isCompleted(false) { startTime = std::chrono::steady_clock::now(); }
 };
 
 /**
@@ -221,10 +221,16 @@ public:
     void onSharedRepetitionCompleted(double peakForceN, double durationSeconds,
                                      double timeToPeakSeconds, double averageForceN,
                                      double impulseNs, double targetAccuracyPercent);
+    void onSharedSeriesCompleted(int repetitionCount, double averagePeakForceN,
+                                 double maximumPeakForceN, double minimumPeakForceN,
+                                 double averageTimeToPeakSeconds, double averageForceN,
+                                 double averageRepetitionDurationSeconds, double totalImpulseNs,
+                                 double targetAccuracyPercent, double consistencyScorePercent);
 
 signals:
     void trainingStarted();
     void trainingStopped();
+    void engineSeriesSizeRequested(int repetitionsPerSeries);
     void trainingPaused();
     void trainingResumed();
     void exerciseCompleted(int index, const ExerciseStats& stats);
