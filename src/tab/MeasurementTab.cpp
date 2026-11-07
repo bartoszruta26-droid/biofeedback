@@ -1638,6 +1638,7 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_recordedSamples = session.samples;
         if (m_rawBox)
             m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
+        showCurrentMeasurementData();
 
         // Odśwież widok
         m_statsTable->setRowCount(0);
@@ -1655,6 +1656,80 @@ bool MeasurementTab::importFromJSON(const QString& filename)
     }
     
     return false;
+}
+
+void MeasurementTab::showCurrentMeasurementData()
+{
+    m_rawForceBuffer.clear();
+    m_timeBuffer.clear();
+    m_rawTable->setRowCount(0);
+    m_forcePlot->clearData();
+
+    if (m_recordedSamples.isEmpty()) {
+        if (m_rawBox)
+            m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z 0 próbek)"));
+        return;
+    }
+
+    // A session is normally locked to one acquisition mode. If an imported
+    // legacy file contains mixed units, show only the final contiguous unit
+    // segment rather than drawing ADC counts and newtons on one axis.
+    const QString displayUnit = m_recordedSamples.last().unit;
+    int firstDisplaySample = m_recordedSamples.size() - 1;
+    while (firstDisplaySample > 0 &&
+           m_recordedSamples[firstDisplaySample - 1].unit == displayUnit)
+        --firstDisplaySample;
+
+    m_showRawValues = (displayUnit == "count");
+    if (m_btnToggleRaw) {
+        const QSignalBlocker blocker(m_btnToggleRaw);
+        m_btnToggleRaw->setChecked(m_showRawValues);
+        m_btnToggleRaw->setEnabled(false);
+        m_btnToggleRaw->setText(m_showRawValues
+            ? tr("TRYB: WARTOŚCI RAW")
+            : tr("TRYB: WARTOŚCI SKALIBROWANE"));
+        m_btnToggleRaw->setStyleSheet(m_showRawValues
+            ? "background-color: #FF9800; color: white;"
+            : "background-color: #2196F3; color: white;");
+    }
+    if (m_unitSelector)
+        m_unitSelector->setEnabled(!m_showRawValues);
+    m_forcePlot->setUnit(m_showRawValues ? ForceUnit::Raw : m_currentUnit);
+
+    constexpr int liveBufferCapacity = 10000;
+    const int displayStart = std::max(
+        firstDisplaySample, m_recordedSamples.size() - liveBufferCapacity);
+    for (int i = displayStart; i < m_recordedSamples.size(); ++i) {
+        const auto& sample = m_recordedSamples[i];
+        m_rawForceBuffer.append(sample.value);
+        m_timeBuffer.append(sample.elapsedTimeSeconds);
+        m_forcePlot->addSample(sample.value, sample.elapsedTimeSeconds);
+    }
+
+    const int tableStart = std::max(firstDisplaySample, m_recordedSamples.size() - 100);
+    for (int i = tableStart; i < m_recordedSamples.size(); ++i) {
+        const auto& sample = m_recordedSamples[i];
+        const int row = m_rawTable->rowCount();
+        m_rawTable->insertRow(row);
+        m_rawTable->setItem(row, 0, new QTableWidgetItem(
+            QString::number(sample.elapsedTimeSeconds, 'f', 3)));
+        const double displayed = m_showRawValues ? sample.value
+            : (m_currentUnit == ForceUnit::Kilograms ? sample.value / 9.80665 : sample.value);
+        m_rawTable->setItem(row, 1, new QTableWidgetItem(
+            QString::number(displayed, 'f', 2)));
+    }
+
+    const double currentValue = m_recordedSamples.last().value;
+    const double displayedValue = m_showRawValues ? currentValue
+        : (m_currentUnit == ForceUnit::Kilograms ? currentValue / 9.80665 : currentValue);
+    const QString unitLabel = m_showRawValues ? "ADC"
+        : (m_currentUnit == ForceUnit::Kilograms ? "kgf" : "N");
+    m_lblCurrentForce->setText(
+        QString("Aktualna siła: %1 %2").arg(displayedValue, 0, 'f', 1).arg(unitLabel));
+    m_forceBar->setValue(static_cast<int>(displayedValue));
+    m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
+    m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
+    m_rawTable->scrollToBottom();
 }
 
 void MeasurementTab::loadPatientTrends()
