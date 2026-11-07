@@ -11,7 +11,7 @@ checks = {
     "monotonic session clock": "QElapsedTimer m_sessionClock" in header,
     "deterministic active/session clock model": "TrainingSessionClock m_trainingClock" in header,
     "rest clock monotonic": "QElapsedTimer m_restClock" in header,
-    "active time excludes pause and rest": "m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_isPaused && !m_inRestPeriod)" in source,
+    "active time excludes pause and rest": "m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_stateMachine.paused() && !m_stateMachine.resting())" in source,
     "session clock keeps ticking during pause": "m_timer->stop();" not in source[source.index("void TrainingTab::pauseTraining"):source.index("void TrainingTab::resumeTraining")],
     "rest countdown based on elapsed monotonic time": "m_restDurationMs - m_restClock.elapsed()" in source,
     "rest duration freezes on pause": "m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;" in source,
