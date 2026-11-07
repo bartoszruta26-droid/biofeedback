@@ -7,6 +7,7 @@ A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live fo
 - **Patient Management**: Create, edit, import, export, and delete patient records
 - **Live Measurement**: Real-time graph visualization, validated sample stream, and statistical analysis
 - **Repetition and Set Analysis**: Hysteresis-based repetition detection, peak/mean force, duration, time-to-peak, target achievement, and set variability (CV%)
+- **Desktop Training Analytics**: Peak-force chart, repetition and series tables, explicit local session-history snapshots, and detailed CSV reports including game points
 - **Training Games**: Multiple biofeedback-controlled games including:
   - **Sin/Tan Games** - Wave-based training exercises
   - **Flappy Bird** - Classic flapping game controlled by strain gauge
@@ -17,8 +18,8 @@ A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live fo
 
 ## Interfejsy użytkownika
 
-- **Desktop GUI (Qt5)** — główna aplikacja okienkowa: pacjenci, pomiary, trening i diagnostyka; pulpit statusowy z szybką nawigacją.
-- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia; podgląd siły oraz podstawowy trening 3×8. Zobacz `docs/TUI_DESIGN.md`.
+- **Desktop GUI (Qt5)** — główna aplikacja okienkowa: pacjenci, pomiary, trening, analityka powtórzeń i serii, wykres siły, historia sesji oraz raporty CSV.
+- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia; konfiguracja ćwiczenia, celu, serii, powtórzeń i odpoczynku, zapis sesji CSV oraz diagnostyka jakości próbek. Zobacz `docs/TUI_DESIGN.md`.
 - **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
 - **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
 
