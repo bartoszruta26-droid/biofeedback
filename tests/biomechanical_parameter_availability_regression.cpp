@@ -104,6 +104,11 @@ int main()
     assert(result.availabilityAt(58) == ParameterAvailability::RequiresCalibration);
     assert(result.availabilityAt(64) == ParameterAvailability::RequiresHistory);
 
+    SeriesData undersampled = series;
+    undersampled.reps[0].samples.clear();
+    const BiomechanicalParams rejected = formulas.calculateAllParams(undersampled);
+    assert(rejected.availabilityAt(0) == ParameterAvailability::InvalidInput);
+
     // A missing historical or sensor-dependent metric is never advertised as
     // a measured result merely because its reset numeric field happens to be 0.
     assert(result.availabilityAt(53) != ParameterAvailability::Available);
