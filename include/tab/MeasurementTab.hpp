@@ -400,6 +400,7 @@ private:
     double m_targetForce;     // N
     double m_sessionStartTime;
     QElapsedTimer m_sessionElapsedTimer;
+    double m_sessionElapsedOffsetSeconds{0.0};
     
     // Bufory danych
     QVector<double> m_rawForceBuffer;
