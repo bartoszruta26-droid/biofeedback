@@ -231,6 +231,24 @@ if(Qt5_FOUND)
     # Create executable
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+    # Process-restart regression for durable analytics and checkpoint history.
+    add_executable(training_history_restart_regression
+        tests/training_history_restart_regression.cpp
+        src/tab/TrainingAnalyticsWidget.cpp
+        include/tab/TrainingAnalyticsWidget.hpp
+    )
+    set_target_properties(training_history_restart_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(training_history_restart_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(training_history_restart_regression PRIVATE
+        biofeedback_training Qt5::Core Qt5::Widgets Qt5::Charts
+    )
+    add_test(NAME training_history_restart_regression
+        COMMAND training_history_restart_regression
+    )
+    set_tests_properties(training_history_restart_regression PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
     # Minimal mandatory Qt5 example source.
     add_executable(qt5_mandatory_example examples/qt5_mandatory.cpp)
 
