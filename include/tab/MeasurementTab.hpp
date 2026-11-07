@@ -21,6 +21,7 @@
 #include <QTextEdit>
 #include <memory>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
@@ -168,6 +169,8 @@ struct MeasurementSession {
     QString date;                       // Data pomiaru
     QVector<SeriesStats> series;        // Serie z tej sesji
     QVector<RecordedMeasurementSample> samples; // Pełny przebieg próbkowania
+    double elasticConstantNPerM{0.0};
+    double patientMassKg{0.0};
     
     MeasurementSession() {}
 };
@@ -339,6 +342,7 @@ private:
     void calculateRepetitionStats();
     void updateStatsTable();
     void updateBiomechanicalTable();
+    void recalculateBiomechanicalResults();
     void updateSeriesProgress();
     double calculateMedian(const QVector<double>& values) const;
     double calculateMode(const QVector<double>& values) const;
@@ -390,6 +394,8 @@ private:
     QTableWidget* m_statsTable;
     QGroupBox* m_biomechBox;
     QTableWidget* m_biomechTable;
+    QDoubleSpinBox* m_elasticConstantInput;
+    QDoubleSpinBox* m_patientMassInput;
     
     // Tabela surowych danych
     QGroupBox* m_rawBox;
