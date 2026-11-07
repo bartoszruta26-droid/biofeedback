@@ -1010,6 +1010,7 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
         if (deviceTimestampMs == 0) {
             m_repetitionDetector.reset();
         } else if (m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)) {
+            m_lastCompletedRepetition = repetition;
             m_currentRepForces.clear();
             m_currentRepTimes.clear();
             for (const auto& sample : repetition.samples) {
@@ -1089,6 +1090,24 @@ void MeasurementTab::calculateRepetitionStats()
     m_currentRepStats = RepetitionStats();
     m_currentRepStats.repNumber = m_currentRepInSeries + 1;
     m_currentRepStats.peakForce = m_repPeakForce;
+    m_currentRepStats.biomechanicalData.repNumber = m_currentRepStats.repNumber;
+    m_currentRepStats.biomechanicalData.startTime = m_lastCompletedRepetition.startTimestampMs;
+    m_currentRepStats.biomechanicalData.endTime = m_lastCompletedRepetition.endTimestampMs;
+    m_currentRepStats.biomechanicalData.peakTime =
+        m_lastCompletedRepetition.startTimestampMs + m_lastCompletedRepetition.timeToPeakMs;
+    m_currentRepStats.biomechanicalData.startForce = m_repStartForce;
+    m_currentRepStats.biomechanicalData.peakForce = m_repPeakForce;
+    m_currentRepStats.biomechanicalData.endForce = m_lastCompletedRepetition.samples.empty()
+        ? 0.0 : m_lastCompletedRepetition.samples.back().forceN;
+    m_currentRepStats.biomechanicalData.samples.reserve(
+        m_lastCompletedRepetition.samples.size());
+    for (const auto& sample : m_lastCompletedRepetition.samples) {
+        m_currentRepStats.biomechanicalData.samples.emplace_back(
+            sample.timestampMs, sample.forceN);
+    }
+    Formulas biomechanicalFormulas;
+    m_currentRepStats.biomechanicalParams =
+        biomechanicalFormulas.calculateRepParams(m_currentRepStats.biomechanicalData);
     m_currentRepStats.timeToPeak = m_repPeakTime - m_repStartTime;
     
     // Rise rate (szybkość narastania)
@@ -1168,6 +1187,22 @@ void MeasurementTab::calculateRepetitionStats()
     // Dodaj do bieżącej serii
     SeriesStats& currentSeries = m_completedSeriesStats.last();
     currentSeries.reps.append(m_currentRepStats);
+
+    // Recalculate the current set from its complete repetition records after
+    // each accepted repetition; unavailable metrics retain explicit statuses.
+    SeriesData biomechanicalSeries;
+    biomechanicalSeries.seriesNumber = currentSeries.seriesNumber;
+    if (!currentSeries.reps.isEmpty()) {
+        biomechanicalSeries.startTime =
+            currentSeries.reps.first().biomechanicalData.startTime;
+        biomechanicalSeries.endTime =
+            currentSeries.reps.last().biomechanicalData.endTime;
+        biomechanicalSeries.reps.reserve(currentSeries.reps.size());
+        for (const auto& rep : currentSeries.reps)
+            biomechanicalSeries.reps.push_back(rep.biomechanicalData);
+        currentSeries.biomechanicalParams =
+            biomechanicalFormulas.calculateAllParams(biomechanicalSeries);
+    }
     
     std::cout << "[DEBUG] calculateRepetitionStats: Before emit repetitionCompleted" << std::endl;
     
