@@ -10,6 +10,10 @@ Po pobraniu pliku DEB:
 
     sudo apt install ./biofeedback_1.0.0_amd64.deb
 
+Przy pierwszym uruchomieniu aplikacja poprosi o utworzenie konta administratora. Wymagane jest hasło o długości co najmniej 12 znaków; repozytorium i pakiet nie zawierają domyślnego konta ani wspólnego hasła.
+
+Konfiguracja i baza kont są przechowywane w katalogu XDG użytkownika, a dane pacjentów w katalogu danych aplikacji użytkownika. Nie są zapisywane w katalogu instalacyjnym /usr/share.
+
 Uruchomienie aplikacji graficznej:
 
     biofeedback
