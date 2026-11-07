@@ -735,6 +735,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     std::vector<double> repImpulses;
     std::vector<double> repTimes;
     std::vector<double> repRFDs;
+    std::vector<double> repPeakPowers;
     std::vector<std::vector<SensorSample>> allRepSamples;
     
     // Oblicz parametry dla każdego powtórzenia
@@ -745,6 +746,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
         repImpulses.push_back(repParams.I_impulse);
         repTimes.push_back(repParams.T_rep);
         repRFDs.push_back(repParams.RFD);
+        repPeakPowers.push_back(repParams.P_peak);
         allRepSamples.push_back(rep.samples);
         
         params.W_total += repParams.W_total;
@@ -781,7 +783,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     // Moc
     params.P_set_avg = calculateSetAvgPower(params.W_total, params.T_set);
     params.P_rep_avg = calculateAvgPower(params.W_total / series.reps.size(), params.T_rep_avg);
-    params.P_peak = calculatePeakPower(params.F_set_peak, series.reps.back().samples);
+    params.P_peak = calculateSetPeakForce(repPeakPowers);
     
     // RFD
     params.RFD_set_avg = calculateSetAvgRFD(repRFDs);
