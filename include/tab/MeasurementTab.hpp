@@ -20,6 +20,8 @@
 #include <QHeaderView>
 #include <QTextEdit>
 #include <memory>
+#include <thread>
+#include <atomic>
 #include <QComboBox>
 
 #include "sensor/SerialCommunication.hpp"
@@ -321,6 +323,8 @@ private:
     
     // Metody SerialCommunication
     void connectToArduinoAsync();
+    std::thread m_connectionThread;
+    std::atomic<bool> m_stopConnectionThread{false};
     
     // Konwersja jednostek
     double convertForce(double newtons, ForceUnit targetUnit) const;
