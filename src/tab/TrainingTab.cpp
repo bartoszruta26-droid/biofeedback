@@ -1113,8 +1113,8 @@ void TrainingTab::finishCurrentSeries()
         m_currentSeriesRepetitions, exercise.targetForce);
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
     stats.series.append(summary);
-    refreshAnalytics();
     stats.completedSeries = stats.series.size();
+    refreshAnalytics();
     const double cv = biofeedback::training::summarizeSeries(
         stats.repetitions.isEmpty()
             ? std::vector<biofeedback::training::RepetitionRecord>{}
