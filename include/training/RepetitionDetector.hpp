@@ -55,7 +55,7 @@ public:
     double releaseThresholdN() const noexcept;
 
 private:
-    void begin(std::uint32_t timestampMs, double forceN) noexcept;
+    void begin(std::uint32_t timestampMs, double forceN);
 
     RepDetectorConfig m_config;
     bool m_active{false};
