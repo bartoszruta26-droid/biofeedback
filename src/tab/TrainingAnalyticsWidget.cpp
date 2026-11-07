@@ -68,7 +68,9 @@ void TrainingAnalyticsWidget::rebuildSummary(const QVector<ExerciseStats>& stats
     int repetitionCount = 0;
     double peakSum = 0.0;
     double peakMaximum = 0.0;
+    int gamePoints = 0;
     for (const auto& exercise : stats) {
+        gamePoints += exercise.gameScore;
         if (exercise.completedReps > 0) ++exerciseCount;
         seriesCount += exercise.completedSeries;
         repetitionCount += exercise.completedReps;
@@ -78,9 +80,9 @@ void TrainingAnalyticsWidget::rebuildSummary(const QVector<ExerciseStats>& stats
     const double average = repetitionCount > 0 ? peakSum / repetitionCount : 0.0;
     m_summaryLabel->setText(
         tr("Ćwiczenia z danymi: %1 | Ukończone serie: %2 | Powtórzenia: %3"
-           " | Średni szczyt: %4 N | Maksymalny szczyt: %5 N")
+           " | Średni szczyt: %4 N | Maksymalny szczyt: %5 N | Punkty gier: %6")
             .arg(exerciseCount).arg(seriesCount).arg(repetitionCount)
-            .arg(average, 0, 'f', 2).arg(peakMaximum, 0, 'f', 2));
+            .arg(average, 0, 'f', 2).arg(peakMaximum, 0, 'f', 2).arg(gamePoints));
 }
 
 void TrainingAnalyticsWidget::rebuildSeriesTable(const QVector<ExerciseStats>& stats) {
