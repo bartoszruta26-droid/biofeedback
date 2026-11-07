@@ -861,13 +861,21 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
             const size_t forcePos = resp.find("FORCE:");
             if (forcePos != std::string::npos) {
                 const size_t gramsEnd = resp.find("g,", forcePos);
+                bool calibrationConfirmed = false;
+                const size_t calibrationPos = resp.find("CAL:", forcePos);
+                if (calibrationPos != std::string::npos) {
+                    try {
+                        const int calibrationFlag = std::stoi(resp.substr(calibrationPos + 4));
+                        calibrationConfirmed = (calibrationFlag == 1);
+                    } catch (...) {}
+                }
                 if (gramsEnd != std::string::npos) {
                     try {
                         const double grams = std::stod(
                             resp.substr(forcePos + 6, gramsEnd - forcePos - 6));
                         if (std::isfinite(grams)) {
                             data.calibratedValue = grams;
-                            data.hasCalibratedValue = true;
+                            data.hasCalibratedValue = calibrationConfirmed;
                             data.isValid = true;
                         }
                     } catch (...) {}
