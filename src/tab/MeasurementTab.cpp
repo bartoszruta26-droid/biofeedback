@@ -730,6 +730,7 @@ void MeasurementTab::loadAllHistoricalMeasurements()
 void MeasurementTab::setTargetForce(double force)
 {
     m_targetForce = force;
+    m_measurementEngine.setTargetForceN(force);
     m_forcePlot->setTargetForce(force);
 }
 
@@ -785,10 +786,7 @@ void MeasurementTab::stopMeasurement()
     m_isMeasuring = false;
     
     // Jeśli trwa powtórzenie, zakończ je
-    if (m_inContraction && !m_currentRepForces.isEmpty()) {
-        std::cout << "[DEBUG] stopMeasurement: Ending current repetition before stopping" << std::endl;
-        calculateRepetitionStats();
-    }
+    // Incomplete contractions are discarded; only completed engine events are recorded.
     
     std::cout << "[DEBUG] stopMeasurement: Unlocking Raw/Calibrated button" << std::endl;
     
@@ -828,6 +826,8 @@ void MeasurementTab::resetSession()
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
+    m_measurementEngine.reset();
+    m_measurementEngine.setTargetForceN(m_targetForce);
     
     m_inContraction = false;
     m_repStartForce = 0;
@@ -902,175 +902,118 @@ void MeasurementTab::simulateSensorData()
     // Usunięto ograniczenie do 0 - pozwalamy na wartości ujemne dla rozciągania
     // if (currentForce < 0) currentForce = 0;
     
-    readSingleSample(currentForce);
+    m_sampleSource = measurement::SampleSource::Simulation;
+    readSingleSample(currentForce, currentForce);
 }
 
-void MeasurementTab::readSingleSample(double forceValue)
+void MeasurementTab::readSingleSample(double forceValue, double forceInNewtons)
 {
-    std::cout << "[DEBUG] readSingleSample START: forceValue=" << forceValue 
-              << " m_completedSeriesStats.size()=" << m_completedSeriesStats.size() << std::endl;
-    
-    // Safety check - ensure series is initialized
-    if (m_completedSeriesStats.isEmpty()) {
-        std::cout << "[DEBUG] readSingleSample: No series initialized, calling ensureCurrentSeriesInitialized" << std::endl;
-        ensureCurrentSeriesInitialized();
-    }
-    
-    // Safety check - ensure session clock is started
-    if (m_sessionStartTime <= 0.0) {
-        std::cout << "[DEBUG] readSingleSample: Session clock not started, calling ensureSessionClockStarted" << std::endl;
-        ensureSessionClockStarted();
-    }
-
-    std::cout << "[DEBUG] readSingleSample After checks: m_completedSeriesStats.size()=" 
-              << m_completedSeriesStats.size() << " m_sessionStartTime=" << m_sessionStartTime << std::endl;
-
-    double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0 - m_sessionStartTime;
-    
-    std::cout << "[DEBUG] readSingleSample: currentTime=" << currentTime << std::endl;
-    
+    if (m_completedSeriesStats.isEmpty()) ensureCurrentSeriesInitialized();
+    ensureSessionClockStarted();
+    const double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0 - m_sessionStartTime;
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
-    
-    m_currentRepForces.append(forceValue);
-    m_currentRepTimes.append(currentTime);
-    
-    std::cout << "[DEBUG] readSingleSample: Data prepared for display - rawForceBuffer.size()=" 
-              << m_rawForceBuffer.size() << " currentRepForces.size()=" << m_currentRepForces.size() << std::endl;
-    
-    std::cout << "[DEBUG] readSingleSample Before emit newForceSample, force=" << forceValue 
-              << " timestamp=" << currentTime << std::endl;
-    
-    try {
-        // Emit signal with all three parameters to match the signal definition
-        emit newForceSample(forceValue, currentTime, m_showRawValues);
-        std::cout << "[DEBUG] readSingleSample: Signal emitted successfully" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "[ERROR] readSingleSample: Exception while emitting signal: " << e.what() << std::endl;
-    } catch (...) {
-        std::cerr << "[ERROR] readSingleSample: Unknown exception while emitting signal" << std::endl;
+
+    const bool hasNewtonSample = std::isfinite(forceInNewtons) && forceInNewtons >= 0.0;
+    std::optional<measurement::RepetitionStats> completedRepetition;
+    if (hasNewtonSample) {
+        measurement::Sample sample;
+        sample.timestampSeconds = currentTime;
+        sample.force = forceInNewtons;
+        sample.unit = measurement::ForceUnit::Newton;
+        sample.source = m_sampleSource;
+        sample.valid = true;
+        completedRepetition = m_measurementEngine.addSample(sample);
+        emit newForceSample(forceInNewtons, currentTime, false);
     }
-    
-    std::cout << "[DEBUG] readSingleSample Before updateLiveDisplay" << std::endl;
+
     updateLiveDisplay(forceValue);
-    std::cout << "[DEBUG] readSingleSample: updateLiveDisplay completed" << std::endl;
-    
-    std::cout << "[DEBUG] readSingleSample Before detectRepetitions" << std::endl;
-    detectRepetitions();
-    std::cout << "[DEBUG] readSingleSample: detectRepetitions completed" << std::endl;
-    
-    std::cout << "[DEBUG] readSingleSample END" << std::endl;
-    
-    // Aktualizuj tabelę surowych danych (ostatnie 100) - safety check for null pointer
-    if (m_rawTable != nullptr) {
-        if (m_rawTable->rowCount() >= 100) {
-            m_rawTable->removeRow(0);
-        }
-        int row = m_rawTable->rowCount();
+    if (hasNewtonSample) m_forcePlot->addSample(forceInNewtons, currentTime);
+    if (completedRepetition) {
+        consumeEngineRepetition(*completedRepetition);
+        for (const auto& series : m_measurementEngine.takeCompletedSeries())
+            consumeEngineSeries(series);
+    }
+
+    if (m_rawTable) {
+        if (m_rawTable->rowCount() >= 100) m_rawTable->removeRow(0);
+        const int row = m_rawTable->rowCount();
         m_rawTable->insertRow(row);
         m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
         m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(forceValue, 'f', 2)));
         m_rawTable->scrollToBottom();
-    } else {
-        std::cerr << "[ERROR] readSingleSample: m_rawTable is null!" << std::endl;
     }
 }
 
 void MeasurementTab::updateLiveDisplay(double force)
 {
-    std::cout << "[DEBUG] updateLiveDisplay START: force=" << force 
-              << " m_showRawValues=" << m_showRawValues << " m_currentUnit=" << static_cast<int>(m_currentUnit) << std::endl;
-    
-    // Wyświetl siłę w aktualnie wybranej jednostce
-    double displayForce = force;
-    QString unitLabel = "N";
-    
+    QString unitLabel = "ADC";
     if (!m_showRawValues) {
         switch (m_currentUnit) {
-            case ForceUnit::Kilograms:
-                displayForce = force * 1000.0 / 9.81;  // N -> kg
-                unitLabel = "kg";
-                std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
-                break;
-            case ForceUnit::Raw:
-                // Nie powinno się zdarzyć, bo raw jest obsługiwane osobno
-                displayForce = force;
-                unitLabel = "ADC";
-                std::cout << "[DEBUG] updateLiveDisplay: Raw mode, displayForce=" << displayForce << std::endl;
-                break;
+            case ForceUnit::Kilograms: unitLabel = "kgf"; break;
+            case ForceUnit::Raw: unitLabel = "ADC"; break;
             case ForceUnit::Newtons:
-            default:
-                displayForce = force;
-                unitLabel = "N";
-                std::cout << "[DEBUG] updateLiveDisplay: Newtons mode, displayForce=" << displayForce << std::endl;
-                break;
+            default: unitLabel = "N"; break;
         }
-    } else {
-        unitLabel = "ADC";
-        std::cout << "[DEBUG] updateLiveDisplay: showRawValues=true, displayForce=" << displayForce << std::endl;
     }
-    
-    std::cout << "[DEBUG] updateLiveDisplay: Before updating UI components" << std::endl;
-    m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
-    m_forceBar->setValue(static_cast<int>(displayForce));
-    
-    double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
-    std::cout << "[DEBUG] updateLiveDisplay: Before addSample, force=" << force << " time=" << lastTime << std::endl;
-    m_forcePlot->addSample(force, lastTime);
-    std::cout << "[DEBUG] updateLiveDisplay END" << std::endl;
+    m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(force, 0, 'f', 1).arg(unitLabel));
+    m_forceBar->setValue(static_cast<int>(force));
 }
 
-void MeasurementTab::detectRepetitions()
+void MeasurementTab::consumeEngineRepetition(const measurement::RepetitionStats& source)
 {
-    std::cout << "[DEBUG] detectRepetitions START: m_currentRepForces.size()=" 
-              << m_currentRepForces.size() << std::endl;
-    
-    if (m_currentRepForces.isEmpty()) {
-        std::cout << "[DEBUG] detectRepetitions END: m_currentRepForces is empty" << std::endl;
-        return;
+    if (m_completedSeriesStats.isEmpty()) ensureCurrentSeriesInitialized();
+    m_currentRepStats = RepetitionStats{};
+    m_currentRepStats.repNumber = m_currentRepInSeries + 1;
+    m_currentRepStats.peakForce = source.peakForceN;
+    m_currentRepStats.timeToPeak = source.timeToPeakSeconds;
+    m_currentRepStats.riseRate = source.riseRateNPerSecond;
+    m_currentRepStats.fallRate = source.fallRateNPerSecond;
+    m_currentRepStats.duration = source.durationSeconds;
+    m_currentRepStats.timeInTop8pct = source.timeInTop8PercentSeconds;
+    m_currentRepStats.timeInBottom8pct = source.timeInBottom8PercentSeconds;
+    m_currentRepStats.areaUnderCurve = source.impulseNs;
+    m_currentRepStats.avgForce = source.averageForceN;
+    m_currentRepStats.medianForce = source.medianForceN;
+    m_currentRepStats.modeForce = source.modeForceN;
+    m_currentRepStats.isValid = source.sampleCount >= 2;
+    m_completedSeriesStats.last().reps.append(m_currentRepStats);
+    ++m_currentRepInSeries;
+    ++m_totalReps;
+    emit repetitionCompleted(m_currentSeries, m_currentRepStats.repNumber, m_currentRepStats);
+    updateStatsTable();
+    updateSeriesProgress();
+}
+
+void MeasurementTab::consumeEngineSeries(const measurement::SeriesStats& source)
+{
+    if (m_completedSeriesStats.isEmpty()) ensureCurrentSeriesInitialized();
+    SeriesStats& target = m_completedSeriesStats.last();
+    target.seriesNumber = m_currentSeries;
+    target.avgPeakForce = source.averagePeakForceN;
+    target.medianPeakForce = source.medianPeakForceN;
+    target.fatigueIndex = source.fatigueIndexPercent;
+    target.totalWork = source.totalImpulseNs;
+    target.impulseTotal = source.totalImpulseNs;
+    target.avgRiseRate = source.averageRiseRateNPerSecond;
+    target.avgFallRate = source.averageFallRateNPerSecond;
+    target.seriesSpeed = source.seriesSpeedRepsPerSecond;
+    target.consistencyScore = source.consistencyScorePercent;
+    target.sessionDate = QDate::currentDate().toString(Qt::ISODate);
+    emit seriesCompleted(m_currentSeries, target);
+    ++m_currentSeries;
+    m_currentRepInSeries = 0;
+    if (m_currentSeries > 3) {
+        m_lblStatus->setText("Status: SESJA ZAKOŃCZONA");
+        m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
+        emit sessionFinished(m_completedSeriesStats);
+    } else {
+        SeriesStats next;
+        next.seriesNumber = m_currentSeries;
+        m_completedSeriesStats.append(next);
+        m_lblStatus->setText(QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
     }
-    
-    double currentForce = m_currentRepForces.last();
-    double currentTime = m_currentRepTimes.last();
-    
-    std::cout << "[DEBUG] detectRepetitions: currentForce=" << currentForce 
-              << " currentTime=" << currentTime
-              << " m_inContraction=" << m_inContraction 
-              << " m_contractionThreshold=" << m_contractionThreshold << std::endl;
-    
-    // Detekcja początku skurcza
-    if (!m_inContraction && currentForce > m_contractionThreshold) {
-        std::cout << "[DEBUG] detectRepetitions: Detected contraction START" << std::endl;
-        m_inContraction = true;
-        m_repStartTime = currentTime;
-        m_repStartForce = currentForce;
-        m_repPeakForce = currentForce;
-        m_repPeakTime = currentTime;
-        m_currentRepForces.clear();
-        m_currentRepTimes.clear();
-        m_currentRepForces.append(currentForce);
-        m_currentRepTimes.append(currentTime);
-        std::cout << "[DEBUG] detectRepetitions: Contraction started, repStartTime=" << m_repStartTime << std::endl;
-    }
-    // Śledzenie szczytu
-    else if (m_inContraction && currentForce > m_repPeakForce) {
-        std::cout << "[DEBUG] detectRepetitions: New peak force=" << currentForce << std::endl;
-        m_repPeakForce = currentForce;
-        m_repPeakTime = currentTime;
-    }
-    // Detekcja końca skurcza
-    else if (m_inContraction && currentForce < m_contractionThreshold * 0.5) {
-        std::cout << "[DEBUG] detectRepetitions: Detected contraction END, calling calculateRepetitionStats" << std::endl;
-        // Koniec powtórzenia
-        calculateRepetitionStats();
-        
-        m_inContraction = false;
-        m_currentRepForces.clear();
-        m_currentRepTimes.clear();
-        std::cout << "[DEBUG] detectRepetitions: Contraction ended, reset state" << std::endl;
-    }
-    
-    std::cout << "[DEBUG] detectRepetitions END" << std::endl;
+    updateSeriesProgress();
 }
 
 void MeasurementTab::calculateRepetitionStats()
@@ -1370,19 +1313,16 @@ void MeasurementTab::onToggleMeasurement()
 
 void MeasurementTab::onReadSingleSample()
 {
-    // Nie wykonuj synchronicznego odczytu portu w wątku GUI.
-    // Przycisk ręczny wykorzystuje ostatnią próbkę odebraną przez czytnik asynchroniczny.
     if (m_lastSensorData.isValid) {
-        const double valueToUse = m_showRawValues
-            ? static_cast<double>(m_lastSensorData.value)
-            : m_lastSensorData.calibratedValue;
-        readSingleSample(valueToUse);
+        const double forceN = m_lastSensorData.calibratedValue * 9.81 / 1000.0;
+        const double displayValue = m_showRawValues ? static_cast<double>(m_lastSensorData.value)
+                                                     : convertForce(forceN, m_currentUnit);
+        m_sampleSource = measurement::SampleSource::Device;
+        readSingleSample(displayValue, forceN);
         return;
     }
-
     m_lblStatus->setText(m_serialPort && m_serialPort->isConnected()
-        ? "Status: OCZEKIWANIE NA PRÓBKĘ"
-        : "Status: BRAK ARDUINO NANO Z HX711");
+        ? "Status: OCZEKIWANIE NA PRÓBKĘ" : "Status: BRAK ARDUINO NANO Z HX711");
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
 }
 
@@ -1881,51 +1821,16 @@ bool MeasurementTab::isArduinoConnected() const
 
 void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
-    std::cout << "[DEBUG] onSensorDataReceived: data.isValid=" << data.isValid 
-              << " m_isMeasuring=" << m_isMeasuring << std::endl;
-    
-    if (data.isValid) {
-        m_lastSensorData = data;
-        
-        // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
-        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
-            .arg(data.value)
-            .arg(data.calibratedValue);
-        addDebugMessage(arduinoDebug, "ARDUINO");
-        
-        if (m_isMeasuring) {
-            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-            
-            std::cout << "[DEBUG] onSensorDataReceived: showRawValues=" << m_showRawValues 
-                      << " currentUnit=" << static_cast<int>(m_currentUnit) 
-                      << " valueToUse(before conversion)=" << valueToUse << std::endl;
-            
-            // Jeśli nie używamy wartości surowej, przelicz na wybraną jednostkę
-            if (!m_showRawValues && m_currentUnit != ForceUnit::Newtons) {
-                // calibratedValue jest w gramach, przelicz na Newtony najpierw
-                double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
-                valueToUse = convertForce(forceInNewtons, m_currentUnit);
-                std::cout << "[DEBUG] onSensorDataReceived: Converted to unit, valueToUse=" << valueToUse << std::endl;
-            } else if (m_showRawValues) {
-                // Wartość surowa - nie przeliczaj
-                valueToUse = static_cast<double>(data.value);
-                std::cout << "[DEBUG] onSensorDataReceived: Using raw value=" << valueToUse << std::endl;
-            } else {
-                // calibratedValue jest w gramach, przelicz na Newtony
-                valueToUse = data.calibratedValue * 9.81 / 1000.0;
-                std::cout << "[DEBUG] onSensorDataReceived: Converted to Newtons, valueToUse=" << valueToUse << std::endl;
-            }
-            
-            std::cout << "[DEBUG] onSensorDataReceived: Calling readSingleSample with value=" << valueToUse << std::endl;
-            readSingleSample(valueToUse);
-        } else {
-            std::cout << "[DEBUG] onSensorDataReceived: Not measuring, ignoring data" << std::endl;
-        }
-    } else {
-        std::cout << "[DEBUG] onSensorDataReceived: Received invalid data" << std::endl;
-        addDebugMessage("Otrzymano nieprawidłowe dane z Arduino", "WARNING");
-    }
+    if (!data.isValid) return;
+    m_lastSensorData = data;
+    const double forceN = data.calibratedValue * 9.81 / 1000.0;
+    addDebugMessage(QString("Arduino: RAW=%1 | CALIBRATED=%2 g")
+        .arg(data.value).arg(data.calibratedValue, 0, 'f', 2), "ARDUINO");
+    if (!m_isMeasuring) return;
+    m_sampleSource = measurement::SampleSource::Device;
+    const double displayValue = m_showRawValues ? static_cast<double>(data.value)
+                                                 : convertForce(forceN, m_currentUnit);
+    readSingleSample(displayValue, forceN);
 }
 
 void MeasurementTab::connectToArduinoAsync()
