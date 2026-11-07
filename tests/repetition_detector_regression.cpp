@@ -30,6 +30,27 @@ int main() {
     assert(rep.samples.back().timestampMs == rep.endTimestampMs);
     assert(!detector.isActive());
 
+    // Simulate a process restart in the middle of a contraction.
+    detector.reset();
+    assert(!detector.process(2000, 15.0, true, rep));
+    assert(!detector.process(2100, 28.0, true, rep));
+    const auto snapshot = detector.snapshot();
+    assert(snapshot.active && snapshot.samples.size() == 2);
+
+    RepetitionDetector recovered({50.0, 0.20, 0.10, 2.0, 250, 30000, 500});
+    assert(recovered.restore(snapshot));
+    assert(recovered.isActive());
+    assert(!recovered.process(2200, 45.0, true, rep));
+    assert(recovered.process(2300, 4.0, true, rep));
+    assert(rep.startTimestampMs == 2000);
+    assert(rep.endTimestampMs == 2300);
+    assert(rep.sampleCount == 4);
+    assert(std::abs(rep.peakForceN - 45.0) < 1e-9);
+
+    auto corrupt = snapshot;
+    ++corrupt.sampleCount;
+    assert(!recovered.restore(corrupt));
+
     // A short spike is discarded, not counted as a repetition.
     assert(!detector.process(700, 15.0, true, rep));
     assert(!detector.process(800, 0.0, true, rep));
