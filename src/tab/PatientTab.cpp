@@ -600,6 +600,10 @@ void PatientTab::onSelectionChanged()
         
         emit patientSelected(pesel, firstName, lastName);
         emit currentPatientChanged(m_currentPatientPesel, m_currentPatientDataPath);
+    } else if (!m_currentPatientPesel.isEmpty()) {
+        m_currentPatientPesel.clear();
+        m_currentPatientDataPath.clear();
+        emit currentPatientChanged(QString(), QString());
     }
 }
 
