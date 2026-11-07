@@ -107,6 +107,7 @@ Target testowy linkuje DebugManager.cpp i Threads::Threads oraz jest jawnie budo
 - Dodano GameFactory, który rozpoznaje identyfikatory sin, tan, pong, flappy i mario wraz z aliasami zapisanymi w konspektach.
 - TrainingTab i MainWindow korzystają z tego samego factory. MainWindow nie ogranicza już uruchamiania gier OutlineTab do samego SinGame.
 - W OutlineTab gry bez implementacji są widoczne jako przygotowywane, ale ich pozycje są wyłączone.
+- MainWindow sprząta grę po odłączeniu callbacków i wyzerowaniu wskaźnika właściciela, co zapobiega rekurencyjnemu `gameEnded` i podwójnemu usuwaniu widgetu.
 - Dodano game_factory_regression, sprawdzający utworzenie pięciu dostępnych gier, ich cykl życia i odrzucanie nieznanych identyfikatorów.
 
 Walidacja PR #205 obejmuje kompilację Qt5, CTest i security-regression. Dopiero zielone przebiegi dla aktualnego HEAD uprawniają do scalenia. Symulowane próbki nie zastępują testu fizycznego czujnika.
