@@ -345,6 +345,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         }
         
         { std::lock_guard<std::mutex> stateLock(m_impl->stateMutex); m_impl->baudRate = baudRate; }
+        intptr_t newPortHandle = -1;
         
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -385,7 +386,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             m_impl->lastError = "Cannot configure serial port timeouts";
             return false;
         }
-        { std::lock_guard<std::mutex> ioLock(m_impl->readMutex); m_impl->portHandle = reinterpret_cast<intptr_t>(h); }
+        newPortHandle = reinterpret_cast<intptr_t>(h);
 #else
         int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
         if (fd < 0) { 
@@ -424,10 +425,20 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             return false; 
         }
         int fl = fcntl(fd, F_GETFL); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
-        { std::lock_guard<std::mutex> ioLock(m_impl->readMutex); m_impl->portHandle = fd; }
+        newPortHandle = fd;
 #endif
-        { std::lock_guard<std::mutex> stateLock(m_impl->stateMutex); m_impl->portName = portName; }
-        m_impl->isConnected.store(true, std::memory_order_release);
+        // Publish the native handle and connected state atomically with respect
+        // to disconnect/read/write. A disconnect between handle creation and
+        // publication must not leave an unowned open descriptor behind.
+        {
+            std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
+            m_impl->portHandle = newPortHandle;
+            {
+                std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+                m_impl->portName = portName;
+            }
+            m_impl->isConnected.store(true, std::memory_order_release);
+        }
         m_impl->lastActivityTime = std::chrono::steady_clock::now();
         notifyConnectionCallbacks(true, std::string("Connected to ") + portName);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
