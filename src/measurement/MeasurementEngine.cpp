@@ -26,6 +26,7 @@ const char* qualityName(Quality quality) noexcept {
     case Quality::NonFiniteValue: return "non_finite_value";
     case Quality::MissingTimestamp: return "missing_timestamp";
     case Quality::InvalidUnit: return "invalid_unit";
+    case Quality::InvalidSource: return "invalid_source";
     case Quality::OutsideConfiguredRange: return "outside_configured_range";
     }
     return "unknown";
@@ -44,7 +45,7 @@ MeasurementEngine::MeasurementEngine(MeasurementEngineConfig config)
 
 bool MeasurementEngine::normalizeUnit(const std::string& inputUnit,
                                       std::string& canonicalUnit,
-                                      double& multiplier) noexcept {
+                                      double& multiplier) {
     const std::string unit = lowerAscii(inputUnit);
     multiplier = 1.0;
     if (unit == "n" || unit == "newton" || unit == "newtons") canonicalUnit = "N";
@@ -71,7 +72,9 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
     sample.source = input.source;
 
     double multiplier = 1.0;
-    if (!normalizeUnit(input.unit, sample.unit, multiplier)) {
+    if (input.source.empty()) {
+        sample.quality = Quality::InvalidSource;
+    } else if (!normalizeUnit(input.unit, sample.unit, multiplier)) {
         sample.quality = Quality::InvalidUnit;
     } else if (!input.sensorValid) {
         sample.quality = Quality::SensorRejected;
