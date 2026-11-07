@@ -595,9 +595,12 @@ void TrainingTab::pauseTraining()
     if (!m_isTraining || !m_stateMachine.pause()) return;
 
     updateSessionClocks();
-    if (m_inRestPeriod) {
-        updateRestDisplay();
-        m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
+    if (m_inRestPeriod && m_restClock.isValid()) {
+        // Preserve the exact millisecond remainder; the label is rounded up
+        // for display only and must not extend the actual rest interval.
+        m_restDurationMs = qMax<qint64>(0, m_restDurationMs - m_restClock.elapsed());
+        m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
+        m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
     }
     m_isPaused = true;
     m_restTimer->stop();
@@ -617,7 +620,7 @@ void TrainingTab::resumeTraining()
 
     m_isPaused = false;
     if (m_inRestPeriod) {
-        m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
+        // m_restDurationMs already contains the exact frozen remainder.
         m_restClock.restart();
         m_restTimer->start();
     }
