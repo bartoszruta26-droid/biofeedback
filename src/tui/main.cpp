@@ -320,7 +320,7 @@ void drawModule(tui::Screen screen,
                  " N | srednia " + std::to_string(mean) + " N | czas " +
                  std::to_string(duration) + " ms | do szczytu " +
                  std::to_string(timeToPeak) + " ms");
-        drawText(17, x + 2, "Historia: " + tuiSessionFilePath().toStdString());
+        drawText(16, x + 2, "Historia: " + tuiSessionFilePath().toStdString());
         break;
     }
     case tui::Screen::Settings:
