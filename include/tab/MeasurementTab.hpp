@@ -22,6 +22,7 @@
 #include <memory>
 #include <QComboBox>
 #include <QDoubleSpinBox>
+#include <QFile>
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
@@ -343,6 +344,11 @@ private:
     void updateStatsTable();
     void updateBiomechanicalTable();
     void recalculateBiomechanicalResults();
+    bool openSampleJournal();
+    bool appendSampleJournal(const RecordedMeasurementSample& sample);
+    bool flushSampleJournal();
+    void closeSampleJournal();
+    bool recoverSampleJournals(const QString& dataDir);
     void updateSeriesProgress();
     double calculateMedian(const QVector<double>& values) const;
     double calculateMode(const QVector<double>& values) const;
@@ -421,6 +427,11 @@ private:
     QVector<double> m_rawForceBuffer;
     QVector<double> m_timeBuffer;
     QVector<RecordedMeasurementSample> m_recordedSamples;
+    QFile m_sampleJournal;
+    QString m_sampleJournalPath;
+    quint32 m_sampleJournalPendingWrites{0};
+    QString m_activeSessionId;
+    bool m_sampleJournalFailed{false};
     
     // Bufor bieżącego powtórzenia
     QVector<double> m_currentRepForces;
