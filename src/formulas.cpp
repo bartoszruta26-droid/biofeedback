@@ -805,13 +805,13 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
 
     // Explicitly mark only metrics backed by this set's inputs. A value left
     // at its reset value is not evidence that the measured quantity was zero.
-    for (std::size_t index : {4u, 5u, 8u, 9u, 15u, 17u, 19u, 22u, 23u,
-                              26u, 27u, 30u, 31u, 32u, 34u, 35u, 36u, 37u,
-                              38u, 48u, 49u, 50u, 51u, 54u, 56u, 61u, 63u})
+    for (std::size_t index : {4u, 5u, 8u, 9u, 11u, 12u, 13u, 15u, 17u, 19u,
+                              25u, 26u, 27u, 30u, 31u, 32u, 34u, 35u, 36u,
+                              37u, 38u, 48u, 49u, 50u, 51u, 54u, 61u, 63u})
         params.setAvailability(index, ParameterAvailability::Available);
 
     // These outputs depend on a configured elastic element or patient mass.
-    for (std::size_t index : {6u, 7u, 21u, 22u, 23u, 24u, 28u, 45u, 56u})
+    for (std::size_t index : {6u, 7u, 20u, 21u, 22u, 23u, 24u, 28u, 56u})
         params.setAvailability(index, ParameterAvailability::RequiresCalibration);
 
     // Explicit external dependencies; do not fabricate proxy values.
