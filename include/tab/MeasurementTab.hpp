@@ -338,6 +338,7 @@ private:
     void updateLiveDisplay(double force);
     void calculateRepetitionStats();
     void updateStatsTable();
+    void updateBiomechanicalTable();
     void updateSeriesProgress();
     double calculateMedian(const QVector<double>& values) const;
     double calculateMode(const QVector<double>& values) const;
@@ -387,6 +388,8 @@ private:
     // Tabela statystyk
     QGroupBox* m_statsBox;
     QTableWidget* m_statsTable;
+    QGroupBox* m_biomechBox;
+    QTableWidget* m_biomechTable;
     
     // Tabela surowych danych
     QGroupBox* m_rawBox;
