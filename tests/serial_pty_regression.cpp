@@ -91,6 +91,47 @@ int main() {
         ::close(master);
         return 1;
     }
+    // Concurrently exercise independent serial metadata domains.
+    std::atomic<bool> metadataOk{true};
+    std::thread errorWriter([&]() {
+        for (int i = 0; i < 500; ++i) {
+            (void)serial.sendCommand("BAD\\n", false);
+            (void)serial.getLastError();
+        }
+    });
+    std::thread watchdogWriter([&]() {
+        for (int i = 0; i < 500; ++i) {
+            serial.configureWatchdog(1000 + (i % 1000), true);
+            serial.resetWatchdog();
+            if (serial.getTimeSinceLastActivity() < 0) metadataOk.store(false);
+            (void)serial.isWatchdogOK();
+        }
+    });
+    std::thread calibrationWriter([&]() {
+        for (int i = 1; i <= 500; ++i) {
+            serial.setCalibrationPoint(i, static_cast<double>(i) / 10.0);
+            (void)serial.convertToCalibrated(i);
+            (void)serial.getCalibrationScale();
+            (void)serial.getCalibrationOffset();
+            serial.resetCalibration();
+        }
+    });
+    std::thread timestampWriter([&]() {
+        for (uint32_t i = 1; i <= 500; ++i) {
+            serial.syncTimestamp(i);
+            (void)serial.getTimestampOffset();
+        }
+    });
+    errorWriter.join();
+    watchdogWriter.join();
+    calibrationWriter.join();
+    timestampWriter.join();
+    if (!metadataOk.load()) {
+        std::cerr << "Concurrent serial metadata regression failed\\n";
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
 
     std::string command;
     std::thread device([&]() {
