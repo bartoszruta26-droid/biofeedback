@@ -185,6 +185,8 @@ int main() {
         callbackDisconnected.store(true, std::memory_order_release);
     });
     serial.startAsyncReading();
+    // A repeated start while the worker is active must be a no-op.
+    serial.startAsyncReading();
     if (!readLine(master, command, 1000) || command != "DATA\n") {
         std::cerr << "Async reader did not issue DATA command\n";
         serial.stopAsyncReading();
