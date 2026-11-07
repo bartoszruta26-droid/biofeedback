@@ -166,6 +166,12 @@ void MainWindow::setupTabs()
 
     connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
             m_trainingTab, &tab::TrainingTab::setCurrentPatientContext);
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample,
+            this, [this](double value, double, bool isRaw) {
+                updateWeightDisplay(value, isRaw);
+                if (m_dashboardMeasurementValue)
+                    m_dashboardMeasurementValue->setText(isRaw ? tr("Diagnostyka RAW") : tr("Próbka skalibrowana"));
+            });
     connect(m_trainingTab, &tab::TrainingTab::trainingStarted,
             m_patientTab, [this]() {
                 m_patientTab->setEnabled(false);
@@ -614,11 +620,13 @@ void MainWindow::toggleSerialConnection()
     addDebugMessage(tr("Uruchomiono odczyt z portu %1 przy %2 baud").arg(port).arg(DEFAULT_BAUD_RATE), "SERIAL");
 }
 
-void MainWindow::updateWeightDisplay(double weight)
+void MainWindow::updateWeightDisplay(double value, bool isRaw)
 {
-    const QString value = QString("%1 N").arg(weight, 0, 'f', 2);
-    if (m_weightValue) m_weightValue->setText(value);
-    if (m_dashboardForceValue) m_dashboardForceValue->setText(value);
+    const QString valueText = isRaw
+        ? QString("%1 ADC").arg(value, 0, 'f', 0)
+        : QString("%1 N").arg(value, 0, 'f', 2);
+    if (m_weightValue) m_weightValue->setText(valueText);
+    if (m_dashboardForceValue) m_dashboardForceValue->setText(valueText);
 }
 
 void MainWindow::updateConnectionStatus(bool connected, const QString& deviceName)
