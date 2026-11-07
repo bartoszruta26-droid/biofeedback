@@ -63,6 +63,10 @@ int main(int argc, char **argv)
     REQUIRE(arkanoidGame->getDifficultyLevel() == 5);
     arkanoidGame->setDifficultyLevel(0);
     REQUIRE(arkanoidGame->getDifficultyLevel() == 1);
+    arkanoidGame->start();
+    waitForEvents(1800);
+    REQUIRE(arkanoidGame->getScore() > 0); // Ball must hit at least one brick.
+    arkanoidGame->stop();
 
     std::unique_ptr<games::GameEngine> tan(games::createGame(QStringLiteral("tan")));
     auto* tanGame = dynamic_cast<games::TanGame*>(tan.get());
