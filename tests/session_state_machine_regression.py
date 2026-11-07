@@ -17,6 +17,8 @@ checks = {
     "end-rest transition": "m_stateMachine.endRest();" in source,
     "terminal completed/interrupted states": "m_stateMachine.complete()" in source and "m_stateMachine.interrupt()" in source,
     "automatic persistence API": "bool saveSessionAutomatically();" in analytics_header,
+    "checkpoint API": "bool saveSessionCheckpoint();" in analytics_header,
+    "checkpoint records update in place": "replacedActiveSession" in analytics and '"in_progress"' in analytics,
     "automatic persistence called on stop": "saveSessionAutomatically()" in source,
     "persistence supports zero repetitions": "repetitions > 0 ? weightedPeak / repetitions : 0.0" in analytics,
     "failed save keeps session locked": "if (!m_activeSessionHistoryFilePath.isEmpty() && !m_sessionSaved)\n        return false;" in analytics,
