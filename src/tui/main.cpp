@@ -1,5 +1,6 @@
 #include "tui/TuiModel.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "core/DebugManager.hpp"
 
 #include <ncurses.h>
 
@@ -222,6 +223,7 @@ int main(int argc, char** argv)
     }
 
     std::setlocale(LC_ALL, "");
+    core::DebugManager::instance().setConsoleOutputEnabled(false);
     sensor::SerialCommunication serial;
     serial.setVerbose(false);
     LiveData live;
