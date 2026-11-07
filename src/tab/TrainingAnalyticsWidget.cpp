@@ -111,6 +111,37 @@ void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int 
     rebuildForceTraceChart(stats);
 }
 
+void TrainingAnalyticsWidget::setExecutionState(const QJsonObject& state) {
+    m_executionState = state;
+}
+
+QVector<ExerciseStats> TrainingAnalyticsWidget::currentStats() const {
+    return m_currentStats;
+}
+
+bool TrainingAnalyticsWidget::recoverPendingSession(QJsonObject& recoveredEntry) {
+    for (int index = m_historyEntries.size() - 1; index >= 0; --index) {
+        if (!m_historyEntries.at(index).isObject()) continue;
+        const QJsonObject candidate = m_historyEntries.at(index).toObject();
+        if (candidate.value("session_status").toString() != "in_progress" ||
+            candidate.value("session_id").toString().isEmpty()) continue;
+        int row = -1;
+        for (int r = 0; r < m_historyTable->rowCount(); ++r) {
+            const auto* item = m_historyTable->item(r, 0);
+            if (item && item->data(Qt::UserRole).toInt() == index) { row = r; break; }
+        }
+        if (row < 0) continue;
+        onHistoryEntryActivated(row, 0);
+        m_activeSessionId = candidate.value("session_id").toString();
+        m_activeSessionHistoryFilePath = m_historyFilePath;
+        m_sessionSaved = false;
+        m_sessionInProgress = true;
+        recoveredEntry = candidate;
+        return candidate.value("execution_state").isObject();
+    }
+    return false;
+}
+
 void TrainingAnalyticsWidget::setSessionCompleted(bool completed) {
     m_sessionCompleted = completed;
 }
@@ -343,6 +374,7 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback, bool fina
     entry.insert("saved_at", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
     entry.insert("duration_seconds", m_durationSeconds);
     entry.insert("active_duration_seconds", m_activeDurationSeconds);
+    if (!m_executionState.isEmpty()) entry.insert("execution_state", m_executionState);
     entry.insert("session_status", finalize
         ? (m_sessionCompleted ? "completed" : "interrupted") : "in_progress");
     entry.insert("exercise_count", exerciseCount);
@@ -451,6 +483,7 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback, bool fina
     if (finalize) {
         m_activeSessionHistoryFilePath.clear();
         m_activeSessionId.clear();
+        m_executionState = QJsonObject();
     }
     if (!m_pendingHistoryFilePath.isEmpty()) {
         m_historyFilePath = m_pendingHistoryFilePath;
