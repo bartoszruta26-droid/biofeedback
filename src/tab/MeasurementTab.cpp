@@ -24,6 +24,9 @@
 #include <QScrollArea>
 #include <memory>
 #include <iostream>
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
 
 namespace tab {
 
@@ -470,6 +473,183 @@ void MeasurementTab::ensureCurrentSeriesInitialized()
     SeriesStats currentSeries;
     currentSeries.seriesNumber = m_currentSeries;
     m_completedSeriesStats.append(currentSeries);
+}
+
+
+bool MeasurementTab::openSampleJournal()
+{
+    if (m_sampleJournal.isOpen()) return true;
+    if (m_sampleJournalPath.isEmpty()) {
+        const QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
+        if (!QDir().mkpath(dataDir)) return false;
+        if (m_activeSessionId.isEmpty())
+            m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        m_sampleJournalPath = QDir(dataDir).filePath(
+            QStringLiteral("pomiar_%1.jsonl").arg(m_activeSessionId));
+    }
+
+    const bool newFile = !QFile::exists(m_sampleJournalPath);
+    m_sampleJournal.setFileName(m_sampleJournalPath);
+    if (!m_sampleJournal.open(QIODevice::WriteOnly | QIODevice::Append))
+        return false;
+
+    if (newFile) {
+        QJsonObject header;
+        header["recordType"] = "header";
+        header["schemaVersion"] = 1;
+        header["sessionId"] = m_activeSessionId;
+        header["patientId"] = m_patientId;
+        header["date"] = QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
+        header["elasticConstantNPerM"] = m_elasticConstantInput
+            ? m_elasticConstantInput->value() : 0.0;
+        header["patientMassKg"] = m_patientMassInput
+            ? m_patientMassInput->value() : 0.0;
+        const QByteArray line = QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n';
+        if (m_sampleJournal.write(line) != line.size() || !flushSampleJournal()) {
+            closeSampleJournal();
+            return false;
+        }
+        QFile::setPermissions(m_sampleJournalPath,
+                              QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    }
+    m_sampleJournalFailed = false;
+    return true;
+}
+
+bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample)
+{
+    if (!m_sampleJournal.isOpen() || m_sampleJournalFailed) return false;
+
+    QJsonObject record;
+    record["recordType"] = "sample";
+    record["sequence"] = static_cast<qint64>(sample.sequence);
+    record["timestampUnixMs"] = sample.timestampUnixMs;
+    record["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
+    record["elapsedTimeSeconds"] = sample.elapsedTimeSeconds;
+    record["value"] = sample.value;
+    record["rawValue"] = sample.rawValue;
+    record["hasRawValue"] = sample.hasRawValue;
+    record["calibratedMassKg"] = sample.calibratedMassKg;
+    record["hasCalibratedMass"] = sample.hasCalibratedMass;
+    record["unit"] = sample.unit;
+    record["source"] = sample.source;
+    record["quality"] = sample.quality;
+    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
+    if (m_sampleJournal.write(line) != line.size()) {
+        m_sampleJournalFailed = true;
+        return false;
+    }
+
+    ++m_sampleJournalPendingWrites;
+    // Bound the unflushed window to at most 31 samples. This avoids a full
+    // JSON rewrite in the acquisition path while keeping recovery loss bounded.
+    if (m_sampleJournalPendingWrites >= 32 && !flushSampleJournal()) {
+        m_sampleJournalFailed = true;
+        return false;
+    }
+    return true;
+}
+
+bool MeasurementTab::flushSampleJournal()
+{
+    if (!m_sampleJournal.isOpen()) return true;
+    if (!m_sampleJournal.flush()) return false;
+#ifdef Q_OS_UNIX
+    if (::fsync(m_sampleJournal.handle()) != 0) return false;
+#endif
+    m_sampleJournalPendingWrites = 0;
+    return true;
+}
+
+void MeasurementTab::closeSampleJournal()
+{
+    if (!m_sampleJournal.isOpen()) return;
+    flushSampleJournal();
+    m_sampleJournal.close();
+}
+
+bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
+{
+    QDir dir(dataDir);
+    const QStringList journals = dir.entryList(
+        QStringList() << "pomiar_*.jsonl", QDir::Files, QDir::Name);
+    bool recoveredAny = false;
+
+    for (const QString& fileName : journals) {
+        const QString path = dir.filePath(fileName);
+        if (path == m_sampleJournalPath) continue;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+
+        MeasurementSession session;
+        bool validHeader = false;
+        bool malformed = false;
+        quint64 expectedSequence = 1;
+        while (!file.atEnd()) {
+            QByteArray line = file.readLine();
+            if (line.trimmed().isEmpty()) continue;
+            QJsonParseError parseError;
+            const QJsonDocument doc = QJsonDocument::fromJson(line, &parseError);
+            if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+                malformed = true;
+                break;
+            }
+            const QJsonObject object = doc.object();
+            const QString recordType = object["recordType"].toString();
+            if (!validHeader) {
+                if (recordType != "header" || object["schemaVersion"].toInt() != 1)
+                    { malformed = true; break; }
+                session.sessionId = object["sessionId"].toString();
+                session.patientId = object["patientId"].toString();
+                session.date = object["date"].toString();
+                session.elasticConstantNPerM = object["elasticConstantNPerM"].toDouble();
+                session.patientMassKg = object["patientMassKg"].toDouble();
+                if (session.sessionId.isEmpty() || session.patientId != m_patientId)
+                    { malformed = true; break; }
+                validHeader = true;
+                continue;
+            }
+            if (recordType != "sample") { malformed = true; break; }
+            const quint64 sequence = object["sequence"].toVariant().toULongLong();
+            const double elapsed = object["elapsedTimeSeconds"].toDouble(-1.0);
+            const double value = object["value"].toDouble(
+                std::numeric_limits<double>::quiet_NaN());
+            if (sequence != expectedSequence || !std::isfinite(elapsed) ||
+                elapsed < 0.0 || !std::isfinite(value)) {
+                malformed = true;
+                break;
+            }
+            RecordedMeasurementSample sample;
+            sample.sequence = sequence;
+            sample.timestampUnixMs = object["timestampUnixMs"].toVariant().toLongLong();
+            sample.deviceTimestampMs = static_cast<quint32>(
+                object["deviceTimestampMs"].toVariant().toULongLong());
+            sample.elapsedTimeSeconds = elapsed;
+            sample.value = value;
+            sample.rawValue = object["rawValue"].toInt();
+            sample.hasRawValue = object["hasRawValue"].toBool();
+            sample.calibratedMassKg = object["calibratedMassKg"].toDouble();
+            sample.hasCalibratedMass = object["hasCalibratedMass"].toBool();
+            sample.unit = object["unit"].toString();
+            sample.source = object["source"].toString();
+            sample.quality = object["quality"].toString();
+            session.samples.append(sample);
+            ++expectedSequence;
+        }
+        file.close();
+
+        if (!validHeader || malformed || session.samples.isEmpty()) continue;
+        const bool alreadyLoaded = std::any_of(
+            m_patientSessions.cbegin(), m_patientSessions.cend(),
+            [&session](const MeasurementSession& existing) {
+                return existing.sessionId == session.sessionId;
+            });
+        if (!alreadyLoaded) {
+            m_patientSessions.append(session);
+            recoveredAny = true;
+        }
+    }
+    return recoveredAny;
 }
 
 void MeasurementTab::ensureSessionClockStarted()
