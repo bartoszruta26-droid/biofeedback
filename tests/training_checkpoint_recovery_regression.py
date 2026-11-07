@@ -25,6 +25,20 @@ checks = {
     "state machine restore validates state": "bool restore(SessionState state" in machine,
     "session clock restore is monotonic": "void restore(std::int64_t sessionMs, std::int64_t activeMs)" in clock,
     "recovery record is updated in place": "replacedActiveSession" in analytics,
+    "restart recovery activates and deserializes the persisted history entry": (
+        "onHistoryEntryActivated(row, 0);" in analytics and
+        "m_currentStats = restored;" in analytics and
+        "m_executionState = candidate.value(\"execution_state\").toObject();" in analytics
+    ),
+    "history reload restores every repetition sample": (
+        "const QJsonArray repetitions = object.value(\"repetitions\").toArray();" in analytics and
+        "const QJsonArray samples = repetitionObject.value(\"samples\").toArray();" in analytics and
+        "record.measurement.samples.push_back(sample);" in analytics
+    ),
+    "checkpoint persists the full exercise and repetition history": (
+        "entry.insert(\"exercises\", exerciseEntries);" in analytics and
+        "repetitionEntry.insert(\"samples\", sampleEntries);" in analytics
+    ),
     "checkpoint JSON is atomically persisted": "QSaveFile file(path)" in analytics and "!file.commit()" in analytics,
     "checkpoint restore validates before mutating live state": (
         "// Phase 1: parse and validate everything" in tab and
