@@ -513,7 +513,7 @@ void MeasurementTab::setupUI()
         updateUnitDisplay();
         updateRawTableUnits();
     });
-    m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
     m_btnReset->setMinimumHeight(35);
