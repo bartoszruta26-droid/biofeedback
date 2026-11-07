@@ -636,7 +636,7 @@ bool TrainingTab::exportResultsToCSV(const QString& filename)
     QFile file(filename);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
     QTextStream out(&file);
-    out << "exercise_name,completed_series,completed_reps,avg_peak_force_N,max_peak_force_N,"
+    out << "metrics_version,exercise_name,completed_series,completed_reps,avg_peak_force_N,max_peak_force_N,"
            "min_peak_force_N,avg_time_to_peak_s,avg_force_N,total_impulse_Ns,"
            "target_accuracy_percent,consistency_percent,duration_s,completion_rate_percent\n";
     const auto csv = [](const QString& value) {
@@ -646,7 +646,7 @@ bool TrainingTab::exportResultsToCSV(const QString& filename)
         return "\"" + escaped + "\"";
     };
     for (const auto& stats : m_exerciseStats) {
-        out << csv(stats.exerciseName) << ','
+        out << stats.metricsVersion << ',' << csv(stats.exerciseName) << ','
             << stats.completedSeries << ',' << stats.completedReps << ','
             << QString::number(stats.avgPeakForce, 'f', 4) << ','
             << QString::number(stats.maxPeakForce, 'f', 4) << ','
@@ -870,7 +870,7 @@ void TrainingTab::onSharedRepetitionCompleted(double peakForceN, double duration
     }
 }
 
-void TrainingTab::onSharedSeriesCompleted(int repetitionCount, double averagePeakForceN,
+void TrainingTab::onSharedSeriesCompleted(int metricsVersion, int repetitionCount, double averagePeakForceN,
                                            double maximumPeakForceN, double minimumPeakForceN,
                                            double averageTimeToPeakSeconds, double averageForceN,
                                            double averageRepetitionDurationSeconds,
@@ -882,6 +882,7 @@ void TrainingTab::onSharedSeriesCompleted(int repetitionCount, double averagePea
         m_currentExerciseIndex >= m_exerciseStats.size() || repetitionCount <= 0) return;
 
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    stats.metricsVersion = metricsVersion;
     const int previousCount = stats.aggregatedReps;
     const int combinedCount = previousCount + repetitionCount;
     const double oldWeight = static_cast<double>(previousCount);
