@@ -2,6 +2,7 @@
 #include <ncurses.h>
 #include <algorithm>
 #include <cstdio>
+#include <clocale>
 #include <cstdlib>
 #include <string>
 namespace {
@@ -38,7 +39,7 @@ void drawDashboard() {
     drawText(8, left + panelWidth + 4, "Dane rzeczywiste: niedostepne");
     drawPanel(11, left, 7, contentWidth, "SZYBKI DOSTEP");
     drawText(13, left + 2, "Wybierz modul z menu po lewej stronie.");
-    drawText(14, left + 2, "Strzalki gora/dol: nawigacja   Enter: wybierz modul");
+    drawText(14, left + 2, "Strzalki: wybor modulu   Enter: otworz");
     drawText(15, left + 2, "Dane demonstracyjne nie sa danymi pacjenta ani odczytem czujnika.");
 }
 void drawModule(tui::Screen screen) {
@@ -79,7 +80,7 @@ void drawModule(tui::Screen screen) {
     case tui::Screen::Dashboard: drawDashboard(); break;
     }
 }
-void draw(std::size_t selected) {
+void draw(std::size_t selected, std::size_t active) {
     erase();
     attron(A_BOLD | COLOR_PAIR(1)); mvhline(0, 0, ' ', COLS);
     drawText(0, 2, "BIOFEEDBACK  /  TERMINAL WORKSPACE"); attroff(A_BOLD | COLOR_PAIR(1));
@@ -88,12 +89,18 @@ void draw(std::size_t selected) {
     const auto& screens = tui::TuiModel::screens();
     for (std::size_t i = 0; i < screens.size(); ++i) {
         const int y = 5 + static_cast<int>(i);
-        if (i == selected) { attron(A_REVERSE | A_BOLD); drawText(y, 3, std::string("> ") + screens[i].title, 18); attroff(A_REVERSE | A_BOLD); }
-        else drawText(y, 3, std::string("  ") + screens[i].title, 18);
+        const std::string marker = (i == active ? "* " : "  ");
+        if (i == selected) {
+            attron(A_REVERSE | A_BOLD);
+            drawText(y, 3, std::string("> ") + marker + screens[i].title, 18);
+            attroff(A_REVERSE | A_BOLD);
+        } else {
+            drawText(y, 3, marker + screens[i].title, 18);
+        }
     }
-    drawModule(screens[selected].id);
+    drawModule(screens[active].id);
     attron(COLOR_PAIR(1)); mvhline(LINES - 3, 0, ' ', COLS);
-    drawText(LINES - 3, 2, "GORA/DOL: wybor   HOME/END: skrajne moduly   Q: wyjscie"); attroff(COLOR_PAIR(1));
+    drawText(LINES - 3, 2, "GORA/DOL: wybor   ENTER: otworz   HOME/END: skrajne   Q: wyjscie"); attroff(COLOR_PAIR(1));
     refresh();
 }
 }
@@ -102,6 +109,7 @@ int main(int argc, char** argv) {
         std::puts("Biofeedback TUI 0.1.0");
         return EXIT_SUCCESS;
     }
+    std::setlocale(LC_ALL, "");
     initscr();
     if (has_colors()) {
         start_color(); use_default_colors();
@@ -116,14 +124,16 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
     std::size_t selected = 0;
+    std::size_t active = 0;
     bool running = true;
     while (running) {
-        draw(selected);
+        draw(selected, active);
         switch (getch()) {
         case KEY_UP: selected = tui::TuiModel::clampSelection(static_cast<int>(selected) - 1); break;
         case KEY_DOWN: selected = tui::TuiModel::clampSelection(static_cast<int>(selected) + 1); break;
         case KEY_HOME: selected = 0; break;
         case KEY_END: selected = tui::TuiModel::screenCount() - 1; break;
+        case KEY_ENTER: case 10: case 13: active = selected; break;
         case 'q': case 'Q': case 27: running = false; break;
         default: break;
         }
