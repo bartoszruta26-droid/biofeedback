@@ -17,5 +17,9 @@ if "processSample(data)" in source:
 
 if "MeasurementSerialAdapter" not in source:
     raise SystemExit("MeasurementTab must retain the shared measurement adapter")
+if "m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)" not in source:
+    raise SystemExit("MeasurementTab must use the shared repetition detector")
+if "m_repetitionDetector.reset()" not in source:
+    raise SystemExit("MeasurementTab must reset repetition state at session boundaries")
 
 print("MeasurementTab lifecycle and single-ingestion policy passed")
