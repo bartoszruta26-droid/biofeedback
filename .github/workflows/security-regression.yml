@@ -34,6 +34,11 @@ jobs:
           done
           grep -q '"ok":true' /tmp/biofeedback-health.json
           curl --silent --fail http://127.0.0.1:18765/api/v1/status | grep -q '"status":"ready"'
+          missing_code=$(curl --silent --output /tmp/biofeedback-404.json --write-out '%{http_code}' http://127.0.0.1:18765/api/v1/unknown)
+          test "$missing_code" = "404"
+          disabled_code=$(curl --silent --output /tmp/biofeedback-disabled.json --write-out '%{http_code}' -X POST http://127.0.0.1:18765/api/v1/devices/sensor-01/connect)
+          test "$disabled_code" = "503"
+          grep -q 'CAPABILITY_NOT_AVAILABLE' /tmp/biofeedback-disabled.json
       - name: Smoke-test TUI command modes
         run: ./build/biofeedback_tui --version && ./build/biofeedback_tui --status && ./build/biofeedback_tui --list-ports
       - name: Validate WebUI JavaScript
