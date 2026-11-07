@@ -814,7 +814,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
                 
                 // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
                 // followed by end markers 0xAA 0x55
-                if (rawData.size() >= 11) {
+                if (!gotBinaryData && rawData.size() >= 11) {
                     // Look for end marker pattern
                     if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
                         // Extract binary packet (9 bytes before end markers)
