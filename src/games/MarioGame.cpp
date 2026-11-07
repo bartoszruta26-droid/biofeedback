@@ -91,6 +91,7 @@ void MarioGame::update(double deltaTime)
 {
     // Aktualizacja gracza
     updatePlayer(deltaTime);
+    if (!isRunning()) return;
     
     // Generowanie i aktualizacja przeszkód
     generateObstacles(deltaTime);
