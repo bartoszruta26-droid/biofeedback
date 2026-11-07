@@ -684,11 +684,12 @@ double SerialCommunication::tare(int samples) {
         }
         readings.push_back(sample.value);
     }
-    std::sort(readings.begin(), readings.end());
-    const std::size_t middle = readings.size() / 2;
-    const double zero = (readings.size() % 2 == 0)
-        ? (static_cast<double>(readings[middle - 1]) + static_cast<double>(readings[middle])) * 0.5
-        : static_cast<double>(readings[middle]);
+    const auto zeroResult = CalibrationMath::medianRaw(readings);
+    if (!zeroResult) {
+        m_impl->lastError = "Tare sample set is invalid";
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double zero = *zeroResult;
     {
         std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
         m_impl->zeroOffset = zero;
@@ -710,17 +711,12 @@ void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
     }
 
     std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
-    const double delta = static_cast<double>(raw) - m_impl->zeroOffset;
-    if (!std::isfinite(delta) || delta <= 0.0) {
-        m_impl->lastError = "Calibration point must be above the tare baseline";
+    const auto scaleResult = CalibrationMath::scaleFromReference(m_impl->zeroOffset, raw, known);
+    if (!scaleResult) {
+        m_impl->lastError = "Calibration point must be above the tare baseline with a finite positive reference";
         return;
     }
-    const double scale = known / delta;
-    if (!std::isfinite(scale) || scale <= 0.0) {
-        m_impl->lastError = "Calibration scale must be finite and positive";
-        return;
-    }
-    m_impl->scaleFactor = scale;
+    m_impl->scaleFactor = *scaleResult;
     m_impl->isCalibrated = true;
     m_impl->calibrationReferenceRaw = raw;
     m_impl->calibrationReferenceValue = known;
@@ -733,8 +729,10 @@ bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double kno
         return false;
     }
 
-    const double scale = knownWeight / static_cast<double>(span);
-    if (!std::isfinite(scale) || scale <= 0.0) return false;
+    const auto scaleResult = CalibrationMath::scaleFromReference(
+        static_cast<double>(rawZero), rawSpan, knownWeight);
+    if (!scaleResult) return false;
+    const double scale = *scaleResult;
     {
         std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
         m_impl->zeroOffset = static_cast<double>(rawZero);
@@ -749,7 +747,8 @@ bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double kno
 }
 double SerialCommunication::convertToCalibrated(int32_t raw) const {
     std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
-    return (static_cast<double>(raw) - m_impl->zeroOffset) * m_impl->scaleFactor;
+    const auto converted = CalibrationMath::convertRaw(raw, m_impl->zeroOffset, m_impl->scaleFactor);
+    return converted.value_or(0.0);
 }
 std::string SerialCommunication::getCalibrationDeviceId() const {
     const ArduinoInfo info = getArduinoInfo();
