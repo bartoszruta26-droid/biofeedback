@@ -656,6 +656,20 @@ bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
                 return existing.sessionId == session.sessionId;
             });
         if (!alreadyLoaded) {
+            // Materialize the recovered stream as a normal, selectable JSON
+            // session so it remains accessible after this in-memory recovery.
+            const QString recoveredPath = dir.filePath(
+                QStringLiteral("pomiar_odzyskany_%1_%2.json")
+                    .arg(QDateTime::currentMSecsSinceEpoch())
+                    .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+            const QByteArray recoveredPayload = serializeSessionToJSON(session).toUtf8();
+            QSaveFile recoveredFile(recoveredPath);
+            if (recoveredFile.open(QIODevice::WriteOnly) &&
+                recoveredFile.write(recoveredPayload) == recoveredPayload.size() &&
+                recoveredFile.commit()) {
+                QFile::setPermissions(recoveredPath,
+                    QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+            }
             m_patientSessions.append(session);
             recoveredAny = true;
         }
