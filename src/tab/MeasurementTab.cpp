@@ -1538,9 +1538,12 @@ void MeasurementTab::calculateRepetitionStats()
         m_currentRepInSeries = 0;
         ++m_currentSeries;
         if (m_currentSeries > 3) {
+            emit sessionFinished(m_completedSeriesStats);
+            // A completed 3 x 8 protocol must stop acquisition; otherwise
+            // later samples would be journaled without belonging to a set.
+            stopMeasurement();
             m_lblStatus->setText(tr("Status: SESJA ZAKOŃCZONA"));
             m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
-            emit sessionFinished(m_completedSeriesStats);
         } else {
             m_lblStatus->setText(
                 QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
