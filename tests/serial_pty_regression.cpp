@@ -95,7 +95,7 @@ int main() {
     std::atomic<bool> metadataOk{true};
     std::thread errorWriter([&]() {
         for (int i = 0; i < 500; ++i) {
-            (void)serial.sendCommand("BAD\\n", false);
+            (void)serial.sendCommand("BAD\n", false);
             (void)serial.getLastError();
         }
     });
@@ -142,7 +142,7 @@ int main() {
     timestampWriter.join();
     timestampReader.join();
     if (!metadataOk.load()) {
-        std::cerr << "Concurrent serial metadata regression failed\\n";
+        std::cerr << "Concurrent serial metadata regression failed\n";
         serial.disconnect();
         ::close(master);
         return 1;
