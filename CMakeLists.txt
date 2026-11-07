@@ -49,6 +49,14 @@ target_link_libraries(biofeedback_core
         Qt5::Core
 )
 
+# Shared measurement pipeline: validation, canonical units, quality and bounded history.
+add_library(biofeedback_measurement STATIC src/measurement/MeasurementEngine.cpp)
+target_include_directories(biofeedback_measurement PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
+target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement)
+add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
+
 # Local loopback HTTP API. Sensitive and hardware operations remain disabled
 # until authentication, authorization and measurement services are integrated.
 add_executable(biofeedback_api
@@ -97,7 +105,7 @@ if(CURSES_FOUND)
     )
     set_target_properties(biofeedback_tui PROPERTIES AUTOMOC ON)
     target_include_directories(biofeedback_tui PRIVATE ${CMAKE_SOURCE_DIR}/include ${CURSES_INCLUDE_DIRS})
-    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model Qt5::Core ${CURSES_LIBRARIES})
+    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model biofeedback_measurement Qt5::Core ${CURSES_LIBRARIES})
     install(TARGETS biofeedback_tui DESTINATION bin)
 else()
     message(STATUS "ncurses not found - skipping optional biofeedback_tui target")
