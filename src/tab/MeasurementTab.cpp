@@ -1942,7 +1942,17 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
         seriesObj["seriesSpeed"] = series.seriesSpeed;
         seriesObj["consistencyScore"] = series.consistencyScore;
         seriesObj["impulseTotal"] = series.impulseTotal;
-        
+        QJsonArray seriesBiomechanicalValues;
+        QJsonArray seriesBiomechanicalAvailability;
+        const auto seriesValues = series.biomechanicalParams.values();
+        for (std::size_t i = 0; i < BiomechanicalParams::ParameterCount; ++i) {
+            seriesBiomechanicalValues.append(seriesValues[i]);
+            seriesBiomechanicalAvailability.append(
+                static_cast<int>(series.biomechanicalParams.availabilityAt(i)));
+        }
+        seriesObj["biomechanicalValues"] = seriesBiomechanicalValues;
+        seriesObj["biomechanicalAvailability"] = seriesBiomechanicalAvailability;
+
         QJsonArray repsArray;
         for (const auto& rep : series.reps) {
             QJsonObject repObj;
@@ -1961,6 +1971,16 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
             repObj["medianForce"] = rep.medianForce;
             repObj["modeForce"] = rep.modeForce;
             repObj["isValid"] = rep.isValid;
+            QJsonArray repBiomechanicalValues;
+            QJsonArray repBiomechanicalAvailability;
+            const auto repValues = rep.biomechanicalParams.values();
+            for (std::size_t i = 0; i < BiomechanicalParams::ParameterCount; ++i) {
+                repBiomechanicalValues.append(repValues[i]);
+                repBiomechanicalAvailability.append(
+                    static_cast<int>(rep.biomechanicalParams.availabilityAt(i)));
+            }
+            repObj["biomechanicalValues"] = repBiomechanicalValues;
+            repObj["biomechanicalAvailability"] = repBiomechanicalAvailability;
             repsArray.append(repObj);
         }
         seriesObj["repetitions"] = repsArray;
@@ -2020,7 +2040,22 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
         series.seriesSpeed = seriesObj["seriesSpeed"].toDouble();
         series.consistencyScore = seriesObj["consistencyScore"].toDouble();
         series.impulseTotal = seriesObj["impulseTotal"].toDouble();
-        
+        const QJsonArray seriesValuesJson = seriesObj["biomechanicalValues"].toArray();
+        const QJsonArray seriesAvailabilityJson = seriesObj["biomechanicalAvailability"].toArray();
+        std::array<double, BiomechanicalParams::ParameterCount> seriesValues{};
+        for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                        i < seriesValuesJson.size(); ++i)
+            seriesValues[static_cast<std::size_t>(i)] = seriesValuesJson[i].toDouble();
+        series.biomechanicalParams.assignValues(seriesValues);
+        for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                        i < seriesAvailabilityJson.size(); ++i) {
+            const int status = seriesAvailabilityJson[i].toInt();
+            if (status >= static_cast<int>(ParameterAvailability::InsufficientData) &&
+                status <= static_cast<int>(ParameterAvailability::InvalidInput))
+                series.biomechanicalParams.setAvailability(
+                    static_cast<std::size_t>(i), static_cast<ParameterAvailability>(status));
+        }
+
         QJsonArray repsArray = seriesObj["repetitions"].toArray();
         for (const auto& repVal : repsArray) {
             QJsonObject repObj = repVal.toObject();
@@ -2040,6 +2075,21 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
             rep.medianForce = repObj["medianForce"].toDouble();
             rep.modeForce = repObj["modeForce"].toDouble();
             rep.isValid = repObj["isValid"].toBool();
+            const QJsonArray repValuesJson = repObj["biomechanicalValues"].toArray();
+            const QJsonArray repAvailabilityJson = repObj["biomechanicalAvailability"].toArray();
+            std::array<double, BiomechanicalParams::ParameterCount> repValues{};
+            for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                            i < repValuesJson.size(); ++i)
+                repValues[static_cast<std::size_t>(i)] = repValuesJson[i].toDouble();
+            rep.biomechanicalParams.assignValues(repValues);
+            for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                            i < repAvailabilityJson.size(); ++i) {
+                const int status = repAvailabilityJson[i].toInt();
+                if (status >= static_cast<int>(ParameterAvailability::InsufficientData) &&
+                    status <= static_cast<int>(ParameterAvailability::InvalidInput))
+                    rep.biomechanicalParams.setAvailability(
+                        static_cast<std::size_t>(i), static_cast<ParameterAvailability>(status));
+            }
             series.reps.append(rep);
         }
         session.series.append(series);
