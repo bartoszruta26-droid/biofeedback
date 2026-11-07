@@ -108,6 +108,7 @@ if(Qt5_FOUND)
         src/main.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
+        src/core/DebugManager.cpp
         src/core/PasswordHasher.cpp
         src/core/ConfigManager.cpp
         src/core/Authentication.cpp
@@ -134,6 +135,7 @@ if(Qt5_FOUND)
     set(HEADERS
         include/core/Application.hpp
         include/core/Logger.hpp
+        include/core/DebugManager.hpp
         include/core/ConfigManager.hpp
         include/core/Authentication.hpp
         include/gui/MainWindow.hpp
