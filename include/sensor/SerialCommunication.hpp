@@ -10,6 +10,7 @@
 #include <memory>
 #include <map>
 #include <mutex>
+#include "sensor/CalibrationProfile.hpp"
 
 // Default baud rate for serial communication
 #define DEFAULT_BAUD_RATE 115200
@@ -255,6 +256,14 @@ public:
      * @param knownValue Znana wartość wzorcowa w jednostkach wyniku kalibracji (po uprzednim tare)
      */
     void setCalibrationPoint(int32_t rawValue, double knownValue);
+
+    /** Stable identifier used to bind a calibration profile to one device. */
+    std::string getCalibrationDeviceId() const;
+
+    /** Persist or apply a versioned calibration profile for the connected device. */
+    bool saveCalibrationProfile(const std::string& path, std::string* error = nullptr) const;
+    bool loadCalibrationProfile(const std::string& path, std::string* error = nullptr);
+    bool isCalibrated() const;
     
     /**
      * @brief Kalibruje czujnik używając dwóch punktów
