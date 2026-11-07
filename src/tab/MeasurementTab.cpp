@@ -181,7 +181,7 @@ void ForcePlotWidget::setUnit(ForceUnit unit)
 QString ForcePlotWidget::getUnitLabel() const
 {
     switch (m_unit) {
-        case ForceUnit::Kilograms: return "kg";
+        case ForceUnit::Kilograms: return "kgf";
         case ForceUnit::Raw: return "ADC";
         default: return "N";
     }
@@ -281,7 +281,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     painter.setPen(Qt::black);
     for (int i = 0; i <= 10; ++i) {
         int y = margin + plotHeight - (plotHeight * i / 10);
-        double force = -m_maxForce + (2.0 * m_maxForce * i / 10);  // Zakres od -max do +max
+        double force = (-m_maxForce + (2.0 * m_maxForce * i / 10)) * (m_unit == ForceUnit::Kilograms ? 1.0 / 9.80665 : 1.0);
         QString label = QString::number(force, 'f', 0);
         painter.drawText(5, y + 3, label);
     }
@@ -499,6 +499,8 @@ void MeasurementTab::setupUI()
     m_btnToggleRaw->setFont(QFont("Arial", 9));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
         m_showRawValues = checked;
+        if (m_forcePlot)
+            m_forcePlot->setUnit(checked ? ForceUnit::Raw : m_currentUnit);
         if (checked) {
             m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
             m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
@@ -506,6 +508,8 @@ void MeasurementTab::setupUI()
             m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
             m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
         }
+        updateUnitDisplay();
+        updateRawTableUnits();
     });
     m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
     
@@ -1940,11 +1944,11 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 void MeasurementTab::setCurrentUnit(ForceUnit unit)
 {
     m_currentUnit = unit;
-    
-    // Aktualizuj wykres siły
-    if (m_forcePlot) {
-        m_forcePlot->setUnit(unit);
-    }
+    m_showRawValues = (unit == ForceUnit::Raw);
+    if (m_btnToggleRaw && m_btnToggleRaw->isChecked() != m_showRawValues)
+        m_btnToggleRaw->setChecked(m_showRawValues);
+    if (m_forcePlot)
+        m_forcePlot->setUnit(m_showRawValues ? ForceUnit::Raw : unit);
     
     // Aktualizuj etykiety w tabelach
     updateUnitDisplay();
@@ -1960,19 +1964,16 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
 void MeasurementTab::updateUnitDisplay()
 {
     QString unitLabel;
-    switch (m_currentUnit) {
-        case ForceUnit::Kilograms:
-            unitLabel = "kgf";
-            break;
-        case ForceUnit::Raw:
-            unitLabel = "ADC";
-            break;
-        case ForceUnit::Newtons:
-        default:
-            unitLabel = "N";
-            break;
+    if (m_showRawValues) {
+        unitLabel = "ADC";
+    } else {
+        switch (m_currentUnit) {
+            case ForceUnit::Kilograms: unitLabel = "kgf"; break;
+            case ForceUnit::Raw: unitLabel = "ADC"; break;
+            case ForceUnit::Newtons: default: unitLabel = "N"; break;
+        }
     }
-    
+
     // Aktualizuj etykietę aktualnej siły z nową jednostką
     if (m_lblCurrentForce && !m_rawForceBuffer.isEmpty()) {
         double currentForce = m_rawForceBuffer.last();
@@ -2005,19 +2006,16 @@ void MeasurementTab::updateRawTableUnits()
     if (!m_rawTable) return;
     
     QString unitLabel;
-    switch (m_currentUnit) {
-        case ForceUnit::Kilograms:
-            unitLabel = "kg";
-            break;
-        case ForceUnit::Raw:
-            unitLabel = "ADC";
-            break;
-        case ForceUnit::Newtons:
-        default:
-            unitLabel = "N";
-            break;
+    if (m_showRawValues) {
+        unitLabel = "ADC";
+    } else {
+        switch (m_currentUnit) {
+            case ForceUnit::Kilograms: unitLabel = "kgf"; break;
+            case ForceUnit::Raw: unitLabel = "ADC"; break;
+            case ForceUnit::Newtons: default: unitLabel = "N"; break;
+        }
     }
-    
+
     // Aktualizuj nagłówek kolumny siły
     if (m_rawTable->columnCount() > 1) {
         m_rawTable->setHorizontalHeaderItem(1, new QTableWidgetItem("Siła [" + unitLabel + "]"));
