@@ -380,7 +380,11 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_btnReadManual(nullptr)
     , m_btnSave(nullptr)
     , m_btnLoad(nullptr)
+    , m_btnSaveJSON(nullptr)
+    , m_btnLoadJSON(nullptr)
+    , m_btnToggleRaw(nullptr)
     , m_btnReset(nullptr)
+    , m_unitSelector(nullptr)
     , m_liveBox(nullptr)
     , m_forcePlot(nullptr)
     , m_lblCurrentForce(nullptr)
@@ -398,27 +402,22 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_currentSeries(1)
     , m_currentRepInSeries(0)
     , m_totalReps(0)
-    , m_sampleRate(100.0)  // 100 Hz
-    , m_targetForce(50.0)  // 50 N domyślnie
-    , m_sessionStartTime(0)
+    , m_sampleRate(100.0)
+    , m_targetForce(50.0)
+    , m_sessionStartTime(0.0)
+    , m_currentUnit(ForceUnit::Newtons)
+    , m_showRawValues(false)
     , m_inContraction(false)
-    , m_repStartForce(0)
-    , m_repPeakForce(0)
-    , m_repStartTime(0)
-    , m_repPeakTime(0)
-    , m_showRawValues(false)  // Domyślnie analizujemy skalibrowaną siłę
-    , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
-    , m_unitSelector(nullptr)
+    , m_repStartForce(0.0)
+    , m_repPeakForce(0.0)
+    , m_repStartTime(0.0)
+    , m_repPeakTime(0.0)
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
     , m_trendsContent(nullptr)
     , m_chkShowTrends(nullptr)
     , m_serialPort(nullptr)
 {
-    // Inicjalizacja wskaźników przycisków JSON
-    m_btnSaveJSON = nullptr;
-    m_btnLoadJSON = nullptr;
-    
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
