@@ -3,6 +3,8 @@
 #include "core/Logger.hpp"
 #include "core/Authentication.hpp"
 #include "core/DebugManager.hpp"
+#include "core/RuntimePaths.hpp"
+#include <QDir>
 #include "gui/MainWindow.hpp"
 #include "gui/LoginDialog.hpp"
 #include "data/DataManager.hpp"
@@ -31,6 +33,9 @@ Application::Application(int& argc, char* argv[])
     , m_state(ApplicationState::NotInitialized)
     , m_startTime(QDateTime::currentDateTime())
 {
+    setOrganizationName("Biofeedback");
+    setApplicationName("Biofeedback");
+    setOrganizationDomain("biofeedback.local");
 }
 
 Application::~Application()
@@ -165,7 +170,10 @@ bool Application::initialize()
         }
 
         // The administrator and regular-user database follows the same file policy.
-        m_authentication = std::make_unique<Authentication>("config/users.json");
+        const QString usersPath = runtime::ensureUserConfigFile("users.json");
+        if (usersPath.isEmpty())
+            throw std::runtime_error("Cannot prepare the per-user account database.");
+        m_authentication = std::make_unique<Authentication>(usersPath.toStdString());
         m_authentication->setFileEncryption(encryptionEnabled, encryptionKey);
 
         // Patient-linked files follow the same policy.
@@ -404,15 +412,17 @@ bool Application::loadConfiguration()
     try {
         m_configManager = std::make_unique<ConfigManager>();
         
-        // Try to load from default location
-        std::string configPath = "config/config.json";
-        
-        if (!m_configManager->load(configPath)) {
-            std::cerr << "Warning: Could not load configuration from " << configPath << std::endl;
-            std::cerr << "Using default configuration" << std::endl;
+        // Resolve packaged defaults and keep writable configuration in the
+        // current user's XDG config directory, never beside the installed binary.
+        const QString configPath = runtime::ensureUserConfigFile("config.json");
+        if (configPath.isEmpty() || !m_configManager->load(configPath.toStdString())) {
+            std::cerr << "Warning: Could not load user configuration; using safe defaults" << std::endl;
             m_configManager->setDefaults();
         }
-        
+
+        const QString patientRoot = QDir(runtime::appDataDirectory()).filePath("patients");
+        QDir().mkpath(patientRoot);
+        m_configManager->setValue("data.base_path", patientRoot.toStdString());
         return true;
     } catch (const std::exception& e) {
         std::cerr << "Error loading configuration: " << e.what() << std::endl;
