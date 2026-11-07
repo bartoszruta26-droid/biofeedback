@@ -265,6 +265,8 @@ private:
     QLabel* m_weightLabel;
     QLabel* m_weightValue;
     QLabel* m_statusLabel;
+    QLabel* m_dashboardConnectionValue;
+    QLabel* m_dashboardForceValue;
     
     QSpinBox* m_samplingRateSpin;
     QSpinBox* m_graphDurationSpin;
