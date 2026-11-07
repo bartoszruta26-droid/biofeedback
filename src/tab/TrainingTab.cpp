@@ -1,5 +1,6 @@
 #include "tab/TrainingTab.hpp"
 #include "tab/TrainingAnalyticsWidget.hpp"
+#include "measurement/Units.hpp"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTextStream>
@@ -195,15 +196,16 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_currentForce(0.0)
     , m_peakForceInRep(0.0)
     , m_serialPort(nullptr)
+    , m_measurementEngine(nullptr)
 {
     setupUI();
 }
 
 TrainingTab::~TrainingTab()
 {
-    if (m_serialPort && m_dataCallbackToken) {
-        m_serialPort->removeDataCallback(m_dataCallbackToken);
-        m_dataCallbackToken = 0;
+    if (m_measurementEngine && m_measurementCallbackToken) {
+        m_measurementEngine->unsubscribe(m_measurementCallbackToken);
+        m_measurementCallbackToken = 0;
     }
     stopTraining();
 }
@@ -624,19 +626,27 @@ bool TrainingTab::isTrainingPaused() const
 
 void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    if (m_serialPort && m_dataCallbackToken) {
-        m_serialPort->removeDataCallback(m_dataCallbackToken);
-        m_dataCallbackToken = 0;
-    }
-    m_serialPort = serial;
+    // Serial ownership and acquisition stay in MainWindow/MeasurementTab.
+    // Training receives calibrated samples only through MeasurementEngine.
+    m_serialPort = std::move(serial);
+}
 
-    if (m_serialPort) {
-        m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, [this, data]() {
-                onSensorDataReceived(data);
+void TrainingTab::setMeasurementEngine(
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine)
+{
+    if (m_measurementEngine && m_measurementCallbackToken) {
+        m_measurementEngine->unsubscribe(m_measurementCallbackToken);
+        m_measurementCallbackToken = 0;
+    }
+    m_measurementEngine = std::move(engine);
+    if (!m_measurementEngine) return;
+
+    m_measurementCallbackToken = m_measurementEngine->subscribe(
+        [this](const biofeedback::measurement::MeasurementSample& sample) {
+            QMetaObject::invokeMethod(this, [this, sample]() {
+                onMeasurementSample(sample);
             }, Qt::QueuedConnection);
         });
-    }
 }
 
 void TrainingTab::setCurrentPatientContext(const QString& patientPesel,
@@ -934,24 +944,26 @@ void TrainingTab::onTimerTick()
     updateProgressWidgets();
 }
 
-void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
+void TrainingTab::onMeasurementSample(
+    const biofeedback::measurement::MeasurementSample& sample)
 {
     if (!m_isTraining) return;
 
-    // An invalid/missing calibrated frame, pause, or rest period breaks the
-    // contraction continuity. Reset the detector instead of silently skipping
-    // the frame and integrating across an unknown interval.
-    if (m_isPaused || m_inRestPeriod || !data.isValid || !data.hasCalibratedValue ||
+    // MeasurementEngine normalizes firmware grams to kilograms. Convert the
+    // canonical mass-equivalent value to SI force exactly once for biomechanics.
+    if (m_isPaused || m_inRestPeriod || !sample.isValid() || sample.unit != "kg" ||
         m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) {
         biofeedback::training::RepetitionRecord discarded;
-        m_repetitionDetector.process(data.timestamp, 0.0, false, discarded);
+        m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
         return;
     }
 
-    // Firmware reports calibrated mass-equivalent values in grams. Training
-    // targets are expressed in newtons (SI), so convert exactly once here.
-    const double force = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
-    if (!std::isfinite(force) || force < 0.0) return;
+    const double force = sample.value * biofeedback::measurement::standardGravityMetersPerSecondSquared;
+    if (!std::isfinite(force) || force < 0.0) {
+        biofeedback::training::RepetitionRecord discarded;
+        m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
+        return;
+    }
     m_currentForce = force;
 
     m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
@@ -969,7 +981,7 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
     }
 
     biofeedback::training::RepetitionRecord repetition;
-    if (m_repetitionDetector.process(data.timestamp, force, true, repetition))
+    if (m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition))
         onRepetitionDetected(repetition);
 
     emit newForceSample(force);
