@@ -248,7 +248,6 @@ private:
     void loadNextExercise();
     void loadNextSeries();
     void loadNextRep();
-    void checkExerciseCompletion();
     void calculateExerciseStats();
     void onRepetitionDetected(const biofeedback::training::RepetitionRecord& repetition);
     void finishCurrentSeries();
@@ -297,6 +296,7 @@ private:
     // Tabela statystyk
     QGroupBox* m_statsBox;
     QWidget* m_statsContainer;
+    QLabel* m_statsSummaryLabel;
     
     // Logika i dane
     QTimer* m_timer;
