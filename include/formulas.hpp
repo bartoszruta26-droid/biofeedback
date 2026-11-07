@@ -234,7 +234,7 @@ public:
     
     /**
      * @brief 7. Całkowita Praca Mechaniczna Serii (Total Work)
-     * W = (1/k_elastic) * sum(F_i * (F_{i+1} - F_i))
+     * W = sum(abs((F_i + F_{i+1})/2 * (F_{i+1} - F_i) / k_elastic))
      */
     double calculateWork(const std::vector<SensorSample>& samples) const;
     
