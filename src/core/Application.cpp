@@ -277,18 +277,18 @@ void Application::setupConnections()
 {
     // Connect MainWindow signals to tab slots
     connect(m_mainWindow.get(), &gui::MainWindow::dataCollectionStarted,
-            m_measurementTab.get(), &tab::MeasurementTab::startMeasurement);
+            m_measurementTab, &tab::MeasurementTab::startMeasurement);
     
     connect(m_mainWindow.get(), &gui::MainWindow::dataCollectionStopped,
-            m_measurementTab.get(), &tab::MeasurementTab::stopMeasurement);
+            m_measurementTab, &tab::MeasurementTab::stopMeasurement);
     
     connect(m_mainWindow.get(), &gui::MainWindow::samplingRateChanged,
-            m_measurementTab.get(), [this](int /*rate*/) {
+            m_measurementTab, [this](int /*rate*/) {
                 // Update measurement tab sampling rate
             });
     
     // Connect MeasurementTab signals to MainWindow slots
-    connect(m_measurementTab.get(), &tab::MeasurementTab::newForceSample,
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample,
             m_mainWindow.get(), [this](double force, double /*timestamp*/, bool /*isRaw*/) {
                 try {
                     if (m_mainWindow && m_mainWindow->measurementTab()) {
@@ -320,7 +320,7 @@ void Application::setupConnections()
                 }
             });
     
-    connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStarted,
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStarted,
             m_mainWindow.get(), [this]() {
                 try {
                     m_mainWindow->startDataCollection();
@@ -343,7 +343,7 @@ void Application::setupConnections()
                 }
             });
     
-    connect(m_measurementTab.get(), &tab::MeasurementTab::measurementStopped,
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
             m_mainWindow.get(), [this]() {
                 try {
                     m_mainWindow->stopDataCollection();
@@ -367,7 +367,7 @@ void Application::setupConnections()
             });
     
     // Connect PatientTab signals
-    connect(m_patientTab.get(), &tab::PatientTab::patientAdded,
+    connect(m_patientTab, &tab::PatientTab::patientAdded,
             this, [this](const QString& pesel, const QString& firstName, const QString& lastName) {
                 m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel).toStdString());
                 if (m_mainWindow && m_mainWindow->debugTerminal()) {
@@ -379,11 +379,11 @@ void Application::setupConnections()
             });
     
     // Connect PatientTab to MeasurementTab for automatic data loading when patient changes
-    connect(m_patientTab.get(), &tab::PatientTab::currentPatientChanged,
-            m_measurementTab.get(), &tab::MeasurementTab::onPatientChanged);
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            m_measurementTab, &tab::MeasurementTab::onPatientChanged);
     
     // Connect OutlineTab signals
-    connect(m_outlineTab.get(), &tab::OutlineTab::sessionStarted,
+    connect(m_outlineTab, &tab::OutlineTab::sessionStarted,
             this, [this](const QString& outlineId) {
                 m_logger->info(QString("Session started with outline: %1").arg(outlineId).toStdString());
                 if (m_mainWindow && m_mainWindow->debugTerminal()) {
@@ -394,7 +394,7 @@ void Application::setupConnections()
                 }
             });
     
-    connect(m_outlineTab.get(), &tab::OutlineTab::requestGameStart,
+    connect(m_outlineTab, &tab::OutlineTab::requestGameStart,
             this, [this](const QString& gameId, const tab::ExerciseData& exerciseData) {
                 m_logger->info(QString("Starting game: %1 for exercise: %2").arg(gameId).arg(exerciseData.name).toStdString());
                 if (m_mainWindow && m_mainWindow->debugTerminal()) {
