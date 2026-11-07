@@ -74,6 +74,7 @@ public:
     std::vector<SeriesStats> takeCompletedSeries();
     void setTargetForceN(double targetForceN);
     bool setRepetitionsPerSeries(std::size_t repetitionsPerSeries);
+    void discardPartialRepetition();
     void reset();
 
     bool isInContraction() const noexcept { return m_inContraction; }
