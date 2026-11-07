@@ -219,6 +219,8 @@ private slots:
     void onAutoScaleToggled(bool enabled);
     void onUpdateTimerTimeout();
     void showSettingsDialog();
+    void refreshSerialPorts();
+    void toggleSerialConnection();
 
 private:
     void setupUI();
@@ -272,6 +274,8 @@ private:
     QSpinBox* m_samplingRateSpin;
     QSpinBox* m_graphDurationSpin;
     QComboBox* m_unitCombo;
+    QComboBox* m_devicePortCombo;
+    QPushButton* m_connectDeviceButton;
     
     // Timer do aktualizacji UI
     QTimer* m_updateTimer;
@@ -303,6 +307,7 @@ private:
     
     // Połączenie szeregowe z Arduino - współdzielone między zakładkami
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
 };
 
 } // namespace gui
