@@ -19,7 +19,7 @@ if "QSaveFile" not in save or "!file.commit()" not in save:
 if "QFileDevice::ReadOwner | QFileDevice::WriteOwner" not in save:
     raise SystemExit("Training history must use owner-only file permissions")
 widget = Path("src/tab/TrainingAnalyticsWidget.cpp").read_text(encoding="utf-8")
-if "void TrainingAnalyticsWidget::beginSession()" not in widget:
+if "bool TrainingAnalyticsWidget::beginSession()" not in widget:
     raise SystemExit("Training session must snapshot its history destination at start")
 if "m_activeSessionHistoryFilePath" not in save:
     raise SystemExit("Session save must use the original patient destination")
