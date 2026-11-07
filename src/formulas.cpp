@@ -722,6 +722,7 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     params.T_conc = calculateConcentricTime(rep.startTime, rep.peakTime);
     params.T_ecc = calculateEccentricTime(rep.peakTime, rep.endTime);
     params.R_CE = calculateCERatio(params.T_conc, params.T_ecc);
+    params.v_avg = calculateVelocity(params.F_range, params.T_rep);
     
     // Praca i impuls
     params.W_total = calculateWork(rep.samples);
@@ -750,7 +751,7 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     const bool hasElasticCalibration = std::isfinite(k_elastic_) && k_elastic_ > 0.0;
     const auto calibrationStatus = hasElasticCalibration
         ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration;
-    for (std::size_t index : {6u, 20u, 21u, 28u})
+    for (std::size_t index : {6u, 18u, 20u, 21u, 28u})
         params.setAvailability(index, calibrationStatus);
 
     return params;
@@ -784,6 +785,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
 
     std::vector<double> repPeakForces;
     std::vector<double> repMeanForces;
+    std::vector<double> repMinForces;
     std::vector<double> repImpulses;
     std::vector<double> repTimes;
     std::vector<double> repRFDs;
@@ -795,6 +797,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
         BiomechanicalParams repParams = calculateRepParams(rep);
         repPeakForces.push_back(repParams.F_peak);
         repMeanForces.push_back(repParams.F_mean);
+        repMinForces.push_back(repParams.F_min);
         repImpulses.push_back(repParams.I_impulse);
         repTimes.push_back(repParams.T_rep);
         repRFDs.push_back(repParams.RFD);
@@ -809,6 +812,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.F_set_peak = calculateSetPeakForce(repPeakForces);
     params.F_peak = params.F_set_peak;  // Maksymalna z wszystkich
     params.F_mean = params.F_set_mean;
+    params.F_min = *std::min_element(repMinForces.begin(), repMinForces.end());
+    params.F_range = calculateForceRange(params.F_peak, params.F_min);
     
     // Praca średnia na powtórzenie
     params.W_rep_avg = calculateAvgWorkPerRep(params.W_total, series.reps.size());
@@ -821,6 +826,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.T_set = calculateSetDuration(series.startTime, series.endTime);
     params.T_rep_avg = calculateAvgRepTime(repTimes);
     params.f_rep = calculateRepFrequency(series.reps.size(), params.T_set);
+    params.v_avg = calculateVelocity(params.F_range, params.T_rep_avg);
     
     // Średni czas koncentryczny i ekscentryczny
     double totalConc = 0.0, totalEcc = 0.0;
@@ -954,6 +960,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
         ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration;
     for (std::size_t index : {6u, 7u, 20u, 21u, 22u, 23u, 28u, 56u})
         params.setAvailability(index, elasticStatus);
+    params.setAvailability(2, ParameterAvailability::Available);
+    params.setAvailability(3, ParameterAvailability::Available);
     params.setAvailability(18, elasticStatus);
     params.setAvailability(24, hasElasticCalibration && hasPatientMass
         ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration);
