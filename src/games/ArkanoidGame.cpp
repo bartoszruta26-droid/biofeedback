@@ -187,7 +187,9 @@ void ArkanoidGame::update(double deltaTime)
     const QRectF ballBounds(m_ballPosition.x() - m_ballRadius,
                             m_ballPosition.y() - m_ballRadius,
                             2.0 * m_ballRadius, 2.0 * m_ballRadius);
-    if (m_ballVelocity.y() > 0.0 && ballBounds.intersects(m_paddle)) {
+    if (m_ballVelocity.y() > 0.0 &&
+        previousPosition.y() + m_ballRadius <= m_paddle.top() &&
+        ballBounds.intersects(m_paddle)) {
         const double halfWidth = qMax(1.0, m_paddle.width() / 2.0);
         const double hitOffset = qBound(-1.0,
             (m_ballPosition.x() - m_paddle.center().x()) / halfWidth, 1.0);
