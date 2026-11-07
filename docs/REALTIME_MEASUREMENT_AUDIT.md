@@ -35,7 +35,7 @@ Ważne rozróżnienie: wykres zakładki MeasurementTab jest realizowany przez `F
 
 - Model `BiomechanicalParams` zawiera teraz 65 uporządkowanych nazw, jednostek i statusów dostępności.
 - Statusy są odrębne od wartości liczbowej: `Available`, `InsufficientData`, `RequiresCalibration`, `RequiresAdditionalSensor`, `RequiresHistory`, `InvalidInput`. Wartość 0 może być prawidłowym wynikiem; brak danych nie jest już utożsamiany z zerem.
-- `MeasurementTab` przekazuje rzeczywiste próbki z `RepetitionDetector` do `Formulas`, oblicza parametry powtórzenia i bieżącej serii oraz wyświetla tabelę 65 parametrów z jednostką i statusem.
+- `MeasurementTab` przekazuje rzeczywiste próbki z `RepetitionDetector` do `Formulas`, oblicza parametry powtórzenia i bieżącej serii oraz wyświetla tabelę 65 parametrów z jednostką i statusem. Tabela ma wybór serii, a wartości sztywności i masy są jawnie konfigurowane, zapisywane w sesji i ponownie stosowane przy imporcie; zmiana pacjenta czyści masę poprzedniej osoby.
 - JSON zapisuje wyniki i statusy dla każdego powtórzenia i serii, a także wejściowe znaczniki czasu, siły i próbki powtórzenia, co pozwala odtworzyć i ponownie przeliczyć wyniki po imporcie. Wersja schematu 3 zapisuje również sztywność układu sprężystego i masę pacjenta; oba parametry mają domyślnie stan „brak kalibracji/danych” i mogą być jawnie ustawione w panelu.
 - Naprawiono agregację mocy szczytowej: maksimum jest wybierane spośród mocy poszczególnych powtórzeń, a nie obliczane z maksimum siły z całej serii i próbek ostatniego powtórzenia.
 - Oddzielono impuls siły [N·s] od pracy mechanicznej [J] w statystykach serii.
