@@ -23,8 +23,9 @@ struct SensorData {
     double calibratedValue;  ///< Wartość po kalibracji
     uint8_t crc;             ///< Suma kontrolna CRC
     bool isValid;            ///< Flagi poprawności danych
+    bool hasFrame;            ///< Czy odebrano ramkę (również z błędnym CRC)
     
-    SensorData() : timestamp(0), value(0), calibratedValue(0.0), crc(0), isValid(false) {}
+    SensorData() : timestamp(0), value(0), calibratedValue(0.0), crc(0), isValid(false), hasFrame(false) {}
 };
 
 /**
@@ -77,6 +78,7 @@ public:
      * @brief Typ funkcji callback dla statusu połączenia
      */
     using ConnectionCallback = std::function<void(bool connected, const std::string& message)>;
+    using CallbackToken = std::uint64_t;
 
     /**
      * @brief Konstruktor
@@ -121,6 +123,7 @@ public:
      * @return Nazwa portu lub pusty string jeśli niepołączony
      */
     std::string getPortName() const;
+    int getBaudRate() const;
 
     // ==================== Identyfikacja ====================
     
@@ -177,6 +180,10 @@ public:
      * @param callback Funkcja wywoływana przy zmianie statusu
      */
     void setConnectionCallback(ConnectionCallback callback);
+    CallbackToken addDataCallback(DataCallback callback);
+    CallbackToken addConnectionCallback(ConnectionCallback callback);
+    void removeDataCallback(CallbackToken token);
+    void removeConnectionCallback(CallbackToken token);
     
     /**
      * @brief Rozpoczyna asynchroniczne czytanie danych
@@ -351,6 +358,8 @@ private:
     bool writeToPort(const uint8_t* data, size_t length);
     SensorData parseSensorData(const std::vector<uint8_t>& rawData);
     void updateWatchdog();
+    void notifyDataCallbacks(const SensorData& data);
+    void notifyConnectionCallbacks(bool connected, const std::string& message);
 };
 
 } // namespace sensor

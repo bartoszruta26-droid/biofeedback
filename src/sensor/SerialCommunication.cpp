@@ -24,6 +24,7 @@
 #include <sstream>
 #include <iostream>
 #include <thread>
+#include <utility>
 #include <mutex>
 #include <atomic>
 #include <climits>
@@ -36,13 +37,13 @@
 // ============================================================================
 
 /// Enable detailed debug logging for serial operations
-constexpr bool DEBUG_SERIAL_COMM = true;
+constexpr bool DEBUG_SERIAL_COMM = false;
 
 /// Enable verbose data packet debugging
 constexpr bool DEBUG_DATA_PACKETS = false;
 
 /// Enable connection state debugging
-constexpr bool DEBUG_CONNECTION = true;
+constexpr bool DEBUG_CONNECTION = false;
 
 /// Enable CRC validation debugging
 constexpr bool DEBUG_CRC = false;
@@ -166,6 +167,7 @@ public:
     int portHandle = -1;
     bool isConnected = false;
     int baudRate = DEFAULT_BAUD_RATE;
+    std::string portName;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
     double zeroOffset = 0.0;
@@ -174,11 +176,15 @@ public:
     ArduinoInfo arduinoInfo;
     DataCallback dataCallback;
     ConnectionCallback connectionCallback;
+    std::mutex callbackMutex;
+    std::map<CallbackToken, DataCallback> dataSubscribers;
+    std::map<CallbackToken, ConnectionCallback> connectionSubscribers;
+    CallbackToken nextCallbackToken = 1;
     std::atomic<bool> asyncReading{false};
     std::thread asyncThread;
     std::mutex readMutex;
     std::string lastError;
-    bool verbose = true;
+    bool verbose = false;
     int32_t timestampOffset = 0;
 };
 
@@ -407,7 +413,9 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         m_impl->portHandle = fd;
 #endif
         m_impl->isConnected = true;
+        m_impl->portName = portName;
         m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        notifyConnectionCallbacks(true, std::string("Connected to ") + portName);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
 #if DEBUG_CONNECTION
@@ -449,11 +457,15 @@ void SerialCommunication::disconnect() {
 #else
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
-    m_impl->portHandle = -1; m_impl->isConnected = false;
+    m_impl->portHandle = -1;
+    m_impl->isConnected = false;
+    m_impl->portName.clear();
+    notifyConnectionCallbacks(false, "Disconnected");
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
-std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? "Unknown" : ""; }
+std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? m_impl->portName : ""; }
+int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
@@ -609,6 +621,8 @@ SensorData SerialCommunication::readData(int timeout) {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     
+    data.hasFrame = !rawData.empty();
+
     if (m_impl->verbose && data.isValid) {
         std::cout << "[SerialComm] Data: TS=" << data.timestamp 
                   << ", Value=" << data.value 
@@ -627,8 +641,76 @@ SensorData SerialCommunication::readData(int timeout) {
 }
 
 bool SerialCommunication::tryReadData(SensorData& data) { data = readData(100); return data.isValid; }
-void SerialCommunication::setDataCallback(DataCallback cb) { m_impl->dataCallback = cb; }
-void SerialCommunication::setConnectionCallback(ConnectionCallback cb) { m_impl->connectionCallback = cb; }
+
+void SerialCommunication::setDataCallback(DataCallback callback)
+{
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataCallback = std::move(callback);
+}
+
+void SerialCommunication::setConnectionCallback(ConnectionCallback callback)
+{
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->connectionCallback = std::move(callback);
+}
+
+SerialCommunication::CallbackToken SerialCommunication::addDataCallback(DataCallback callback)
+{
+    if (!callback) return 0;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    const CallbackToken token = m_impl->nextCallbackToken++;
+    m_impl->dataSubscribers.emplace(token, std::move(callback));
+    return token;
+}
+
+SerialCommunication::CallbackToken SerialCommunication::addConnectionCallback(ConnectionCallback callback)
+{
+    if (!callback) return 0;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    const CallbackToken token = m_impl->nextCallbackToken++;
+    m_impl->connectionSubscribers.emplace(token, std::move(callback));
+    return token;
+}
+
+void SerialCommunication::removeDataCallback(CallbackToken token)
+{
+    if (token == 0) return;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataSubscribers.erase(token);
+}
+
+void SerialCommunication::removeConnectionCallback(CallbackToken token)
+{
+    if (token == 0) return;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->connectionSubscribers.erase(token);
+}
+
+void SerialCommunication::notifyDataCallbacks(const SensorData& data)
+{
+    std::vector<DataCallback> callbacks;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        if (m_impl->dataCallback) callbacks.push_back(m_impl->dataCallback);
+        for (const auto& item : m_impl->dataSubscribers) callbacks.push_back(item.second);
+    }
+    for (const auto& callback : callbacks) {
+        try { callback(data); } catch (...) { /* isolate subscriber failures from serial reader */ }
+    }
+}
+
+void SerialCommunication::notifyConnectionCallbacks(bool connected, const std::string& message)
+{
+    std::vector<ConnectionCallback> callbacks;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        if (m_impl->connectionCallback) callbacks.push_back(m_impl->connectionCallback);
+        for (const auto& item : m_impl->connectionSubscribers) callbacks.push_back(item.second);
+    }
+    for (const auto& callback : callbacks) {
+        try { callback(connected, message); } catch (...) { /* isolate subscriber failures from device state */ }
+    }
+}
 
 void SerialCommunication::startAsyncReading() {
     if (m_impl->asyncReading) return;
@@ -636,7 +718,7 @@ void SerialCommunication::startAsyncReading() {
     m_impl->asyncThread = std::thread([this]() {
         while (m_impl->asyncReading && m_impl->isConnected) {
             SensorData d = readData(100);
-            if (d.isValid && m_impl->dataCallback) m_impl->dataCallback(d);
+            if (d.hasFrame) notifyDataCallbacks(d);
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
         }
     });
@@ -695,6 +777,21 @@ int32_t SerialCommunication::getTimestampOffset() const {
 }
 
 std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
+    // The wire protocol is line-oriented. Never allow a caller to append
+    // another command or inject control bytes into the serial stream.
+    constexpr std::size_t MaxCommandLength = 128;
+    if (cmd.empty() || cmd.size() > MaxCommandLength ||
+        cmd.find_first_of("\r\n") != std::string::npos ||
+        cmd.find('\0') != std::string::npos) {
+        m_impl->lastError = "Rejected invalid serial command";
+        return "";
+    }
+    for (const unsigned char ch : cmd) {
+        if (ch < 0x20 || ch > 0x7e) {
+            m_impl->lastError = "Rejected invalid serial command";
+            return "";
+        }
+    }
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
     std::string toSend = cmd + "\n";
@@ -720,6 +817,7 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
     if (m_impl->verbose && !resp.empty()) std::cout << "[SerialComm] " << resp << std::endl;
     return resp;
 }
+
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
     if (!m_impl->isConnected || !data || len == 0) return false;

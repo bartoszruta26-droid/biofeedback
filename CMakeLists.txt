@@ -21,14 +21,16 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 # Find dependencies
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
-find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(Qt5 REQUIRED COMPONENTS Core Network)
 
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
     src/core/Logger.cpp
+    src/core/PasswordHasher.cpp
     src/core/Authentication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
+    src/data/LegacyXorMigration.cpp
 )
 
 target_include_directories(biofeedback_core
@@ -47,12 +49,75 @@ target_link_libraries(biofeedback_core
         Qt5::Core
 )
 
+# Shared measurement pipeline: validation, canonical units, quality and bounded history.
+add_library(biofeedback_measurement STATIC src/measurement/MeasurementEngine.cpp)
+target_include_directories(biofeedback_measurement PUBLIC ${CMAKE_SOURCE_DIR}/include)
+
+add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
+target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement)
+add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
+
+# Local loopback HTTP API. Sensitive and hardware operations remain disabled
+# until authentication, authorization and measurement services are integrated.
+add_executable(biofeedback_api
+    src/api/main.cpp
+    src/api/HttpApiServer.cpp
+    include/api/HttpApiServer.hpp
+)
+set_target_properties(biofeedback_api PROPERTIES AUTOMOC ON)
+target_include_directories(biofeedback_api PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network)
+install(TARGETS biofeedback_api DESTINATION bin)
+
 # Regression targets that can be built without Qt.
+enable_testing()
+add_executable(encryption_regression tests/encryption_regression.cpp)
+target_link_libraries(encryption_regression PRIVATE biofeedback_core)
+add_test(NAME encryption_regression COMMAND encryption_regression)
+
+add_executable(password_hasher_regression tests/password_hasher_regression.cpp)
+target_link_libraries(password_hasher_regression PRIVATE biofeedback_core)
+add_test(NAME password_hasher_regression COMMAND password_hasher_regression)
+
 add_executable(auth_regression tests/auth_regression.cpp)
 target_link_libraries(auth_regression PRIVATE biofeedback_core)
+add_test(NAME auth_regression COMMAND auth_regression)
 
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
+add_test(NAME data_manager_regression COMMAND data_manager_regression)
+
+# Shared terminal-interface model is independent of ncurses and is always testable.
+add_library(biofeedback_tui_model STATIC src/tui/TuiModel.cpp)
+target_include_directories(biofeedback_tui_model PUBLIC ${CMAKE_SOURCE_DIR}/include)
+add_executable(tui_model_regression tests/tui_model_regression.cpp)
+target_link_libraries(tui_model_regression PRIVATE biofeedback_tui_model)
+add_test(NAME tui_model_regression COMMAND tui_model_regression)
+
+# Build the interactive terminal UI when ncurses development files are available.
+find_package(Curses QUIET)
+if(CURSES_FOUND)
+    add_executable(biofeedback_tui
+        src/tui/main.cpp
+        src/sensor/SerialCommunication.cpp
+        src/sensor/MeasurementSerialAdapter.cpp
+        src/core/DebugManager.cpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(biofeedback_tui PROPERTIES AUTOMOC ON)
+    target_include_directories(biofeedback_tui PRIVATE ${CMAKE_SOURCE_DIR}/include ${CURSES_INCLUDE_DIRS})
+    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model biofeedback_measurement Qt5::Core ${CURSES_LIBRARIES})
+    install(TARGETS biofeedback_tui DESTINATION bin)
+else()
+    message(STATUS "ncurses not found - skipping optional biofeedback_tui target")
+endif()
+
+# Explicit, offline-only legacy migration utility and synthetic regression.
+add_executable(biofeedback_legacy_migrate src/tools/legacy_xor_migrate.cpp)
+target_link_libraries(biofeedback_legacy_migrate PRIVATE biofeedback_core)
+add_executable(legacy_xor_migration_regression tests/legacy_xor_migration_regression.cpp)
+target_link_libraries(legacy_xor_migration_regression PRIVATE biofeedback_core)
+add_test(NAME legacy_xor_migration_regression COMMAND legacy_xor_migration_regression)
 
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
@@ -70,6 +135,8 @@ if(Qt5_FOUND)
         src/main.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
+        src/core/DebugManager.cpp
+        src/core/PasswordHasher.cpp
         src/core/ConfigManager.cpp
         src/core/Authentication.cpp
         src/gui/MainWindow.cpp
@@ -81,6 +148,7 @@ if(Qt5_FOUND)
         src/tab/TrainingTab.cpp
         src/tab/DebugTab.cpp
         src/sensor/SerialCommunication.cpp
+        src/sensor/MeasurementSerialAdapter.cpp
         src/data/DataManager.cpp
         src/data/Encryption.cpp
         src/games/GameEngine.cpp
@@ -95,6 +163,7 @@ if(Qt5_FOUND)
     set(HEADERS
         include/core/Application.hpp
         include/core/Logger.hpp
+        include/core/DebugManager.hpp
         include/core/ConfigManager.hpp
         include/core/Authentication.hpp
         include/gui/MainWindow.hpp
@@ -106,6 +175,8 @@ if(Qt5_FOUND)
         include/tab/TrainingTab.hpp
         include/tab/DebugTab.hpp
         include/sensor/SerialCommunication.hpp
+        include/sensor/MeasurementSerialAdapter.hpp
+        include/measurement/MeasurementEngine.hpp
         include/data/DataManager.hpp
         include/data/Encryption.hpp
         include/games/GameEngine.hpp
@@ -135,6 +206,7 @@ if(Qt5_FOUND)
 
     # Link libraries
     target_link_libraries(${PROJECT_NAME}
+        biofeedback_measurement
         Qt5::Core
         Qt5::Widgets
         Qt5::Charts
@@ -152,6 +224,14 @@ if(Qt5_FOUND)
     )
 else()
     message(WARNING "Qt5 not found - GUI target '${PROJECT_NAME}' will not be built. Core/regression targets remain available.")
+endif()
+
+# Compile the changed login dialog independently from unrelated legacy GUI tabs.
+find_package(Qt5 QUIET COMPONENTS Core Widgets)
+if(Qt5Core_FOUND AND Qt5Widgets_FOUND)
+    add_library(login_dialog_compile OBJECT src/gui/LoginDialog.cpp)
+    target_include_directories(login_dialog_compile PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(login_dialog_compile PRIVATE Qt5::Core Qt5::Widgets)
 endif()
 
 # Install rules

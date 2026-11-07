@@ -191,6 +191,10 @@ TrainingTab::TrainingTab(QWidget *parent)
 
 TrainingTab::~TrainingTab()
 {
+    if (m_serialPort && m_dataCallbackToken) {
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_dataCallbackToken = 0;
+    }
     stopTraining();
 }
 
@@ -581,14 +585,17 @@ bool TrainingTab::isTrainingPaused() const
 
 void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
+    if (m_serialPort && m_dataCallbackToken) {
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_dataCallbackToken = 0;
+    }
     m_serialPort = serial;
-    
+
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback w wątku sensora - używamy QMetaObject dla bezpieczeństwa
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
+        m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
+            QMetaObject::invokeMethod(this, [this, data]() {
+                onSensorDataReceived(data);
+            }, Qt::QueuedConnection);
         });
     }
 }
@@ -911,7 +918,7 @@ void TrainingTab::loadNextExercise()
         if (index >= 0) {
             m_gameTypeCombo->setCurrentIndex(index);
         }
-        reconfigureGameForExercise(ex);
+        addDebugMessage(QString("Wybrano typ gry: %1").arg(ex.gameType), "INFO");
     }
     
     loadNextSeries();
@@ -991,61 +998,30 @@ void TrainingTab::checkExerciseCompletion()
 
 void TrainingTab::calculateExerciseStats()
 {
-    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-    stats.completedSeries = m_currentSeriesIndex;
-    stats.completedReps = m_currentRepIndex;
-    
-    // Obliczenie pełnych statystyk ćwiczenia
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    // Średnia siła szczytowa na powtórzenie
-    if (stats.peakForcePerRep.size() > 0) {
-        double totalPeakForce = 0.0;
-        for (double peakForce : stats.peakForcePerRep) {
-            totalPeakForce += peakForce;
-        }
-        stats.averagePeakForce = totalPeakForce / static_cast<double>(stats.peakForcePerRep.size());
-    } else {
-        stats.averagePeakForce = 0.0;
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exerciseStats.size() ||
+        m_currentExerciseIndex >= m_exercisePlan.size()) {
+        return;
     }
-    
-    // Maksymalna siła szczytowa
-    stats.maxPeakForce = 0.0;
-    for (double peakForce : stats.peakForcePerRep) {
-        if (peakForce > stats.maxPeakForce) {
-            stats.maxPeakForce = peakForce;
-        }
-    }
-    
-    // Minimalna siła szczytowa
-    if (!stats.peakForcePerRep.empty()) {
-        stats.minPeakForce = stats.peakForcePerRep[0];
-        for (double peakForce : stats.peakForcePerRep) {
-            if (peakForce < stats.minPeakForce) {
-                stats.minPeakForce = peakForce;
-            }
-        }
-    } else {
-        stats.minPeakForce = 0.0;
-    }
-    
-    // Czas trwania ćwiczenia
-    stats.duration = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - stats.startTime
-    ).count();
-    
-    // Współczynnik wykonania (procent ukończonych serii i powtórzeń)
-    if (ex.seriesCount > 0 && ex.repsPerSeries > 0) {
-        int totalExpectedReps = ex.seriesCount * ex.repsPerSeries;
-        int actualReps = stats.completedSeries * ex.repsPerSeries + stats.completedReps;
-        stats.completionRate = static_cast<double>(actualReps) / static_cast<double>(totalExpectedReps) * 100.0;
-    } else {
-        stats.completionRate = 0.0;
-    }
-    
-    stats.isCompleted = true;
-}
 
+    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
+    stats.completedSeries = qMax(stats.completedSeries, m_currentSeriesIndex);
+    stats.completedReps = qMax(stats.completedReps, m_currentRepIndex);
+    stats.maxPeakForce = qMax(stats.maxPeakForce, m_peakForceInRep);
+
+    // The current model stores aggregate statistics only. Do not invent per-repetition
+    // samples or timing values that the training state machine has not recorded.
+    if (stats.completedReps > 0 && m_peakForceInRep > 0.0) {
+        const int previousCount = qMax(0, stats.completedReps - 1);
+        stats.avgPeakForce = (stats.avgPeakForce * previousCount + m_peakForceInRep) /
+                             static_cast<double>(previousCount + 1);
+    }
+
+    // Consistency requires a series of per-repetition samples; this model does not
+    // retain that series yet, so leave consistencyScore unchanged rather than
+    // mislabeling completion percentage as measurement consistency.
+    stats.isCompleted = stats.completedSeries >= exercise.seriesCount;
+}
 void TrainingTab::startRestTimer()
 {
     const auto& ex = m_exercisePlan[m_currentExerciseIndex];

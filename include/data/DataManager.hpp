@@ -229,21 +229,22 @@ public:
      * @return true jeśli szyfrowanie jest aktywne
      */
     bool isEncryptionEnabled() const;
+    void setEncryptionEnabled(bool enabled);
     
     // ==================== Zapis i odczyt danych pacjenta ====================
     /**
-     * @brief Zapisuje dane pacjenta do pliku
+     * @brief Zapisuje dane pacjenta zgodnie z encryption.enabled; przy wyłączonej opcji zapisuje JSON jawny
      * @param patient Dane pacjenta
      * @param filename Nazwa pliku
-     * @param encrypt Czy szyfrować dane (domyślnie false)
+     * @param encrypt Parametr zachowany dla zgodności; szyfrowanie jest zawsze wymuszone
      * @return true jeśli zapis pomyślny
      */
     bool savePatientData(const PatientData& patient, const std::string& filename, bool encrypt = false);
     
     /**
-     * @brief Wczytuje dane pacjenta z pliku
+     * @brief Wczytuje dane pacjenta jawne lub AES-256-GCM zależnie od formatu pliku
      * @param filename Nazwa pliku
-     * @param decrypt Czy odszyfrowywać dane (domyślnie false)
+     * @param decrypt Parametr zachowany dla zgodności; deszyfrowanie jest zawsze wymuszone
      * @return Dane pacjenta (puste jeśli błąd)
      */
     PatientData loadPatientData(const std::string& filename, bool decrypt = false);
@@ -253,7 +254,7 @@ public:
      * @brief Zapisuje listę ćwiczeń do pliku
      * @param exercises Lista ćwiczeń
      * @param filename Nazwa pliku
-     * @param encrypt Czy szyfrować dane (domyślnie false)
+     * @param encrypt Parametr zachowany dla zgodności; dane pacjenta są zawsze szyfrowane
      * @return true jeśli zapis pomyślny
      */
     bool saveExercises(const std::vector<Exercise>& exercises, const std::string& filename, bool encrypt = false);
@@ -261,7 +262,7 @@ public:
     /**
      * @brief Wczytuje listę ćwiczeń z pliku
      * @param filename Nazwa pliku
-     * @param decrypt Czy odszyfrowywać dane (domyślnie false)
+     * @param decrypt Parametr zachowany dla zgodności; dane pacjenta są zawsze odszyfrowywane
      * @return Lista ćwiczeń (pusta jeśli błąd)
      */
     std::vector<Exercise> loadExercises(const std::string& filename, bool decrypt = false);
@@ -271,7 +272,7 @@ public:
      * @brief Zapisuje wyniki ćwiczeń do pliku
      * @param results Lista wyników
      * @param filename Nazwa pliku
-     * @param encrypt Czy szyfrować dane (domyślnie false)
+     * @param encrypt Parametr zachowany dla zgodności; dane powiązane z pacjentem są zawsze szyfrowane
      * @return true jeśli zapis pomyślny
      */
     bool saveExerciseResults(const std::vector<ExerciseResult>& results, const std::string& filename, bool encrypt = false);
@@ -279,7 +280,7 @@ public:
     /**
      * @brief Wczytuje wyniki ćwiczeń z pliku
      * @param filename Nazwa pliku
-     * @param decrypt Czy odszyfrowywać dane (domyślnie false)
+     * @param decrypt Parametr zachowany dla zgodności; dane powiązane z pacjentem są zawsze odszyfrowywane
      * @return Lista wyników (pusta jeśli błąd)
      */
     std::vector<ExerciseResult> loadExerciseResults(const std::string& filename, bool decrypt = false);
@@ -324,7 +325,7 @@ public:
      */
     std::vector<std::string> listFiles(const std::string& directory = ".") const;
     
-    // ==================== Eksport/Import nieszyfrowany JSON ====================
+    // ==================== Eksport/Import uwierzytelnionego JSON ====================
     /**
      * @brief Eksportuje dane do pliku JSON
      * @param data Dane do zapisu

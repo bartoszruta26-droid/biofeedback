@@ -6,8 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
-#include "data/Encryption.hpp"
-#include "core/ConfigManager.hpp"
+#include <mutex>
 
 namespace biofeedback {
 
@@ -17,6 +16,7 @@ struct UserData {
     std::string password;
     std::string role;
     bool encrypted;
+    bool mustChangePassword{false};
     
     // Konwersja do JSON
     std::string toJson() const;
@@ -59,6 +59,7 @@ public:
      * @return true jeśli zapis powiódł się
      */
     bool saveUsers();
+    void setFileEncryption(bool enabled, const std::string& key = std::string());
     
     /**
      * @brief Loguje użytkownika
@@ -67,6 +68,9 @@ public:
      * @return true jeśli logowanie powiodło się
      */
     bool login(const std::string& username, const std::string& password);
+    bool requiresPasswordChange() const;
+    bool changePassword(const std::string& newPassword);
+    bool createUser(const std::string& username, const std::string& password, const std::string& role);
     
     /**
      * @brief Wylogowuje bieżącego użytkownika
@@ -98,18 +102,15 @@ public:
      */
     int encryptPasswordsIfNeeded(const std::string& encryptionKey);
     
-    /**
-     * @brief Ustawia klucz szyfrujący
-     * @param key Klucz szyfrujący
-     */
-    void setEncryptionKey(const std::string& key);
+
 
 private:
     mutable std::mutex m_mutex;          ///< Mutex for thread-safe access to shared state
     std::string usersFilePath;
+    bool fileEncryptionEnabled{false};
+    std::string fileEncryptionKey;
     std::vector<UserData> users;
-    std::string encryptionKey;
-    UserData* currentUser;
+    UserData* currentUser{nullptr};
     
     /**
      * @brief Wyszukuje użytkownika po nazwie
@@ -118,19 +119,6 @@ private:
      */
     UserData* findUser(const std::string& username);
     
-    /**
-     * @brief Szyfruje pojedyncze hasło
-     * @param password Hasło do zaszyfrowania
-     * @return Zaszyfrowane hasło
-     */
-    std::string encryptPassword(const std::string& password);
-    
-    /**
-     * @brief Deszyfruje pojedyncze hasło
-     * @param encryptedPassword Zaszyfrowane hasło
-     * @return Odszyfrowane hasło
-     */
-    std::string decryptPassword(const std::string& encryptedPassword);
 };
 
 } // namespace biofeedback

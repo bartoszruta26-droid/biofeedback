@@ -14,6 +14,15 @@ A professional medical-grade biofeedback application built with C++, Qt5, and Ar
 - **Data Security**: JSON storage with optional encryption for sensitive medical data
 - **Medical Standards**: Comprehensive logging, data validation, and audit trails
 
+## Interfejsy użytkownika
+
+- **Desktop GUI (Qt5)** — główna aplikacja okienkowa: pacjenci, pomiary, trening i diagnostyka; pulpit statusowy z szybką nawigacją.
+- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia. Zobacz `docs/TUI_DESIGN.md`.
+- **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
+- **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
+
+Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać rzeczywiste próbki z podłączonego czujnika. WebUI i Android pozostają warstwami prezentacji w trybie podglądu do czasu wdrożenia API. Żaden interfejs nie tworzy fikcyjnych danych pacjentów.
+
 ## Hardware Requirements
 
 - Raspberry Pi 4
@@ -341,3 +350,17 @@ Please read CONTRIBUTING.md for details on our code of conduct and the process f
 ## Disclaimer
 
 This software is for research and development purposes. For medical use, proper certification and regulatory approval are required.
+
+
+## Lokalny serwer API
+
+Minimalny serwer statusu HTTP (Qt Network) można zbudować i uruchomić:
+
+    cmake -S . -B build
+    cmake --build build --target biofeedback_api
+    ./build/biofeedback_api --port 8765
+
+Usługa nasłuchuje wyłącznie na `127.0.0.1` i udostępnia `/healthz` oraz
+`/api/v1/status`. Sterowanie sprzętem, dane pacjentów i strumień pomiarowy
+pozostają wyłączone do czasu wdrożenia uwierzytelniania, autoryzacji oraz
+wspólnych usług domenowych. Nie wystawiaj tego prototypu na sieć publiczną.

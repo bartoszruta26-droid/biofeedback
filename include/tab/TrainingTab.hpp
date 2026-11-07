@@ -305,6 +305,7 @@ private:
     double m_peakForceInRep;
     
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
     
     // Pomocnicze
     QString getExerciseDisplayName(int index) const;

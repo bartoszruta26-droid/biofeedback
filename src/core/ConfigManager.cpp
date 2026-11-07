@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
+#include <type_traits>
 #include <iostream>
 #include <QThread>
 #include <QFile>
@@ -109,7 +110,7 @@ bool ConfigManager::load(const std::string& path, bool validate) {
             m_statistics.loadsSuccessful.fetch_add(1);
             
             logMessage(ConfigManagerLogLevel::INFO, 
-                      QString("Configuration loaded successfully (%1 keys)").arg(m_config.size()),
+                      QString("Configuration loaded successfully (%1 keys)").arg(m_config.size()).toStdString(),
                       "load");
             return true;
         }
@@ -278,12 +279,12 @@ bool ConfigManager::createBackup(const std::string& path) const {
         
         if (QFile::copy(sourcePath, backupPath)) {
             logMessage(ConfigManagerLogLevel::VERBOSE,
-                      QString("Backup created: %1").arg(backupPath.toStdString()).toStdString(),
+                      QString("Backup created: %1").arg(backupPath).toStdString(),
                       "createBackup");
             return true;
         } else {
             logMessage(ConfigManagerLogLevel::WARNING,
-                      QString("Failed to create backup: %1").arg(backupPath.toStdString()).toStdString(),
+                      QString("Failed to create backup: %1").arg(backupPath).toStdString(),
                       "createBackup");
             return false;
         }
@@ -447,7 +448,7 @@ void ConfigManager::setDefaults() {
     m_loaded = true;
     
     logMessage(ConfigManagerLogLevel::INFO,
-              QString("Default configuration set (%1 keys)").arg(m_config.size()),
+              QString("Default configuration set (%1 keys)").arg(m_config.size()).toStdString(),
               "setDefaults");
 }
 
@@ -558,11 +559,20 @@ void ConfigManager::setValue(const std::string& key, const ConfigValue& value) {
     m_config[key] = value;
     m_statistics.valuesWritten.fetch_add(1);
     
-    std::visit([this, &key](auto&& arg) {
-        logMessage(ConfigManagerLogLevel::VERBOSE,
-                  QString("Set '%1' = %2").arg(QString::fromStdString(key)).arg(QString::fromStdString(std::to_string(static_cast<double>(arg)))).toStdString(),
-                  "setValue");
+    const std::string displayValue = std::visit([](const auto& item) -> std::string {
+        using ValueType = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<ValueType, std::string>) {
+            return item;
+        } else if constexpr (std::is_same_v<ValueType, bool>) {
+            return item ? "true" : "false";
+        } else {
+            return std::to_string(item);
+        }
     }, value);
+    logMessage(ConfigManagerLogLevel::VERBOSE,
+              QString("Set '%1' = %2").arg(QString::fromStdString(key))
+                  .arg(QString::fromStdString(displayValue)).toStdString(),
+              "setValue");
 }
 
 bool ConfigManager::hasKey(const std::string& key) const {
@@ -586,7 +596,7 @@ void ConfigManager::setMinimumLogLevel(ConfigManagerLogLevel level) {
     QMutexLocker locker(&m_mutex);
     m_minLogLevel = level;
     logMessage(ConfigManagerLogLevel::INFO,
-              QString("Minimum log level set to: %1").arg(logLevelToString(level)).toStdString(),
+              QString("Minimum log level set to: %1").arg(QString::fromStdString(logLevelToString(level))).toStdString(),
               "setMinimumLogLevel");
 }
 
@@ -599,7 +609,7 @@ void ConfigManager::setConsoleOutputEnabled(bool enabled) {
     QMutexLocker locker(&m_mutex);
     m_consoleOutputEnabled = enabled;
     logMessage(ConfigManagerLogLevel::INFO,
-              QString("Console output %1").arg(enabled ? "enabled" : "disabled").toStdString(),
+              QString("Console output %1").arg(enabled ? QStringLiteral("enabled") : QStringLiteral("disabled")).toStdString(),
               "setConsoleOutputEnabled");
 }
 

@@ -5,12 +5,16 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <csignal>
+#include <sys/resource.h>
 
 namespace {
 
 const char* kExercisesFile = "/tmp/biofeedback_dm_exercises.json";
 const char* kResultsFile = "/tmp/biofeedback_dm_results.json";
 const char* kPatientFile = "/tmp/biofeedback_dm_patient.json";
+const char* kAtomicFailureFile = "/tmp/biofeedback_dm_atomic_failure.dat";
 
 void expect(bool condition, const std::string& message) {
     if (!condition) {
@@ -22,7 +26,13 @@ void expect(bool condition, const std::string& message) {
 
 int main() {
     try {
+        DataManager noKey; // Default development mode: plaintext files, no key required.
+        PatientData developmentPatient; developmentPatient.id = "development";
+        expect(noKey.savePatientData(developmentPatient, kPatientFile, false), "plaintext development-mode patient write");
+        expect(noKey.loadPatientData(kPatientFile, false).id == "development", "plaintext development-mode patient read");
+
         DataManager dm;
+        dm.setEncryptionKey("regression-key-material-32-bytes");
 
         std::vector<Exercise> exercises;
         Exercise ex1;
@@ -107,12 +117,70 @@ int main() {
         expect(loadedPatient.address == patient.address, "patient.address z backslash");
         expect(loadedPatient.medicalHistory == patient.medicalHistory, "patient.medicalHistory z newline");
 
+        TrainingPlan plan;
+        plan.id = "plan-1";
+        plan.patientId = "p-1";
+        plan.name = "Rehabilitation plan";
+        plan.description = "Encrypted plan";
+        expect(dm.saveTrainingPlan(plan, kResultsFile, false), "szyfrowany plan treningowy");
+        const auto loadedPlan = dm.loadTrainingPlan(kResultsFile, false);
+        expect(loadedPlan.id == plan.id && loadedPlan.patientId == plan.patientId, "odszyfrowany plan treningowy");
+
+        const std::string exportPayload = "protected-json-payload";
+        expect(dm.exportToJson(exportPayload, kResultsFile), "szyfrowany eksport JSON");
+        expect(dm.importFromJson(kResultsFile) == exportPayload, "odszyfrowany import JSON");
+
+        // Turning encryption off must not make existing BFENC files unreadable.
+        // The existing encrypted patient record remains readable with the same key.
+        dm.setEncryptionEnabled(false);
+        expect(dm.loadPatientData(kPatientFile, false).firstName == patient.firstName,
+               "encrypted patient data remains readable after disabling encryption");
+
+        // Explicitly switch the same manager to plaintext development mode.
+        patient.id = "p-plaintext";
+        expect(dm.savePatientData(patient, kPatientFile, false), "plaintext mode patient save");
+        std::ifstream plainPatientFile(kPatientFile, std::ios::binary);
+        std::string plainPatient((std::istreambuf_iterator<char>(plainPatientFile)), std::istreambuf_iterator<char>());
+        expect(plainPatient.find("BFENC:v1:") != 0, "patient file must be plaintext when encryption is disabled");
+        expect(dm.loadPatientData(kPatientFile, false).id == "p-plaintext", "plaintext mode patient read");
+
+        expect(dm.saveExerciseResults(results, kResultsFile, false), "plaintext mode exercise results save");
+        expect(dm.loadExerciseResults(kResultsFile, false).size() == 2, "plaintext mode exercise results read");
+        expect(dm.saveTrainingPlan(plan, kResultsFile, false), "plaintext mode training plan save");
+        expect(dm.loadTrainingPlan(kResultsFile, false).id == plan.id, "plaintext mode training plan read");
+        expect(dm.exportToJson(exportPayload, kResultsFile), "plaintext mode JSON export");
+        expect(dm.importFromJson(kResultsFile) == exportPayload, "plaintext mode JSON import");
+
+
+        // Force a partial write to the temporary file. The existing destination
+        // must remain unchanged because rename is reached only after full write+fsync.
+        {
+            std::ofstream original(kAtomicFailureFile, std::ios::binary);
+            original << "original-content";
+        }
+        struct rlimit previousLimit{};
+        expect(::getrlimit(RLIMIT_FSIZE, &previousLimit) == 0, "getrlimit RLIMIT_FSIZE");
+        struct rlimit limited = previousLimit;
+        limited.rlim_cur = 1;
+        const auto previousHandler = std::signal(SIGXFSZ, SIG_IGN);
+        expect(::setrlimit(RLIMIT_FSIZE, &limited) == 0, "setrlimit partial-write injection");
+        const bool interruptedWrite = dm.exportToJson("payload-longer-than-one-byte", kAtomicFailureFile);
+        const int restoreResult = ::setrlimit(RLIMIT_FSIZE, &previousLimit);
+        std::signal(SIGXFSZ, previousHandler);
+        expect(restoreResult == 0, "restore RLIMIT_FSIZE");
+        expect(!interruptedWrite, "partial atomic write must fail");
+        std::ifstream preserved(kAtomicFailureFile, std::ios::binary);
+        std::string preservedContent((std::istreambuf_iterator<char>(preserved)), std::istreambuf_iterator<char>());
+        expect(preservedContent == "original-content", "previous destination must survive partial write");
+
+        std::remove(kAtomicFailureFile);
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
         std::remove(kPatientFile);
         std::cout << "OK: data_manager_regression" << std::endl;
         return 0;
     } catch (const std::exception& ex) {
+        std::remove(kAtomicFailureFile);
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
         std::remove(kPatientFile);
