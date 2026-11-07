@@ -97,6 +97,7 @@ struct ExerciseStats {
     double avgReactionTime;
     double consistencyScore;
     bool isCompleted;
+    int gameScore{0};
     QVector<TrainingRepetitionRecord> repetitions;
     QVector<biofeedback::training::SeriesSummary> series;
     
@@ -250,6 +251,7 @@ private:
     void updateDisplay();
     void updateProgressWidgets();
     void refreshAnalytics();
+    void configureGameForExercise();
     void loadNextExercise();
     void loadNextSeries();
     void loadNextRep();
@@ -297,6 +299,7 @@ private:
     // Widget gry (embedowany)
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
+    QString m_activeGameType;
     
     // Tabela statystyk
     QGroupBox* m_statsBox;
