@@ -115,6 +115,12 @@ bool MeasurementEngine::setRepetitionsPerSeries(std::size_t repetitionsPerSeries
     return true;
 }
 
+void MeasurementEngine::discardPartialRepetition()
+{
+    m_repetition.clear();
+    m_inContraction = false;
+}
+
 void MeasurementEngine::reset()
 {
     m_repetition.clear();
