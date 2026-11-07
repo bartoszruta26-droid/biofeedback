@@ -130,6 +130,51 @@ bool RepetitionDetector::process(std::uint32_t timestampMs, double forceN, bool 
     return true;
 }
 
+
+RepetitionDetectorSnapshot RepetitionDetector::snapshot() const {
+    RepetitionDetectorSnapshot result;
+    result.active = m_active;
+    result.waitingForRelease = m_waitingForRelease;
+    result.startTimestampMs = m_startTimestampMs;
+    result.lastTimestampMs = m_lastTimestampMs;
+    result.peakTimestampMs = m_peakTimestampMs;
+    result.peakForceN = m_peakForceN;
+    result.areaForceMs = m_areaForceMs;
+    result.previousForceN = m_previousForceN;
+    result.sampleCount = m_sampleCount;
+    result.samples = m_samples;
+    return result;
+}
+
+bool RepetitionDetector::restore(const RepetitionDetectorSnapshot& value) noexcept {
+    if (value.version != 1 || (value.active && value.waitingForRelease) ||
+        value.samples.size() > 100000 ||
+        !std::isfinite(value.peakForceN) || value.peakForceN < 0.0 ||
+        !std::isfinite(value.areaForceMs) || value.areaForceMs < 0.0 ||
+        !std::isfinite(value.previousForceN) || value.previousForceN < 0.0 ||
+        value.sampleCount != value.samples.size() ||
+        (value.active && (value.sampleCount == 0 ||
+            value.lastTimestampMs - value.startTimestampMs > m_config.maximumDurationMs ||
+            value.peakTimestampMs - value.startTimestampMs >
+                value.lastTimestampMs - value.startTimestampMs))) {
+        return false;
+    }
+    for (const auto& sample : value.samples) {
+        if (!std::isfinite(sample.forceN) || sample.forceN < 0.0) return false;
+    }
+    m_active = value.active;
+    m_waitingForRelease = value.waitingForRelease;
+    m_startTimestampMs = value.startTimestampMs;
+    m_lastTimestampMs = value.lastTimestampMs;
+    m_peakTimestampMs = value.peakTimestampMs;
+    m_peakForceN = value.peakForceN;
+    m_areaForceMs = value.areaForceMs;
+    m_previousForceN = value.previousForceN;
+    m_sampleCount = value.sampleCount;
+    m_samples = value.samples;
+    return true;
+}
+
 SeriesSummary summarizeSeries(const std::vector<RepetitionRecord>& repetitions,
                               double targetForceN) noexcept {
     SeriesSummary result;
