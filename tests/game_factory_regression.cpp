@@ -1,6 +1,7 @@
 #include "games/GameFactory.hpp"
 #include "games/TanGame.hpp"
 #include "games/ArkanoidGame.hpp"
+#include "games/GalagaGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
@@ -35,6 +36,7 @@ int main(int argc, char **argv)
         QStringLiteral("tan_game"),
         QStringLiteral("pong"),
         QStringLiteral("arkanoid"),
+        QStringLiteral("galaga"),
         QStringLiteral("flappy_bird"),
         QStringLiteral("mario")
     };
@@ -67,6 +69,14 @@ int main(int argc, char **argv)
     waitForEvents(1800);
     REQUIRE(arkanoidGame->getScore() > 0); // Ball must hit at least one brick.
     arkanoidGame->stop();
+
+    std::unique_ptr<games::GameEngine> galaga(games::createGame(QStringLiteral("galaga")));
+    auto* galagaGame = dynamic_cast<games::GalagaGame*>(galaga.get());
+    REQUIRE(galagaGame != nullptr);
+    galagaGame->setDifficultyLevel(5);
+    REQUIRE(galagaGame->getDifficultyLevel() == 5);
+    galagaGame->setDifficultyLevel(0);
+    REQUIRE(galagaGame->getDifficultyLevel() == 1);
 
     std::unique_ptr<games::GameEngine> tan(games::createGame(QStringLiteral("tan")));
     auto* tanGame = dynamic_cast<games::TanGame*>(tan.get());
