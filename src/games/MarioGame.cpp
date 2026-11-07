@@ -241,10 +241,14 @@ void MarioGame::updateObstacles(double deltaTime)
 
 bool MarioGame::checkCollision(const Player& player, const Obstacle& obstacle)
 {
-    // Upadek przez otwór jest rozstrzygany po przekroczeniu dolnej
-    // krawędzi ekranu w update(), a nie przy wejściu nad lukę.
-    if (obstacle.type == Obstacle::GAP)
-        return false;
+    // Dziura staje się śmiertelna, gdy postać opadnie o własną
+    // wysokość poniżej poziomu podłoża, pozostając nad otworem.
+    if (obstacle.type == Obstacle::GAP) {
+        const double groundY = height() * GROUND_Y_RATIO;
+        const bool overlapsGap = player.body.right() > obstacle.rect.left() &&
+                                 player.body.left() < obstacle.rect.right();
+        return overlapsGap && player.body.bottom() > groundY + player.body.height();
+    }
     
     // Dla innych przeszkód sprawdzamy prostokąty
     return player.body.intersects(obstacle.rect);
