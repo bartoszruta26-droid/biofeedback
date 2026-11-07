@@ -40,7 +40,7 @@ void drawDashboard() {
     drawText(6, left + panelWidth + 4, "Probkowanie: -- Hz");
     drawText(7, left + panelWidth + 4, "Ostatnia probka: --");
     drawText(8, left + panelWidth + 4, "Dane rzeczywiste: niedostepne");
-    drawPanel(11, left, 7, contentWidth, "SZYBKI DOSTEP");
+    drawPanel(11, left, 6, contentWidth, "SZYBKI DOSTEP");
     drawText(13, left + 2, "Wybierz modul z menu po lewej stronie.");
     drawText(14, left + 2, "Strzalki: wybor modulu   Enter: otworz");
     drawText(15, left + 2, "Dane demonstracyjne nie sa danymi pacjenta ani odczytem czujnika.");
@@ -86,15 +86,15 @@ void drawModule(tui::Screen screen) {
     case tui::Screen::Devices: {
         drawText(8, x + 2, "Kandydaci portow szeregowych w systemie:");
         const auto ports = scanSerialPortCandidates();
+        const int availableRows = std::max(0, std::min(6, LINES - 16));
         if (ports.empty()) {
             drawText(10, x + 2, "Nie znaleziono portow ttyUSB, ttyACM, ttyS ani cu.*.");
         } else {
-            for (std::size_t i = 0; i < ports.size() && i < 6; ++i) {
+            for (std::size_t i = 0; i < ports.size() && i < static_cast<std::size_t>(availableRows); ++i) {
                 drawText(10 + static_cast<int>(i), x + 2, ports[i]);
             }
         }
-        drawText(17, x + 2, "Skanowanie wykrywa nazwy portow; nie oznacza aktywnego polaczenia.");
-        drawText(18, x + 2, "Ta wersja TUI nie otwiera portu i nie wysyla komend.");
+        drawText(LINES - 6, x + 2, "Skanowanie wykrywa nazwy portow; polaczenie nie jest aktywne.");
         break;
     }
     case tui::Screen::Diagnostics:
