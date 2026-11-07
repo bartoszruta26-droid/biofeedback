@@ -9,6 +9,7 @@
 #include <QRandomGenerator>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QSignalBlocker>
 #include <QPainter>
 #include <QPen>
 #include <QBrush>
@@ -23,6 +24,10 @@
 #include <QScrollArea>
 #include <memory>
 #include <iostream>
+#include <limits>
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
 
 namespace tab {
 
@@ -192,30 +197,35 @@ QString ForcePlotWidget::getUnitLabel() const
 
 void ForcePlotWidget::addSample(double force, double time)
 {
-    std::cout << "[DEBUG] ForcePlotWidget::addSample ENTER: force=" << force << " time=" << time 
-              << " m_forces.size()=" << m_forces.size() << std::endl;
-    
+    if (!std::isfinite(force) || !std::isfinite(time) || m_maxTimeWindow <= 0.0)
+        return;
+
+    // The live trace is ordered by the session clock. Reject a clock regression
+    // instead of drawing a backwards segment or corrupting the visible window.
+    if (!m_times.isEmpty() && time < m_times.last())
+        return;
+
     m_forces.append(force);
     m_times.append(time);
-    
-    // Keep raw extrema separate from the display range. Applying the margin
-    // to an already-expanded range on every sample caused exponential growth.
-    m_maxObservedForce = std::max(m_maxObservedForce, force);
-    m_minObservedForce = std::min(m_minObservedForce, force);
-    const double observedMagnitude = std::max(
-        std::abs(m_maxObservedForce), std::abs(m_minObservedForce));
-    m_maxForce = std::max(5.0, observedMagnitude * 1.2);
-    std::cout << "[DEBUG] ForcePlotWidget::addSample: Display range=" << m_maxForce << std::endl;
-    
-    // Usuń stare dane poza oknem czasowym
-    while (!m_times.isEmpty() && (time - m_times.first()) > m_maxTimeWindow) {
+
+    const double cutoff = time - m_maxTimeWindow;
+    while (!m_times.isEmpty() && m_times.first() < cutoff) {
         m_forces.removeFirst();
         m_times.removeFirst();
     }
-    
-    std::cout << "[DEBUG] ForcePlotWidget::addSample: Before update(), m_forces.size()=" << m_forces.size() << std::endl;
+
+    // Recompute the scale from the visible window. Historical peaks that have
+    // left the window must not keep compressing the current trace.
+    m_maxObservedForce = 0.0;
+    m_minObservedForce = 0.0;
+    for (double sample : m_forces) {
+        m_maxObservedForce = std::max(m_maxObservedForce, sample);
+        m_minObservedForce = std::min(m_minObservedForce, sample);
+    }
+    const double observedMagnitude = std::max(
+        std::abs(m_maxObservedForce), std::abs(m_minObservedForce));
+    m_maxForce = std::max(5.0, observedMagnitude * 1.2);
     update();
-    std::cout << "[DEBUG] ForcePlotWidget::addSample EXIT" << std::endl;
 }
 
 void ForcePlotWidget::clearData()
@@ -236,7 +246,25 @@ void ForcePlotWidget::setTargetForce(double force)
 
 void ForcePlotWidget::setMaxTimeWindow(double seconds)
 {
-    m_maxTimeWindow = seconds;
+    if (std::isfinite(seconds) && seconds > 0.0) {
+        m_maxTimeWindow = seconds;
+        if (!m_times.isEmpty()) {
+            const double cutoff = m_times.last() - m_maxTimeWindow;
+            while (!m_times.isEmpty() && m_times.first() < cutoff) {
+                m_forces.removeFirst();
+                m_times.removeFirst();
+            }
+            m_maxObservedForce = 0.0;
+            m_minObservedForce = 0.0;
+            for (double sample : m_forces) {
+                m_maxObservedForce = std::max(m_maxObservedForce, sample);
+                m_minObservedForce = std::min(m_minObservedForce, sample);
+            }
+            m_maxForce = std::max(5.0, std::max(
+                std::abs(m_maxObservedForce), std::abs(m_minObservedForce)) * 1.2);
+        }
+        update();
+    }
 }
 
 void ForcePlotWidget::paintEvent(QPaintEvent *event)
@@ -356,7 +384,11 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_btnReadManual(nullptr)
     , m_btnSave(nullptr)
     , m_btnLoad(nullptr)
+    , m_btnSaveJSON(nullptr)
+    , m_btnLoadJSON(nullptr)
+    , m_btnToggleRaw(nullptr)
     , m_btnReset(nullptr)
+    , m_unitSelector(nullptr)
     , m_liveBox(nullptr)
     , m_forcePlot(nullptr)
     , m_lblCurrentForce(nullptr)
@@ -366,33 +398,33 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_seriesProgress(nullptr)
     , m_statsBox(nullptr)
     , m_statsTable(nullptr)
+    , m_biomechBox(nullptr)
+    , m_biomechTable(nullptr)
+    , m_elasticConstantInput(nullptr)
+    , m_patientMassInput(nullptr)
+    , m_biomechSeriesSelector(nullptr)
     , m_rawBox(nullptr)
     , m_rawTable(nullptr)
     , m_isMeasuring(false)
     , m_currentSeries(1)
     , m_currentRepInSeries(0)
     , m_totalReps(0)
-    , m_sampleRate(100.0)  // 100 Hz
-    , m_targetForce(50.0)  // 50 N domyślnie
-    , m_sessionStartTime(0)
+    , m_sampleRate(100.0)
+    , m_targetForce(50.0)
+    , m_sessionStartTime(0.0)
+    , m_currentUnit(ForceUnit::Newtons)
+    , m_showRawValues(false)
     , m_inContraction(false)
-    , m_repStartForce(0)
-    , m_repPeakForce(0)
-    , m_repStartTime(0)
-    , m_repPeakTime(0)
-    , m_showRawValues(false)  // Domyślnie analizujemy skalibrowaną siłę
-    , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
-    , m_unitSelector(nullptr)
+    , m_repStartForce(0.0)
+    , m_repPeakForce(0.0)
+    , m_repStartTime(0.0)
+    , m_repPeakTime(0.0)
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
     , m_trendsContent(nullptr)
     , m_chkShowTrends(nullptr)
     , m_serialPort(nullptr)
 {
-    // Inicjalizacja wskaźników przycisków JSON
-    m_btnSaveJSON = nullptr;
-    m_btnLoadJSON = nullptr;
-    
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
@@ -419,6 +451,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
+    closeSampleJournal();
     if (m_measurementEngine && m_measurementCallbackToken) {
         m_measurementEngine->unsubscribe(m_measurementCallbackToken);
         m_measurementCallbackToken = 0;
@@ -432,19 +465,223 @@ MeasurementTab::~MeasurementTab()
 
 void MeasurementTab::ensureCurrentSeriesInitialized()
 {
-    std::cout << "[DEBUG] ensureCurrentSeriesInitialized START: m_completedSeriesStats.size()=" 
-              << m_completedSeriesStats.size() << std::endl;
-    
-    if (!m_completedSeriesStats.isEmpty()) {
-        std::cout << "[DEBUG] ensureCurrentSeriesInitialized END: already initialized" << std::endl;
+    if (m_currentSeries < 1 || m_currentSeries > 3)
         return;
+
+    if (!m_completedSeriesStats.isEmpty() &&
+        m_completedSeriesStats.last().seriesNumber == m_currentSeries)
+        return;
+
+    SeriesStats currentSeries;
+    currentSeries.seriesNumber = m_currentSeries;
+    m_completedSeriesStats.append(currentSeries);
+}
+
+
+bool MeasurementTab::openSampleJournal()
+{
+    if (m_sampleJournal.isOpen()) return true;
+    if (m_sampleJournalFailed) {
+        // Keep the failed journal for recovery and start a fresh segment.
+        m_sampleJournalPath.clear();
+        m_activeSessionId.clear();
+        m_sampleJournalPendingWrites = 0;
+        m_sampleJournalFailed = false;
+    }
+    if (m_sampleJournalPath.isEmpty()) {
+        const QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
+        if (!QDir().mkpath(dataDir)) return false;
+        if (m_activeSessionId.isEmpty())
+            m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        m_sampleJournalPath = QDir(dataDir).filePath(
+            QStringLiteral("pomiar_%1.jsonl").arg(m_activeSessionId));
     }
 
-    SeriesStats initialSeries;
-    initialSeries.seriesNumber = 1;
-    m_completedSeriesStats.append(initialSeries);
-    std::cout << "[DEBUG] ensureCurrentSeriesInitialized END: created initial series, size now=" 
-              << m_completedSeriesStats.size() << std::endl;
+    const bool newFile = !QFile::exists(m_sampleJournalPath);
+    m_sampleJournal.setFileName(m_sampleJournalPath);
+    if (!m_sampleJournal.open(QIODevice::WriteOnly | QIODevice::Append))
+        return false;
+
+    if (newFile) {
+        QJsonObject header;
+        header["recordType"] = "header";
+        header["schemaVersion"] = 1;
+        header["firstSequence"] = static_cast<qint64>(m_recordedSamples.size()) + 1;
+        header["sessionId"] = m_activeSessionId;
+        header["patientId"] = m_patientId;
+        header["date"] = QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
+        header["elasticConstantNPerM"] = m_elasticConstantInput
+            ? m_elasticConstantInput->value() : 0.0;
+        header["patientMassKg"] = m_patientMassInput
+            ? m_patientMassInput->value() : 0.0;
+        const QByteArray line = QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n';
+        if (m_sampleJournal.write(line) != line.size() || !flushSampleJournal()) {
+            closeSampleJournal();
+            QFile::remove(m_sampleJournalPath);
+            m_sampleJournalPath.clear();
+            m_activeSessionId.clear();
+            return false;
+        }
+        QFile::setPermissions(m_sampleJournalPath,
+                              QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    }
+    m_sampleJournalFailed = false;
+    return true;
+}
+
+bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample)
+{
+    if (!m_sampleJournal.isOpen() || m_sampleJournalFailed) return false;
+
+    QJsonObject record;
+    record["recordType"] = "sample";
+    record["sequence"] = static_cast<qint64>(sample.sequence);
+    record["timestampUnixMs"] = sample.timestampUnixMs;
+    record["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
+    record["elapsedTimeSeconds"] = sample.elapsedTimeSeconds;
+    record["value"] = sample.value;
+    record["rawValue"] = sample.rawValue;
+    record["hasRawValue"] = sample.hasRawValue;
+    record["calibratedMassKg"] = sample.calibratedMassKg;
+    record["hasCalibratedMass"] = sample.hasCalibratedMass;
+    record["unit"] = sample.unit;
+    record["source"] = sample.source;
+    record["quality"] = sample.quality;
+    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
+    if (m_sampleJournal.write(line) != line.size()) {
+        m_sampleJournalFailed = true;
+        return false;
+    }
+
+    ++m_sampleJournalPendingWrites;
+    // Bound the unflushed window to at most 31 samples. This avoids a full
+    // JSON rewrite in the acquisition path while keeping recovery loss bounded.
+    if (m_sampleJournalPendingWrites >= 32 && !flushSampleJournal()) {
+        m_sampleJournalFailed = true;
+        return false;
+    }
+    return true;
+}
+
+bool MeasurementTab::flushSampleJournal()
+{
+    if (!m_sampleJournal.isOpen()) return true;
+    if (!m_sampleJournal.flush()) return false;
+#ifdef Q_OS_UNIX
+    if (::fsync(m_sampleJournal.handle()) != 0) return false;
+#endif
+    m_sampleJournalPendingWrites = 0;
+    return true;
+}
+
+void MeasurementTab::closeSampleJournal()
+{
+    if (!m_sampleJournal.isOpen()) return;
+    flushSampleJournal();
+    m_sampleJournal.close();
+}
+
+bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
+{
+    QDir dir(dataDir);
+    const QStringList journals = dir.entryList(
+        QStringList() << "pomiar_*.jsonl", QDir::Files, QDir::Name);
+    bool recoveredAny = false;
+
+    for (const QString& fileName : journals) {
+        const QString path = dir.filePath(fileName);
+        if (path == m_sampleJournalPath) continue;
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) continue;
+
+        MeasurementSession session;
+        bool validHeader = false;
+        bool malformed = false;
+        quint64 expectedSequence = 1;
+        while (!file.atEnd()) {
+            QByteArray line = file.readLine();
+            if (line.trimmed().isEmpty()) continue;
+            QJsonParseError parseError;
+            const QJsonDocument doc = QJsonDocument::fromJson(line, &parseError);
+            if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+                // A power loss can leave only the final append incomplete.
+                // Keep the preceding fully flushed records and ignore that tail.
+                if (file.atEnd()) break;
+                malformed = true;
+                break;
+            }
+            const QJsonObject object = doc.object();
+            const QString recordType = object["recordType"].toString();
+            if (!validHeader) {
+                if (recordType != "header" || object["schemaVersion"].toInt() != 1)
+                    { malformed = true; break; }
+                session.sessionId = object["sessionId"].toString();
+                session.patientId = object["patientId"].toString();
+                session.date = object["date"].toString();
+                session.elasticConstantNPerM = object["elasticConstantNPerM"].toDouble();
+                session.patientMassKg = object["patientMassKg"].toDouble();
+                if (session.sessionId.isEmpty() || session.patientId != m_patientId)
+                    { malformed = true; break; }
+                expectedSequence = object["firstSequence"].toVariant().toULongLong();
+                if (expectedSequence == 0) expectedSequence = 1;
+                validHeader = true;
+                continue;
+            }
+            if (recordType != "sample") { malformed = true; break; }
+            const quint64 sequence = object["sequence"].toVariant().toULongLong();
+            const double elapsed = object["elapsedTimeSeconds"].toDouble(-1.0);
+            const double value = object["value"].toDouble(
+                std::numeric_limits<double>::quiet_NaN());
+            if (sequence != expectedSequence || !std::isfinite(elapsed) ||
+                elapsed < 0.0 || !std::isfinite(value)) {
+                malformed = true;
+                break;
+            }
+            RecordedMeasurementSample sample;
+            sample.sequence = sequence;
+            sample.timestampUnixMs = object["timestampUnixMs"].toVariant().toLongLong();
+            sample.deviceTimestampMs = static_cast<quint32>(
+                object["deviceTimestampMs"].toVariant().toULongLong());
+            sample.elapsedTimeSeconds = elapsed;
+            sample.value = value;
+            sample.rawValue = object["rawValue"].toInt();
+            sample.hasRawValue = object["hasRawValue"].toBool();
+            sample.calibratedMassKg = object["calibratedMassKg"].toDouble();
+            sample.hasCalibratedMass = object["hasCalibratedMass"].toBool();
+            sample.unit = object["unit"].toString();
+            sample.source = object["source"].toString();
+            sample.quality = object["quality"].toString();
+            session.samples.append(sample);
+            ++expectedSequence;
+        }
+        file.close();
+
+        if (!validHeader || malformed || session.samples.isEmpty()) continue;
+        const bool alreadyLoaded = std::any_of(
+            m_patientSessions.cbegin(), m_patientSessions.cend(),
+            [&session](const MeasurementSession& existing) {
+                return existing.sessionId == session.sessionId;
+            });
+        if (!alreadyLoaded) {
+            // Materialize the recovered stream as a normal, selectable JSON
+            // session so it remains accessible after this in-memory recovery.
+            const QString recoveredPath = dir.filePath(
+                QStringLiteral("pomiar_odzyskany_%1_%2.json")
+                    .arg(QDateTime::currentMSecsSinceEpoch())
+                    .arg(QUuid::createUuid().toString(QUuid::WithoutBraces)));
+            const QByteArray recoveredPayload = serializeSessionToJSON(session).toUtf8();
+            QSaveFile recoveredFile(recoveredPath);
+            if (recoveredFile.open(QIODevice::WriteOnly) &&
+                recoveredFile.write(recoveredPayload) == recoveredPayload.size() &&
+                recoveredFile.commit()) {
+                QFile::setPermissions(recoveredPath,
+                    QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+            }
+            m_patientSessions.append(session);
+            recoveredAny = true;
+        }
+    }
+    return recoveredAny;
 }
 
 void MeasurementTab::ensureSessionClockStarted()
@@ -453,9 +690,9 @@ void MeasurementTab::ensureSessionClockStarted()
     
     if (m_sessionStartTime <= 0.0) {
         m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-        std::cout << "[DEBUG] ensureSessionClockStarted: Started clock, m_sessionStartTime=" << m_sessionStartTime << std::endl;
-    } else {
-        std::cout << "[DEBUG] ensureSessionClockStarted: Clock already running" << std::endl;
+        m_sessionElapsedTimer.start();
+    } else if (!m_sessionElapsedTimer.isValid()) {
+        m_sessionElapsedTimer.start();
     }
 }
 
@@ -631,7 +868,59 @@ void MeasurementTab::setupUI()
     statsLayout->addWidget(m_statsTable);
     m_statsBox->setLayout(statsLayout);
     m_mainLayout->addWidget(m_statsBox);
-    
+
+    // Pełna tabela 65 wskaźników; status oddziela wynik liczbowy od braku danych.
+    m_biomechBox = new QGroupBox("Parametry biomechaniczne (65)", this);
+    m_biomechBox->setFont(QFont("Arial", 11, QFont::Bold));
+    QVBoxLayout* biomechLayout = new QVBoxLayout();
+    QHBoxLayout* calibrationLayout = new QHBoxLayout();
+    calibrationLayout->addWidget(new QLabel(tr("Sztywność układu [N/m]:"), this));
+    m_elasticConstantInput = new QDoubleSpinBox(this);
+    m_elasticConstantInput->setRange(0.0, 1000000.0);
+    m_elasticConstantInput->setDecimals(2);
+    m_elasticConstantInput->setSingleStep(10.0);
+    m_elasticConstantInput->setSpecialValueText(tr("Brak kalibracji"));
+    m_elasticConstantInput->setValue(0.0);
+    m_elasticConstantInput->setToolTip(
+        tr("Wprowadź zmierzoną sztywność układu sprężystego. Nie wpisuj wartości szacunkowej."));
+    calibrationLayout->addWidget(m_elasticConstantInput);
+    calibrationLayout->addWidget(new QLabel(tr("Masa pacjenta [kg]:"), this));
+    m_patientMassInput = new QDoubleSpinBox(this);
+    m_patientMassInput->setRange(0.0, 500.0);
+    m_patientMassInput->setDecimals(2);
+    m_patientMassInput->setSingleStep(0.5);
+    m_patientMassInput->setSpecialValueText(tr("Brak danych"));
+    m_patientMassInput->setValue(0.0);
+    calibrationLayout->addWidget(m_patientMassInput);
+    calibrationLayout->addWidget(new QLabel(tr("Wyniki serii:"), this));
+    m_biomechSeriesSelector = new QComboBox(this);
+    m_biomechSeriesSelector->setMinimumWidth(110);
+    calibrationLayout->addWidget(m_biomechSeriesSelector);
+    biomechLayout->addLayout(calibrationLayout);
+    connect(m_biomechSeriesSelector, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int) { updateBiomechanicalTable(); });
+    connect(m_elasticConstantInput, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { recalculateBiomechanicalResults(); });
+    connect(m_patientMassInput, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [this](double) { recalculateBiomechanicalResults(); });
+
+    m_biomechTable = new QTableWidget(this);
+    m_biomechTable->setColumnCount(4);
+    m_biomechTable->setHorizontalHeaderLabels(
+        {"Parametr", "Wartość", "Jednostka", "Dostępność"});
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(2, QHeaderView::ResizeToContents);
+    m_biomechTable->horizontalHeader()->setSectionResizeMode(3, QHeaderView::Stretch);
+    m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
+    m_biomechTable->setAlternatingRowColors(true);
+    m_biomechTable->setMaximumHeight(480);
+    m_biomechTable->setFont(QFont("Arial", 9));
+    biomechLayout->addWidget(m_biomechTable);
+    m_biomechBox->setLayout(biomechLayout);
+    m_mainLayout->addWidget(m_biomechBox);
+    updateBiomechanicalTable();
+
     // Tabela surowych danych
     m_rawBox = new QGroupBox("Surowe Dane (ostatnie 100 próbek)", this);
     m_rawBox->setFont(QFont("Arial", 11, QFont::Bold));
@@ -676,13 +965,29 @@ void MeasurementTab::setupTrendsUI()
 
 void MeasurementTab::setPatientId(const QString& id)
 {
+    if (m_patientId == id) return;
+
+    // Never carry samples or a live journal across patient boundaries.
+    // resetSession() closes and flushes the old patient's journal before
+    // clearing the in-memory stream, so an interrupted session remains
+    // recoverable only in the directory belonging to its original patient.
+    const bool hasActivePatientData =
+        !m_recordedSamples.isEmpty() || !m_completedSeriesStats.isEmpty() ||
+        m_sampleJournal.isOpen() || !m_sampleJournalPath.isEmpty();
+    if (hasActivePatientData)
+        resetSession();
+
+    if (m_patientMassInput) {
+        const QSignalBlocker blocker(m_patientMassInput);
+        m_patientMassInput->setValue(0.0);
+    }
     m_patientId = id;
 }
 
 void MeasurementTab::onPatientChanged(const QString& pesel, const QString& /*patientDataPath*/)
 {
-    // Ustaw ID pacjenta
-    m_patientId = pesel;
+    // Zmiana pacjenta unieważnia masę przypisaną do poprzedniej osoby.
+    setPatientId(pesel);
     
     // Zaktualizuj etykietę w trendach długoterminowych
     if (m_trendsContent) {
@@ -722,7 +1027,7 @@ void MeasurementTab::loadAllHistoricalMeasurements()
             QString jsonContent = in.readAll();
             file.close();
             
-            MeasurementSession session = deserializeSessionFromJSON(jsonContent);
+            MeasurementSession session = deserializeSessionFromJSON(jsonContent, false);
             if (!session.sessionId.isEmpty()) {
                 // Sprawdź czy sesja już istnieje (unikaj duplikatów)
                 bool exists = false;
@@ -738,6 +1043,8 @@ void MeasurementTab::loadAllHistoricalMeasurements()
             }
         }
     }
+    // Finalized sessions take precedence over duplicate unfinished journals.
+    recoverSampleJournals(dataDir);
 }
 
 void MeasurementTab::setTargetForce(double force)
@@ -763,6 +1070,11 @@ void MeasurementTab::startMeasurement()
     if (!m_serialPort || !m_serialPort->isConnected()) {
         QMessageBox::warning(this, tr("Brak urządzenia"),
                              tr("Połącz czujnik HX711 przed rozpoczęciem pomiaru."));
+        return;
+    }
+    if (!openSampleJournal()) {
+        QMessageBox::critical(this, tr("Błąd dziennika pomiaru"),
+                              tr("Nie można utworzyć trwałego dziennika próbek. Pomiar nie został rozpoczęty."));
         return;
     }
 
@@ -807,6 +1119,8 @@ void MeasurementTab::stopMeasurement()
     }
     
     m_isMeasuring = false;
+    const bool journalFlushed = flushSampleJournal();
+    closeSampleJournal();
     
     // An unfinished contraction is discarded; it must not be stored as a
     // completed repetition with an artificial end boundary.
@@ -832,6 +1146,8 @@ void MeasurementTab::stopMeasurement()
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     m_lblStatus->setText("Status: ZATRZYMANO");
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
+    if (!journalFlushed)
+        m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku"));
     
     std::cout << "[DEBUG] stopMeasurement: emit measurementStopped" << std::endl;
     emit measurementStopped();
@@ -847,9 +1163,17 @@ void MeasurementTab::resetSession()
     m_currentRepInSeries = 0;
     m_totalReps = 0;
     m_sessionStartTime = 0;
+    m_sessionElapsedTimer.invalidate();
+    m_sessionElapsedOffsetSeconds = 0.0;
     
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
+    m_recordedSamples.clear();
+    closeSampleJournal();
+    m_sampleJournalPath.clear();
+    m_activeSessionId.clear();
+    m_sampleJournalPendingWrites = 0;
+    m_sampleJournalFailed = false;
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
@@ -933,43 +1257,61 @@ void MeasurementTab::simulateSensorData()
     readSingleSample(currentForce, static_cast<std::uint32_t>(simTime * 1000.0));
 }
 
-void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs)
+void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs,
+                                       std::int32_t rawValue, bool hasRawValue,
+                                       double calibratedMassKg, bool hasCalibratedMass)
 {
-    std::cout << "[DEBUG] readSingleSample START: forceValue=" << forceValue 
-              << " m_completedSeriesStats.size()=" << m_completedSeriesStats.size() << std::endl;
-    
-    // Safety check - ensure series is initialized
-    if (m_completedSeriesStats.isEmpty()) {
-        std::cout << "[DEBUG] readSingleSample: No series initialized, calling ensureCurrentSeriesInitialized" << std::endl;
-        ensureCurrentSeriesInitialized();
-    }
-    
-    // Safety check - ensure session clock is started
-    if (m_sessionStartTime <= 0.0) {
-        std::cout << "[DEBUG] readSingleSample: Session clock not started, calling ensureSessionClockStarted" << std::endl;
+    if (!std::isfinite(forceValue)) return;
+
+    ensureCurrentSeriesInitialized();
+    if (m_sessionStartTime <= 0.0 || !m_sessionElapsedTimer.isValid())
         ensureSessionClockStarted();
-    }
 
-    std::cout << "[DEBUG] readSingleSample After checks: m_completedSeriesStats.size()=" 
-              << m_completedSeriesStats.size() << " m_sessionStartTime=" << m_sessionStartTime << std::endl;
+    // Elapsed time must be monotonic even when the system wall clock is
+    // corrected while a measurement is running.
+    const double currentTime = m_sessionElapsedOffsetSeconds +
+                               m_sessionElapsedTimer.elapsed() / 1000.0;
 
-    double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0 - m_sessionStartTime;
-    
-    std::cout << "[DEBUG] readSingleSample: currentTime=" << currentTime << std::endl;
-    
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
+
+    RecordedMeasurementSample recorded;
+    recorded.sequence = static_cast<quint64>(m_recordedSamples.size()) + 1;
+    recorded.timestampUnixMs = QDateTime::currentMSecsSinceEpoch();
+    recorded.deviceTimestampMs = deviceTimestampMs;
+    recorded.elapsedTimeSeconds = currentTime;
+    recorded.value = forceValue;
+    recorded.rawValue = rawValue;
+    recorded.hasRawValue = hasRawValue;
+    recorded.calibratedMassKg = calibratedMassKg;
+    recorded.hasCalibratedMass = hasCalibratedMass && std::isfinite(calibratedMassKg);
+    recorded.unit = m_showRawValues ? "count" : "N";
+    recorded.source = "desktop-hx711";
+    recorded.quality = "valid";
+    m_recordedSamples.append(recorded);
+    if (m_sampleJournal.isOpen()) {
+        const bool wasFailed = m_sampleJournalFailed;
+        if (!appendSampleJournal(recorded) && !wasFailed && m_lblStatus)
+            m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA"));
+    }
+
+    if (m_rawBox)
+        m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
+
+    constexpr int liveBufferCapacity = 10000;
+    if (m_rawForceBuffer.size() > liveBufferCapacity)
+        m_rawForceBuffer.remove(0, m_rawForceBuffer.size() - liveBufferCapacity);
+    if (m_timeBuffer.size() > liveBufferCapacity)
+        m_timeBuffer.remove(0, m_timeBuffer.size() - liveBufferCapacity);
     if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(false);
     if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 
-    // Repetition boundaries and all derived biomechanics use the same
-    // detector implementation as TrainingTab. A missing device timestamp
-    // breaks continuity rather than inventing an interval.
     if (!m_showRawValues) {
         biofeedback::training::RepetitionRecord repetition;
         if (deviceTimestampMs == 0) {
             m_repetitionDetector.reset();
         } else if (m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)) {
+            m_lastCompletedRepetition = repetition;
             m_currentRepForces.clear();
             m_currentRepTimes.clear();
             for (const auto& sample : repetition.samples) {
@@ -988,37 +1330,14 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
             m_currentRepTimes.clear();
         }
     }
-    
-    std::cout << "[DEBUG] readSingleSample: Data prepared for display - rawForceBuffer.size()=" 
-              << m_rawForceBuffer.size() << " currentRepForces.size()=" << m_currentRepForces.size() << std::endl;
-    
-    std::cout << "[DEBUG] readSingleSample Before emit newForceSample, force=" << forceValue 
-              << " timestamp=" << currentTime << std::endl;
-    
-    try {
-        // Emit signal with all three parameters to match the signal definition
-        emit newForceSample(forceValue, currentTime, m_showRawValues);
-        std::cout << "[DEBUG] readSingleSample: Signal emitted successfully" << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "[ERROR] readSingleSample: Exception while emitting signal: " << e.what() << std::endl;
-    } catch (...) {
-        std::cerr << "[ERROR] readSingleSample: Unknown exception while emitting signal" << std::endl;
-    }
-    
-    std::cout << "[DEBUG] readSingleSample Before updateLiveDisplay" << std::endl;
-    updateLiveDisplay(forceValue);
-    std::cout << "[DEBUG] readSingleSample: updateLiveDisplay completed" << std::endl;
-    
 
-    
-    std::cout << "[DEBUG] readSingleSample END" << std::endl;
-    
-    // Aktualizuj tabelę surowych danych (ostatnie 100) - safety check for null pointer
-    if (m_rawTable != nullptr) {
-        if (m_rawTable->rowCount() >= 100) {
+    emit newForceSample(forceValue, currentTime, m_showRawValues);
+    updateLiveDisplay(forceValue);
+
+    if (m_rawTable) {
+        if (m_rawTable->rowCount() >= 100)
             m_rawTable->removeRow(0);
-        }
-        int row = m_rawTable->rowCount();
+        const int row = m_rawTable->rowCount();
         m_rawTable->insertRow(row);
         m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
         const double displayedSample = m_showRawValues
@@ -1026,85 +1345,73 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
             : (m_currentUnit == ForceUnit::Kilograms ? forceValue / 9.80665 : forceValue);
         m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(displayedSample, 'f', 2)));
         m_rawTable->scrollToBottom();
-    } else {
-        std::cerr << "[ERROR] readSingleSample: m_rawTable is null!" << std::endl;
     }
 }
 
 void MeasurementTab::updateLiveDisplay(double force)
 {
-    std::cout << "[DEBUG] updateLiveDisplay START: force=" << force 
-              << " m_showRawValues=" << m_showRawValues << " m_currentUnit=" << static_cast<int>(m_currentUnit) << std::endl;
-    
-    // Wyświetl siłę w aktualnie wybranej jednostce
+    if (!std::isfinite(force)) return;
+
     double displayForce = force;
     QString unitLabel = "N";
-    
-    if (!m_showRawValues) {
-        switch (m_currentUnit) {
-            case ForceUnit::Kilograms:
-                displayForce = force / 9.80665;  // N -> kgf
-                unitLabel = "kgf";
-                std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
-                break;
-            case ForceUnit::Raw:
-                // Nie powinno się zdarzyć, bo raw jest obsługiwane osobno
-                displayForce = force;
-                unitLabel = "ADC";
-                std::cout << "[DEBUG] updateLiveDisplay: Raw mode, displayForce=" << displayForce << std::endl;
-                break;
-            case ForceUnit::Newtons:
-            default:
-                displayForce = force;
-                unitLabel = "N";
-                std::cout << "[DEBUG] updateLiveDisplay: Newtons mode, displayForce=" << displayForce << std::endl;
-                break;
-        }
-    } else {
+    if (m_showRawValues) {
         unitLabel = "ADC";
-        std::cout << "[DEBUG] updateLiveDisplay: showRawValues=true, displayForce=" << displayForce << std::endl;
+    } else if (m_currentUnit == ForceUnit::Kilograms) {
+        displayForce = force / 9.80665;
+        unitLabel = "kgf";
     }
-    
-    std::cout << "[DEBUG] updateLiveDisplay: Before updating UI components" << std::endl;
-    m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
+
+    m_lblCurrentForce->setText(
+        QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
     m_forceBar->setValue(static_cast<int>(displayForce));
     m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
-    m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
-    
-    double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
-    std::cout << "[DEBUG] updateLiveDisplay: Before addSample, force=" << force << " time=" << lastTime << std::endl;
+
+    const double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
     m_forcePlot->addSample(force, lastTime);
-    std::cout << "[DEBUG] updateLiveDisplay END" << std::endl;
 }
 
 void MeasurementTab::calculateRepetitionStats()
 {
-    std::cout << "[DEBUG] calculateRepetitionStats START: m_currentRepForces.size()=" 
-              << m_currentRepForces.size() 
-              << " m_completedSeriesStats.size()=" << m_completedSeriesStats.size() << std::endl;
-    
-    if (m_currentRepForces.size() < 2) {
-        std::cout << "[DEBUG] calculateRepetitionStats END: m_currentRepForces.size() < 2" << std::endl;
+    if (m_currentRepForces.size() < 3 ||
+        m_currentRepForces.size() != m_currentRepTimes.size())
         return;
-    }
-    
-    if (m_completedSeriesStats.isEmpty()) {
-        std::cerr << "[ERROR] calculateRepetitionStats: m_completedSeriesStats is EMPTY - this should not happen!" << std::endl;
-        ensureCurrentSeriesInitialized();
-    }
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Setting repNumber=" << (m_currentRepInSeries + 1) << std::endl;
-    
+
+    ensureCurrentSeriesInitialized();
+    if (m_completedSeriesStats.isEmpty() || m_currentSeries > 3)
+        return;
+
     m_currentRepStats = RepetitionStats();
     m_currentRepStats.repNumber = m_currentRepInSeries + 1;
     m_currentRepStats.peakForce = m_repPeakForce;
-    m_currentRepStats.timeToPeak = m_repPeakTime - m_repStartTime;
-    
-    // Rise rate (szybkość narastania)
-    if (m_repPeakTime - m_repStartTime > 0) {
-        m_currentRepStats.riseRate = (m_repPeakForce - m_repStartForce) / (m_repPeakTime - m_repStartTime);
+    m_currentRepStats.biomechanicalData.repNumber = m_currentRepStats.repNumber;
+    m_currentRepStats.biomechanicalData.startTime = m_lastCompletedRepetition.startTimestampMs;
+    m_currentRepStats.biomechanicalData.endTime = m_lastCompletedRepetition.endTimestampMs;
+    m_currentRepStats.biomechanicalData.peakTime =
+        m_lastCompletedRepetition.startTimestampMs + m_lastCompletedRepetition.timeToPeakMs;
+    m_currentRepStats.biomechanicalData.startForce = m_repStartForce;
+    m_currentRepStats.biomechanicalData.peakForce = m_repPeakForce;
+    m_currentRepStats.biomechanicalData.endForce = m_lastCompletedRepetition.samples.empty()
+        ? 0.0 : m_lastCompletedRepetition.samples.back().forceN;
+    m_currentRepStats.biomechanicalData.samples.reserve(
+        m_lastCompletedRepetition.samples.size());
+    for (const auto& sample : m_lastCompletedRepetition.samples) {
+        m_currentRepStats.biomechanicalData.samples.emplace_back(
+            sample.timestampMs, sample.forceN);
     }
-    
+
+    Formulas biomechanicalFormulas(
+        m_elasticConstantInput ? m_elasticConstantInput->value() : 0.0,
+        m_patientMassInput ? m_patientMassInput->value() : 0.0);
+    m_currentRepStats.biomechanicalParams =
+        biomechanicalFormulas.calculateRepParams(m_currentRepStats.biomechanicalData);
+
+    m_currentRepStats.timeToPeak =
+        static_cast<double>(m_lastCompletedRepetition.timeToPeakMs) / 1000.0;
+    if (m_currentRepStats.timeToPeak > 0.0) {
+        m_currentRepStats.riseRate =
+            (m_repPeakForce - m_repStartForce) / m_currentRepStats.timeToPeak;
+    }
+
     // Average force decay rate from the peak to the first post-peak
     // sample at or below 10% of peak force.
     double fallEndTime = m_repPeakTime;
@@ -1121,144 +1428,226 @@ void MeasurementTab::calculateRepetitionStats()
         m_currentRepStats.fallRate =
             (m_repPeakForce - fallEndForce) / (fallEndTime - m_repPeakTime);
     }
-    
-    // Czas trwania
-    m_currentRepStats.duration = m_currentRepTimes.last() - m_repStartTime;
-    
-    // Czas w górnych 8% siły
-    double thresholdTop = m_repPeakForce * 0.92;
-    double timeInTop = 0;
+
+    m_currentRepStats.duration =
+        static_cast<double>(m_lastCompletedRepetition.durationMs) / 1000.0;
+    const double repetitionEndTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
+    m_currentRepStats.endTime = repetitionEndTime;
+    m_currentRepStats.startTime = repetitionEndTime - m_currentRepStats.duration;
+
+    const double thresholdTop = m_repPeakForce * 0.92;
+    double timeInTop = 0.0;
     for (int i = 1; i < m_currentRepForces.size(); ++i) {
-        if (m_currentRepForces[i] >= thresholdTop && m_currentRepForces[i-1] >= thresholdTop) {
-            timeInTop += m_currentRepTimes[i] - m_currentRepTimes[i-1];
+        if (m_currentRepForces[i] >= thresholdTop &&
+            m_currentRepForces[i - 1] >= thresholdTop) {
+            timeInTop += m_currentRepTimes[i] - m_currentRepTimes[i - 1];
         }
     }
     m_currentRepStats.timeInTop8pct = timeInTop;
-    
-    // Czas w dolnych 8% siły (relaksacja między powtórzeniami)
-    double thresholdBottom = m_repPeakForce * 0.08;
-    double timeInBottom = 0;
+
+    const double thresholdBottom = m_repPeakForce * 0.08;
+    double timeInBottom = 0.0;
     for (int i = 1; i < m_currentRepForces.size(); ++i) {
-        if (m_currentRepForces[i] <= thresholdBottom && m_currentRepForces[i-1] <= thresholdBottom) {
-            timeInBottom += m_currentRepTimes[i] - m_currentRepTimes[i-1];
+        if (m_currentRepForces[i] <= thresholdBottom &&
+            m_currentRepForces[i - 1] <= thresholdBottom) {
+            timeInBottom += m_currentRepTimes[i] - m_currentRepTimes[i - 1];
         }
     }
     m_currentRepStats.timeInBottom8pct = timeInBottom;
-    
-    // Pole pod krzywą (impuls)
-    m_currentRepStats.areaUnderCurve = calculateAreaUnderCurve(m_currentRepForces, m_currentRepTimes);
-    
-    // Time-weighted mean force uses the same trapezoidal integral and
-    // repetition duration as RepetitionDetector::meanForceN.
+    m_currentRepStats.areaUnderCurve =
+        calculateAreaUnderCurve(m_currentRepForces, m_currentRepTimes);
+
     if (m_currentRepStats.duration > 0.0) {
         m_currentRepStats.avgForce =
             m_currentRepStats.areaUnderCurve / m_currentRepStats.duration;
-    } else {
-        double sum = 0.0;
-        for (double force : m_currentRepForces) sum += force;
-        m_currentRepStats.avgForce = sum / m_currentRepForces.size();
     }
-    
-    // Mediana
     QVector<double> sortedForces = m_currentRepForces;
     std::sort(sortedForces.begin(), sortedForces.end());
     m_currentRepStats.medianForce = calculateMedian(sortedForces);
-    
-    // Dominanta (najczęstsza wartość w histogramie)
     m_currentRepStats.modeForce = calculateMode(m_currentRepForces);
-    
     m_currentRepStats.isValid = true;
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before accessing m_completedSeriesStats.last()" << std::endl;
-    
-    // Dodaj do bieżącej serii
+
     SeriesStats& currentSeries = m_completedSeriesStats.last();
     currentSeries.reps.append(m_currentRepStats);
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before emit repetitionCompleted" << std::endl;
-    
-    // Emituj sygnał
+
+    SeriesData biomechanicalSeries;
+    biomechanicalSeries.seriesNumber = currentSeries.seriesNumber;
+    biomechanicalSeries.startTime =
+        currentSeries.reps.first().biomechanicalData.startTime;
+    biomechanicalSeries.endTime =
+        currentSeries.reps.last().biomechanicalData.endTime;
+    biomechanicalSeries.reps.reserve(
+        static_cast<std::size_t>(currentSeries.reps.size()));
+    for (const auto& rep : currentSeries.reps)
+        biomechanicalSeries.reps.push_back(rep.biomechanicalData);
+    currentSeries.biomechanicalParams =
+        biomechanicalFormulas.calculateAllParams(biomechanicalSeries);
+
+    // Keep the ordinary series summary current even when the operator stops
+    // before completing all eight repetitions.
+    currentSeries.avgPeakForce = 0.0;
+    currentSeries.impulseTotal = 0.0;
+    currentSeries.avgRiseRate = 0.0;
+    currentSeries.avgFallRate = 0.0;
+    QVector<double> peakForces;
+    for (const auto& rep : currentSeries.reps) {
+        currentSeries.avgPeakForce += rep.peakForce;
+        currentSeries.impulseTotal += rep.areaUnderCurve;
+        currentSeries.avgRiseRate += rep.riseRate;
+        currentSeries.avgFallRate += rep.fallRate;
+        peakForces.append(rep.peakForce);
+    }
+    const double repCount = static_cast<double>(currentSeries.reps.size());
+    currentSeries.avgPeakForce /= repCount;
+    currentSeries.avgRiseRate /= repCount;
+    currentSeries.avgFallRate /= repCount;
+    currentSeries.medianPeakForce = calculateMedian(peakForces);
+    currentSeries.totalWork = currentSeries.biomechanicalParams.W_total;
+    if (currentSeries.reps.size() >= 2 &&
+        currentSeries.reps.first().peakForce > 0.0) {
+        const double firstPeak = currentSeries.reps.first().peakForce;
+        const double lastPeak = currentSeries.reps.last().peakForce;
+        currentSeries.fatigueIndex = ((firstPeak - lastPeak) / firstPeak) * 100.0;
+    }
+    const double seriesDuration =
+        currentSeries.reps.last().endTime - currentSeries.reps.first().startTime;
+    currentSeries.seriesSpeed = seriesDuration > 0.0
+        ? repCount / seriesDuration : 0.0;
+
+    double variance = 0.0;
+    for (double peak : peakForces) {
+        const double difference = peak - currentSeries.avgPeakForce;
+        variance += difference * difference;
+    }
+    variance /= repCount;
+    const double stdDev = std::sqrt(variance);
+    currentSeries.consistencyScore = currentSeries.avgPeakForce > 0.0
+        ? std::max(0.0, 100.0 -
+            (stdDev / currentSeries.avgPeakForce) * 100.0) : 0.0;
+
     emit repetitionCompleted(m_currentSeries, m_currentRepStats.repNumber, m_currentRepStats);
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before updateStatsTable" << std::endl;
-    
-    // Aktualizuj tabelę
     updateStatsTable();
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before checking series completion" << std::endl;
-    
-    // Sprawdź czy seria zakończona
-    m_currentRepInSeries++;
+    ++m_currentRepInSeries;
+
+    // Recompute both the selected set and whole-session metrics after every
+    // completed repetition, not only after changing calibration inputs.
+    recalculateBiomechanicalResults();
+
     if (m_currentRepInSeries >= 8) {
-        // Analiza serii
-        currentSeries.avgPeakForce = 0;
-        currentSeries.totalWork = 0;
-        currentSeries.avgRiseRate = 0;
-        currentSeries.avgFallRate = 0;
-        
-        QVector<double> peakForces;
-        for (const auto& rep : currentSeries.reps) {
-            currentSeries.avgPeakForce += rep.peakForce;
-            currentSeries.totalWork += rep.areaUnderCurve;
-            currentSeries.avgRiseRate += rep.riseRate;
-            currentSeries.avgFallRate += rep.fallRate;
-            peakForces.append(rep.peakForce);
-        }
-        
-        currentSeries.avgPeakForce /= currentSeries.reps.size();
-        currentSeries.avgRiseRate /= currentSeries.reps.size();
-        currentSeries.avgFallRate /= currentSeries.reps.size();
-        currentSeries.medianPeakForce = calculateMedian(peakForces);
-        currentSeries.impulseTotal = currentSeries.totalWork;
-        
-        // Wskaźnik zmęczenia (spadek siły względem pierwszego powtórzenia)
-        if (currentSeries.reps.size() >= 2 && currentSeries.reps.first().peakForce > 0) {
-            double lastPeak = currentSeries.reps.last().peakForce;
-            double firstPeak = currentSeries.reps.first().peakForce;
-            currentSeries.fatigueIndex = ((firstPeak - lastPeak) / firstPeak) * 100.0;
-        }
-        
-        std::cout << "[DEBUG] calculateRepetitionStats: Before seriesDuration calculation, reps.size()=" 
-                  << currentSeries.reps.size() << std::endl;
-        
-        // Szybkość serii - zabezpieczenie przed pustym wektorem
-        double seriesDuration = 0;
-        if (!currentSeries.reps.isEmpty()) {
-            seriesDuration = currentSeries.reps.last().duration - currentSeries.reps.first().duration;
-        }
-        if (seriesDuration > 0) {
-            currentSeries.seriesSpeed = currentSeries.reps.size() / seriesDuration;
-        }
-        
-        // Wskaźnik powtarzalności (odwrotność odchylenia standardowego)
-        double variance = 0;
-        for (double pf : peakForces) {
-            variance += (pf - currentSeries.avgPeakForce) * (pf - currentSeries.avgPeakForce);
-        }
-        variance /= peakForces.size();
-        double stdDev = std::sqrt(variance);
-        if (currentSeries.avgPeakForce > 0) {
-            currentSeries.consistencyScore = std::max(0.0, 100.0 - (stdDev / currentSeries.avgPeakForce) * 100.0);
-        }
-        
-        std::cout << "[DEBUG] calculateRepetitionStats: Before emit seriesCompleted" << std::endl;
         emit seriesCompleted(m_currentSeries, currentSeries);
-        
-        // Przejdź do następnej serii lub zakończ sesję
         m_currentRepInSeries = 0;
-        m_currentSeries++;
-        
+        ++m_currentSeries;
         if (m_currentSeries > 3) {
-            m_lblStatus->setText("Status: SESJA ZAKOŃCZONA");
-            m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
+            // Stop acquisition before notifying listeners that the session
+            // is complete, so no post-protocol samples can enter the journal.
+            stopMeasurement();
             emit sessionFinished(m_completedSeriesStats);
+            m_lblStatus->setText(tr("Status: SESJA ZAKOŃCZONA"));
+            m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
         } else {
-            m_lblStatus->setText(QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
+            m_lblStatus->setText(
+                QString("Status: PRZERWA - ZA CHWILĘ SERIA %1").arg(m_currentSeries));
         }
     }
-    
-    std::cout << "[DEBUG] calculateRepetitionStats: Before updateSeriesProgress" << std::endl;
     updateSeriesProgress();
+}
+
+void MeasurementTab::recalculateBiomechanicalResults()
+{
+    const double elasticConstant = m_elasticConstantInput
+        ? m_elasticConstantInput->value() : 0.0;
+    const double patientMass = m_patientMassInput
+        ? m_patientMassInput->value() : 0.0;
+    Formulas formulas(elasticConstant, patientMass);
+    std::vector<SeriesData> sessionSeries;
+    sessionSeries.reserve(static_cast<std::size_t>(m_completedSeriesStats.size()));
+
+    for (auto& seriesStats : m_completedSeriesStats) {
+        if (seriesStats.reps.isEmpty()) {
+            seriesStats.biomechanicalParams = BiomechanicalParams();
+            continue;
+        }
+
+        SeriesData seriesData;
+        seriesData.seriesNumber = seriesStats.seriesNumber;
+        seriesData.startTime = seriesStats.reps.first().biomechanicalData.startTime;
+        seriesData.endTime = seriesStats.reps.last().biomechanicalData.endTime;
+        seriesData.reps.reserve(static_cast<std::size_t>(seriesStats.reps.size()));
+        for (auto& repetition : seriesStats.reps) {
+            repetition.biomechanicalParams =
+                formulas.calculateRepParams(repetition.biomechanicalData);
+            seriesData.reps.push_back(repetition.biomechanicalData);
+        }
+        seriesStats.biomechanicalParams = formulas.calculateAllParams(seriesData);
+        sessionSeries.push_back(std::move(seriesData));
+    }
+
+    m_sessionBiomechanicalParams = formulas.calculateSessionParams(sessionSeries);
+    updateBiomechanicalTable();
+}
+
+void MeasurementTab::updateBiomechanicalTable()
+{
+    if (!m_biomechTable) return;
+    m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
+
+    int selectedIndex = m_completedSeriesStats.isEmpty()
+        ? -1 : m_completedSeriesStats.size() - 1;
+    if (m_biomechSeriesSelector) {
+        const QVariant previousData = m_biomechSeriesSelector->currentData();
+        const int previous = previousData.isValid() ? previousData.toInt() : selectedIndex;
+        const QSignalBlocker blocker(m_biomechSeriesSelector);
+        m_biomechSeriesSelector->clear();
+        m_biomechSeriesSelector->addItem(tr("Cała sesja"), -1);
+        for (int i = 0; i < m_completedSeriesStats.size(); ++i) {
+            m_biomechSeriesSelector->addItem(
+                tr("Seria %1").arg(m_completedSeriesStats[i].seriesNumber), i);
+        }
+        const int previousIndex = m_biomechSeriesSelector->findData(previous);
+        m_biomechSeriesSelector->setCurrentIndex(
+            previousIndex >= 0 ? previousIndex : 0);
+        selectedIndex = m_biomechSeriesSelector->currentData().toInt();
+    }
+
+    const BiomechanicalParams* result = selectedIndex < 0
+        ? &m_sessionBiomechanicalParams
+        : (selectedIndex < m_completedSeriesStats.size()
+            ? &m_completedSeriesStats[selectedIndex].biomechanicalParams : nullptr);
+    const auto values = result ? result->values()
+                               : std::array<double, BiomechanicalParams::ParameterCount>{};
+
+    for (std::size_t i = 0; i < BiomechanicalParams::ParameterCount; ++i) {
+        const auto status = result
+            ? result->availabilityAt(i)
+            : ParameterAvailability::InsufficientData;
+        QString statusText;
+        switch (status) {
+        case ParameterAvailability::Available: statusText = tr("Obliczono"); break;
+        case ParameterAvailability::RequiresCalibration: statusText = tr("Wymaga kalibracji"); break;
+        case ParameterAvailability::RequiresAdditionalSensor: statusText = tr("Wymaga dodatkowego czujnika"); break;
+        case ParameterAvailability::RequiresHistory: statusText = tr("Wymaga historii"); break;
+        case ParameterAvailability::InvalidInput: statusText = tr("Nieprawidłowe dane"); break;
+        case ParameterAvailability::InsufficientData:
+        default: statusText = tr("Brak wystarczających danych"); break;
+        }
+
+        QString valueText = QString::fromUtf8("—");
+        if (result && status == ParameterAvailability::Available) {
+            if (std::isfinite(values[i]))
+                valueText = QString::number(values[i], 'g', 8);
+            else
+                statusText = tr("Nieprawidłowy wynik");
+        }
+
+        const int row = static_cast<int>(i);
+        m_biomechTable->setItem(row, 0,
+            new QTableWidgetItem(QString("%1. %2").arg(row + 1)
+                .arg(QString::fromLatin1(BiomechanicalParams::parameterName(i)))));
+        m_biomechTable->setItem(row, 1, new QTableWidgetItem(valueText));
+        m_biomechTable->setItem(row, 2,
+            new QTableWidgetItem(QString::fromUtf8(BiomechanicalParams::parameterUnit(i))));
+        m_biomechTable->setItem(row, 3, new QTableWidgetItem(statusText));
+    }
 }
 
 void MeasurementTab::updateStatsTable()
@@ -1413,7 +1802,8 @@ void MeasurementTab::onReadSingleSample()
     if (!std::isfinite(value)) return;
     if (m_sessionStartTime <= 0.0) ensureSessionClockStarted();
     ensureCurrentSeriesInitialized();
-    readSingleSample(value, m_lastSensorData.timestamp);
+    readSingleSample(value, m_lastSensorData.timestamp, m_lastSensorData.value, true,
+                     m_lastSensorData.calibratedValue, m_lastSensorData.hasCalibratedValue);
     m_lblStatus->setText(tr("Status: PRÓBKA ZAPISANA"));
     m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
 }
@@ -1446,7 +1836,7 @@ void MeasurementTab::onSaveMeasurementJSON()
     const bool hasCompletedRepetition = std::any_of(
         m_completedSeriesStats.cbegin(), m_completedSeriesStats.cend(),
         [](const SeriesStats& series) { return !series.reps.isEmpty(); });
-    if (!hasCompletedRepetition) {
+    if (!hasCompletedRepetition && m_recordedSamples.isEmpty()) {
         QMessageBox::warning(this, "Ostrzeżenie", "Brak zakończonych powtórzeń do zapisania.");
         return;
     }
@@ -1500,7 +1890,8 @@ bool MeasurementTab::exportToCSV(const QString& filename)
     
     // Nagłówek
     out << "Pacjent,Seria,Powtorzenie,Szczyt_N,CzasDoSzczytu_s,RiseRate_N_s,FallRate_N_s,"
-        << "Duration_s,TimeInTop8_s,TimeInBottom8_s,Impuls_Ns,AvgForce_N,MedianForce_N,ModeForce_N\n";
+        << "Duration_s,StartTime_s,EndTime_s,TimeInTop8_s,TimeInBottom8_s,Impuls_Ns,"
+        << "AvgForce_N,MedianForce_N,ModeForce_N\n";
     
     // Dane
     for (const auto& series : m_completedSeriesStats) {
@@ -1513,6 +1904,8 @@ bool MeasurementTab::exportToCSV(const QString& filename)
                 << rep.riseRate << ","
                 << rep.fallRate << ","
                 << rep.duration << ","
+                << rep.startTime << ","
+                << rep.endTime << ","
                 << rep.timeInTop8pct << ","
                 << rep.timeInBottom8pct << ","
                 << rep.areaUnderCurve << ","
@@ -1563,12 +1956,18 @@ bool MeasurementTab::importFromCSV(const QString& filename)
             stats.riseRate = parts[5].toDouble();
             stats.fallRate = parts[6].toDouble();
             stats.duration = parts[7].toDouble();
-            stats.timeInTop8pct = parts[8].toDouble();
-            stats.timeInBottom8pct = parts[9].toDouble();
-            stats.areaUnderCurve = parts[10].toDouble();
-            stats.avgForce = parts[11].toDouble();
-            stats.medianForce = parts[12].toDouble();
-            stats.modeForce = parts[13].toDouble();
+            const bool hasTimeBounds = parts.size() >= 16;
+            const int metricOffset = hasTimeBounds ? 2 : 0;
+            if (hasTimeBounds) {
+                stats.startTime = parts[8].toDouble();
+                stats.endTime = parts[9].toDouble();
+            }
+            stats.timeInTop8pct = parts[8 + metricOffset].toDouble();
+            stats.timeInBottom8pct = parts[9 + metricOffset].toDouble();
+            stats.areaUnderCurve = parts[10 + metricOffset].toDouble();
+            stats.avgForce = parts[11 + metricOffset].toDouble();
+            stats.medianForce = parts[12 + metricOffset].toDouble();
+            stats.modeForce = parts[13 + metricOffset].toDouble();
             stats.isValid = true;
             
             m_completedSeriesStats[seriesNum - 1].reps.append(stats);
@@ -1596,10 +1995,17 @@ bool MeasurementTab::importFromCSV(const QString& filename)
 bool MeasurementTab::exportToJSON(const QString& filename)
 {
     MeasurementSession session;
-    session.sessionId = QUuid::createUuid().toString();
+    if (m_activeSessionId.isEmpty())
+        m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    session.sessionId = m_activeSessionId;
     session.patientId = m_patientId;
     session.date = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
     session.series = m_completedSeriesStats;
+    session.samples = m_recordedSamples;
+    session.elasticConstantNPerM = m_elasticConstantInput
+        ? m_elasticConstantInput->value() : 0.0;
+    session.patientMassKg = m_patientMassInput
+        ? m_patientMassInput->value() : 0.0;
 
     const QByteArray payload = serializeSessionToJSON(session).toUtf8();
     QSaveFile file(filename);
@@ -1611,6 +2017,10 @@ bool MeasurementTab::exportToJSON(const QString& filename)
         return false;
     }
     QFile::setPermissions(filename, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    closeSampleJournal();
+    if (!m_sampleJournalPath.isEmpty()) QFile::remove(m_sampleJournalPath);
+    m_sampleJournalPath.clear();
+    m_activeSessionId.clear();
     QMessageBox::information(this, tr("Sukces"), tr("Dane sesji zapisano do: %1").arg(filename));
     return true;
 }
@@ -1631,8 +2041,29 @@ bool MeasurementTab::importFromJSON(const QString& filename)
     if (!session.sessionId.isEmpty()) {
         m_patientSessions.append(session);
         m_patientId = session.patientId;
+        m_sampleJournalPath.clear();
+        m_activeSessionId.clear();
+        m_sampleJournalPendingWrites = 0;
+        m_sampleJournalFailed = false;
         m_completedSeriesStats = session.series;
-        
+        m_recordedSamples = session.samples;
+        if (m_elasticConstantInput) {
+            const QSignalBlocker blocker(m_elasticConstantInput);
+            m_elasticConstantInput->setValue(session.elasticConstantNPerM);
+        }
+        if (m_patientMassInput) {
+            const QSignalBlocker blocker(m_patientMassInput);
+            m_patientMassInput->setValue(session.patientMassKg);
+        }
+        recalculateBiomechanicalResults();
+        m_sessionElapsedOffsetSeconds = m_recordedSamples.isEmpty()
+            ? 0.0 : m_recordedSamples.last().elapsedTimeSeconds;
+        m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+        m_sessionElapsedTimer.start();
+        if (m_rawBox)
+            m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
+        showCurrentMeasurementData();
+
         // Odśwież widok
         m_statsTable->setRowCount(0);
         for (const auto& series : m_completedSeriesStats) {
@@ -1649,6 +2080,80 @@ bool MeasurementTab::importFromJSON(const QString& filename)
     }
     
     return false;
+}
+
+void MeasurementTab::showCurrentMeasurementData()
+{
+    m_rawForceBuffer.clear();
+    m_timeBuffer.clear();
+    m_rawTable->setRowCount(0);
+    m_forcePlot->clearData();
+
+    if (m_recordedSamples.isEmpty()) {
+        if (m_rawBox)
+            m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z 0 próbek)"));
+        return;
+    }
+
+    // A session is normally locked to one acquisition mode. If an imported
+    // legacy file contains mixed units, show only the final contiguous unit
+    // segment rather than drawing ADC counts and newtons on one axis.
+    const QString displayUnit = m_recordedSamples.last().unit;
+    int firstDisplaySample = m_recordedSamples.size() - 1;
+    while (firstDisplaySample > 0 &&
+           m_recordedSamples[firstDisplaySample - 1].unit == displayUnit)
+        --firstDisplaySample;
+
+    m_showRawValues = (displayUnit == "count");
+    if (m_btnToggleRaw) {
+        const QSignalBlocker blocker(m_btnToggleRaw);
+        m_btnToggleRaw->setChecked(m_showRawValues);
+        m_btnToggleRaw->setEnabled(false);
+        m_btnToggleRaw->setText(m_showRawValues
+            ? tr("TRYB: WARTOŚCI RAW")
+            : tr("TRYB: WARTOŚCI SKALIBROWANE"));
+        m_btnToggleRaw->setStyleSheet(m_showRawValues
+            ? "background-color: #FF9800; color: white;"
+            : "background-color: #2196F3; color: white;");
+    }
+    if (m_unitSelector)
+        m_unitSelector->setEnabled(!m_showRawValues);
+    m_forcePlot->setUnit(m_showRawValues ? ForceUnit::Raw : m_currentUnit);
+
+    constexpr int liveBufferCapacity = 10000;
+    const int displayStart = std::max(
+        firstDisplaySample, m_recordedSamples.size() - liveBufferCapacity);
+    for (int i = displayStart; i < m_recordedSamples.size(); ++i) {
+        const auto& sample = m_recordedSamples[i];
+        m_rawForceBuffer.append(sample.value);
+        m_timeBuffer.append(sample.elapsedTimeSeconds);
+        m_forcePlot->addSample(sample.value, sample.elapsedTimeSeconds);
+    }
+
+    const int tableStart = std::max(firstDisplaySample, m_recordedSamples.size() - 100);
+    for (int i = tableStart; i < m_recordedSamples.size(); ++i) {
+        const auto& sample = m_recordedSamples[i];
+        const int row = m_rawTable->rowCount();
+        m_rawTable->insertRow(row);
+        m_rawTable->setItem(row, 0, new QTableWidgetItem(
+            QString::number(sample.elapsedTimeSeconds, 'f', 3)));
+        const double displayed = m_showRawValues ? sample.value
+            : (m_currentUnit == ForceUnit::Kilograms ? sample.value / 9.80665 : sample.value);
+        m_rawTable->setItem(row, 1, new QTableWidgetItem(
+            QString::number(displayed, 'f', 2)));
+    }
+
+    const double currentValue = m_recordedSamples.last().value;
+    const double displayedValue = m_showRawValues ? currentValue
+        : (m_currentUnit == ForceUnit::Kilograms ? currentValue / 9.80665 : currentValue);
+    const QString unitLabel = m_showRawValues ? "ADC"
+        : (m_currentUnit == ForceUnit::Kilograms ? "kgf" : "N");
+    m_lblCurrentForce->setText(
+        QString("Aktualna siła: %1 %2").arg(displayedValue, 0, 'f', 1).arg(unitLabel));
+    m_forceBar->setValue(static_cast<int>(displayedValue));
+    m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
+    m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
+    m_rawTable->scrollToBottom();
 }
 
 void MeasurementTab::loadPatientTrends()
@@ -1676,13 +2181,17 @@ void MeasurementTab::loadPatientTrends()
             QString jsonContent = in.readAll();
             file.close();
             
-            MeasurementSession session = deserializeSessionFromJSON(jsonContent);
+            MeasurementSession session = deserializeSessionFromJSON(jsonContent, false);
             if (!session.sessionId.isEmpty()) {
                 m_patientSessions.append(session);
             }
         }
     }
     
+    // Prefer a finalized JSON session over its still-present journal (e.g. a crash
+    // after atomic JSON commit but before journal cleanup).
+    recoverSampleJournals(dataDir);
+
     if (m_patientSessions.isEmpty()) {
         QMessageBox::information(this, "Informacja", "Brak zapisanych sesji JSON dla tego pacjenta.");
         return;
@@ -1785,7 +2294,29 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
     root["sessionId"] = session.sessionId;
     root["patientId"] = session.patientId;
     root["date"] = session.date;
-    
+    root["schemaVersion"] = 3;
+    root["elasticConstantNPerM"] = session.elasticConstantNPerM;
+    root["patientMassKg"] = session.patientMassKg;
+
+    QJsonArray samplesArray;
+    for (const auto& sample : session.samples) {
+        QJsonObject sampleObj;
+        sampleObj["sequence"] = static_cast<qint64>(sample.sequence);
+        sampleObj["timestampUnixMs"] = sample.timestampUnixMs;
+        sampleObj["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
+        sampleObj["elapsedTimeSeconds"] = sample.elapsedTimeSeconds;
+        sampleObj["value"] = sample.value;
+        sampleObj["rawValue"] = sample.rawValue;
+        sampleObj["hasRawValue"] = sample.hasRawValue;
+        sampleObj["calibratedMassKg"] = sample.calibratedMassKg;
+        sampleObj["hasCalibratedMass"] = sample.hasCalibratedMass;
+        sampleObj["unit"] = sample.unit;
+        sampleObj["source"] = sample.source;
+        sampleObj["quality"] = sample.quality;
+        samplesArray.append(sampleObj);
+    }
+    root["samples"] = samplesArray;
+
     QJsonArray seriesArray;
     for (const auto& series : session.series) {
         QJsonObject seriesObj;
@@ -1799,7 +2330,17 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
         seriesObj["seriesSpeed"] = series.seriesSpeed;
         seriesObj["consistencyScore"] = series.consistencyScore;
         seriesObj["impulseTotal"] = series.impulseTotal;
-        
+        QJsonArray seriesBiomechanicalValues;
+        QJsonArray seriesBiomechanicalAvailability;
+        const auto seriesValues = series.biomechanicalParams.values();
+        for (std::size_t i = 0; i < BiomechanicalParams::ParameterCount; ++i) {
+            seriesBiomechanicalValues.append(seriesValues[i]);
+            seriesBiomechanicalAvailability.append(
+                static_cast<int>(series.biomechanicalParams.availabilityAt(i)));
+        }
+        seriesObj["biomechanicalValues"] = seriesBiomechanicalValues;
+        seriesObj["biomechanicalAvailability"] = seriesBiomechanicalAvailability;
+
         QJsonArray repsArray;
         for (const auto& rep : series.reps) {
             QJsonObject repObj;
@@ -1809,6 +2350,8 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
             repObj["riseRate"] = rep.riseRate;
             repObj["fallRate"] = rep.fallRate;
             repObj["duration"] = rep.duration;
+            repObj["startTime"] = rep.startTime;
+            repObj["endTime"] = rep.endTime;
             repObj["timeInTop8pct"] = rep.timeInTop8pct;
             repObj["timeInBottom8pct"] = rep.timeInBottom8pct;
             repObj["areaUnderCurve"] = rep.areaUnderCurve;
@@ -1816,6 +2359,35 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
             repObj["medianForce"] = rep.medianForce;
             repObj["modeForce"] = rep.modeForce;
             repObj["isValid"] = rep.isValid;
+            QJsonArray repBiomechanicalValues;
+            QJsonArray repBiomechanicalAvailability;
+            const auto repValues = rep.biomechanicalParams.values();
+            for (std::size_t i = 0; i < BiomechanicalParams::ParameterCount; ++i) {
+                repBiomechanicalValues.append(repValues[i]);
+                repBiomechanicalAvailability.append(
+                    static_cast<int>(rep.biomechanicalParams.availabilityAt(i)));
+            }
+            repObj["biomechanicalValues"] = repBiomechanicalValues;
+            repObj["biomechanicalAvailability"] = repBiomechanicalAvailability;
+
+            QJsonObject biomechanicalInput;
+            biomechanicalInput["repNumber"] = rep.biomechanicalData.repNumber;
+            biomechanicalInput["startTime"] = static_cast<qint64>(rep.biomechanicalData.startTime);
+            biomechanicalInput["peakTime"] = static_cast<qint64>(rep.biomechanicalData.peakTime);
+            biomechanicalInput["endTime"] = static_cast<qint64>(rep.biomechanicalData.endTime);
+            biomechanicalInput["startForce"] = rep.biomechanicalData.startForce;
+            biomechanicalInput["peakForce"] = rep.biomechanicalData.peakForce;
+            biomechanicalInput["endForce"] = rep.biomechanicalData.endForce;
+            QJsonArray biomechanicalSamples;
+            for (const auto& sample : rep.biomechanicalData.samples) {
+                QJsonObject sampleObject;
+                sampleObject["timestamp"] = static_cast<qint64>(sample.timestamp);
+                sampleObject["force"] = sample.force;
+                sampleObject["isValid"] = sample.isValid;
+                biomechanicalSamples.append(sampleObject);
+            }
+            biomechanicalInput["samples"] = biomechanicalSamples;
+            repObj["biomechanicalInput"] = biomechanicalInput;
             repsArray.append(repObj);
         }
         seriesObj["repetitions"] = repsArray;
@@ -1827,7 +2399,7 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
     return doc.toJson(QJsonDocument::Indented);
 }
 
-MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& json) const
+MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& json, bool includeSamples) const
 {
     MeasurementSession session;
     
@@ -1838,7 +2410,31 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
     session.sessionId = root["sessionId"].toString();
     session.patientId = root["patientId"].toString();
     session.date = root["date"].toString();
-    
+    session.elasticConstantNPerM = root["elasticConstantNPerM"].toDouble();
+    session.patientMassKg = root["patientMassKg"].toDouble();
+
+    if (includeSamples) {
+        const QJsonArray samplesArray = root["samples"].toArray();
+        session.samples.reserve(samplesArray.size());
+        for (const auto& sampleValue : samplesArray) {
+            const QJsonObject sampleObj = sampleValue.toObject();
+            RecordedMeasurementSample sample;
+            sample.sequence = static_cast<quint64>(sampleObj["sequence"].toVariant().toULongLong());
+            sample.timestampUnixMs = sampleObj["timestampUnixMs"].toVariant().toLongLong();
+            sample.deviceTimestampMs = static_cast<quint32>(sampleObj["deviceTimestampMs"].toVariant().toULongLong());
+            sample.elapsedTimeSeconds = sampleObj["elapsedTimeSeconds"].toDouble();
+            sample.value = sampleObj["value"].toDouble();
+            sample.rawValue = sampleObj["rawValue"].toInt();
+            sample.hasRawValue = sampleObj["hasRawValue"].toBool();
+            sample.calibratedMassKg = sampleObj["calibratedMassKg"].toDouble();
+            sample.hasCalibratedMass = sampleObj["hasCalibratedMass"].toBool();
+            sample.unit = sampleObj["unit"].toString();
+            sample.source = sampleObj["source"].toString();
+            sample.quality = sampleObj["quality"].toString();
+            session.samples.append(sample);
+        }
+    }
+
     QJsonArray seriesArray = root["series"].toArray();
     for (const auto& seriesVal : seriesArray) {
         QJsonObject seriesObj = seriesVal.toObject();
@@ -1853,7 +2449,22 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
         series.seriesSpeed = seriesObj["seriesSpeed"].toDouble();
         series.consistencyScore = seriesObj["consistencyScore"].toDouble();
         series.impulseTotal = seriesObj["impulseTotal"].toDouble();
-        
+        const QJsonArray seriesValuesJson = seriesObj["biomechanicalValues"].toArray();
+        const QJsonArray seriesAvailabilityJson = seriesObj["biomechanicalAvailability"].toArray();
+        std::array<double, BiomechanicalParams::ParameterCount> seriesValues{};
+        for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                        i < seriesValuesJson.size(); ++i)
+            seriesValues[static_cast<std::size_t>(i)] = seriesValuesJson[i].toDouble();
+        series.biomechanicalParams.assignValues(seriesValues);
+        for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                        i < seriesAvailabilityJson.size(); ++i) {
+            const int status = seriesAvailabilityJson[i].toInt();
+            if (status >= static_cast<int>(ParameterAvailability::InsufficientData) &&
+                status <= static_cast<int>(ParameterAvailability::InvalidInput))
+                series.biomechanicalParams.setAvailability(
+                    static_cast<std::size_t>(i), static_cast<ParameterAvailability>(status));
+        }
+
         QJsonArray repsArray = seriesObj["repetitions"].toArray();
         for (const auto& repVal : repsArray) {
             QJsonObject repObj = repVal.toObject();
@@ -1864,6 +2475,8 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
             rep.riseRate = repObj["riseRate"].toDouble();
             rep.fallRate = repObj["fallRate"].toDouble();
             rep.duration = repObj["duration"].toDouble();
+            rep.startTime = repObj["startTime"].toDouble();
+            rep.endTime = repObj["endTime"].toDouble();
             rep.timeInTop8pct = repObj["timeInTop8pct"].toDouble();
             rep.timeInBottom8pct = repObj["timeInBottom8pct"].toDouble();
             rep.areaUnderCurve = repObj["areaUnderCurve"].toDouble();
@@ -1871,6 +2484,46 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
             rep.medianForce = repObj["medianForce"].toDouble();
             rep.modeForce = repObj["modeForce"].toDouble();
             rep.isValid = repObj["isValid"].toBool();
+            const QJsonArray repValuesJson = repObj["biomechanicalValues"].toArray();
+            const QJsonArray repAvailabilityJson = repObj["biomechanicalAvailability"].toArray();
+            std::array<double, BiomechanicalParams::ParameterCount> repValues{};
+            for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                            i < repValuesJson.size(); ++i)
+                repValues[static_cast<std::size_t>(i)] = repValuesJson[i].toDouble();
+            rep.biomechanicalParams.assignValues(repValues);
+            for (int i = 0; i < static_cast<int>(BiomechanicalParams::ParameterCount) &&
+                            i < repAvailabilityJson.size(); ++i) {
+                const int status = repAvailabilityJson[i].toInt();
+                if (status >= static_cast<int>(ParameterAvailability::InsufficientData) &&
+                    status <= static_cast<int>(ParameterAvailability::InvalidInput))
+                    rep.biomechanicalParams.setAvailability(
+                        static_cast<std::size_t>(i), static_cast<ParameterAvailability>(status));
+            }
+
+            const QJsonObject biomechanicalInput = repObj["biomechanicalInput"].toObject();
+            rep.biomechanicalData.repNumber = biomechanicalInput["repNumber"].toInt();
+            rep.biomechanicalData.startTime = static_cast<std::uint32_t>(
+                biomechanicalInput["startTime"].toVariant().toULongLong());
+            rep.biomechanicalData.peakTime = static_cast<std::uint32_t>(
+                biomechanicalInput["peakTime"].toVariant().toULongLong());
+            rep.biomechanicalData.endTime = static_cast<std::uint32_t>(
+                biomechanicalInput["endTime"].toVariant().toULongLong());
+            rep.biomechanicalData.startForce = biomechanicalInput["startForce"].toDouble();
+            rep.biomechanicalData.peakForce = biomechanicalInput["peakForce"].toDouble();
+            rep.biomechanicalData.endForce = biomechanicalInput["endForce"].toDouble();
+            if (includeSamples) {
+                const QJsonArray biomechanicalSamples = biomechanicalInput["samples"].toArray();
+                rep.biomechanicalData.samples.reserve(
+                    static_cast<std::size_t>(biomechanicalSamples.size()));
+                for (const auto& sampleValue : biomechanicalSamples) {
+                    const QJsonObject sampleObject = sampleValue.toObject();
+                    SensorSample sample(
+                        static_cast<std::uint32_t>(sampleObject["timestamp"].toVariant().toULongLong()),
+                        sampleObject["force"].toDouble());
+                    sample.isValid = sampleObject["isValid"].toBool();
+                    rep.biomechanicalData.samples.push_back(sample);
+                }
+            }
             series.reps.append(rep);
         }
         session.series.append(series);
@@ -1923,15 +2576,16 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         addDebugMessage(tr("Ramka zawiera tylko dane RAW; oczekuję na skalibrowaną wartość w gramach."), "WARNING");
         return;
     }
-    addDebugMessage(QString("HX711: RAW=%1 | skalibrowana masa=%2 g")
-        .arg(data.value).arg(data.calibratedValue, 0, 'f', 2), "ARDUINO");
+    // Per-frame logging at the sensor's sample rate floods the debug channel
+    // and adds synchronous UI work to the acquisition hot path.
 
     if (!m_isMeasuring) return;
 
     // Calibrated biomechanical samples are delivered through MeasurementEngine.
     // Raw ADC capture remains a diagnostic-only path and is never treated as force.
     if (m_isMeasuring && m_showRawValues)
-        readSingleSample(static_cast<double>(data.value), data.timestamp);
+        readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true,
+                         data.calibratedValue, data.hasCalibratedValue);
 }
 
 void MeasurementTab::onMeasurementSample(
@@ -1949,7 +2603,7 @@ void MeasurementTab::onMeasurementSample(
         m_repetitionDetector.reset();
         return;
     }
-    readSingleSample(force, sample.deviceTimestampMs);
+    readSingleSample(force, sample.deviceTimestampMs, sample.rawValue, true, sample.value, true);
 }
 
 // ============================================================================

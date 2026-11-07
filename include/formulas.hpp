@@ -7,6 +7,8 @@
 #include <cmath>
 #include <numeric>
 #include <algorithm>
+#include <array>
+#include <cstddef>
 
 /**
  * @brief Struktura reprezentująca pojedynczą próbkę danych z czujnika
@@ -49,10 +51,35 @@ struct SeriesData {
     SeriesData() : seriesNumber(0), startTime(0), endTime(0) {}
 };
 
+/** Availability is separate from the numeric value: zero is a valid result,
+ * while missing inputs must never be represented as a measured zero. */
+enum class ParameterAvailability : std::uint8_t {
+    InsufficientData,
+    Available,
+    RequiresCalibration,
+    RequiresAdditionalSensor,
+    RequiresHistory,
+    InvalidInput
+};
+
 /**
  * @brief Struktura zawierająca wszystkie obliczone parametry biomechaniczne
  */
 struct BiomechanicalParams {
+    static constexpr std::size_t ParameterCount = 65;
+    std::array<ParameterAvailability, ParameterCount> availability{};
+
+    void setAvailability(std::size_t index, ParameterAvailability status) noexcept {
+        if (index < ParameterCount) availability[index] = status;
+    }
+    ParameterAvailability availabilityAt(std::size_t index) const noexcept {
+        return index < ParameterCount ? availability[index]
+                                       : ParameterAvailability::InvalidInput;
+    }
+    static const char* parameterName(std::size_t index) noexcept;
+    static const char* parameterUnit(std::size_t index) noexcept;
+    std::array<double, ParameterCount> values() const noexcept;
+    void assignValues(const std::array<double, ParameterCount>& values) noexcept;
     // Kategoria 1: Parametry Siłowe (1-10)
     double F_peak;              // 1. Maksymalna Siła Chwilowa [N]
     double F_mean;              // 2. Średnia Siła z Powtórzenia [N]
@@ -149,7 +176,7 @@ public:
      * @param patientMass Masa pacjenta [kg]
      * @param sampleRate Częstotliwość próbkowania [Hz]
      */
-    Formulas(double k_elastic = 100.0, double patientMass = 70.0, double sampleRate = 100.0);
+    Formulas(double k_elastic = 0.0, double patientMass = 0.0, double sampleRate = 100.0);
     
     /**
      * @brief Oblicza wszystkie parametry biomechaniczne dla serii
@@ -157,6 +184,8 @@ public:
      * @return Obliczone parametry biomechaniczne
      */
     BiomechanicalParams calculateAllParams(const SeriesData& series);
+    /** Aggregate comparable metrics across the current session's exercise sets. */
+    BiomechanicalParams calculateSessionParams(const std::vector<SeriesData>& series);
     
     /**
      * @brief Oblicza parametry dla pojedynczego powtórzenia
@@ -205,7 +234,7 @@ public:
     
     /**
      * @brief 7. Całkowita Praca Mechaniczna Serii (Total Work)
-     * W = (1/k_elastic) * sum(F_i * (F_{i+1} - F_i))
+     * W = sum(abs((F_i + F_{i+1})/2 * (F_{i+1} - F_i) / k_elastic))
      */
     double calculateWork(const std::vector<SensorSample>& samples) const;
     
@@ -565,9 +594,9 @@ public:
     static double calculateLPT(double currentCTS, double previousCTS);
     
     // Gettery i settery
-    void setElasticConstant(double k) { k_elastic_ = k; }
-    void setPatientMass(double m) { patient_mass_ = m; }
-    void setSampleRate(double rate) { sample_rate_ = rate; }
+    void setElasticConstant(double k) { k_elastic_ = (std::isfinite(k) && k > 0.0) ? k : 0.0; }
+    void setPatientMass(double m) { patient_mass_ = (std::isfinite(m) && m > 0.0) ? m : 0.0; }
+    void setSampleRate(double rate) { sample_rate_ = (std::isfinite(rate) && rate > 0.0) ? rate : 0.0; }
     
     double getElasticConstant() const { return k_elastic_; }
     double getPatientMass() const { return patient_mass_; }
@@ -577,7 +606,6 @@ private:
     double k_elastic_;      // Stała sprężystości taśmy [N/m]
     double patient_mass_;   // Masa pacjenta [kg]
     double sample_rate_;    // Częstotliwość próbkowania [Hz]
-    double dt_;             // Interwał próbkowania [s]
     
     // Funkcje pomocnicze
     static std::vector<double> extractForces(const std::vector<SensorSample>& samples);

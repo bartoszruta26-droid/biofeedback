@@ -2,6 +2,7 @@
 #define TAB_MEASUREMENTTAB_HPP
 
 #include <QWidget>
+#include <QElapsedTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -20,11 +21,14 @@
 #include <QTextEdit>
 #include <memory>
 #include <QComboBox>
+#include <QDoubleSpinBox>
+#include <QFile>
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
 #include "training/RepetitionDetector.hpp"
 #include "core/DebugManager.hpp"
+#include "formulas.hpp"
 
 namespace tab {
 
@@ -98,6 +102,8 @@ struct RepetitionStats {
     double riseRate;            // Szybkość narastania siły [N/s]
     double fallRate;            // Szybkość opadania siły [N/s]
     double duration;            // Czas trwania powtórzenia [s]
+    double startTime;            // Czas rozpoczęcia od początku sesji [s]
+    double endTime;              // Czas zakończenia od początku sesji [s]
     double timeInTop8pct;       // Czas w górnych 8% siły [s]
     double timeInBottom8pct;    // Czas w dolnych 8% siły [s]
     double areaUnderCurve;      // Pole pod krzywą (impuls) [N·s]
@@ -105,9 +111,11 @@ struct RepetitionStats {
     double medianForce;         // Mediana siły [N]
     double modeForce;           // Dominanta siły [N]
     bool isValid;
+    RepetitionData biomechanicalData;
+    BiomechanicalParams biomechanicalParams;
     
     RepetitionStats() : repNumber(0), peakForce(0), timeToPeak(0), 
-                        riseRate(0), fallRate(0), duration(0),
+                        riseRate(0), fallRate(0), duration(0), startTime(0), endTime(0),
                         timeInTop8pct(0), timeInBottom8pct(0),
                         areaUnderCurve(0), avgForce(0), medianForce(0),
                         modeForce(0), isValid(false) {}
@@ -122,13 +130,14 @@ struct SeriesStats {
     double avgPeakForce;                // Średnia siła szczytowa serii
     double medianPeakForce;             // Mediana sił szczytowych
     double fatigueIndex;                // Wskaźnik zmęczenia [% spadku]
-    double totalWork;                   // Całkowita praca (suma pól pod krzywą) [N·s]
+    double totalWork;                   // Praca mechaniczna [J]; status w biomechanicalParams
     double avgRiseRate;                 // Średnia szybkość narastania [N/s]
     double avgFallRate;                 // Średnia szybkość opadania [N/s]
     double seriesSpeed;                 // Szybkość wykonania serii [rep/s]
     double consistencyScore;            // Wskaźnik powtarzalności [%]
-    double impulseTotal;                // Całkowity impuls [N·s]
+    double impulseTotal;                // Całkowity impuls siły [N·s]
     QString sessionDate;                // Data sesji pomiarowej
+    BiomechanicalParams biomechanicalParams; // 65 parametrów z oceną dostępności
     
     SeriesStats() : seriesNumber(0), avgPeakForce(0), medianPeakForce(0),
                     fatigueIndex(0), totalWork(0), avgRiseRate(0),
@@ -139,11 +148,30 @@ struct SeriesStats {
 /**
  * @brief Dane sesji pomiarowej do trendów długoterminowych
  */
+struct RecordedMeasurementSample {
+    quint64 sequence{0};
+    qint64 timestampUnixMs{0};
+    quint32 deviceTimestampMs{0};
+    double elapsedTimeSeconds{0.0};
+    double value{0.0};
+    qint32 rawValue{0};
+    bool hasRawValue{false};
+    double calibratedMassKg{0.0};
+    bool hasCalibratedMass{false};
+    QString unit;
+    QString source;
+    QString quality;
+};
+
+/** Full sample stream retained for lossless session export/import. */
 struct MeasurementSession {
     QString sessionId;                  // Unikalny identyfikator sesji
     QString patientId;                  // ID pacjenta
     QString date;                       // Data pomiaru
     QVector<SeriesStats> series;        // Serie z tej sesji
+    QVector<RecordedMeasurementSample> samples; // Pełny przebieg próbkowania
+    double elasticConstantNPerM{0.0};
+    double patientMassKg{0.0};
     
     MeasurementSession() {}
 };
@@ -205,7 +233,9 @@ public:
     /**
      * @brief Ręczne wczytanie pojedynczej próbki siły
      */
-    void readSingleSample(double forceValue, std::uint32_t deviceTimestampMs = 0);
+    void readSingleSample(double forceValue, std::uint32_t deviceTimestampMs = 0,
+                          std::int32_t rawValue = 0, bool hasRawValue = false,
+                          double calibratedMassKg = 0.0, bool hasCalibratedMass = false);
     
     /**
      * @brief Analizuje serię i zwraca statystyki
@@ -312,6 +342,13 @@ private:
     void updateLiveDisplay(double force);
     void calculateRepetitionStats();
     void updateStatsTable();
+    void updateBiomechanicalTable();
+    void recalculateBiomechanicalResults();
+    bool openSampleJournal();
+    bool appendSampleJournal(const RecordedMeasurementSample& sample);
+    bool flushSampleJournal();
+    void closeSampleJournal();
+    bool recoverSampleJournals(const QString& dataDir);
     void updateSeriesProgress();
     double calculateMedian(const QVector<double>& values) const;
     double calculateMode(const QVector<double>& values) const;
@@ -320,7 +357,7 @@ private:
     void setupTrendsUI();
     void updateTrendsView();
     QString serializeSessionToJSON(const MeasurementSession& session) const;
-    MeasurementSession deserializeSessionFromJSON(const QString& json) const;
+    MeasurementSession deserializeSessionFromJSON(const QString& json, bool includeSamples = true) const;
     
     // Konwersja jednostek
     double convertForce(double newtons, ForceUnit targetUnit) const;
@@ -346,7 +383,7 @@ private:
     QPushButton* m_btnToggleRaw;      // Przełącznik trybu Raw/Calibrated
     QPushButton* m_btnReset;
     
-    // Wybór jednostki siły (must be after m_currentUnit for init order)
+    // Wybór jednostki siły
     QComboBox* m_unitSelector;
     
     // Panel żywy z wykresem
@@ -361,6 +398,12 @@ private:
     // Tabela statystyk
     QGroupBox* m_statsBox;
     QTableWidget* m_statsTable;
+    QGroupBox* m_biomechBox;
+    QTableWidget* m_biomechTable;
+    QDoubleSpinBox* m_elasticConstantInput;
+    QDoubleSpinBox* m_patientMassInput;
+    QComboBox* m_biomechSeriesSelector;
+    BiomechanicalParams m_sessionBiomechanicalParams;
     
     // Tabela surowych danych
     QGroupBox* m_rawBox;
@@ -377,16 +420,24 @@ private:
     double m_sampleRate;      // Hz
     double m_targetForce;     // N
     double m_sessionStartTime;
+    QElapsedTimer m_sessionElapsedTimer;
+    double m_sessionElapsedOffsetSeconds{0.0};
     
     // Bufory danych
     QVector<double> m_rawForceBuffer;
     QVector<double> m_timeBuffer;
+    QVector<RecordedMeasurementSample> m_recordedSamples;
+    QFile m_sampleJournal;
+    QString m_sampleJournalPath;
+    quint32 m_sampleJournalPendingWrites{0};
+    QString m_activeSessionId;
+    bool m_sampleJournalFailed{false};
     
     // Bufor bieżącego powtórzenia
     QVector<double> m_currentRepForces;
     QVector<double> m_currentRepTimes;
     
-    // Aktualna jednostka wyświetlania (must be before m_unitSelector for init order)
+    // Aktualna jednostka wyświetlania
     ForceUnit m_currentUnit;
     
     // Tryb wyświetlania: raw value vs calibrated
@@ -399,6 +450,7 @@ private:
     double m_repStartTime;
     double m_repPeakTime;
     biofeedback::training::RepetitionDetector m_repetitionDetector;
+    biofeedback::training::RepetitionRecord m_lastCompletedRepetition;
     
     // Wyniki
     QVector<SeriesStats> m_completedSeriesStats;
