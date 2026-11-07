@@ -127,6 +127,13 @@ private:
         Obstacle() : xPosition(0), gapY(0), gapHeight(0), passed(false) {}
     };
 
+    // Stałe fizyczne/logiczne muszą być zadeklarowane przed polami,
+    // których inicjalizatory konstruktora z nich korzystają.
+    const float m_birdBaseRadius = 12.0f;
+    const float m_obstacleBaseWidth = 60.0f;
+    const double m_minForce = 0.0;
+    const double m_maxForce = 100.0; ///< Zakres siły w jednostkach umownych
+
     // Stan gry - Ptak
     QPointF m_birdPos;            ///< Pozycja ptaka
     QPointF m_birdVelocity;       ///< Prędkość ptaka
@@ -151,11 +158,6 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort; ///< Współdzielony wskaźnik do komunikacji
     bool m_ownSerial;                                          ///< Czy gra jest właścicielem obiektu serial
     
-    // Stałe fizyczne/logiczne
-    const float m_birdBaseRadius = 12.0f;
-    const float m_obstacleBaseWidth = 60.0f;
-    const double m_minForce = 0.0;
-    const double m_maxForce = 100.0; ///< Zakres siły w jednostkach umownych
     
     // Aktualna siła z sensora (znormalizowana 0.0 - 1.0)
     double m_currentForce;

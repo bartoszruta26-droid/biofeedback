@@ -30,7 +30,42 @@ int main() {
     assert(rep.samples.back().timestampMs == rep.endTimestampMs);
     assert(!detector.isActive());
 
+    // Simulate a process restart in the middle of a contraction.
+    detector.reset();
+    assert(!detector.process(2000, 15.0, true, rep));
+    assert(!detector.process(2100, 28.0, true, rep));
+    const auto snapshot = detector.snapshot();
+    assert(snapshot.active && snapshot.samples.size() == 2);
+
+    RepetitionDetector recovered({50.0, 0.20, 0.10, 2.0, 250, 30000, 500});
+    assert(recovered.restore(snapshot));
+    assert(recovered.isActive());
+    assert(!recovered.process(2200, 45.0, true, rep));
+    assert(recovered.process(2300, 4.0, true, rep));
+    assert(rep.startTimestampMs == 2000);
+    assert(rep.endTimestampMs == 2300);
+    assert(rep.sampleCount == 4);
+    assert(std::abs(rep.peakForceN - 45.0) < 1e-9);
+
+    // A malformed checkpoint is rejected without modifying a separate
+    // detector that was already restored from the valid snapshot.
+    RepetitionDetector guarded({50.0, 0.20, 0.10, 2.0, 250, 30000, 500});
+    assert(guarded.restore(snapshot));
+    auto corrupt = snapshot;
+    ++corrupt.sampleCount;
+    assert(!guarded.restore(corrupt));
+    auto unorderedSamples = snapshot;
+    unorderedSamples.samples[1].timestampMs = unorderedSamples.samples[0].timestampMs;
+    assert(!guarded.restore(unorderedSamples));
+    assert(guarded.isActive());
+    assert(guarded.process(2200, 45.0, true, rep) == false);
+    assert(guarded.process(2300, 4.0, true, rep));
+    assert(rep.startTimestampMs == 2000 && rep.endTimestampMs == 2300);
+    assert(!guarded.isActive());
+    assert(!guarded.process(2400, 0.0, true, rep));
+
     // A short spike is discarded, not counted as a repetition.
+    detector.reset();
     assert(!detector.process(700, 15.0, true, rep));
     assert(!detector.process(800, 0.0, true, rep));
     assert(!detector.isActive());
@@ -54,9 +89,9 @@ int main() {
     assert(rep.durationMs == 320);
 
     std::vector<RepetitionRecord> series{
-        {0, 400, 400, 200, 40.0, 20.0, 5},
-        {500, 900, 400, 180, 50.0, 22.0, 5},
-        {1000, 1400, 400, 220, 60.0, 24.0, 5}
+        {0, 400, 400, 200, 40.0, 20.0, 5, {}},
+        {500, 900, 400, 180, 50.0, 22.0, 5, {}},
+        {1000, 1400, 400, 220, 60.0, 24.0, 5, {}}
     };
     const auto summary = summarizeSeries(series, 50.0);
     assert(summary.repetitionCount == 3);

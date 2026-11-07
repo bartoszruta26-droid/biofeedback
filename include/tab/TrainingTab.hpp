@@ -125,6 +125,7 @@ struct ExerciseStats {
 class TrainingTab : public QWidget
 {
     Q_OBJECT
+    friend class TrainingTabProcessRestartRegression;
 
 public:
     explicit TrainingTab(QWidget *parent = nullptr);
@@ -341,7 +342,6 @@ private:
     
     int m_sessionTime;
     int m_restTimeRemaining;
-    bool m_restAdvancesExercise;
     biofeedback::training::RepetitionDetector m_repetitionDetector;
     std::vector<biofeedback::training::RepetitionRecord> m_currentSeriesRepetitions;
 

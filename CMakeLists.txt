@@ -231,6 +231,71 @@ if(Qt5_FOUND)
     # Create executable
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+    # Process-restart regression for durable analytics and checkpoint history.
+    add_executable(training_history_restart_regression
+        tests/training_history_restart_regression.cpp
+        src/tab/TrainingAnalyticsWidget.cpp
+        include/tab/TrainingAnalyticsWidget.hpp
+    )
+    set_target_properties(training_history_restart_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(training_history_restart_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(training_history_restart_regression PRIVATE
+        biofeedback_training Qt5::Core Qt5::Widgets Qt5::Charts
+    )
+    add_test(NAME training_history_restart_regression
+        COMMAND training_history_restart_regression
+    )
+    set_tests_properties(training_history_restart_regression PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+
+    # Full TrainingTab integration test. The test launches child processes to
+    # simulate abrupt termination and a fresh application process on recovery.
+    add_executable(training_tab_process_restart_regression
+        tests/training_tab_process_restart_regression.cpp
+        src/tab/TrainingTab.cpp
+        src/tab/TrainingAnalyticsWidget.cpp
+        src/core/DebugManager.cpp
+        src/sensor/SerialCommunication.cpp
+        src/games/GameEngine.cpp
+        src/games/PongGame.cpp
+        src/games/FlappyBirdGame.cpp
+        src/games/MarioGame.cpp
+        src/games/SinGame.cpp
+        include/tab/TrainingTab.hpp
+        include/tab/TrainingAnalyticsWidget.hpp
+        include/core/DebugManager.hpp
+        include/sensor/SerialCommunication.hpp
+        include/measurement/MeasurementEngine.hpp
+        include/games/GameEngine.hpp
+        include/games/PongGame.hpp
+        include/games/FlappyBirdGame.hpp
+        include/games/MarioGame.hpp
+        include/games/SinGame.hpp
+    )
+    set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(training_tab_process_restart_regression PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${LIBSERIALPORT_INCLUDE_DIRS}
+    )
+    target_link_directories(training_tab_process_restart_regression PRIVATE
+        ${LIBSERIALPORT_LIBRARY_DIRS}
+    )
+    target_link_libraries(training_tab_process_restart_regression PRIVATE
+        biofeedback_training
+        biofeedback_measurement
+        Qt5::Core Qt5::Widgets Qt5::Charts
+        ${LIBSERIALPORT_LIBRARIES}
+        OpenSSL::SSL OpenSSL::Crypto pthread
+    )
+    add_test(NAME training_tab_process_restart_regression
+        COMMAND training_tab_process_restart_regression
+    )
+    set_tests_properties(training_tab_process_restart_regression PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        TIMEOUT 120
+    )
+
     # Minimal mandatory Qt5 example source.
     add_executable(qt5_mandatory_example examples/qt5_mandatory.cpp)
 
