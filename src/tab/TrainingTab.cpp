@@ -1544,8 +1544,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
 
     biofeedback::training::SessionStateMachine stagedStateMachine;
     if (!stagedStateMachine.restore(biofeedback::training::SessionState::Paused,
-                                    resumeState, restTarget))
-        return false;
+                                    resumeState, restTarget)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan automatu sesji.", "ERROR"); return false; }
 
     // Parse and validate the detector independently of the live detector.
     biofeedback::training::RepetitionDetector stagedDetector;
@@ -1588,16 +1587,15 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
                 !isFiniteNonNegative(force)) return false;
             detectorSnapshot.samples.push_back({timestamp, force});
         }
-        if (!stagedDetector.restore(detectorSnapshot)) return false;
+        if (!stagedDetector.restore(detectorSnapshot)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan detektora.", "ERROR"); return false; }
     }
 
     // The statistics are already loaded from the recovered history entry.
     // Stage their shape before committing any of the execution state.
     const QVector<ExerciseStats> stagedStats = m_analyticsWidget->currentStats();
-    if (stagedStats.size() != stagedPlan.size()) return false;
+    if (stagedStats.size() != stagedPlan.size()) { addDebugMessage(QString("Punkt kontrolny odrzucony: liczba zestawów statystyk (%1) różni się od planu (%2).").arg(stagedStats.size()).arg(stagedPlan.size()), "ERROR"); return false; }
     for (int index = 0; index < stagedPlan.size(); ++index) {
-        if (stagedStats[index].exerciseName != stagedPlan[index].name)
-            return false;
+        if (stagedStats[index].exerciseName != stagedPlan[index].name) { addDebugMessage(QString("Punkt kontrolny odrzucony: nazwa ćwiczenia %1 nie zgadza się z planem %2.").arg(stagedStats[index].exerciseName, stagedPlan[index].name), "ERROR"); return false; }
     }
 
     std::vector<biofeedback::training::RepetitionRecord> stagedSeriesRepetitions;
