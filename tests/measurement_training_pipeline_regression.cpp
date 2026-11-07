@@ -37,5 +37,8 @@ int main() {
     assert(repetition.durationMs == 300);
     assert(std::abs(repetition.peakForceN - gramsToNewtons(200.0)) < 1e-9);
     assert(repetition.sampleCount == 4);
+    assert(repetition.samples.size() == repetition.sampleCount);
+    assert(repetition.samples.front().forceN == gramsToNewtons(100.0));
+    assert(repetition.samples.back().forceN == gramsToNewtons(10.0));
     return 0;
 }
