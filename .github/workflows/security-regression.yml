@@ -21,8 +21,6 @@ jobs:
         run: python3 tests/measurement_tab_lifecycle_regression.py
       - name: Check game sensor ownership
         run: python3 tests/game_sensor_ownership_regression.py
-      - name: Check game sensor ownership
-        run: python3 tests/game_sensor_ownership_regression.py
       - name: Install build dependencies
         run: |
           sudo apt-get update
