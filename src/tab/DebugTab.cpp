@@ -49,8 +49,9 @@ DebugTab::DebugTab(QWidget *parent)
 
 DebugTab::~DebugTab()
 {
-    if (m_serialPort && m_serialCallbackId != 0) {
-        m_serialPort->removeDataCallback(m_serialCallbackId);
+    if (m_serialPort) {
+        if (m_serialCallbackId != 0) m_serialPort->removeDataCallback(m_serialCallbackId);
+        m_serialPort->setConnectionCallback({});
         m_serialCallbackId = 0;
     }
     core::DebugManager::instance().unregisterDebugCallback();
@@ -264,8 +265,10 @@ bool DebugTab::exportLogsToFile(const QString& filename)
 
 void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    if (m_serialPort && m_serialCallbackId != 0)
-        m_serialPort->removeDataCallback(m_serialCallbackId);
+    if (m_serialPort) {
+        if (m_serialCallbackId != 0) m_serialPort->removeDataCallback(m_serialCallbackId);
+        m_serialPort->setConnectionCallback({});
+    }
     m_serialPort = std::move(serial);
     m_serialCallbackId = 0;
 
