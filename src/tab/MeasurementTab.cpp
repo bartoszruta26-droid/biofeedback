@@ -1,5 +1,6 @@
 #include "tab/MeasurementTab.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "measurement/Units.hpp"
 #include <QFileInfo>
 #include <QTextStream>
 #include <QDateTime>
@@ -367,7 +368,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_statsTable(nullptr)
     , m_rawBox(nullptr)
     , m_rawTable(nullptr)
-    , m_timer(nullptr)
     , m_isMeasuring(false)
     , m_currentSeries(1)
     , m_currentRepInSeries(0)
@@ -407,9 +407,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
     // który przekazuje je do centralnej zakładki DebugTab.
     
-    m_timer = new QTimer(this);
-    m_timer->setInterval(10);  // 10 ms = 100 Hz
-    connect(m_timer, &QTimer::timeout, this, &MeasurementTab::onTimerTick);
     
     setupUI();
     setupTrendsUI();
@@ -496,8 +493,8 @@ void MeasurementTab::setupUI()
     // Przełącznik trybu Raw/Calibrated - zablokowany podczas aktywnej sesji
     m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
     m_btnToggleRaw->setCheckable(true);
-    m_btnToggleRaw->setChecked(true);  // Domyślnie włączone (wartości surowe)
-    m_btnToggleRaw->setEnabled(false);  // Domyślnie wyłączone
+    m_btnToggleRaw->setChecked(false);  // Domyślnie skalibrowana siła w niutonach
+    m_btnToggleRaw->setEnabled(true);   // Tryb można zmieniać poza aktywnym pomiarem
     m_btnToggleRaw->setMinimumHeight(35);
     m_btnToggleRaw->setFont(QFont("Arial", 9));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
@@ -510,7 +507,7 @@ void MeasurementTab::setupUI()
             m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
         }
     });
-    m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
     m_btnReset->setMinimumHeight(35);
@@ -520,7 +517,7 @@ void MeasurementTab::setupUI()
     // Wybór jednostki siły
     m_unitSelector = new QComboBox(this);
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
-    m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
+    m_unitSelector->addItem("Kilogram-siła (kgf)", static_cast<int>(ForceUnit::Kilograms));
     m_unitSelector->addItem("Wartość surowa (ADC)", static_cast<int>(ForceUnit::Raw));
     m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
     m_unitSelector->setMinimumHeight(35);
@@ -750,12 +747,17 @@ void MeasurementTab::startMeasurement()
         return;
     }
 
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        QMessageBox::warning(this, tr("Brak urządzenia"),
+                             tr("Połącz skalibrowany czujnik HX711 przed rozpoczęciem pomiaru."));
+        return;
+    }
+
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
     ensureCurrentSeriesInitialized();
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
-    m_timer->start();
     
     std::cout << "[DEBUG] startMeasurement: Locking Raw/Calibrated button" << std::endl;
     
@@ -787,7 +789,6 @@ void MeasurementTab::stopMeasurement()
         return;
     }
     
-    m_timer->stop();
     m_isMeasuring = false;
     
     // Jeśli trwa powtórzenie, zakończ je
@@ -994,8 +995,8 @@ void MeasurementTab::updateLiveDisplay(double force)
     if (!m_showRawValues) {
         switch (m_currentUnit) {
             case ForceUnit::Kilograms:
-                displayForce = force * 1000.0 / 9.81;  // N -> kg
-                unitLabel = "kg";
+                displayForce = force / biofeedback::measurement::standardGravityMetersPerSecondSquared;  // N -> kgf
+                unitLabel = "kgf";
                 std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
                 break;
             case ForceUnit::Raw:
@@ -1376,65 +1377,23 @@ void MeasurementTab::onToggleMeasurement()
 
 void MeasurementTab::onReadSingleSample()
 {
-    // Odczyt z Arduino Nano z HX711 przez SerialCommunication
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data = m_serialPort->readData(500);
-        if (data.isValid) {
-            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-            readSingleSample(valueToUse);
-            m_lastSensorData = data;
-        } else {
-            // Jeśli dane nie są poprawne, wyświetl komunikat
-            m_lblStatus->setText("Status: BŁĄD ODCZYTU");
-            m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
-        }
-    } else {
-        // Brak podłączonego Arduino - wyświetl komunikat
+    if (!m_serialPort || !m_serialPort->isConnected()) {
         m_lblStatus->setText("Status: BRAK ARDUINO NANO Z HX711");
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
         emit arduinoConnectionStatus(false, "Nie wykryto Arduino Nano z HX711. Sprawdź połączenie USB.");
+        return;
     }
-}
+    if (!m_lastSensorData.isValid) {
+        m_lblStatus->setText("Status: OCZEKIWANIE NA POPRAWNĄ PRÓBKĘ");
+        m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
+        return;
+    }
 
-void MeasurementTab::onTimerTick()
-{
-    // Pobieranie danych z prawdziwego Arduino zamiast symulacji
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data;
-        const bool sampleValid = m_serialPort->tryReadData(data);
-        if (sampleValid) {
-            if (data.isValid) {
-                std::cout << "[DEBUG] onTimerTick: RAW DATA FROM ARDUINO - timestamp=" << data.timestamp 
-                          << " value=" << data.value << " calibratedValue=" << data.calibratedValue 
-                          << " isValid=" << data.isValid << " crc=" << static_cast<int>(data.crc) << std::endl;
-                
-                m_lastSensorData = data;
-                // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-                double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-                std::cout << "[DEBUG] onTimerTick: valueToUse after conversion=" << valueToUse 
-                          << " m_showRawValues=" << m_showRawValues << std::endl;
-                
-                // Safety check before calling readSingleSample
-                try {
-                    std::cout << "[DEBUG] onTimerTick: About to call readSingleSample with value=" << valueToUse << std::endl;
-                    readSingleSample(valueToUse);
-                    std::cout << "[DEBUG] onTimerTick: readSingleSample completed successfully" << std::endl;
-                } catch (const std::exception& e) {
-                    std::cerr << "[ERROR] onTimerTick: Exception in readSingleSample: " << e.what() << std::endl;
-                } catch (...) {
-                    std::cerr << "[ERROR] onTimerTick: Unknown exception in readSingleSample" << std::endl;
-                }
-            } else {
-                std::cout << "[DEBUG] onTimerTick: Received invalid data" << std::endl;
-            }
-        } else {
-            std::cout << "[DEBUG] onTimerTick: tryReadData returned false" << std::endl;
-        }
-    } else {
-        std::cout << "[DEBUG] onTimerTick: Serial port not connected" << std::endl;
-    }
-    // Jeśli Arduino nie jest podłączone, nie wykonujemy symulacji - czekamy na podłączenie
+    const double valueToUse = m_showRawValues
+        ? static_cast<double>(m_lastSensorData.value)
+        : convertForce(biofeedback::measurement::gramsToNewtons(m_lastSensorData.calibratedValue),
+                       m_currentUnit);
+    readSingleSample(valueToUse);
 }
 
 void MeasurementTab::onSelectionChanged()
@@ -1937,9 +1896,9 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         m_lastSensorData = data;
         
         // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
-        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
+        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%2 g")
             .arg(data.value)
-            .arg(data.calibratedValue);
+            .arg(data.calibratedValue, 0, 'f', 2);
         addDebugMessage(arduinoDebug, "ARDUINO");
         
         if (m_isMeasuring) {
@@ -1953,7 +1912,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
             // Jeśli nie używamy wartości surowej, przelicz na wybraną jednostkę
             if (!m_showRawValues && m_currentUnit != ForceUnit::Newtons) {
                 // calibratedValue jest w gramach, przelicz na Newtony najpierw
-                double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
+                double forceInNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
                 valueToUse = convertForce(forceInNewtons, m_currentUnit);
                 std::cout << "[DEBUG] onSensorDataReceived: Converted to unit, valueToUse=" << valueToUse << std::endl;
             } else if (m_showRawValues) {
@@ -1962,7 +1921,7 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
                 std::cout << "[DEBUG] onSensorDataReceived: Using raw value=" << valueToUse << std::endl;
             } else {
                 // calibratedValue jest w gramach, przelicz na Newtony
-                valueToUse = data.calibratedValue * 9.81 / 1000.0;
+                valueToUse = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
                 std::cout << "[DEBUG] onSensorDataReceived: Converted to Newtons, valueToUse=" << valueToUse << std::endl;
             }
             
@@ -1986,7 +1945,7 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
     switch (targetUnit) {
         case ForceUnit::Kilograms:
             // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
-            return newtons * 1000.0 / 9.81;  // zwraca w kg
+            return newtons / biofeedback::measurement::standardGravityMetersPerSecondSquared;  // zwraca w kgf
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
             return newtons;
@@ -2021,7 +1980,7 @@ void MeasurementTab::updateUnitDisplay()
     QString unitLabel;
     switch (m_currentUnit) {
         case ForceUnit::Kilograms:
-            unitLabel = "kg";
+            unitLabel = "kgf";
             break;
         case ForceUnit::Raw:
             unitLabel = "ADC";
@@ -2038,7 +1997,7 @@ void MeasurementTab::updateUnitDisplay()
         double displayForce = currentForce;
         
         if (!m_showRawValues && m_currentUnit == ForceUnit::Kilograms) {
-            displayForce = currentForce * 1000.0 / 9.81;
+            displayForce = currentForce / biofeedback::measurement::standardGravityMetersPerSecondSquared;
         }
         
         m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
@@ -2052,7 +2011,7 @@ void MeasurementTab::updateStatsTableUnits()
     QString unitLabel;
     switch (m_currentUnit) {
         case ForceUnit::Kilograms:
-            unitLabel = "kg";
+            unitLabel = "kgf";
             break;
         case ForceUnit::Raw:
             unitLabel = "ADC";
@@ -2085,7 +2044,7 @@ void MeasurementTab::updateRawTableUnits()
     QString unitLabel;
     switch (m_currentUnit) {
         case ForceUnit::Kilograms:
-            unitLabel = "kg";
+            unitLabel = "kgf";
             break;
         case ForceUnit::Raw:
             unitLabel = "ADC";
