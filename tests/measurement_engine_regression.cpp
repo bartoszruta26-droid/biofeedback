@@ -23,6 +23,7 @@ int main()
     }
 
     assert(completed.has_value());
+    assert(completed->metricsVersion == CurrentMetricsVersion);
     assert(completed->source == SampleSource::Simulation);
     assert(completed->sampleCount == 6);
     assert(std::abs(completed->peakForceN - 10.0) < 1e-9);
@@ -66,6 +67,7 @@ int main()
     }
     const auto seriesResults = seriesEngine.takeCompletedSeries();
     assert(seriesResults.size() == 1);
+    assert(seriesResults.front().metricsVersion == CurrentMetricsVersion);
     assert(seriesResults.front().repetitionCount == 2);
     assert(std::abs(seriesResults.front().averagePeakForceN - 8.0) < 1e-9);
     assert(std::abs(seriesResults.front().maximumPeakForceN - 8.0) < 1e-9);
