@@ -593,7 +593,7 @@ void TrainingTab::pauseTraining()
     if (!m_stateMachine.running() || !m_stateMachine.pause()) return;
 
     updateSessionClocks();
-    if (m_inRestPeriod && m_restClock.isValid()) {
+    if (m_stateMachine.resting() && m_restClock.isValid()) {
         // Preserve the exact millisecond remainder; the label is rounded up
         // for display only and must not extend the actual rest interval.
         m_restDurationMs = qMax<qint64>(0, m_restDurationMs - m_restClock.elapsed());
@@ -615,7 +615,7 @@ void TrainingTab::pauseTraining()
 
 void TrainingTab::resumeTraining()
 {
-    if (!m_isTraining || !m_stateMachine.resume()) return;
+    if (!m_stateMachine.running() || !m_stateMachine.resume()) return;
 
     if (m_inRestPeriod) {
         // m_restDurationMs already contains the exact frozen remainder.
@@ -1142,7 +1142,7 @@ void TrainingTab::loadNextSeries()
             m_lblRestTimer->setText(QString("Odpoczynek przed kolejnym ćwiczeniem: %1 s")
                                     .arg(m_restTimeRemaining));
             if (m_restTimeRemaining == 0) advanceAfterRest();
-            else if (!m_isPaused) m_restTimer->start();
+            else if (!m_stateMachine.paused()) m_restTimer->start();
         }
         return;
     }
@@ -1304,7 +1304,6 @@ void TrainingTab::advanceAfterRest()
     m_restTimer->stop();
     if (m_stateMachine.resting() && !m_stateMachine.paused())
         m_stateMachine.endRest();
-    m_inRestPeriod = false;
     m_lblRestTimer->clear();
     if (m_restAdvancesExercise) {
         m_restAdvancesExercise = false;
@@ -1456,8 +1455,6 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     m_restDurationMs = qMax<qint64>(0, static_cast<qint64>(
         checkpoint.value("rest_remaining_ms").toDouble()));
     m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
-    m_isTraining = true;
-    m_isPaused = true;
 
     const qint64 sessionMs = qMax<qint64>(0, static_cast<qint64>(
         checkpoint.value("session_elapsed_ms").toDouble()));
