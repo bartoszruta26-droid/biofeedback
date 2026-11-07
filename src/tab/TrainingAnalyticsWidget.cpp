@@ -199,9 +199,13 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
         : m_historyFilePath;
     QDir().mkpath(QFileInfo(path).absolutePath());
     QSaveFile file(path);
-    if (!file.open(QIODevice::WriteOnly) ||
-        file.write(QJsonDocument(updated).toJson(QJsonDocument::Indented)) < 0 ||
-        !file.commit()) {
+    const QByteArray payload = QJsonDocument(updated).toJson(QJsonDocument::Indented);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, tr("Historia treningów"),
+                             tr("Nie udało się otworzyć pliku historii: %1").arg(file.errorString()));
+        return;
+    }
+    if (file.write(payload) != payload.size() || !file.commit()) {
         QMessageBox::warning(this, tr("Historia treningów"),
                              tr("Nie udało się zapisać historii: %1").arg(file.errorString()));
         return;
