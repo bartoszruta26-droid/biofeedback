@@ -703,7 +703,7 @@ void MeasurementTab::loadAllHistoricalMeasurements()
     }
     
     // Wczytaj wszystkie historyczne sesje JSON
-    QStringList jsonFiles = dir.entryList(QStringList() << "*.json", QDir::Files);
+    QStringList jsonFiles = dir.entryList(QStringList() << "pomiar_*.json", QDir::Files);
     
     for (const QString& fileName : jsonFiles) {
         QString filePath = dataDir + "/" + fileName;
@@ -758,6 +758,9 @@ void MeasurementTab::startMeasurement()
 
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
     ensureCurrentSeriesInitialized();
+    m_inContraction = false;
+    m_currentRepForces.clear();
+    m_currentRepTimes.clear();
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
@@ -795,11 +798,14 @@ void MeasurementTab::stopMeasurement()
     m_isMeasuring = false;
     
     // Jeśli trwa powtórzenie, zakończ je
-    if (m_inContraction && !m_currentRepForces.isEmpty()) {
+    if (m_inContraction && !m_currentRepForces.isEmpty() && !m_showRawValues) {
         std::cout << "[DEBUG] stopMeasurement: Ending current repetition before stopping" << std::endl;
         calculateRepetitionStats();
     }
-    
+    m_inContraction = false;
+    m_currentRepForces.clear();
+    m_currentRepTimes.clear();
+
     std::cout << "[DEBUG] stopMeasurement: Unlocking Raw/Calibrated button" << std::endl;
     
     // Odblokuj przycisk zmiany trybu Raw/Calibrated po zatrzymaniu pomiaru
@@ -1031,6 +1037,7 @@ void MeasurementTab::updateLiveDisplay(double force)
     std::cout << "[DEBUG] updateLiveDisplay: Before updating UI components" << std::endl;
     m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
     m_forceBar->setValue(static_cast<int>(displayForce));
+    m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
     m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
     
     double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
@@ -1888,6 +1895,7 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
         m_dataCallbackToken = 0;
     }
     m_measurementAdapter.reset();
+    m_lastSensorData = sensor::SensorData();
     m_serialPort = serial;
     if (m_serialPort && m_measurementEngine) {
         m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
