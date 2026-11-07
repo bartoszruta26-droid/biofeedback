@@ -959,7 +959,8 @@ void MeasurementTab::simulateSensorData()
 }
 
 void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs,
-                                       std::int32_t rawValue, bool hasRawValue)
+                                       std::int32_t rawValue, bool hasRawValue,
+                                       double calibratedMassKg, bool hasCalibratedMass)
 {
     if (!std::isfinite(forceValue)) return;
 
@@ -983,6 +984,8 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.value = forceValue;
     recorded.rawValue = rawValue;
     recorded.hasRawValue = hasRawValue;
+    recorded.calibratedMassKg = calibratedMassKg;
+    recorded.hasCalibratedMass = hasCalibratedMass && std::isfinite(calibratedMassKg);
     recorded.unit = m_showRawValues ? "count" : "N";
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
@@ -1402,7 +1405,8 @@ void MeasurementTab::onReadSingleSample()
     if (!std::isfinite(value)) return;
     if (m_sessionStartTime <= 0.0) ensureSessionClockStarted();
     ensureCurrentSeriesInitialized();
-    readSingleSample(value, m_lastSensorData.timestamp, m_lastSensorData.value, true);
+    readSingleSample(value, m_lastSensorData.timestamp, m_lastSensorData.value, true,
+                     m_lastSensorData.calibratedValue, m_lastSensorData.hasCalibratedValue);
     m_lblStatus->setText(tr("Status: PRÓBKA ZAPISANA"));
     m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
 }
@@ -1799,6 +1803,8 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
         sampleObj["value"] = sample.value;
         sampleObj["rawValue"] = sample.rawValue;
         sampleObj["hasRawValue"] = sample.hasRawValue;
+        sampleObj["calibratedMassKg"] = sample.calibratedMassKg;
+        sampleObj["hasCalibratedMass"] = sample.hasCalibratedMass;
         sampleObj["unit"] = sample.unit;
         sampleObj["source"] = sample.source;
         sampleObj["quality"] = sample.quality;
@@ -1874,6 +1880,8 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
             sample.value = sampleObj["value"].toDouble();
             sample.rawValue = sampleObj["rawValue"].toInt();
             sample.hasRawValue = sampleObj["hasRawValue"].toBool();
+            sample.calibratedMassKg = sampleObj["calibratedMassKg"].toDouble();
+            sample.hasCalibratedMass = sampleObj["hasCalibratedMass"].toBool();
             sample.unit = sampleObj["unit"].toString();
             sample.source = sampleObj["source"].toString();
             sample.quality = sampleObj["quality"].toString();
@@ -1975,7 +1983,8 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     // Calibrated biomechanical samples are delivered through MeasurementEngine.
     // Raw ADC capture remains a diagnostic-only path and is never treated as force.
     if (m_isMeasuring && m_showRawValues)
-        readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true);
+        readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true,
+                         data.calibratedValue, data.hasCalibratedValue);
 }
 
 void MeasurementTab::onMeasurementSample(
@@ -1993,7 +2002,7 @@ void MeasurementTab::onMeasurementSample(
         m_repetitionDetector.reset();
         return;
     }
-    readSingleSample(force, sample.deviceTimestampMs, sample.rawValue, true);
+    readSingleSample(force, sample.deviceTimestampMs, sample.rawValue, true, sample.value, true);
 }
 
 // ============================================================================
