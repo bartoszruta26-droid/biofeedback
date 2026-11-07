@@ -12,6 +12,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
+#include "measurement/Units.hpp"
 
 namespace tab {
 
@@ -490,6 +491,12 @@ void TrainingTab::startTraining()
         QMessageBox::warning(this, "Brak planu", "Dodaj ćwiczenia przed rozpoczęciem treningu.");
         return;
     }
+
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        QMessageBox::warning(this, "Brak urządzenia",
+                             "Podłącz skalibrowany czujnik HX711 przed rozpoczęciem treningu.");
+        return;
+    }
     
     m_isTraining = true;
     m_isPaused = false;
@@ -848,7 +855,7 @@ void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 
     // Firmware reports calibrated mass-equivalent values in grams. Training
     // targets are expressed in newtons (SI), so convert exactly once here.
-    const double force = data.calibratedValue * 9.80665 / 1000.0;
+    const double force = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
     if (!std::isfinite(force) || force < 0.0) return;
     m_currentForce = force;
 
