@@ -1,6 +1,7 @@
 #ifndef GAMES_GAMEFACTORY_HPP
 #define GAMES_GAMEFACTORY_HPP
 
+#include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/PongGame.hpp"
@@ -24,6 +25,9 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
 
     if (id == QStringLiteral("pong"))
         return new PongGame(parent);
+
+    if (id == QStringLiteral("arkanoid"))
+        return new ArkanoidGame(parent);
 
     if (id == QStringLiteral("flappy") || id == QStringLiteral("flappy_bird"))
         return new FlappyBirdGame(parent);
