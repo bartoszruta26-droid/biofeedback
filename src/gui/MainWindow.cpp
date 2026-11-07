@@ -14,6 +14,8 @@
 #include <QTabWidget>
 #include <QStackedWidget>
 #include <QMessageBox>
+#include <QGridLayout>
+#include <QFrame>
 #include <memory>
 
 namespace gui {
@@ -38,6 +40,8 @@ MainWindow::MainWindow(QWidget *parent)
     , m_weightLabel(nullptr)
     , m_weightValue(nullptr)
     , m_statusLabel(nullptr)
+    , m_dashboardConnectionValue(nullptr)
+    , m_dashboardForceValue(nullptr)
     , m_samplingRateSpin(nullptr)
     , m_graphDurationSpin(nullptr)
     , m_unitCombo(nullptr)
@@ -51,6 +55,7 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
     setMinimumSize(1280, 800);
+    setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:10px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:11px 18px;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:12px;} QLabel#dashboardValue{color:#14243a;font-size:21pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:8px;padding:10px 16px;font-weight:600;} QPushButton:hover{background:#06696c;}");
     
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
@@ -124,15 +129,45 @@ void MainWindow::setupTabs()
         m_debugTab->setSerialConnection(m_serialPort);
     }
     
-    // Add tabs to widget - DebugTab jako ostatnia zakładka
+    QWidget* dashboard = new QWidget(m_tabWidget);
+    QVBoxLayout* dashboardLayout = new QVBoxLayout(dashboard);
+    dashboardLayout->setContentsMargins(28, 26, 28, 26);
+    QLabel* dashboardTitle = new QLabel(tr("Centrum Biofeedback"), dashboard);
+    dashboardTitle->setStyleSheet("font-size:24px;font-weight:700;color:#14243a;");
+    dashboardLayout->addWidget(dashboardTitle);
+    QLabel* connectionHeading = new QLabel(tr("POŁĄCZENIE Z URZĄDZENIEM"), dashboard);
+    m_dashboardConnectionValue = new QLabel(tr("Rozłączono"), dashboard);
+    m_dashboardConnectionValue->setObjectName("dashboardValue");
+    QLabel* forceHeading = new QLabel(tr("OSTATNI ODCZYT"), dashboard);
+    m_dashboardForceValue = new QLabel(tr("-- N"), dashboard);
+    m_dashboardForceValue->setObjectName("dashboardValue");
+    QGridLayout* cards = new QGridLayout();
+    cards->addWidget(connectionHeading, 0, 0);
+    cards->addWidget(m_dashboardConnectionValue, 1, 0);
+    cards->addWidget(forceHeading, 0, 1);
+    cards->addWidget(m_dashboardForceValue, 1, 1);
+    cards->setHorizontalSpacing(40);
+    dashboardLayout->addLayout(cards);
+    QLabel* hint = new QLabel(tr("Wybierz moduł, aby przejść do pacjentów, pomiarów lub treningu."), dashboard);
+    hint->setStyleSheet("color:#74839a;font-size:11pt;");
+    dashboardLayout->addWidget(hint);
+    QHBoxLayout* actions = new QHBoxLayout();
+    QPushButton* patientsButton = new QPushButton(tr("Pacjenci"), dashboard);
+    QPushButton* measurementsButton = new QPushButton(tr("Otwórz pomiary"), dashboard);
+    QPushButton* trainingButton = new QPushButton(tr("Trening"), dashboard);
+    actions->addWidget(patientsButton); actions->addWidget(measurementsButton); actions->addWidget(trainingButton); actions->addStretch();
+    dashboardLayout->addLayout(actions);
+    dashboardLayout->addStretch();
+    m_tabWidget->addTab(dashboard, tr("⌂ Pulpit"));
     m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));
     m_tabWidget->addTab(m_measurementTab, tr("📊 Pomiary"));
     m_tabWidget->addTab(m_outlineTab, tr("🎮 Trening (Outline)"));
     m_tabWidget->addTab(m_trainingTab, tr("🏋️ Trening (Gry)"));
     m_tabWidget->addTab(m_debugTab, tr("🔍 Debug Terminal"));
-    
-    // Set default tab
-    m_tabWidget->setCurrentIndex(0);
+    connect(patientsButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_patientTab); });
+    connect(measurementsButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_measurementTab); });
+    connect(trainingButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_trainingTab); });
+    m_tabWidget->setCurrentWidget(dashboard);
 }
 
 void MainWindow::setupDebugTerminal()
@@ -433,25 +468,22 @@ void MainWindow::saveSettings()
 
 void MainWindow::updateWeightDisplay(double weight)
 {
-    // m_weightValue jest tworzony dopiero po otwarciu okna ustawień,
-    // więc podczas normalnej pracy może być null.
-    if (!m_weightValue) {
-        return;
-    }
-
-    m_weightValue->setText(QString("%1 N").arg(weight, 0, 'f', 2));
+    const QString value = QString("%1 N").arg(weight, 0, 'f', 2);
+    if (m_weightValue) m_weightValue->setText(value);
+    if (m_dashboardForceValue) m_dashboardForceValue->setText(value);
 }
 
 void MainWindow::updateConnectionStatus(bool connected, const QString& deviceName)
 {
     m_isConnected = connected;
     
+    const QString device = deviceName.isEmpty() ? tr("Urządzenie") : deviceName;
     if (connected) {
-        m_statusLabel->setText(tr("Status: Połączono z %1").arg(deviceName.isEmpty() ? tr("Urządzenie") : deviceName));
-        m_statusLabel->setStyleSheet("color: green; font-weight: bold;");
+        if (m_statusLabel) { m_statusLabel->setText(tr("Status: Połączono z %1").arg(device)); m_statusLabel->setStyleSheet("color:#087f82;font-weight:bold;"); }
+        if (m_dashboardConnectionValue) m_dashboardConnectionValue->setText(tr("Połączono"));
     } else {
-        m_statusLabel->setText(tr("Status: Rozłączono"));
-        m_statusLabel->setStyleSheet("color: orange; font-weight: bold;");
+        if (m_statusLabel) { m_statusLabel->setText(tr("Status: Rozłączono")); m_statusLabel->setStyleSheet("color:#b7791f;font-weight:bold;"); }
+        if (m_dashboardConnectionValue) m_dashboardConnectionValue->setText(tr("Rozłączono"));
     }
 }
 
