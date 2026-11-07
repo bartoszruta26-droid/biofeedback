@@ -491,7 +491,7 @@ void MeasurementTab::setupUI()
     m_btnLoadJSON->setFont(QFont("Arial", 9));
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
-    // Przełącznik trybu Raw/Calibrated - zablokowany podczas aktywnej sesji
+    // Przełącznik RAW jest dostępny przed pierwszą próbką; tryb jest blokowany, aby nie mieszać jednostek w jednej sesji.
     m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
     m_btnToggleRaw->setCheckable(true);
     m_btnToggleRaw->setChecked(false); // Domyślnie skalibrowana siła
@@ -1954,7 +1954,7 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 {
     switch (targetUnit) {
         case ForceUnit::Kilograms:
-            // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
+            // 1 kgf = 9.80665 N.
             return newtons / 9.80665;  // kilogram-siła (kgf)
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
