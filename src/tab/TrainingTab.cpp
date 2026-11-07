@@ -1593,13 +1593,12 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
 
     // The statistics are already loaded from the recovered history entry.
     // Stage their shape before committing any of the execution state.
-    QVector<ExerciseStats> stagedStats = m_analyticsWidget->currentStats();
-    while (stagedStats.size() < stagedPlan.size()) {
-        ExerciseStats stats;
-        stats.exerciseName = stagedPlan[stagedStats.size()].name;
-        stagedStats.append(stats);
-    }
+    const QVector<ExerciseStats> stagedStats = m_analyticsWidget->currentStats();
     if (stagedStats.size() != stagedPlan.size()) return false;
+    for (int index = 0; index < stagedPlan.size(); ++index) {
+        if (stagedStats[index].exerciseName != stagedPlan[index].name)
+            return false;
+    }
 
     std::vector<biofeedback::training::RepetitionRecord> stagedSeriesRepetitions;
     for (const auto& record : stagedStats[exerciseIndex].repetitions) {
