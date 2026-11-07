@@ -867,7 +867,7 @@ void MeasurementTab::resetSession()
     m_forceBar->setValue(0);
     m_lblStatus->setText("Status: GOTOWY");
     m_lblStatus->setStyleSheet("color: blue; font-weight: bold;");
-    m_lblSeriesInfo->setText("Seria: 1 | Powtórzenia: 0/8");
+    m_lblSeriesInfo->setText(QString("Seria: 1 | Powtórzenia: 0/%1").arg(m_engineRepetitionsPerSeries));
     m_seriesProgress->setValue(0);
     
     m_statsTable->setRowCount(0);
@@ -1079,11 +1079,12 @@ void MeasurementTab::updateSeriesProgress()
     std::cout << "[DEBUG] updateSeriesProgress: m_currentSeries=" << m_currentSeries 
               << " m_currentRepInSeries=" << m_currentRepInSeries << std::endl;
     
-    m_seriesProgress->setRange(0, 8);
+    m_seriesProgress->setRange(0, m_engineRepetitionsPerSeries);
     m_seriesProgress->setValue(m_currentRepInSeries);
-    m_lblSeriesInfo->setText(QString("Seria: %1 | Powtórzenia: %2/8")
+    m_lblSeriesInfo->setText(QString("Seria: %1 | Powtórzenia: %2/%3")
                              .arg(m_currentSeries)
-                             .arg(m_currentRepInSeries));
+                             .arg(m_currentRepInSeries)
+                             .arg(m_engineRepetitionsPerSeries));
 }
 
 double MeasurementTab::calculateMedian(const QVector<double>& values) const
