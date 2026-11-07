@@ -50,6 +50,7 @@ int main()
     assert(engine.rejectedSampleCount() == 3);
     Sample afterSwitch{2.2, 4.0, ForceUnit::Newton, SampleSource::Replay, true};
     assert(!engine.addSample(afterSwitch));
+    assert(!engine.lastSampleAccepted());
     assert(engine.isInContraction());
 
     // Shared series aggregation and target-zone accuracy are produced by the engine.
@@ -102,6 +103,7 @@ int main()
     for (double force : oneRep) {
         configurable.addSample(Sample{configurableTime, force, ForceUnit::Newton,
                                       SampleSource::Simulation, true});
+        assert(configurable.lastSampleAccepted());
         configurableTime += 0.1;
     }
     assert(configurable.takeCompletedSeries().size() == 1);
