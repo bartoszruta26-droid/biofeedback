@@ -980,7 +980,10 @@ void MeasurementTab::readSingleSample(double forceValue)
         int row = m_rawTable->rowCount();
         m_rawTable->insertRow(row);
         m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
-        m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(forceValue, 'f', 2)));
+        const double displayedSample = m_showRawValues
+            ? forceValue
+            : (m_currentUnit == ForceUnit::Kilograms ? forceValue / 9.80665 : forceValue);
+        m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(displayedSample, 'f', 2)));
         m_rawTable->scrollToBottom();
     } else {
         std::cerr << "[ERROR] readSingleSample: m_rawTable is null!" << std::endl;
@@ -999,8 +1002,8 @@ void MeasurementTab::updateLiveDisplay(double force)
     if (!m_showRawValues) {
         switch (m_currentUnit) {
             case ForceUnit::Kilograms:
-                displayForce = force * 1000.0 / 9.81;  // N -> kg
-                unitLabel = "kg";
+                displayForce = force / 9.80665;  // N -> kgf
+                unitLabel = "kgf";
                 std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
                 break;
             case ForceUnit::Raw:
@@ -1325,7 +1328,7 @@ double MeasurementTab::calculateMode(const QVector<double>& values) const
     QMap<int, int> histogram;
     
     for (double v : values) {
-        int bin = static_cast<int>((v - minVal) / binSize);
+        int bin = qBound(0, static_cast<int>((v - minVal) / binSize), 9);
         histogram[bin]++;
     }
     
@@ -1924,7 +1927,7 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
     switch (targetUnit) {
         case ForceUnit::Kilograms:
             // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
-            return newtons * 1000.0 / 9.81;  // zwraca w kg
+            return newtons / 9.80665;  // kilogram-siła (kgf)
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
             return newtons;
@@ -1959,7 +1962,7 @@ void MeasurementTab::updateUnitDisplay()
     QString unitLabel;
     switch (m_currentUnit) {
         case ForceUnit::Kilograms:
-            unitLabel = "kg";
+            unitLabel = "kgf";
             break;
         case ForceUnit::Raw:
             unitLabel = "ADC";
@@ -1976,7 +1979,7 @@ void MeasurementTab::updateUnitDisplay()
         double displayForce = currentForce;
         
         if (!m_showRawValues && m_currentUnit == ForceUnit::Kilograms) {
-            displayForce = currentForce * 1000.0 / 9.81;
+            displayForce = currentForce / 9.80665;
         }
         
         m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
@@ -1986,33 +1989,14 @@ void MeasurementTab::updateUnitDisplay()
 void MeasurementTab::updateStatsTableUnits()
 {
     if (!m_statsTable) return;
-    
-    QString unitLabel;
-    switch (m_currentUnit) {
-        case ForceUnit::Kilograms:
-            unitLabel = "kg";
-            break;
-        case ForceUnit::Raw:
-            unitLabel = "ADC";
-            break;
-        case ForceUnit::Newtons:
-        default:
-            unitLabel = "N";
-            break;
-    }
-    
-    // Aktualizuj nagłówki kolumn z siłą
-    if (m_statsTable->columnCount() > 0) {
-        // Przykładowa aktualizacja - można dostosować do rzeczywistych nagłówków
-        for (int col = 0; col < m_statsTable->columnCount(); ++col) {
-            QString header = m_statsTable->horizontalHeaderItem(col)->text();
-            if (header.contains("[N]")) {
-                header.replace("[N]", "[" + unitLabel + "]");
-                m_statsTable->horizontalHeaderItem(col)->setText(header);
-            } else if (header.contains("Siła") && !header.contains("[")) {
-                m_statsTable->horizontalHeaderItem(col)->setText(header + " [" + unitLabel + "]");
-            }
-        }
+    // Movement metrics are stored and reported in SI units. Changing the
+    // live display unit must not relabel N values as kgf or ADC.
+    if (m_statsTable->columnCount() == 12) {
+        m_statsTable->setHorizontalHeaderLabels({
+            "Seria", "Powt.", "Szczyt [N]", "Czas do szczytu [s]",
+            "Rise Rate [N/s]", "Fall Rate [N/s]", "Top 8% [s]", "Bottom 8% [s]",
+            "Impuls [N·s]", "Średnia [N]", "Mediana [N]", "Dominanta [N]"
+        });
     }
 }
 
