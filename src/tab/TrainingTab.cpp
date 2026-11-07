@@ -173,6 +173,7 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_currentGame(nullptr)
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
+    , m_statsSummaryLabel(nullptr)
     , m_timer(nullptr)
     , m_restTimer(nullptr)
     , m_isTraining(false)
@@ -380,6 +381,11 @@ void TrainingTab::setupUI()
     QVBoxLayout* statsLayout = new QVBoxLayout(m_statsBox);
     
     m_statsContainer = new QWidget(this);
+    QVBoxLayout* statsContentLayout = new QVBoxLayout(m_statsContainer);
+    statsContentLayout->setContentsMargins(4, 4, 4, 4);
+    m_statsSummaryLabel = new QLabel("Brak zarejestrowanych powtórzeń.", m_statsContainer);
+    m_statsSummaryLabel->setWordWrap(true);
+    statsContentLayout->addWidget(m_statsSummaryLabel);
     statsLayout->addWidget(m_statsContainer);
     
     m_mainLayout->addWidget(m_statsBox);
@@ -916,7 +922,6 @@ void TrainingTab::updateProgressWidgets()
 void TrainingTab::loadNextExercise()
 {
     if (m_currentExerciseIndex >= m_exercisePlan.size()) {
-        for (int i = 0; i < m_exerciseStats.size(); ++i) calculateExerciseStats();
         const QVector<ExerciseStats> completed = m_exerciseStats;
         stopTraining();
         emit trainingFinished(completed);
@@ -1006,6 +1011,19 @@ void TrainingTab::onRepetitionDetected(
         stats.avgReactionTime += item.measurement.timeToPeakMs / 1000.0;
     stats.avgReactionTime /= static_cast<double>(stats.repetitions.size());
 
+    const auto seriesSummary = biofeedback::training::summarizeSeries(
+        m_currentSeriesRepetitions, m_exercisePlan[m_currentExerciseIndex].targetForce);
+    m_statsSummaryLabel->setText(
+        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\\n"
+                "Ostatnie: szczyt %4 N, średnia %5 N, czas %6 ms, czas do szczytu %7 ms\\n"
+                "Seria: średni szczyt %8 N, maksymalny %9 N")
+            .arg(stats.completedReps).arg(stats.completedSeries)
+            .arg(m_exercisePlan[m_currentExerciseIndex].seriesCount)
+            .arg(repetition.peakForceN, 0, 'f', 2)
+            .arg(repetition.meanForceN, 0, 'f', 2)
+            .arg(repetition.durationMs).arg(repetition.timeToPeakMs)
+            .arg(seriesSummary.averagePeakForceN, 0, 'f', 2)
+            .arg(seriesSummary.maximumPeakForceN, 0, 'f', 2));
     emit repetitionCompleted(m_currentExerciseIndex, m_currentSeriesIndex, m_currentRepIndex);
     ++m_currentRepIndex;
     if (m_currentRepIndex >= m_exercisePlan[m_currentExerciseIndex].repsPerSeries) {
