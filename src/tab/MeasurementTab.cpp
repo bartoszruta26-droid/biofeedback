@@ -398,6 +398,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_biomechTable(nullptr)
     , m_elasticConstantInput(nullptr)
     , m_patientMassInput(nullptr)
+    , m_biomechSeriesSelector(nullptr)
     , m_rawBox(nullptr)
     , m_rawTable(nullptr)
     , m_isMeasuring(false)
@@ -679,7 +680,13 @@ void MeasurementTab::setupUI()
     m_patientMassInput->setSpecialValueText(tr("Brak danych"));
     m_patientMassInput->setValue(0.0);
     calibrationLayout->addWidget(m_patientMassInput);
+    calibrationLayout->addWidget(new QLabel(tr("Wyniki serii:"), this));
+    m_biomechSeriesSelector = new QComboBox(this);
+    m_biomechSeriesSelector->setMinimumWidth(110);
+    calibrationLayout->addWidget(m_biomechSeriesSelector);
     biomechLayout->addLayout(calibrationLayout);
+    connect(m_biomechSeriesSelector, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int) { updateBiomechanicalTable(); });
     connect(m_elasticConstantInput, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, [this](double) { recalculateBiomechanicalResults(); });
     connect(m_patientMassInput, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
@@ -1377,8 +1384,32 @@ void MeasurementTab::updateBiomechanicalTable()
     if (!m_biomechTable) return;
     m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
 
-    const BiomechanicalParams* result = m_completedSeriesStats.isEmpty()
-        ? nullptr : &m_completedSeriesStats.last().biomechanicalParams;
+    int selectedSeriesNumber = m_completedSeriesStats.isEmpty()
+        ? 0 : m_completedSeriesStats.last().seriesNumber;
+    if (m_biomechSeriesSelector) {
+        const int previous = m_biomechSeriesSelector->currentData().toInt();
+        const QSignalBlocker blocker(m_biomechSeriesSelector);
+        m_biomechSeriesSelector->clear();
+        for (int i = 0; i < m_completedSeriesStats.size(); ++i) {
+            const int number = m_completedSeriesStats[i].seriesNumber;
+            m_biomechSeriesSelector->addItem(tr("Seria %1").arg(number), i);
+            if (number == selectedSeriesNumber)
+                m_biomechSeriesSelector->setCurrentIndex(i);
+        }
+        if (previous >= 0 && previous < m_completedSeriesStats.size())
+            m_biomechSeriesSelector->setCurrentIndex(previous);
+        if (m_biomechSeriesSelector->currentIndex() >= 0)
+            selectedSeriesNumber = m_completedSeriesStats[
+                m_biomechSeriesSelector->currentData().toInt()].seriesNumber;
+    }
+
+    const BiomechanicalParams* result = nullptr;
+    for (const auto& series : m_completedSeriesStats) {
+        if (series.seriesNumber == selectedSeriesNumber) {
+            result = &series.biomechanicalParams;
+            break;
+        }
+    }
     const auto values = result ? result->values()
                                : std::array<double, BiomechanicalParams::ParameterCount>{};
 
