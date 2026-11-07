@@ -1538,10 +1538,10 @@ void MeasurementTab::calculateRepetitionStats()
         m_currentRepInSeries = 0;
         ++m_currentSeries;
         if (m_currentSeries > 3) {
-            emit sessionFinished(m_completedSeriesStats);
-            // A completed 3 x 8 protocol must stop acquisition; otherwise
-            // later samples would be journaled without belonging to a set.
+            // Stop acquisition before notifying listeners that the session
+            // is complete, so no post-protocol samples can enter the journal.
             stopMeasurement();
+            emit sessionFinished(m_completedSeriesStats);
             m_lblStatus->setText(tr("Status: SESJA ZAKOŃCZONA"));
             m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
         } else {
