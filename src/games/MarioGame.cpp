@@ -246,7 +246,6 @@ bool MarioGame::checkCollision(const Player& player, const Obstacle& obstacle)
 {
     // Dla dziur sprawdzamy czy gracz jest nad dziurą i nie skacze
     if (obstacle.type == Obstacle::GAP) {
-        Q_UNUSED(player);
         // Upadek przez dziurę jest rozstrzygany po przekroczeniu dolnej
         // krawędzi ekranu, a nie natychmiast przy wejściu na jej obszar.
         return false;
