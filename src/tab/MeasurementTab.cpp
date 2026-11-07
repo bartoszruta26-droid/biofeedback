@@ -1148,10 +1148,16 @@ void MeasurementTab::calculateRepetitionStats()
     // Pole pod krzywą (impuls)
     m_currentRepStats.areaUnderCurve = calculateAreaUnderCurve(m_currentRepForces, m_currentRepTimes);
     
-    // Średnia siła
-    double sum = 0;
-    for (double f : m_currentRepForces) sum += f;
-    m_currentRepStats.avgForce = sum / m_currentRepForces.size();
+    // Time-weighted mean force uses the same trapezoidal integral and
+    // repetition duration as RepetitionDetector::meanForceN.
+    if (m_currentRepStats.duration > 0.0) {
+        m_currentRepStats.avgForce =
+            m_currentRepStats.areaUnderCurve / m_currentRepStats.duration;
+    } else {
+        double sum = 0.0;
+        for (double force : m_currentRepForces) sum += force;
+        m_currentRepStats.avgForce = sum / m_currentRepForces.size();
+    }
     
     // Mediana
     QVector<double> sortedForces = m_currentRepForces;
