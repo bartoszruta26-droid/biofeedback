@@ -62,11 +62,11 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
     }
 
     m_historyTable = new QTableWidget(m_tabs);
-    m_historyTable->setColumnCount(9);
+    m_historyTable->setColumnCount(10);
     m_historyTable->setHorizontalHeaderLabels({
         tr("Zapisano"), tr("Status"), tr("Sesja [s]"), tr("Aktywnie [s]"),
         tr("Ćwiczenia"), tr("Serie"), tr("Powtórzenia"),
-        tr("Śr. szczyt [N]"), tr("Maks. [N]")
+        tr("Śr. szczyt [N]"), tr("Maks. [N]"), tr("Punkty gry")
     });
     m_historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -150,6 +150,7 @@ bool TrainingAnalyticsWidget::beginSession() {
     }
     m_activeSessionHistoryFilePath = m_historyFilePath;
     m_sessionSaved = false;
+    m_sessionCompleted = false;
     m_saveHistoryButton->setEnabled(false);
     return true;
 }
@@ -198,7 +199,8 @@ void TrainingAnalyticsWidget::rebuildHistoryTable() {
             QString::number(entry.value("series_count").toInt()),
             QString::number(entry.value("repetition_count").toInt()),
             QString::number(entry.value("average_peak_force_n").toDouble(), 'f', 2),
-            QString::number(entry.value("maximum_peak_force_n").toDouble(), 'f', 2)
+            QString::number(entry.value("maximum_peak_force_n").toDouble(), 'f', 2),
+            QString::number(entry.value("game_points").toInt())
         };
         const int row = m_historyTable->rowCount();
         m_historyTable->insertRow(row);
