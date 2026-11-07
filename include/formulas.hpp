@@ -77,6 +77,8 @@ struct BiomechanicalParams {
                                        : ParameterAvailability::InvalidInput;
     }
     static const char* parameterName(std::size_t index) noexcept;
+    std::array<double, ParameterCount> values() const noexcept;
+    void assignValues(const std::array<double, ParameterCount>& values) noexcept;
     // Kategoria 1: Parametry Siłowe (1-10)
     double F_peak;              // 1. Maksymalna Siła Chwilowa [N]
     double F_mean;              // 2. Średnia Siła z Powtórzenia [N]
