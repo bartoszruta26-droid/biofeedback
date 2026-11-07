@@ -31,6 +31,7 @@ add_library(biofeedback_core STATIC
     src/data/DataManager.cpp
     src/data/Encryption.cpp
     src/data/LegacyXorMigration.cpp
+    src/core/MeasurementEngine.cpp
 )
 
 target_include_directories(biofeedback_core
@@ -73,6 +74,10 @@ target_link_libraries(biofeedback_legacy_migrate PRIVATE biofeedback_core)
 add_executable(legacy_xor_migration_regression tests/legacy_xor_migration_regression.cpp)
 target_link_libraries(legacy_xor_migration_regression PRIVATE biofeedback_core)
 add_test(NAME legacy_xor_migration_regression COMMAND legacy_xor_migration_regression)
+
+add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
+target_link_libraries(measurement_engine_regression PRIVATE biofeedback_core)
+add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
 
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
