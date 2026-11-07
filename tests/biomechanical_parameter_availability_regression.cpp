@@ -41,6 +41,9 @@ int main()
         SensorSample(0x00000010u, 10.0)
     };
     assert(near(formulas.calculateImpulse(wrapped), 0.32));
+    assert(near(Formulas::calculateRepDuration(0xfffffff0u, 0x00000010u), 0.032));
+    assert(near(Formulas::calculateInterRepRest(0xfffffff0u, 0x00000010u), 0.032));
+    assert(near(Formulas::calculateRepDuration(200u, 100u), 0.0));
 
     BiomechanicalParams empty;
     assert(empty.availabilityAt(0) == ParameterAvailability::InsufficientData);
