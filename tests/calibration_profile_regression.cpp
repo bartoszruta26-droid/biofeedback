@@ -16,7 +16,7 @@ int main()
     profile.deviceId = "device-123";
     profile.firmwareVersion = "1.2.0";
     profile.zeroOffsetRaw = 100000.0;
-    profile.scaleFactor = 0.00042;
+    profile.scaleFactor = 9.81 / 23357.0;
     profile.referenceValue = 9.81;
     profile.referenceRaw = 123357;
     profile.sampleCount = 21;
