@@ -134,7 +134,7 @@ bool ArkanoidGame::hasActiveBricks() const
 void ArkanoidGame::advanceLevel()
 {
     ++m_level;
-    m_ballSpeed *= 1.06;
+    m_ballSpeed = qMin(m_ballSpeed * 1.06, 800.0);
     addScore(100);
     buildLevel();
     resetBall();
