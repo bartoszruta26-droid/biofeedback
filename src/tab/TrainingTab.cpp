@@ -1489,6 +1489,7 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     m_restDurationMs = qMax<qint64>(0, static_cast<qint64>(
         checkpoint.value("rest_remaining_ms").toDouble()));
     m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
+    m_restClock.invalidate();
 
     const qint64 sessionMs = qMax<qint64>(0, static_cast<qint64>(
         checkpoint.value("session_elapsed_ms").toDouble()));
@@ -1554,8 +1555,11 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     }
     updateProgressWidgets();
     updateDisplay();
-    if (m_stateMachine.resting())
+    if (m_stateMachine.resting()) {
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s — sesja odzyskana, wstrzymana").arg(m_restTimeRemaining));
+        if (resumeState == biofeedback::training::SessionState::Resting)
+            m_restTimer->stop();
+    }
     m_timer->start();
     return true;
 }
