@@ -392,6 +392,22 @@ void MainWindow::createConnections()
     connect(m_updateTimer, &QTimer::timeout, this, &MainWindow::onUpdateTimerTimeout);
     m_updateTimer->start();
     
+    // One validated measurement stream feeds training, games and the main UI.
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample,
+            m_trainingTab, &tab::TrainingTab::onSharedForceSample, Qt::QueuedConnection);
+    connect(m_measurementTab, &tab::MeasurementTab::sharedRepetitionCompleted,
+            m_trainingTab, &tab::TrainingTab::onSharedRepetitionCompleted, Qt::QueuedConnection);
+    connect(m_trainingTab, &tab::TrainingTab::trainingStarted, this, [this]() {
+        m_measurementTab->resetSession();
+        m_measurementTab->startMeasurement();
+    });
+    connect(m_trainingTab, &tab::TrainingTab::trainingStopped,
+            m_measurementTab, &tab::MeasurementTab::stopMeasurement);
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample, this,
+            [this](double forceN, double, bool isRaw) {
+                if (!isRaw) forwardSensorToGame(forceN);
+            }, Qt::QueuedConnection);
+
     // Connect tabs to game system
     connect(m_outlineTab, &tab::OutlineTab::requestGameStart,
             this, [this](const QString& gameId, const tab::ExerciseData& exerciseData) {
