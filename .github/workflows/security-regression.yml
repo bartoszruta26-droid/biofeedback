@@ -22,6 +22,8 @@ jobs:
         run: python3 tests/measurement_tab_lifecycle_regression.py
       - name: Check training session clock cadence
         run: python3 tests/training_session_timer_regression.py
+      - name: Check deterministic training clock model
+        run: cmake -S . -B build-clock -DCMAKE_BUILD_TYPE=Debug && cmake --build build-clock --target training_session_clock_regression --parallel 2 && ./build-clock/training_session_clock_regression
       - name: Check single measurement reader
         run: python3 tests/measurement_single_reader_regression.py
       - name: Check game sensor ownership
