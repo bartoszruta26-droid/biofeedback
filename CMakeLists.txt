@@ -280,3 +280,23 @@ if(DOXYGEN_FOUND)
     set(DOXYGEN_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/docs)
     doxygen_add_docs(docs ALL ${CMAKE_SOURCE_DIR}/include)
 endif()
+
+# Linux desktop integration and Debian package.
+install(FILES packaging/linux/biofeedback.desktop
+    DESTINATION share/applications)
+install(FILES resources/biofeedback.svg
+    DESTINATION share/icons/hicolor/scalable/apps)
+
+set(CPACK_GENERATOR "DEB")
+set(CPACK_PACKAGE_NAME "biofeedback")
+set(CPACK_PACKAGE_VENDOR "Biofeedback Project")
+set(CPACK_PACKAGE_CONTACT "Biofeedback Project")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Biofeedback measurement and training application")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/bartoszruta26-droid/biofeedback")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Biofeedback Project")
+set(CPACK_DEBIAN_PACKAGE_SECTION "science")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+include(CPack)
