@@ -510,6 +510,9 @@ bool MeasurementTab::openSampleJournal()
         const QByteArray line = QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n';
         if (m_sampleJournal.write(line) != line.size() || !flushSampleJournal()) {
             closeSampleJournal();
+            QFile::remove(m_sampleJournalPath);
+            m_sampleJournalPath.clear();
+            m_activeSessionId.clear();
             return false;
         }
         QFile::setPermissions(m_sampleJournalPath,
@@ -594,6 +597,9 @@ bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
             QJsonParseError parseError;
             const QJsonDocument doc = QJsonDocument::fromJson(line, &parseError);
             if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+                // A power loss can leave only the final append incomplete.
+                // Keep the preceding fully flushed records and ignore that tail.
+                if (file.atEnd()) break;
                 malformed = true;
                 break;
             }
@@ -1083,8 +1089,6 @@ void MeasurementTab::stopMeasurement()
     m_isMeasuring = false;
     const bool journalFlushed = flushSampleJournal();
     closeSampleJournal();
-    if (!journalFlushed && m_lblStatus)
-        m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku"));
     
     // An unfinished contraction is discarded; it must not be stored as a
     // completed repetition with an artificial end boundary.
@@ -1110,6 +1114,8 @@ void MeasurementTab::stopMeasurement()
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     m_lblStatus->setText("Status: ZATRZYMANO");
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
+    if (!journalFlushed)
+        m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku"));
     
     std::cout << "[DEBUG] stopMeasurement: emit measurementStopped" << std::endl;
     emit measurementStopped();
