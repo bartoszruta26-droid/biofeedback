@@ -930,6 +930,14 @@ void SerialCommunication::notifyConnectionCallbacks(bool connected, const std::s
 void SerialCommunication::startAsyncReading() {
     std::lock_guard<std::mutex> lifecycleLock(m_impl->asyncLifecycleMutex);
 
+    // Repeated starts while the worker is active are idempotent. A callback
+    // running on the worker cannot synchronously restart and join itself.
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        if (m_impl->asyncWorkerId == std::this_thread::get_id()) return;
+    }
+    if (m_impl->asyncReading.load(std::memory_order_acquire)) return;
+
     // Reap a completed worker before assigning a new std::thread.
     std::thread previousWorker;
     {
