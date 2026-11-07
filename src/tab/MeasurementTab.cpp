@@ -730,6 +730,7 @@ void MeasurementTab::loadAllHistoricalMeasurements()
 
 void MeasurementTab::setTargetForce(double force)
 {
+    if (!std::isfinite(force) || force < 0.0) return;
     m_targetForce = force;
     m_measurementEngine.setTargetForceN(force);
     m_forcePlot->setTargetForce(force);
@@ -1005,6 +1006,7 @@ void MeasurementTab::consumeEngineSeries(const measurement::SeriesStats& source)
     ++m_currentSeries;
     m_currentRepInSeries = 0;
     if (m_currentSeries > 3) {
+        stopMeasurement();
         m_lblStatus->setText("Status: SESJA ZAKOŃCZONA");
         m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
         emit sessionFinished(m_completedSeriesStats);
