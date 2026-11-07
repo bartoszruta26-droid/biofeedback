@@ -28,6 +28,7 @@ public:
 
 private slots:
     void saveCurrentSession();
+    void onHistoryEntryActivated(int row, int column);
 
 private:
     void loadHistory();
