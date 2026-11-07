@@ -331,8 +331,6 @@ private:
     qint64 m_restDurationMs{0};
     qint64 m_sessionElapsedOffsetMs{0};
     int m_lastCheckpointSeconds{-1};
-    bool m_isTraining;
-    bool m_isPaused;
     
     QVector<TrainingExercise> m_exercisePlan;
     QVector<ExerciseStats> m_exerciseStats;
