@@ -160,7 +160,7 @@ public:
     /**
      * @brief Zatrzymuje sesję treningową
      */
-    void stopTraining();
+    void stopTraining(bool completed = false);
     
     /**
      * @brief Pauzuje trening
