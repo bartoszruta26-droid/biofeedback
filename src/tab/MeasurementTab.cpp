@@ -24,6 +24,7 @@
 #include <QScrollArea>
 #include <memory>
 #include <iostream>
+#include <limits>
 #ifdef Q_OS_UNIX
 #include <unistd.h>
 #endif
@@ -973,6 +974,8 @@ void MeasurementTab::loadAllHistoricalMeasurements()
         return;
     }
     
+    // Recover interrupted append-only sample journals before loading finalized JSON.
+    recoverSampleJournals(dataDir);
     // Wczytaj wszystkie historyczne sesje JSON
     QStringList jsonFiles = dir.entryList(QStringList() << "pomiar_*.json", QDir::Files);
     
@@ -1027,6 +1030,11 @@ void MeasurementTab::startMeasurement()
                              tr("Połącz czujnik HX711 przed rozpoczęciem pomiaru."));
         return;
     }
+    if (!openSampleJournal()) {
+        QMessageBox::critical(this, tr("Błąd dziennika pomiaru"),
+                              tr("Nie można utworzyć trwałego dziennika próbek. Pomiar nie został rozpoczęty."));
+        return;
+    }
 
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
     ensureCurrentSeriesInitialized();
@@ -1069,6 +1077,10 @@ void MeasurementTab::stopMeasurement()
     }
     
     m_isMeasuring = false;
+    const bool journalFlushed = flushSampleJournal();
+    closeSampleJournal();
+    if (!journalFlushed && m_lblStatus)
+        m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku"));
     
     // An unfinished contraction is discarded; it must not be stored as a
     // completed repetition with an artificial end boundary.
@@ -1230,6 +1242,11 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
+    if (m_sampleJournal.isOpen() && !appendSampleJournal(recorded)) {
+        if (!m_sampleJournalFailed && m_lblStatus)
+            m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA"));
+        m_sampleJournalFailed = true;
+    }
 
     if (m_rawBox)
         m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
@@ -1977,7 +1994,9 @@ bool MeasurementTab::importFromCSV(const QString& filename)
 bool MeasurementTab::exportToJSON(const QString& filename)
 {
     MeasurementSession session;
-    session.sessionId = QUuid::createUuid().toString();
+    if (m_activeSessionId.isEmpty())
+        m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    session.sessionId = m_activeSessionId;
     session.patientId = m_patientId;
     session.date = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
     session.series = m_completedSeriesStats;
@@ -1997,6 +2016,10 @@ bool MeasurementTab::exportToJSON(const QString& filename)
         return false;
     }
     QFile::setPermissions(filename, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    closeSampleJournal();
+    if (!m_sampleJournalPath.isEmpty()) QFile::remove(m_sampleJournalPath);
+    m_sampleJournalPath.clear();
+    m_activeSessionId.clear();
     QMessageBox::information(this, tr("Sukces"), tr("Dane sesji zapisano do: %1").arg(filename));
     return true;
 }
@@ -2143,6 +2166,7 @@ void MeasurementTab::loadPatientTrends()
     }
     
     m_patientSessions.clear();
+    recoverSampleJournals(dataDir);
     QStringList jsonFiles = dir.entryList(QStringList() << "pomiar_*.json", QDir::Files);
     
     for (const QString& fileName : jsonFiles) {
