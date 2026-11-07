@@ -5,6 +5,7 @@
 #include <clocale>
 #include <cstdlib>
 #include <filesystem>
+#include <iostream>
 #include <system_error>
 #include <vector>
 #include <string>
@@ -135,9 +136,33 @@ void draw(std::size_t selected, std::size_t active) {
 }
 }
 int main(int argc, char** argv) {
-    if (argc > 1 && std::string(argv[1]) == "--version") {
-        std::puts("Biofeedback TUI 0.1.0");
-        return EXIT_SUCCESS;
+    if (argc > 1) {
+        const std::string option(argv[1]);
+        if (option == "--version") {
+            std::puts("Biofeedback TUI 0.1.0");
+            return EXIT_SUCCESS;
+        }
+        if (option == "--help") {
+            std::puts("Biofeedback TUI 0.1.0");
+            std::puts("Usage: biofeedback_tui [--help|--version|--status|--list-ports]");
+            return EXIT_SUCCESS;
+        }
+        if (option == "--status") {
+            std::puts("TUI: ready");
+            std::puts("Sensor: disconnected");
+            std::puts("Measurement: idle");
+            std::puts("Data mode: preview; no clinical data loaded");
+            return EXIT_SUCCESS;
+        }
+        if (option == "--list-ports") {
+            const auto ports = scanSerialPortCandidates();
+            if (ports.empty()) {
+                std::puts("No serial port candidates found.");
+            } else {
+                for (const auto& port : ports) std::cout << port << '\\n';
+            }
+            return EXIT_SUCCESS;
+        }
     }
     std::setlocale(LC_ALL, "");
     initscr();
