@@ -191,7 +191,7 @@ void MainWindow::setupTabs()
             });
     connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
             m_patientTab, [this]() {
-                if (!m_trainingTab->isTrainingActive()) {
+                if (!m_trainingTab->isTrainingActive() && !m_trainingTab->isTrainingPaused()) {
                     m_patientTab->setEnabled(true);
                     m_trainingTab->setEnabled(true);
                 }
