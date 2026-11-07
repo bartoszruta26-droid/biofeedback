@@ -22,6 +22,11 @@ checks = {
     "automatic persistence called on stop": "saveSessionAutomatically()" in source,
     "persistence supports zero repetitions": "repetitions > 0 ? weightedPeak / repetitions : 0.0" in analytics,
     "failed save keeps session locked": "if (!m_activeSessionHistoryFilePath.isEmpty() && !m_sessionSaved)\n        return false;" in analytics,
+    "checkpoint restores plan and cursor": '"exercise_plan"' in source and "restoreExecutionCheckpoint" in source and "current_repetition_index" in source,
+    "recovery prompts before resuming": "Odzyskiwanie treningu" in source and "recoverPendingSession" in source,
+    "rest remainder is checkpointed": '"rest_remaining_ms"' in source and "m_restDurationMs - m_restClock.elapsed()" in source,
+    "recovered session is resumed paused": "SessionState::Paused, resumeState" in source,
+    "state machine supports restoration": "bool restore(SessionState state" in machine,
     "state machine has all terminal states": "Completed, Interrupted" in machine,
 }
 for label, ok in checks.items():
