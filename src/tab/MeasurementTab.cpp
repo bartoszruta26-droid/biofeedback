@@ -1361,6 +1361,8 @@ void MeasurementTab::recalculateBiomechanicalResults()
     const double patientMass = m_patientMassInput
         ? m_patientMassInput->value() : 0.0;
     Formulas formulas(elasticConstant, patientMass);
+    std::vector<SeriesData> sessionSeries;
+    sessionSeries.reserve(static_cast<std::size_t>(m_completedSeriesStats.size()));
 
     for (auto& seriesStats : m_completedSeriesStats) {
         if (seriesStats.reps.isEmpty()) {
@@ -1372,15 +1374,17 @@ void MeasurementTab::recalculateBiomechanicalResults()
         seriesData.seriesNumber = seriesStats.seriesNumber;
         seriesData.startTime = seriesStats.reps.first().biomechanicalData.startTime;
         seriesData.endTime = seriesStats.reps.last().biomechanicalData.endTime;
-        seriesData.reps.reserve(seriesStats.reps.size());
+        seriesData.reps.reserve(static_cast<std::size_t>(seriesStats.reps.size()));
         for (auto& repetition : seriesStats.reps) {
             repetition.biomechanicalParams =
                 formulas.calculateRepParams(repetition.biomechanicalData);
             seriesData.reps.push_back(repetition.biomechanicalData);
         }
         seriesStats.biomechanicalParams = formulas.calculateAllParams(seriesData);
+        sessionSeries.push_back(std::move(seriesData));
     }
 
+    m_sessionBiomechanicalParams = formulas.calculateSessionParams(sessionSeries);
     updateBiomechanicalTable();
 }
 
@@ -1389,33 +1393,28 @@ void MeasurementTab::updateBiomechanicalTable()
     if (!m_biomechTable) return;
     m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
 
-    int selectedSeriesNumber = m_completedSeriesStats.isEmpty()
-        ? 0 : m_completedSeriesStats.last().seriesNumber;
+    int selectedIndex = m_completedSeriesStats.isEmpty()
+        ? -1 : m_completedSeriesStats.size() - 1;
     if (m_biomechSeriesSelector) {
         const QVariant previousData = m_biomechSeriesSelector->currentData();
-        const int previous = previousData.isValid() ? previousData.toInt() : -1;
+        const int previous = previousData.isValid() ? previousData.toInt() : selectedIndex;
         const QSignalBlocker blocker(m_biomechSeriesSelector);
         m_biomechSeriesSelector->clear();
+        m_biomechSeriesSelector->addItem(tr("Cała sesja"), -1);
         for (int i = 0; i < m_completedSeriesStats.size(); ++i) {
-            const int number = m_completedSeriesStats[i].seriesNumber;
-            m_biomechSeriesSelector->addItem(tr("Seria %1").arg(number), i);
-            if (number == selectedSeriesNumber)
-                m_biomechSeriesSelector->setCurrentIndex(i);
+            m_biomechSeriesSelector->addItem(
+                tr("Seria %1").arg(m_completedSeriesStats[i].seriesNumber), i);
         }
-        if (previous >= 0 && previous < m_completedSeriesStats.size())
-            m_biomechSeriesSelector->setCurrentIndex(previous);
-        if (m_biomechSeriesSelector->currentIndex() >= 0)
-            selectedSeriesNumber = m_completedSeriesStats[
-                m_biomechSeriesSelector->currentData().toInt()].seriesNumber;
+        const int previousIndex = m_biomechSeriesSelector->findData(previous);
+        m_biomechSeriesSelector->setCurrentIndex(
+            previousIndex >= 0 ? previousIndex : 0);
+        selectedIndex = m_biomechSeriesSelector->currentData().toInt();
     }
 
-    const BiomechanicalParams* result = nullptr;
-    for (const auto& series : m_completedSeriesStats) {
-        if (series.seriesNumber == selectedSeriesNumber) {
-            result = &series.biomechanicalParams;
-            break;
-        }
-    }
+    const BiomechanicalParams* result = selectedIndex < 0
+        ? &m_sessionBiomechanicalParams
+        : (selectedIndex < m_completedSeriesStats.size()
+            ? &m_completedSeriesStats[selectedIndex].biomechanicalParams : nullptr);
     const auto values = result ? result->values()
                                : std::array<double, BiomechanicalParams::ParameterCount>{};
 
