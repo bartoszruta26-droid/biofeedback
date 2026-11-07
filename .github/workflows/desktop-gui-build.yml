@@ -41,3 +41,50 @@ jobs:
         run: ctest --test-dir build --output-on-failure
       - name: Verify desktop executable
         run: test -x build/biofeedback
+      - name: Check runtime dependencies
+        run: |
+          ldd build/biofeedback | tee build/runtime-dependencies.txt
+          if grep -q "not found" build/runtime-dependencies.txt; then
+            echo "Unresolved runtime dependencies detected"
+            exit 1
+          fi
+      - name: Assemble Linux desktop bundle
+        run: |
+          mkdir -p dist/biofeedback-linux
+          cp build/biofeedback dist/biofeedback-linux/
+          cp -a config resources dist/biofeedback-linux/
+          mkdir -p dist/biofeedback-linux/data
+          cat > dist/biofeedback-linux/run.sh <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          cd "$(dirname "$0")"
+          exec ./biofeedback "$@"
+          EOF
+          cat > dist/biofeedback-linux/README.txt <<'EOF'
+          Biofeedback Linux desktop bundle (Ubuntu 22.04 build)
+          
+          Runtime dependencies: Qt 5 Widgets/Charts/Network, libserialport, OpenSSL.
+          On Debian/Ubuntu install the runtime packages with:
+            sudo apt install libqt5widgets5 libqt5charts5 libqt5network5 libserialport0 libssl3
+          
+          Run:
+            chmod +x run.sh
+            ./run.sh
+          
+          Connect the HX711 device before starting measurement, training or games.
+          Add your user to the dialout group for serial-port access, then sign out and in:
+            sudo usermod -aG dialout "$USER"
+          
+          This bundle is a Linux x86_64 CI build. Hardware calibration and device acceptance
+          must be performed with the actual sensor before clinical or therapeutic use.
+          EOF
+          chmod +x dist/biofeedback-linux/run.sh
+          cp build/runtime-dependencies.txt dist/biofeedback-linux/
+          tar -czf dist/biofeedback-linux-x86_64-ubuntu22.04.tar.gz -C dist biofeedback-linux
+      - name: Upload Linux desktop bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: biofeedback-linux-x86_64-ubuntu22.04
+          path: dist/biofeedback-linux-x86_64-ubuntu22.04.tar.gz
+          if-no-files-found: error
+          retention-days: 14
