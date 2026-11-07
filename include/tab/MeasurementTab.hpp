@@ -75,6 +75,7 @@ public:
     void clearData();
     void setTargetForce(double force);
     void setEngineRepetitionsPerSeries(int repetitions);
+    void setMeasurementPaused(bool paused);
     void setMaxTimeWindow(double seconds);
     void setUnit(ForceUnit unit);
     
