@@ -190,7 +190,6 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_currentRepIndex(0)
     , m_sessionTime(0)
     , m_restTimeRemaining(0)
-    , m_restAdvancesExercise(false)
     , m_repetitionDetector()
     , m_currentSeriesRepetitions()
     , m_currentForce(0.0)
@@ -518,7 +517,6 @@ void TrainingTab::startTraining()
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
-    m_restAdvancesExercise = false;
     m_currentSeriesRepetitions.clear();
     m_repetitionDetector.reset();
     for (int i = 0; i < m_exerciseStats.size(); ++i) {
@@ -567,7 +565,6 @@ void TrainingTab::stopTraining(bool completed)
             addDebugMessage("Nie udało się automatycznie zapisać sesji treningowej; sesja pozostaje do ponownego zapisu.", "ERROR");
     }
 
-    m_restAdvancesExercise = false;
     m_repetitionDetector.reset();
     
     // Aktualizacja UI
@@ -1140,7 +1137,7 @@ void TrainingTab::loadNextSeries()
             emit trainingFinished(completed);
         } else {
             m_stateMachine.beginRest();
-            m_restAdvancesExercise = true;
+            if (!m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise)) return;
             m_restTimeRemaining = 120;
             m_restDurationMs = 120000;
             m_restClock.start();
@@ -1280,12 +1277,11 @@ void TrainingTab::finishCurrentSeries()
         }
         m_currentSeriesIndex = 0;
         m_currentRepIndex = 0;
-        m_restAdvancesExercise = true;
+        if (!m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise)) return;
         m_restTimeRemaining = 120;
         m_restDurationMs = 120000;
     } else {
-        m_restAdvancesExercise = false;
-        m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
+            m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
         m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
     }
 
@@ -1316,9 +1312,8 @@ void TrainingTab::advanceAfterRest()
     if (m_stateMachine.resting() && !m_stateMachine.paused())
         m_stateMachine.endRest();
     m_lblRestTimer->clear();
-    if (m_restAdvancesExercise) {
-        m_restAdvancesExercise = false;
-        loadNextExercise();
+    if (m_stateMachine.restTarget() == biofeedback::training::RestTarget::NextExercise) {
+            loadNextExercise();
     } else {
         loadNextSeries();
     }
@@ -1375,7 +1370,7 @@ QJsonObject TrainingTab::buildExecutionCheckpoint() const
     state.insert("current_exercise_index", m_currentExerciseIndex);
     state.insert("current_series_index", m_currentSeriesIndex);
     state.insert("current_repetition_index", m_currentRepIndex);
-    state.insert("rest_advances_exercise", m_restAdvancesExercise);
+    state.insert("rest_target", static_cast<int>(m_stateMachine.restTarget()));
     state.insert("session_elapsed_ms", static_cast<double>(m_trainingClock.sessionMilliseconds()));
     state.insert("active_elapsed_ms", static_cast<double>(m_trainingClock.activeMilliseconds()));
     qint64 remainingRestMs = m_restDurationMs;
@@ -1496,7 +1491,11 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     m_currentExerciseIndex = exerciseIndex;
     m_currentSeriesIndex = seriesIndex;
     m_currentRepIndex = repetitionIndex;
-    m_restAdvancesExercise = checkpoint.value("rest_advances_exercise").toBool(false);
+    const int savedRestTarget = checkpoint.value("rest_target").toInt(
+        static_cast<int>(biofeedback::training::RestTarget::NextSeries));
+    if (savedRestTarget < static_cast<int>(biofeedback::training::RestTarget::NextSeries) ||
+        savedRestTarget > static_cast<int>(biofeedback::training::RestTarget::NextExercise))
+        return false;
     m_restDurationMs = qMax<qint64>(0, static_cast<qint64>(
         checkpoint.value("rest_remaining_ms").toDouble()));
     m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
@@ -1510,7 +1509,8 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
     m_trainingClock.restore(sessionMs, activeMs);
     m_sessionTime = static_cast<int>(sessionMs / 1000);
     m_sessionClock.start();
-    if (!m_stateMachine.restore(biofeedback::training::SessionState::Paused, resumeState))
+    const auto restTarget = static_cast<biofeedback::training::RestTarget>(savedRestTarget);
+    if (!m_stateMachine.restore(biofeedback::training::SessionState::Paused, resumeState, restTarget))
         return false;
     m_repetitionDetector.reset();
     const QJsonObject detectorObject = checkpoint.value("repetition_detector").toObject();
