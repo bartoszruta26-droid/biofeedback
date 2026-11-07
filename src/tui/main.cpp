@@ -36,6 +36,7 @@ struct LiveData {
     int targetRepsPerSeries = 8;
     int completedSeries = 0;
     int completedReps = 0;
+    std::string trainingMessage = "Polacz czujnik, aby rozpoczac trening.";
     std::vector<biofeedback::training::RepetitionRecord> currentSeries;
     biofeedback::training::SeriesSummary lastSeries;
     biofeedback::training::RepetitionDetector repetitionDetector;
@@ -161,7 +162,8 @@ void drawModule(tui::Screen screen,
     case tui::Screen::Training: {
         bool active = false, paused = false;
         double target = 0.0;
-        int series = 0, reps = 0, totalSeries = 0, totalReps = 0;
+        int series = 0, reps = 0, totalSeries = 0, totalReps = 0, repsInSeries = 0;
+        std::string message;
         biofeedback::training::SeriesSummary last;
         {
             std::lock_guard<std::mutex> lock(live.mutex);
@@ -172,6 +174,8 @@ void drawModule(tui::Screen screen,
             reps = live.completedReps;
             totalSeries = live.targetSeriesCount;
             totalReps = live.targetRepsPerSeries;
+            repsInSeries = static_cast<int>(live.currentSeries.size());
+            message = live.trainingMessage;
             last = live.lastSeries;
         }
         drawText(8, x + 2, std::string("Sesja: ") + (!active ? "zakonczona / bezczynna" : (paused ? "pauza" : "aktywna")));
@@ -179,12 +183,15 @@ void drawModule(tui::Screen screen,
                  std::to_string(series) + "/" + std::to_string(totalSeries) +
                  " | Powtorzenia: " + std::to_string(reps) + "/" +
                  std::to_string(totalSeries * totalReps));
-        drawText(12, x + 2, "Plan demonstracyjny: 3 serie x 8 powtorzen. Start/Stop: S, Pauza/Wznow: P.");
+        drawText(12, x + 2, "Plan: " + std::to_string(totalSeries) + " serie x " +
+                 std::to_string(totalReps) + " powt. | biezaca seria: " +
+                 std::to_string(repsInSeries) + "/" + std::to_string(totalReps));
         drawText(14, x + 2, "Ostatnia seria: " + std::to_string(last.repetitionCount) +
                  " powt. | sredni szczyt: " +
                  std::to_string(static_cast<int>(last.averagePeakForceN)) + " N | CV: " +
                  std::to_string(static_cast<int>(last.peakForceCoefficientOfVariationPercent)) + "%");
-        drawText(16, x + 2, "Zmiana celu: + / - (co 5 N). Dane wymagaja podlaczonego i skalibrowanego HX711.");
+        drawText(16, x + 2, "Plan: [/] serie, ,/. powtorzenia. Cel: +/- 5 N. Wymagany skalibrowany HX711.");
+        drawText(18, x + 2, message);
         break;
     }
     case tui::Screen::Devices: {
@@ -254,7 +261,7 @@ void draw(std::size_t selected,
     if (active == static_cast<std::size_t>(tui::Screen::Devices)) {
         drawText(LINES - 3, 2, "LEWO/PRAWO: port   C: polacz   D: rozlacz   R: skanuj   Q: wyjscie");
     } else if (active == static_cast<std::size_t>(tui::Screen::Training)) {
-        drawText(LINES - 3, 2, "S: start/stop   P: pauza/wznow   +/-: cel sily   Q: wyjscie");
+        drawText(LINES - 3, 2, "S: start/stop P: pauza +/-: cel [ ]: serie , .: powt. Q: wyjscie");
     } else {
         drawText(LINES - 3, 2, "GORA/DOL: wybor   ENTER: otworz   HOME/END: skrajne   Q: wyjscie");
     }
@@ -323,6 +330,7 @@ int main(int argc, char** argv)
             if (live.completedSeries >= live.targetSeriesCount) {
                 live.trainingActive = false;
                 live.trainingPaused = false;
+                live.trainingMessage = "Plan treningowy wykonany.";
             }
         }
     });
@@ -397,16 +405,22 @@ int main(int argc, char** argv)
             if (active == static_cast<std::size_t>(tui::Screen::Training)) {
                 std::lock_guard<std::mutex> lock(live.mutex);
                 if (!live.trainingActive) {
-                    live.trainingActive = true;
-                    live.trainingPaused = false;
-                    live.completedSeries = 0;
-                    live.completedReps = 0;
-                    live.currentSeries.clear();
-                    live.lastSeries = {};
-                    live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
+                    if (!serial.isConnected()) {
+                        live.trainingMessage = "Najpierw polacz czujnik w module Urzadzenia.";
+                    } else {
+                        live.trainingActive = true;
+                        live.trainingPaused = false;
+                        live.completedSeries = 0;
+                        live.completedReps = 0;
+                        live.currentSeries.clear();
+                        live.lastSeries = {};
+                        live.trainingMessage = "Trening aktywny - wykonuj pelne cykle napiecia i zwolnienia.";
+                        live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
+                    }
                 } else {
                     live.trainingActive = false;
                     live.trainingPaused = false;
+                    live.trainingMessage = "Sesja zatrzymana przez operatora.";
                     live.repetitionDetector.reset();
                 }
             }
@@ -417,6 +431,7 @@ int main(int argc, char** argv)
                 std::lock_guard<std::mutex> lock(live.mutex);
                 if (live.trainingActive) {
                     live.trainingPaused = !live.trainingPaused;
+                    live.trainingMessage = live.trainingPaused ? "Trening wstrzymany." : "Trening wznowiony.";
                     live.repetitionDetector.reset();
                 }
             }
@@ -425,16 +440,44 @@ int main(int argc, char** argv)
         case '=':
             if (active == static_cast<std::size_t>(tui::Screen::Training)) {
                 std::lock_guard<std::mutex> lock(live.mutex);
-                live.trainingTargetForceN = std::min(500.0, live.trainingTargetForceN + 5.0);
-                live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
+                if (!live.trainingActive) {
+                    live.trainingTargetForceN = std::min(500.0, live.trainingTargetForceN + 5.0);
+                    live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
+                }
             }
             break;
         case '-':
         case '_':
             if (active == static_cast<std::size_t>(tui::Screen::Training)) {
                 std::lock_guard<std::mutex> lock(live.mutex);
-                live.trainingTargetForceN = std::max(5.0, live.trainingTargetForceN - 5.0);
-                live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
+                if (!live.trainingActive) {
+                    live.trainingTargetForceN = std::max(5.0, live.trainingTargetForceN - 5.0);
+                    live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
+                }
+            }
+            break;
+        case '[':
+            if (active == static_cast<std::size_t>(tui::Screen::Training)) {
+                std::lock_guard<std::mutex> lock(live.mutex);
+                if (!live.trainingActive) live.targetSeriesCount = std::max(1, live.targetSeriesCount - 1);
+            }
+            break;
+        case ']':
+            if (active == static_cast<std::size_t>(tui::Screen::Training)) {
+                std::lock_guard<std::mutex> lock(live.mutex);
+                if (!live.trainingActive) live.targetSeriesCount = std::min(10, live.targetSeriesCount + 1);
+            }
+            break;
+        case ',':
+            if (active == static_cast<std::size_t>(tui::Screen::Training)) {
+                std::lock_guard<std::mutex> lock(live.mutex);
+                if (!live.trainingActive) live.targetRepsPerSeries = std::max(1, live.targetRepsPerSeries - 1);
+            }
+            break;
+        case '.':
+            if (active == static_cast<std::size_t>(tui::Screen::Training)) {
+                std::lock_guard<std::mutex> lock(live.mutex);
+                if (!live.trainingActive) live.targetRepsPerSeries = std::min(50, live.targetRepsPerSeries + 1);
             }
             break;
         case 'q':
