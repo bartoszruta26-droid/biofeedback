@@ -39,6 +39,10 @@ checks = {
         tab.index("// Phase 2: commit.")
     ),
     "version 2 requires a detector snapshot": "checkpointVersion >= 2 && !hasDetectorSnapshot" in tab,
+    "recovery rejects incomplete or mismatched exercise statistics": (
+        "if (stagedStats.size() != stagedPlan.size()) return false;" in tab and
+        "stagedStats[index].exerciseName != stagedPlan[index].name" in tab
+    ),
     "restored elapsed values are finite and ordered": (
         "activeMsValue > sessionMsValue" in tab and
         "restMsValue > 86400000.0" in tab
