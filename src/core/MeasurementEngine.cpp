@@ -99,7 +99,7 @@ RepetitionStats MeasurementEngine::finishRepetition() const
 
     if (stats.timeToPeakSeconds > 0.0) {
         stats.riseRateNPerSecond =
-            stats.peakForceN / stats.timeToPeakSeconds;
+            (stats.peakForceN - m_repetition.front().force) / stats.timeToPeakSeconds;
     }
 
     const double fallDuration = stats.endSeconds - peakTime;
