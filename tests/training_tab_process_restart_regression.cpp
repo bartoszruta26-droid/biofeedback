@@ -16,12 +16,12 @@
 
 class TrainingTabProcessRestartRegression {
 public:
-    static int child(const QStringList& args)
+    static int child(int argc, char** argv)
     {
-        QApplication app(args.size(), nullptr);
-        if (args.size() != 3) return 90;
-        const QString mode = args[1];
-        const QString root = args[2];
+        QApplication app(argc, argv);
+        if (argc != 3) return 90;
+        const QString mode = QString::fromLocal8Bit(argv[1]);
+        const QString root = QString::fromLocal8Bit(argv[2]);
         if (!QDir().mkpath(root)) return 91;
 
         if (mode == "--seed-active") return seedActive(root);
@@ -169,11 +169,8 @@ private:
 
 int main(int argc, char** argv)
 {
-    if (argc > 1) {
-        QStringList args;
-        for (int i = 0; i < argc; ++i) args.append(QString::fromLocal8Bit(argv[i]));
-        return TrainingTabProcessRestartRegression::child(args);
-    }
+    if (argc > 1)
+        return TrainingTabProcessRestartRegression::child(argc, argv);
 
     QApplication app(argc, argv);
     QTemporaryDir temporary;
