@@ -30,6 +30,9 @@ int main()
     assert(completed->impulseNs > 0.0);
     assert(completed->riseRateNPerSecond > 0.0);
     assert(completed->fallRateNPerSecond > 0.0);
+    assert(completed->medianForceN > 0.0);
+    assert(completed->percentile95ForceN >= completed->medianForceN);
+    assert(completed->standardDeviationN > 0.0);
     assert(!engine.isInContraction());
 
     Sample invalid;
