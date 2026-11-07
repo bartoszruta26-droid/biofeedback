@@ -34,6 +34,39 @@ json toJson(const CalibrationProfile& profile)
 }
 }
 
+std::optional<double> CalibrationMath::medianRaw(const std::vector<int32_t>& samples) noexcept
+{
+    if (samples.empty() || samples.size() > 1000) return std::nullopt;
+    std::vector<int32_t> sorted = samples;
+    std::sort(sorted.begin(), sorted.end());
+    const std::size_t middle = sorted.size() / 2;
+    if (sorted.size() % 2 != 0) return static_cast<double>(sorted[middle]);
+    return (static_cast<double>(sorted[middle - 1]) + static_cast<double>(sorted[middle])) * 0.5;
+}
+
+std::optional<double> CalibrationMath::scaleFromReference(double zeroOffsetRaw,
+                                                           int32_t referenceRaw,
+                                                           double referenceValue) noexcept
+{
+    const double delta = static_cast<double>(referenceRaw) - zeroOffsetRaw;
+    if (!std::isfinite(zeroOffsetRaw) || !std::isfinite(referenceValue) ||
+        delta <= 0.0 || referenceValue <= 0.0) return std::nullopt;
+    const double scale = referenceValue / delta;
+    if (!std::isfinite(scale) || scale <= 0.0) return std::nullopt;
+    return scale;
+}
+
+std::optional<double> CalibrationMath::convertRaw(int32_t raw,
+                                                   double zeroOffsetRaw,
+                                                   double scaleFactor) noexcept
+{
+    if (!std::isfinite(zeroOffsetRaw) || !std::isfinite(scaleFactor) || scaleFactor <= 0.0)
+        return std::nullopt;
+    const double result = (static_cast<double>(raw) - zeroOffsetRaw) * scaleFactor;
+    if (!std::isfinite(result)) return std::nullopt;
+    return result;
+}
+
 bool CalibrationProfile::isValidFor(const std::string& expectedDeviceId) const noexcept
 {
     return schemaVersion == CurrentSchemaVersion &&
