@@ -60,24 +60,24 @@ W menu `OutlineTab` pozostają pozycje Arkanoid, Galaga, Archer, Scored Earth i 
 
 ## 5. Ograniczenia walidacji
 
-Zmiany zapisano bezpośrednio na `integration/all-work`. Na moment sporządzenia dokumentu nie ma potwierdzonego zielonego przebiegu CI dla najnowszego commita, więc nie deklaruje się kompilacji ani testów jako zaliczonych. W szczególności należy zweryfikować dostępność przeciążenia funktorowego `QMetaObject::invokeMethod` w najstarszej wspieranej wersji Qt5.
+Poprawki silnika i czterech istniejących gier scalono do `integration/all-work` przez PR #204; Linux Qt5 i security-regression zakończyły się powodzeniem. TanGame i wspólny factory są proponowane w PR #205. `main` nie jest celem tych integracji.
 
 Przed uznaniem audytu za zamknięty wymagane są:
-- zielona kompilacja Qt5 i test `game_engine_regression`;
-- testy zachowania wszystkich czterech istniejących gier;
+- zielona kompilacja Qt5 oraz testy `game_engine_regression` i `game_factory_regression`;
+- scenariuszowe testy rozgrywki wszystkich pięciu dostępnych gier;
 - testy kolizji Pong i Flappy przy granicznych deltaTime;
-- testy ładowania skoku i generatora przeszkód Mario;
+- testy ładowania skoku i upadku w luki w Mario;
 - walidacja kalibracji wejścia sensora i progów dla każdej gry.
 
 ## 6. Kolejność dalszych prac
 
-Po zielonym CI:
-1. SinGame — punktacja, tolerancja, częstotliwość, testy wejścia.
-2. Pong — geometria i ciągłość kolizji, wynik, reset, trudność.
-3. Flappy Bird — fizyka impulsu, luki, kolizje i punktacja.
-4. Mario — ładowanie skoku, platformy, dziury, kolizje i progresja.
-5. TanGame — implementacja i testy (PR #205).
-6. Następnie Arkanoid, Galaga, Archer, Scored Earth i Car Race — każda gra jako osobny zakres z testami.
+Po zielonym CI PR #205:
+1. Zweryfikować TanGame w scenariuszach długiej rozgrywki, zmian trudności i przerw w próbkowaniu.
+2. Arkanoid — implementacja i testy.
+3. Galaga — implementacja i testy.
+4. Archer — implementacja i testy.
+5. Scored Earth — implementacja i testy.
+6. Car Race — implementacja i testy.
 
 
 ## 7. Uzupełniające poprawki — PR #204
@@ -97,7 +97,7 @@ Poprawki gier:
 
 Rozszerzono game_engine_regression o testy statystyk, NaN, przepełnienia wyniku, startu w aktywnej sesji i wznowienia przez start() oraz resume(). Test działa również w konfiguracji Release, ponieważ używa jawnego mechanizmu REQUIRE zamiast assert.
 
-Target testowy linkuje DebugManager.cpp i Threads::Threads oraz jest jawnie budowany w workflow security-regression. Status kompilacji i testów należy ocenić na podstawie przebiegu CI PR #204; testy sprzętowe Arduino/HX711 i walidacja kliniczna pozostają odrębnym zadaniem.
+Target testowy linkuje DebugManager.cpp i Threads::Threads oraz jest jawnie budowany w workflow security-regression. CI PR #204 zakończyło się powodzeniem; testy sprzętowe Arduino/HX711 i walidacja kliniczna pozostają odrębnym zadaniem.
 
 
 ## 8. TanGame i wspólny mechanizm uruchamiania — PR #205
