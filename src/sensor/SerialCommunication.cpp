@@ -183,7 +183,12 @@ public:
     std::map<CallbackToken, ConnectionCallback> connectionSubscribers;
     CallbackToken nextCallbackToken = 1;
     std::atomic<bool> asyncReading{false};
+    // Protect the std::thread object and worker identity independently from I/O.
+    // The lifecycle mutex serializes start/stop; self-stop only requests exit.
+    std::mutex asyncLifecycleMutex;
+    std::mutex asyncThreadMutex;
     std::thread asyncThread;
+    std::thread::id asyncWorkerId;
     std::mutex readMutex;
     std::string lastError;
     bool verbose = false;
@@ -923,20 +928,55 @@ void SerialCommunication::notifyConnectionCallbacks(bool connected, const std::s
 }
 
 void SerialCommunication::startAsyncReading() {
-    if (m_impl->asyncReading) return;
-    m_impl->asyncReading = true;
-    m_impl->asyncThread = std::thread([this]() {
-        while (m_impl->asyncReading && m_impl->isConnected) {
-            SensorData d = readData(100);
-            if (d.hasFrame) notifyDataCallbacks(d);
-            std::this_thread::sleep_for(std::chrono::milliseconds(12));
-        }
-    });
+    std::lock_guard<std::mutex> lifecycleLock(m_impl->asyncLifecycleMutex);
+
+    // Reap a completed worker before assigning a new std::thread.
+    std::thread previousWorker;
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        if (m_impl->asyncThread.joinable()) previousWorker = std::move(m_impl->asyncThread);
+    }
+    if (previousWorker.joinable()) previousWorker.join();
+
+    if (!m_impl->isConnected) return;
+    m_impl->asyncReading.store(true, std::memory_order_release);
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        m_impl->asyncThread = std::thread([this]() {
+            {
+                std::lock_guard<std::mutex> workerLock(m_impl->asyncThreadMutex);
+                m_impl->asyncWorkerId = std::this_thread::get_id();
+            }
+            while (m_impl->asyncReading.load(std::memory_order_acquire) &&
+                   m_impl->isConnected) {
+                SensorData data = readData(100);
+                if (data.hasFrame) notifyDataCallbacks(data);
+                std::this_thread::sleep_for(std::chrono::milliseconds(12));
+            }
+            {
+                std::lock_guard<std::mutex> workerLock(m_impl->asyncThreadMutex);
+                m_impl->asyncWorkerId = std::thread::id{};
+            }
+        });
+    }
 }
 
 void SerialCommunication::stopAsyncReading() {
-    m_impl->asyncReading = false;
-    if (m_impl->asyncThread.joinable()) m_impl->asyncThread.join();
+    m_impl->asyncReading.store(false, std::memory_order_release);
+    // A callback may request stop/disconnect from this worker. Never join self;
+    // leave the joinable handle for the next external stop, restart, or destructor.
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        if (m_impl->asyncWorkerId == std::this_thread::get_id()) return;
+    }
+
+    std::lock_guard<std::mutex> lifecycleLock(m_impl->asyncLifecycleMutex);
+    std::thread worker;
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        if (m_impl->asyncThread.joinable()) worker = std::move(m_impl->asyncThread);
+    }
+    if (worker.joinable()) worker.join();
 }
 
 void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) { m_impl->watchdogTimeoutMs = enabled ? timeoutMs : INT_MAX; }
