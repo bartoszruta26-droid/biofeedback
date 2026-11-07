@@ -44,6 +44,11 @@ struct SeriesStats {
     std::vector<RepetitionStats> repetitions;
     double averagePeakForceN{0.0};
     double medianPeakForceN{0.0};
+    double maximumPeakForceN{0.0};
+    double minimumPeakForceN{0.0};
+    double averageForceN{0.0};
+    double averageTimeToPeakSeconds{0.0};
+    double averageRepetitionDurationSeconds{0.0};
     double fatigueIndexPercent{0.0};
     double totalImpulseNs{0.0};
     double averageRiseRateNPerSecond{0.0};
@@ -68,6 +73,7 @@ public:
     std::optional<RepetitionStats> addSample(const Sample& sample);
     std::vector<SeriesStats> takeCompletedSeries();
     void setTargetForceN(double targetForceN);
+    bool setRepetitionsPerSeries(std::size_t repetitionsPerSeries);
     void reset();
 
     bool isInContraction() const noexcept { return m_inContraction; }
