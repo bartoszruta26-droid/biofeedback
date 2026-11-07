@@ -8,6 +8,7 @@
 #include <QFont>
 #include <QColor>
 #include <QStackedWidget>
+#include <QDir>
 #include <cmath>
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
@@ -624,6 +625,20 @@ void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunicatio
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
         });
+    }
+}
+
+void TrainingTab::setCurrentPatientContext(const QString& patientPesel,
+                                             const QString& patientDataPath)
+{
+    if (m_isTraining) return;
+    m_currentPatientPesel = patientPesel;
+    m_currentPatientDataPath = patientDataPath;
+    if (m_analyticsWidget) {
+        const QString historyPath = patientDataPath.isEmpty()
+            ? QString()
+            : QDir(patientDataPath).filePath(QStringLiteral("training_history.json"));
+        m_analyticsWidget->setHistoryFilePath(historyPath);
     }
 }
 
