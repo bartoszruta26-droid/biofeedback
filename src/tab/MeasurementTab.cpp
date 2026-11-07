@@ -105,7 +105,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     for (int i = 0; i <= 5; ++i) {
         int y = margin + plotHeight - (plotHeight * i / 5);
         double force = m_maxForce * i / 5;
-        QString label = QString::number(force, 'f', m_unit == ForceUnit::Kilograms ? 2 : 0);
+        QString label = QString::number(force, 'f', 0);
         painter.drawText(5, y + 3, label);
     }
     
@@ -283,7 +283,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     for (int i = 0; i <= 10; ++i) {
         int y = margin + plotHeight - (plotHeight * i / 10);
         double force = (-m_maxForce + (2.0 * m_maxForce * i / 10)) * (m_unit == ForceUnit::Kilograms ? 1.0 / 9.80665 : 1.0);
-        QString label = QString::number(force, 'f', 0);
+        QString label = QString::number(force, 'f', m_unit == ForceUnit::Kilograms ? 2 : 0);
         painter.drawText(5, y + 3, label);
     }
     
@@ -409,7 +409,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
     // który przekazuje je do centralnej zakładki DebugTab.
     
-timer init    setupUI();
+    setupUI();
     setupTrendsUI();
 }
 
