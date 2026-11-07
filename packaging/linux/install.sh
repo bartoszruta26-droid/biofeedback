@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-BUNDLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}"")" && pwd)"
+BUNDLE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_DIR="${BIOFEEDBACK_INSTALL_DIR:-$HOME/.local/opt/biofeedback}"
 APP_DIR="$HOME/.local/share/applications"
 
