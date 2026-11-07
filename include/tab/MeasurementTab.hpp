@@ -424,6 +424,7 @@ private:
     
     // Połączenie szeregowe z Arduino
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::DataCallbackId m_serialCallbackId{0};
     sensor::SensorData m_lastSensorData;
     std::atomic<bool> m_hasArduinoConnection{false};
     measurement::MeasurementEngine m_measurementEngine;
