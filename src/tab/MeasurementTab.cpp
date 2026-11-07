@@ -926,7 +926,8 @@ void MeasurementTab::readSingleSample(double forceValue, double forceInNewtons)
         sample.source = m_sampleSource;
         sample.valid = true;
         completedRepetition = m_measurementEngine.addSample(sample);
-        emit newForceSample(forceInNewtons, currentTime, false);
+        if (m_measurementEngine.lastSampleAccepted())
+            emit newForceSample(forceInNewtons, currentTime, false);
     }
 
     updateLiveDisplay(forceValue);
