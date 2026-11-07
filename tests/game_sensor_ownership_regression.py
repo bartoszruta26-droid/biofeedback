@@ -22,6 +22,8 @@ if "gramsToNewtons(data.calibratedValue)" not in main:
     raise SystemExit("Global game input must convert calibrated grams to SI force")
 if "setMeasurementEngine" not in training or "m_measurementEngine->subscribe" not in training:
     raise SystemExit("TrainingTab must consume the shared MeasurementEngine stream")
+if "addDataCallback(" in training or "onSensorDataReceived" in training:
+    raise SystemExit("TrainingTab must not create a second serial sample path")
 if "sample.value * biofeedback::measurement::standardGravityMetersPerSecondSquared" not in training:
     raise SystemExit("TrainingTab must convert canonical kilograms to SI force")
 if "!sample.isValid()" not in training or 'sample.unit != "kg"' not in training:
