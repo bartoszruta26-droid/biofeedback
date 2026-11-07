@@ -7,6 +7,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cmath>
+#include <limits>
+#include <memory>
 
 #define REQUIRE(condition) do { \
     if (!(condition)) { \
