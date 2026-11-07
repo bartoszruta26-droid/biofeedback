@@ -482,6 +482,12 @@ void TrainingTab::startTraining()
         return;
     }
     
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        QMessageBox::warning(this, "Brak urządzenia",
+                             "Podłącz skalibrowany czujnik HX711 przed rozpoczęciem treningu.");
+        return;
+    }
+
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
