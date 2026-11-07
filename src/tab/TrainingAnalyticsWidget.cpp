@@ -82,6 +82,8 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
     m_tabs->addTab(m_repetitionTable, tr("Powtórzenia"));
     m_tabs->addTab(m_historyTable, tr("Historia sesji"));
     layout->addWidget(m_tabs, 1);
+    m_historyFilePath = QDir(biofeedback::runtime::appDataDirectory())
+        .filePath(QStringLiteral("training_history.json"));
     loadHistory();
 }
 
@@ -98,9 +100,22 @@ void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int 
     rebuildPeakChart(stats);
 }
 
+void TrainingAnalyticsWidget::setHistoryFilePath(const QString& filePath) {
+    if (filePath.trimmed().isEmpty()) {
+        m_historyFilePath = QDir(biofeedback::runtime::appDataDirectory())
+            .filePath(QStringLiteral("training_history.json"));
+    } else {
+        m_historyFilePath = filePath;
+    }
+    m_historyReadable = true;
+    loadHistory();
+    setStats(m_currentStats, m_durationSeconds);
+}
+
 void TrainingAnalyticsWidget::loadHistory() {
-    const QString path = QDir(biofeedback::runtime::appDataDirectory())
-        .filePath(QStringLiteral("training_history.json"));
+    const QString path = m_historyFilePath.isEmpty()
+        ? QDir(biofeedback::runtime::appDataDirectory()).filePath(QStringLiteral("training_history.json"))
+        : m_historyFilePath;
     QFile file(path);
     if (!file.exists()) {
         m_historyEntries = QJsonArray();
@@ -177,8 +192,10 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
     QJsonArray updated = m_historyEntries;
     updated.append(entry);
 
-    const QString path = QDir(biofeedback::runtime::appDataDirectory())
-        .filePath(QStringLiteral("training_history.json"));
+    const QString path = m_historyFilePath.isEmpty()
+        ? QDir(biofeedback::runtime::appDataDirectory()).filePath(QStringLiteral("training_history.json"))
+        : m_historyFilePath;
+    QDir().mkpath(QFileInfo(path).absolutePath());
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly) ||
         file.write(QJsonDocument(updated).toJson(QJsonDocument::Indented)) < 0 ||
