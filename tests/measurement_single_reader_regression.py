@@ -17,5 +17,9 @@ receiver = source[source.index("void MeasurementTab::onSensorDataReceived"):
                   source.index("void MeasurementTab::", source.index("void MeasurementTab::onSensorDataReceived") + 30)]
 if "readSingleSample(valueToUse)" not in receiver:
     raise SystemExit("Measurement samples must be consumed from the shared callback")
+if ", m_showRawValues(false)" not in source:
+    raise SystemExit("Calibrated force in newtons must be the default measurement mode")
+if "m_btnToggleRaw->setEnabled(true)" not in source:
+    raise SystemExit("Raw/calibrated mode must be selectable while idle")
 
 print("Single asynchronous measurement reader policy passed")
