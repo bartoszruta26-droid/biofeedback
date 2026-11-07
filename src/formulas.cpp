@@ -12,6 +12,7 @@ BiomechanicalParams::BiomechanicalParams() {
 }
 
 void BiomechanicalParams::reset() {
+    availability.fill(ParameterAvailability::InsufficientData);
     // Kategoria 1: Parametry Siłowe
     F_peak = 0.0; F_mean = 0.0; F_min = 0.0; F_range = 0.0;
     F_set_mean = 0.0; F_set_peak = 0.0; W_total = 0.0; W_rep_avg = 0.0;
@@ -43,6 +44,14 @@ void BiomechanicalParams::reset() {
     
     // Kategoria 7: Parametry Dodatkowe (61-65)
     FG = 0.0; ESI = 0.0; BRC = 0.0; CEI = 0.0; LPT = 0.0;
+}
+
+const char* BiomechanicalParams::parameterName(std::size_t index) noexcept
+{
+    static constexpr const char* names[ParameterCount] = {
+        "F_peak", "F_mean", "F_min", "F_range", "F_set_mean", "F_set_peak", "W_total", "W_rep_avg", "I_impulse", "I_set_avg", "T_rep", "T_conc", "T_ecc", "R_CE", "T_rest_rep", "T_set", "T_rest_set", "T_rep_avg", "v_avg", "f_rep", "P_peak", "P_rep_avg", "P_set_avg", "E_total", "P_norm", "RFD", "RFD_set_avg", "RFD_max", "E_elastic", "eta", "sigma_F", "CV_F", "FI_set", "FI_inter", "MCI", "PSI", "Var_T", "SI", "H_entropy", "BPR", "F_grand_mean", "I_total", "V_training", "INT", "D_training", "SEI", "FMC", "ISI", "TUT_avg", "TUT_total", "MQS", "NML", "PSE", "TRI", "IRI", "TAI", "MEI", "LBI", "FRI", "CTS", "FG", "ESI", "BRC", "CEI", "LPT"
+    };
+    return index < ParameterCount ? names[index] : "";
 }
 
 // ============================================================================
@@ -581,6 +590,15 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     params.PSI = calculatePSI(params.T_conc, params.T_ecc);
     params.H_entropy = calculateEntropy(forces);
     
+    // A single repetition can support these metrics directly. Values that
+    // require calibrated mechanics or additional context remain unavailable.
+    for (std::size_t index : {0u, 1u, 2u, 3u, 10u, 11u, 12u, 13u,
+                              20u, 25u, 35u, 37u, 38u})
+        params.setAvailability(index, ParameterAvailability::Available);
+    params.setAvailability(6, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(21, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(28, ParameterAvailability::RequiresCalibration);
+
     return params;
 }
 
@@ -695,13 +713,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.TUT_avg = calculateAvgTUT(allRepSamples);
     params.TUT_total = calculateTotalTUT(allRepSamples);
 
-    // ==================== Kategoria 6: Parametry Zaawansowane (54-60) ====================
-
-    // 54. Indeks Gotowości Treningowej (TRI) - wymaga historycznego maksimum
-    // Dla pojedynczej serii używamy F_set_peak jako currentSetPeak
-    // F_peak_historical musi być przekazane zewnętrznie lub wczytane z historii pacjenta
-    double historicalPeak = params.F_set_peak * 1.1;  // Przyjmujemy 110% aktualnego jako historyczne maksimum
-    params.TRI = calculateTRI(params.F_set_peak, historicalPeak, params.CV_F);
+    // Historical readiness cannot be inferred from the current set.
 
     // 55. Wskaźnik Ryzyka Kontuzji (IRI) - średni dla serii
     double totalIRI = 0.0;
@@ -715,32 +727,20 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     }
     params.IRI = totalIRI / series.reps.size();
 
-    // 56. Indeks Adaptacji Treningowej (TAI) - wymaga danych z wielu serii
-    // Dla pojedynczej serii przyjmujemy domyślną wartość
-    // TAI wymaga porównania mocy między serią 1 a 3
-    params.TAI = 0.0;  // Wymaga danych z co najmniej 3 serii do obliczenia
+    // TAI requires at least three comparable sets.
 
     // 57. Wskaźnik Ekonomii Ruchu (MEI)
     params.MEI = calculateMEI(params.W_total, params.I_impulse * series.reps.size(), params.F_set_mean);
 
-    // 58. Indeks Zrównoważenia Obciążenia (LBI) - wymaga danych z 3 serii
-    // Dla pojedynczej serii przyjmujemy idealne zrównoważenie
-    params.LBI = 1.0;  // Wymaga danych z co najmniej 3 serii do obliczenia
+    // LBI requires three comparable sets.
 
-    // 59. Wskaźnik Rezerwy Funkcjonalnej (FRI)
-    double maxSensorForce = 500.0;  // Maksymalna siła czujnika [N] - powinna być konfiguracją
-    params.FRI = calculateFRI(params.F_set_peak, maxSensorForce);
+    // FRI requires the configured, calibrated sensor force limit.
 
-    // 60. Kompleksowy Wynik Treningowy (CTS)
-    double refForce = historicalPeak;  // Siła referencyjna
-    params.CTS = calculateCTS(params.F_set_mean, refForce, params.CV_F, 
-                              params.MCI, params.FI_inter);
+    // CTS requires a real reference force and inter-set fatigue context.
 
     // ==================== Kategoria 7: Parametry Dodatkowe (61-65) ====================
 
-    // 61. Gradient Zmęczenia (FG) - wymaga danych z 3 serii
-    // Dla pojedynczej serii używamy FI_set jako wszystkich trzech wartości
-    params.FG = calculateFG(params.FI_set, params.FI_set, params.FI_set);
+    // FG requires fatigue values from three separate sets.
 
     // 62. Indeks Eksplozywnej Siły (ESI) - średni dla serii
     double totalESI = 0.0;
@@ -750,14 +750,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     }
     params.ESI = totalESI / series.reps.size();
 
-    // 63. Współczynnik Powrotu do Bazy (BRC) - średni dla serii
-    double baselineForce = 10.0;  // Siła bazowa/spoczynkowa [N] - powinna być zmierzona przed ćwiczeniem
-    double totalBRC = 0.0;
-    for (const auto& rep : series.reps) {
-        double brc = calculateBRC(rep.endForce, baselineForce);
-        totalBRC += brc;
-    }
-    params.BRC = totalBRC / series.reps.size();
+    // BRC requires a measured resting baseline before the exercise.
 
     // 64. Indeks Kontrolowanego Opuszczania (CEI) - średni dla serii
     double totalCEI = 0.0;
@@ -767,9 +760,42 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     }
     params.CEI = totalCEI / series.reps.size();
 
-    // 65. Wskaźnik Postępu Longitudinalnego (LPT) - wymaga poprzedniej sesji
-    // Dla pojedynczej sesji przyjmujemy 0 (brak porównania)
-    params.LPT = 0.0;  // Wymaga danych z poprzedniej sesji treningowej
+    // LPT requires a previous comparable session.
 
+
+    // Explicitly mark only metrics backed by this set's inputs. A value left
+    // at its reset value is not evidence that the measured quantity was zero.
+    for (std::size_t index : {4u, 5u, 8u, 9u, 15u, 17u, 19u, 22u, 23u,
+                              26u, 27u, 30u, 31u, 32u, 34u, 35u, 36u, 37u,
+                              38u, 48u, 49u, 50u, 51u, 54u, 56u, 61u, 63u})
+        params.setAvailability(index, ParameterAvailability::Available);
+
+    // These outputs depend on a configured elastic element or patient mass.
+    for (std::size_t index : {6u, 7u, 21u, 22u, 23u, 24u, 28u, 45u, 56u})
+        params.setAvailability(index, ParameterAvailability::RequiresCalibration);
+
+    // Explicit external dependencies; do not fabricate proxy values.
+    params.setAvailability(14, ParameterAvailability::InsufficientData);
+    params.setAvailability(16, ParameterAvailability::InsufficientData);
+    params.setAvailability(18, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(29, ParameterAvailability::RequiresAdditionalSensor);
+    params.setAvailability(33, ParameterAvailability::InsufficientData);
+    params.setAvailability(39, ParameterAvailability::RequiresAdditionalSensor);
+    params.setAvailability(40, ParameterAvailability::InsufficientData);
+    params.setAvailability(41, ParameterAvailability::InsufficientData);
+    params.setAvailability(42, ParameterAvailability::InsufficientData);
+    params.setAvailability(43, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(44, ParameterAvailability::InsufficientData);
+    params.setAvailability(46, ParameterAvailability::InsufficientData);
+    params.setAvailability(47, ParameterAvailability::InsufficientData);
+    params.setAvailability(52, ParameterAvailability::RequiresAdditionalSensor);
+    params.setAvailability(53, ParameterAvailability::RequiresHistory);
+    params.setAvailability(55, ParameterAvailability::RequiresHistory);
+    params.setAvailability(57, ParameterAvailability::InsufficientData);
+    params.setAvailability(58, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(59, ParameterAvailability::RequiresHistory);
+    params.setAvailability(60, ParameterAvailability::InsufficientData);
+    params.setAvailability(62, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(64, ParameterAvailability::RequiresHistory);
     return params;
 }
