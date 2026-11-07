@@ -142,6 +142,7 @@ bool TrainingAnalyticsWidget::beginSession() {
     if (!m_activeSessionHistoryFilePath.isEmpty() && !m_sessionSaved)
         return false;
     m_activeSessionHistoryFilePath = m_historyFilePath;
+    m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_sessionSaved = false;
     m_sessionCompleted = false;
     m_saveHistoryButton->setEnabled(false);
@@ -309,10 +310,14 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
 }
 
 bool TrainingAnalyticsWidget::saveSessionAutomatically() {
-    return persistCurrentSession(false);
+    return persistCurrentSession(false, true);
 }
 
-bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback) {
+bool TrainingAnalyticsWidget::saveSessionCheckpoint() {
+    return persistCurrentSession(false, false);
+}
+
+bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback, bool finalize) {
     int repetitions = 0, seriesCount = 0, gamePoints = 0, exerciseCount = 0;
     double weightedPeak = 0.0, maximumPeak = 0.0;
     for (const auto& exercise : m_currentStats) {
@@ -332,10 +337,12 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback) {
 
     QJsonObject entry;
     entry.insert("schema_version", 2);
+    if (!m_activeSessionId.isEmpty()) entry.insert("session_id", m_activeSessionId);
     entry.insert("saved_at", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
     entry.insert("duration_seconds", m_durationSeconds);
     entry.insert("active_duration_seconds", m_activeDurationSeconds);
-    entry.insert("session_status", m_sessionCompleted ? "completed" : "interrupted");
+    entry.insert("session_status", finalize
+        ? (m_sessionCompleted ? "completed" : "interrupted") : "in_progress");
     entry.insert("exercise_count", exerciseCount);
     entry.insert("series_count", seriesCount);
     entry.insert("repetition_count", repetitions);
@@ -400,8 +407,18 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback) {
     }
     entry.insert("exercises", exerciseEntries);
 
-    QJsonArray updated = m_historyEntries;
-    updated.append(entry);
+    QJsonArray updated;
+    bool replacedActiveSession = false;
+    for (const QJsonValue& previous : m_historyEntries) {
+        if (!m_activeSessionId.isEmpty() && previous.isObject() &&
+            previous.toObject().value("session_id").toString() == m_activeSessionId) {
+            if (!replacedActiveSession) updated.append(entry);
+            replacedActiveSession = true;
+        } else {
+            updated.append(previous);
+        }
+    }
+    if (!replacedActiveSession) updated.append(entry);
 
     const QString path = !m_activeSessionHistoryFilePath.isEmpty()
         ? m_activeSessionHistoryFilePath
@@ -427,8 +444,11 @@ bool TrainingAnalyticsWidget::persistCurrentSession(bool showFeedback) {
     }
     QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     m_historyEntries = updated;
-    m_sessionSaved = true;
-    m_activeSessionHistoryFilePath.clear();
+    m_sessionSaved = finalize;
+    if (finalize) {
+        m_activeSessionHistoryFilePath.clear();
+        m_activeSessionId.clear();
+    }
     if (!m_pendingHistoryFilePath.isEmpty()) {
         m_historyFilePath = m_pendingHistoryFilePath;
         m_pendingHistoryFilePath.clear();
