@@ -11,7 +11,6 @@
  */
 
 #include "core/Authentication.hpp"
-#include "core/ConfigManager.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
