@@ -19,6 +19,7 @@
 #include "core/DebugManager.hpp"
 #include <chrono>
 #include <cstring>
+#include <cmath>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -562,7 +563,7 @@ SensorData SerialCommunication::readData(int timeout) {
                                     data.timestamp = timestamp;
                                     data.value = value;
                                     data.crc = crc;
-                                    data.calibratedValue = convertToCalibrated(value);
+                                    data.calibratedValue = m_impl->isCalibrated ? convertToCalibrated(value) : 0.0;
                                     data.isValid = true;
                                     gotBinaryData = true;
                                 }
