@@ -108,8 +108,10 @@ void TrainingAnalyticsWidget::setHistoryFilePath(const QString& filePath) {
         m_historyFilePath = filePath;
     }
     m_historyReadable = true;
+    m_currentStats.clear();
+    m_durationSeconds = 0;
+    setStats({}, 0);
     loadHistory();
-    setStats(m_currentStats, m_durationSeconds);
 }
 
 void TrainingAnalyticsWidget::loadHistory() {
