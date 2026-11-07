@@ -24,6 +24,7 @@
 #include <sstream>
 #include <iostream>
 #include <thread>
+#include <limits>
 #include <utility>
 #include <mutex>
 #include <atomic>
@@ -66,6 +67,7 @@ constexpr int CONNECTION_RETRY_DELAY_MS = 500;
     #include <fcntl.h>
     #include <sys/ioctl.h>
     #include <cerrno>
+    #include <poll.h>
 #endif
 
 namespace sensor {
@@ -370,7 +372,12 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             return false; 
         }
         COMMTIMEOUTS to{}; to.ReadIntervalTimeout = 50; to.ReadTotalTimeoutConstant = 50;
-        SetCommTimeouts(h, &to);
+        to.WriteTotalTimeoutConstant = 1000;
+        if (!SetCommTimeouts(h, &to)) {
+            CloseHandle(h);
+            m_impl->lastError = "Cannot configure serial port timeouts";
+            return false;
+        }
         m_impl->portHandle = reinterpret_cast<int>(h);
 #else
         int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
@@ -463,6 +470,60 @@ void SerialCommunication::disconnect() {
     notifyConnectionCallbacks(false, "Disconnected");
 }
 
+bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
+    if (!m_impl->isConnected || m_impl->portHandle < 0 || data == nullptr || length == 0) {
+        m_impl->lastError = "Serial write rejected: invalid connection or buffer";
+        return false;
+    }
+
+    size_t offset = 0;
+#ifdef _WIN32
+    HANDLE handle = reinterpret_cast<HANDLE>(m_impl->portHandle);
+    while (offset < length) {
+        const DWORD chunk = static_cast<DWORD>(std::min(
+            length - offset, static_cast<size_t>(std::numeric_limits<DWORD>::max())));
+        DWORD written = 0;
+        if (!WriteFile(handle, data + offset, chunk, &written, nullptr) || written == 0) {
+            m_impl->lastError = "Serial write failed";
+            return false;
+        }
+        offset += static_cast<size_t>(written);
+    }
+#else
+    while (offset < length) {
+        pollfd descriptor{};
+        descriptor.fd = m_impl->portHandle;
+        descriptor.events = POLLOUT;
+
+        int ready;
+        do {
+            ready = poll(&descriptor, 1, 1000);
+        } while (ready < 0 && errno == EINTR);
+
+        if (ready == 0) {
+            m_impl->lastError = "Serial write timed out";
+            return false;
+        }
+        if (ready < 0 || (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+            m_impl->lastError = "Serial write failed";
+            return false;
+        }
+
+        const ssize_t written = write(m_impl->portHandle, data + offset, length - offset);
+        if (written > 0) {
+            offset += static_cast<size_t>(written);
+            continue;
+        }
+        if (written < 0 && errno == EINTR) continue;
+        if (written < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) continue;
+
+        m_impl->lastError = "Serial write failed";
+        return false;
+    }
+#endif
+    return true;
+}
+
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
 std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? m_impl->portName : ""; }
 int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
@@ -516,11 +577,9 @@ SensorData SerialCommunication::readData(int timeout) {
     
     // Send DATA command
     std::string toSend = "DATA\n";
-#ifdef _WIN32
-    DWORD w; WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), toSend.c_str(), toSend.size(), &w, nullptr);
-#else
-    write(m_impl->portHandle, toSend.c_str(), toSend.size());
-#endif
+if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
+        return data;
+    }
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     
     // Read response - look for binary packet followed by text
@@ -795,11 +854,9 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
     std::string toSend = cmd + "\n";
-#ifdef _WIN32
-    DWORD w; WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), toSend.c_str(), toSend.size(), &w, nullptr);
-#else
-    write(m_impl->portHandle, toSend.c_str(), toSend.size());
-#endif
+if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
+        return "";
+    }
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     if (!waitForResponse) return "";
     std::string resp; char buf[256];
@@ -820,12 +877,9 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
 
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
-    if (!m_impl->isConnected || !data || len == 0) return false;
-#ifdef _WIN32
-    DWORD w; return WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), data, len, &w, nullptr) && w == len;
-#else
-    return write(m_impl->portHandle, data, len) == static_cast<ssize_t>(len);
-#endif
+    if (!writeToPort(data, len)) return false;
+    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    return true;
 }
 
 void SerialCommunication::setVerbose(bool v) { m_impl->verbose = v; }
