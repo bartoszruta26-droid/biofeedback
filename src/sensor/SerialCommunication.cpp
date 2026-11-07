@@ -18,6 +18,7 @@
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <algorithm>
 #include <fstream>
