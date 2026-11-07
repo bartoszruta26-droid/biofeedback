@@ -680,6 +680,10 @@ ArduinoInfo SerialCommunication::getArduinoInfo() const { return m_impl->arduino
 
 SensorData SerialCommunication::readData(int timeout) {
     SensorData data;
+    if (timeout < 0) {
+        m_impl->lastError = "Serial read rejected: negative timeout";
+        return data;
+    }
     if (!m_impl->isConnected) return data;
     
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
@@ -806,7 +810,9 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
         std::cout << std::endl;
     }
     
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    if (!rawData.empty()) {
+        m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    }
     return data;
 }
 
