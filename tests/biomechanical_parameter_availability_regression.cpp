@@ -131,6 +131,19 @@ int main()
     // Instantaneous peak power is max(F_i * |dF/dt| / k) = 10 W,
     // not max(F) multiplied by a velocity peak from another instant.
     assert(near(powerResult.P_peak, 10.0));
+
+    SensorSample invalidEccentricSample(175, 1000.0);
+    invalidEccentricSample.isValid = false;
+    const std::vector<SensorSample> eccentricWithGap{
+        SensorSample(100, 20.0),
+        invalidEccentricSample,
+        SensorSample(200, 10.0),
+        SensorSample(250, 0.0)
+    };
+    // The invalid interval is excluded; only the final valid 200-250 ms
+    // segment contributes to the eccentric integral.
+    assert(near(formulas.calculateCEI(eccentricWithGap, 20.0, 100, 250),
+                (0.25 * 0.05) / 0.15));
     assert(repetitionResult.availabilityAt(0) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(20) == ParameterAvailability::Available);
     assert(repetitionResult.availabilityAt(64) == ParameterAvailability::InsufficientData);
