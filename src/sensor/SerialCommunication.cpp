@@ -777,6 +777,21 @@ int32_t SerialCommunication::getTimestampOffset() const {
 }
 
 std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
+    // The wire protocol is line-oriented. Never allow a caller to append
+    // another command or inject control bytes into the serial stream.
+    constexpr std::size_t MaxCommandLength = 128;
+    if (cmd.empty() || cmd.size() > MaxCommandLength ||
+        cmd.find_first_of("\r\n") != std::string::npos ||
+        cmd.find('\0') != std::string::npos) {
+        m_impl->lastError = "Rejected invalid serial command";
+        return "";
+    }
+    for (const unsigned char ch : cmd) {
+        if (ch < 0x20 || ch > 0x7e) {
+            m_impl->lastError = "Rejected invalid serial command";
+            return "";
+        }
+    }
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
     std::string toSend = cmd + "\n";
@@ -802,6 +817,7 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
     if (m_impl->verbose && !resp.empty()) std::cout << "[SerialComm] " << resp << std::endl;
     return resp;
 }
+
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
     if (!m_impl->isConnected || !data || len == 0) return false;
