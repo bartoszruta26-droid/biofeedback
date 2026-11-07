@@ -231,6 +231,7 @@ signals:
     void trainingStarted();
     void trainingStopped();
     void engineSeriesSizeRequested(int repetitionsPerSeries);
+    void trainingPaused(bool paused);
     void trainingPaused();
     void trainingResumed();
     void exerciseCompleted(int index, const ExerciseStats& stats);
