@@ -399,6 +399,9 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
+    m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
+    m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
+        m_serialPort, m_measurementEngine, "desktop-hx711", "count");
     m_lastSensorData = sensor::SensorData();
     
     // Próba automatycznego podłączenia do Arduino w tle
@@ -418,6 +421,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
+    m_measurementAdapter.reset();
     if (m_serialPort && m_dataCallbackToken) {
         m_serialPort->removeDataCallback(m_dataCallbackToken);
         m_dataCallbackToken = 0;
@@ -1379,6 +1383,7 @@ void MeasurementTab::onReadSingleSample()
     // Odczyt z Arduino Nano z HX711 przez SerialCommunication
     if (m_serialPort && m_serialPort->isConnected()) {
         sensor::SensorData data = m_serialPort->readData(500);
+        if (m_measurementAdapter && data.hasFrame) m_measurementAdapter->processSample(data);
         if (data.isValid) {
             // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
             double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
@@ -1402,7 +1407,9 @@ void MeasurementTab::onTimerTick()
     // Pobieranie danych z prawdziwego Arduino zamiast symulacji
     if (m_serialPort && m_serialPort->isConnected()) {
         sensor::SensorData data;
-        if (m_serialPort->tryReadData(data)) {
+        const bool sampleValid = m_serialPort->tryReadData(data);
+        if (m_measurementAdapter && data.hasFrame) m_measurementAdapter->processSample(data);
+        if (sampleValid) {
             if (data.isValid) {
                 std::cout << "[DEBUG] onTimerTick: RAW DATA FROM ARDUINO - timestamp=" << data.timestamp 
                           << " value=" << data.value << " calibratedValue=" << data.calibratedValue 
@@ -1905,7 +1912,12 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
         m_serialPort->removeDataCallback(m_dataCallbackToken);
         m_dataCallbackToken = 0;
     }
+    m_measurementAdapter.reset();
     m_serialPort = serial;
+    if (m_serialPort && m_measurementEngine) {
+        m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
+            m_serialPort, m_measurementEngine, "desktop-hx711", "count");
+    }
     if (m_serialPort) {
         m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
             QMetaObject::invokeMethod(this, [this, data]() {
@@ -1922,6 +1934,7 @@ bool MeasurementTab::isArduinoConnected() const
 
 void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
+    if (m_measurementAdapter && data.hasFrame) m_measurementAdapter->processSample(data);
     std::cout << "[DEBUG] onSensorDataReceived: data.isValid=" << data.isValid 
               << " m_isMeasuring=" << m_isMeasuring << std::endl;
     
