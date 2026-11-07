@@ -1109,7 +1109,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.setAvailability(58, ParameterAvailability::RequiresCalibration);
     params.setAvailability(59, ParameterAvailability::RequiresHistory);
     params.setAvailability(60, ParameterAvailability::InsufficientData);
-    params.setAvailability(62, ParameterAvailability::RequiresCalibration);
+    // BRC needs a measured resting baseline, not an elastic-constant calibration.
+    params.setAvailability(62, ParameterAvailability::RequiresHistory);
     params.setAvailability(64, ParameterAvailability::RequiresHistory);
     return params;
 
