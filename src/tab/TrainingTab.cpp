@@ -1089,6 +1089,8 @@ void TrainingTab::finishCurrentSeries()
             emit trainingFinished(completed);
             return;
         }
+        m_currentSeriesIndex = 0;
+        m_currentRepIndex = 0;
         m_restAdvancesExercise = true;
         m_restTimeRemaining = 120;
     } else {
@@ -1096,6 +1098,7 @@ void TrainingTab::finishCurrentSeries()
         m_restTimeRemaining = static_cast<int>(exercise.restTime);
     }
 
+    updateProgressWidgets();
     if (m_restTimeRemaining > 0) {
         m_inRestPeriod = true;
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
