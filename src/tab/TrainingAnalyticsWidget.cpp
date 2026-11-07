@@ -73,6 +73,9 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
     m_historyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     m_historyTable->horizontalHeader()->setStretchLastSection(true);
     m_historyTable->verticalHeader()->setVisible(false);
+    m_historyTable->setToolTip(tr("Kliknij dwukrotnie zapis sesji, aby odtworzyć jej szczegółowe wyniki."));
+    connect(m_historyTable, &QTableWidget::cellDoubleClicked,
+            this, &TrainingAnalyticsWidget::onHistoryEntryActivated);
 
     m_peakChart = new QtCharts::QChartView(m_tabs);
     m_peakChart->setRenderHint(QPainter::Antialiasing);
@@ -170,7 +173,8 @@ void TrainingAnalyticsWidget::loadHistory() {
 
 void TrainingAnalyticsWidget::rebuildHistoryTable() {
     m_historyTable->setRowCount(0);
-    for (const auto& value : m_historyEntries) {
+    for (int entryIndex = 0; entryIndex < m_historyEntries.size(); ++entryIndex) {
+        const QJsonValue value = m_historyEntries.at(entryIndex);
         if (!value.isObject()) continue;
         const QJsonObject entry = value.toObject();
         const QStringList values = {
@@ -185,9 +189,98 @@ void TrainingAnalyticsWidget::rebuildHistoryTable() {
         };
         const int row = m_historyTable->rowCount();
         m_historyTable->insertRow(row);
-        for (int column = 0; column < values.size(); ++column)
-            m_historyTable->setItem(row, column, new QTableWidgetItem(values[column]));
+        for (int column = 0; column < values.size(); ++column) {
+            auto* item = new QTableWidgetItem(values[column]);
+            if (column == 0) item->setData(Qt::UserRole, entryIndex);
+            m_historyTable->setItem(row, column, item);
+        }
     }
+}
+
+void TrainingAnalyticsWidget::onHistoryEntryActivated(int row, int /*column*/) {
+    const QTableWidgetItem* item = m_historyTable->item(row, 0);
+    if (!item) return;
+    const int entryIndex = item->data(Qt::UserRole).toInt();
+    if (entryIndex < 0 || entryIndex >= m_historyEntries.size()) return;
+
+    const QJsonValue value = m_historyEntries.at(entryIndex);
+    if (!value.isObject()) return;
+    const QJsonObject entry = value.toObject();
+    if (entry.value("schema_version").toInt() != 2 ||
+        !entry.value("exercises").isArray()) {
+        m_summaryLabel->setText(tr("Ten zapis ma starszy lub nieobsługiwany format. Zachowano go bez zmian."));
+        return;
+    }
+
+    QVector<ExerciseStats> restored;
+    const QJsonArray exercises = entry.value("exercises").toArray();
+    for (const QJsonValue& exerciseValue : exercises) {
+        if (!exerciseValue.isObject()) continue;
+        const QJsonObject object = exerciseValue.toObject();
+        ExerciseStats exercise;
+        exercise.exerciseName = object.value("exercise_name").toString();
+        exercise.completedSeries = object.value("completed_series").toInt();
+        exercise.completedReps = object.value("completed_repetitions").toInt();
+        exercise.avgPeakForce = object.value("average_peak_force_n").toDouble();
+        exercise.maxPeakForce = object.value("maximum_peak_force_n").toDouble();
+        exercise.avgReactionTime = object.value("average_time_to_peak_seconds").toDouble();
+        exercise.consistencyScore = object.value("consistency_score_percent").toDouble();
+        exercise.gameScore = object.value("game_points").toInt();
+        exercise.isCompleted = true;
+
+        const QJsonArray series = object.value("series").toArray();
+        for (const QJsonValue& seriesValue : series) {
+            if (!seriesValue.isObject()) continue;
+            const QJsonObject seriesObject = seriesValue.toObject();
+            biofeedback::training::SeriesSummary summary;
+            summary.repetitionCount = static_cast<std::size_t>(seriesObject.value("repetition_count").toDouble());
+            summary.averagePeakForceN = seriesObject.value("average_peak_force_n").toDouble();
+            summary.maximumPeakForceN = seriesObject.value("maximum_peak_force_n").toDouble();
+            summary.averageDurationMs = seriesObject.value("average_duration_ms").toDouble();
+            summary.averageTimeToPeakMs = seriesObject.value("average_time_to_peak_ms").toDouble();
+            summary.targetAchievementPercent = seriesObject.value("target_achievement_percent").toDouble();
+            summary.peakForceCoefficientOfVariationPercent = seriesObject.value("peak_force_cv_percent").toDouble();
+            exercise.series.append(summary);
+        }
+
+        const QJsonArray repetitions = object.value("repetitions").toArray();
+        for (const QJsonValue& repetitionValue : repetitions) {
+            if (!repetitionValue.isObject()) continue;
+            const QJsonObject repetitionObject = repetitionValue.toObject();
+            TrainingRepetitionRecord record;
+            record.seriesIndex = repetitionObject.value("series_index").toInt();
+            record.repetitionIndex = repetitionObject.value("repetition_index").toInt();
+            record.measurement.startTimestampMs = static_cast<std::uint32_t>(
+                repetitionObject.value("start_timestamp_ms").toDouble());
+            record.measurement.endTimestampMs = static_cast<std::uint32_t>(
+                repetitionObject.value("end_timestamp_ms").toDouble());
+            record.measurement.durationMs = static_cast<std::uint32_t>(
+                repetitionObject.value("duration_ms").toDouble());
+            record.measurement.timeToPeakMs = static_cast<std::uint32_t>(
+                repetitionObject.value("time_to_peak_ms").toDouble());
+            record.measurement.peakForceN = repetitionObject.value("peak_force_n").toDouble();
+            record.measurement.meanForceN = repetitionObject.value("mean_force_n").toDouble();
+            record.measurement.sampleCount = static_cast<std::size_t>(
+                repetitionObject.value("sample_count").toDouble());
+            exercise.repetitions.append(record);
+        }
+        restored.append(exercise);
+    }
+
+    m_currentStats = restored;
+    m_durationSeconds = entry.value("duration_seconds").toInt();
+    m_sessionSaved = true;
+    m_saveHistoryButton->setEnabled(false);
+    rebuildSummary(restored);
+    rebuildSeriesTable(restored);
+    rebuildRepetitionTable(restored);
+    rebuildPeakChart(restored);
+    m_summaryLabel->setText(tr("Odtworzona sesja z %1 | %2 ćwiczeń, %3 powtórzeń | %4 N średnio, %5 N maksymalnie")
+        .arg(entry.value("saved_at").toString())
+        .arg(entry.value("exercise_count").toInt())
+        .arg(entry.value("repetition_count").toInt())
+        .arg(entry.value("average_peak_force_n").toDouble(), 0, 'f', 2)
+        .arg(entry.value("maximum_peak_force_n").toDouble(), 0, 'f', 2));
 }
 
 void TrainingAnalyticsWidget::saveCurrentSession() {
