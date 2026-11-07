@@ -3,8 +3,20 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace sensor {
+
+class CalibrationMath {
+public:
+    static std::optional<double> medianRaw(const std::vector<int32_t>& samples) noexcept;
+    static std::optional<double> scaleFromReference(double zeroOffsetRaw,
+                                                     int32_t referenceRaw,
+                                                     double referenceValue) noexcept;
+    static std::optional<double> convertRaw(int32_t raw,
+                                            double zeroOffsetRaw,
+                                            double scaleFactor) noexcept;
+};
 
 struct CalibrationProfile {
     static constexpr int CurrentSchemaVersion = 1;
