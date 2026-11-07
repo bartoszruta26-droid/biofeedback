@@ -11,6 +11,8 @@
 #include <QStackedWidget>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <cmath>
 #include <utility>
 #include "games/PongGame.hpp"
@@ -513,6 +515,8 @@ void TrainingTab::startTraining()
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
+    m_sessionElapsedOffsetMs = 0;
+    m_lastCheckpointSeconds = -1;
     m_trainingClock.reset();
     m_sessionClock.start();
     m_trainingClock.update(0, true);
@@ -543,7 +547,7 @@ void TrainingTab::startTraining()
     m_btnPauseResume->setText("Pauza");
     m_configBox->setEnabled(false);
     
-    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+    if (!saveExecutionCheckpoint())
         addDebugMessage("Nie udało się utworzyć początkowego punktu kontrolnego sesji.", "ERROR");
     emit trainingStarted();
 }
@@ -613,7 +617,7 @@ void TrainingTab::pauseTraining()
     
     m_btnPauseResume->setText("Wznów");
     
-    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+    if (!saveExecutionCheckpoint())
         addDebugMessage("Nie udało się zapisać punktu kontrolnego pauzy.", "ERROR");
     emit trainingPaused();
 }
@@ -635,7 +639,7 @@ void TrainingTab::resumeTraining()
     
     m_btnPauseResume->setText("Pauza");
     
-    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+    if (!saveExecutionCheckpoint())
         addDebugMessage("Nie udało się zapisać punktu kontrolnego wznowienia.", "ERROR");
     emit trainingResumed();
 }
@@ -974,13 +978,18 @@ void TrainingTab::onTimerTick()
                         .arg(activeMinutes, 2, 10, QChar('0'))
                         .arg(activeRemainder, 2, 10, QChar('0')));
     updateProgressWidgets();
+    if (m_sessionTime > 0 && m_sessionTime % 5 == 0 && m_sessionTime != m_lastCheckpointSeconds) {
+        m_lastCheckpointSeconds = m_sessionTime;
+        if (!saveExecutionCheckpoint())
+            addDebugMessage("Nie udało się zapisać okresowego punktu kontrolnego.", "ERROR");
+    }
 }
 
 void TrainingTab::updateSessionClocks()
 {
     if (!m_isTraining || !m_sessionClock.isValid()) return;
     const qint64 elapsedMs = m_sessionClock.elapsed();
-    m_trainingClock.update(elapsedMs, !m_isPaused && !m_inRestPeriod);
+    m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_isPaused && !m_inRestPeriod);
     m_sessionTime = static_cast<int>(m_trainingClock.sessionSeconds());
 }
 
@@ -1199,7 +1208,7 @@ void TrainingTab::onRepetitionDetected(
     } else {
         loadNextRep();
     }
-    if (m_analyticsWidget && !m_analyticsWidget->saveSessionCheckpoint())
+    if (!saveExecutionCheckpoint())
         addDebugMessage("Nie udało się zapisać punktu kontrolnego powtórzenia.", "ERROR");
 }
 
