@@ -19,6 +19,8 @@ receiver_end = source.index("// MeasurementTab - Konwersja jednostek", receiver_
 receiver = source[receiver_start:receiver_end]
 if "readSingleSample(value)" not in receiver:
     raise SystemExit("Live samples must flow from the shared callback into measurement")
+if "!data.hasCalibratedValue" not in receiver:
+    raise SystemExit("Calibrated biomechanics must reject raw-only binary frames")
 if "m_showRawValues(false)" not in source:
     raise SystemExit("Calibrated force in SI units must be the default")
 if "m_btnToggleRaw->setEnabled(true)" not in source:
