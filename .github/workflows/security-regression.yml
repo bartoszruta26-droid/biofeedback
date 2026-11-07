@@ -23,6 +23,17 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build regression targets
         run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api
+      - name: Smoke-test local HTTP API
+        run: |
+          ./build/biofeedback_api --port 18765 > /tmp/biofeedback-api.log 2>&1 &
+          api_pid=$!
+          trap 'kill "$api_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:18765/healthz > /tmp/biofeedback-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"ok":true' /tmp/biofeedback-health.json
+          curl --silent --fail http://127.0.0.1:18765/api/v1/status | grep -q '"status":"ready"'
       - name: Smoke-test TUI command modes
         run: ./build/biofeedback_tui --version && ./build/biofeedback_tui --status && ./build/biofeedback_tui --list-ports
       - name: Validate WebUI JavaScript
