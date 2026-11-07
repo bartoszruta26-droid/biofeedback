@@ -1093,7 +1093,6 @@ void TrainingTab::onRepetitionDetected(
     record.repetitionIndex = m_currentRepIndex + 1;
     record.measurement = repetition;
     stats.repetitions.append(record);
-    refreshAnalytics();
     stats.completedReps = stats.repetitions.size();
     stats.maxPeakForce = qMax(stats.maxPeakForce, repetition.peakForceN);
     stats.avgPeakForce = 0.0;
@@ -1104,6 +1103,7 @@ void TrainingTab::onRepetitionDetected(
     for (const auto& item : stats.repetitions)
         stats.avgReactionTime += item.measurement.timeToPeakMs / 1000.0;
     stats.avgReactionTime /= static_cast<double>(stats.repetitions.size());
+    refreshAnalytics();
 
     const auto seriesSummary = biofeedback::training::summarizeSeries(
         m_currentSeriesRepetitions, m_exercisePlan[m_currentExerciseIndex].targetForce);
