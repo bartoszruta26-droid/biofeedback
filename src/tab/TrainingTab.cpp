@@ -544,11 +544,13 @@ void TrainingTab::startTraining()
     emit trainingStarted();
 }
 
-void TrainingTab::stopTraining()
+void TrainingTab::stopTraining(bool completed)
 {
     if (!m_isTraining) return;
     
     updateSessionClocks();
+    refreshAnalytics();
+    if (m_analyticsWidget) m_analyticsWidget->setSessionCompleted(completed);
     m_timer->stop();
     m_restTimer->stop();
     
@@ -760,7 +762,10 @@ QVector<ExerciseStats> TrainingTab::getTrainingStats() const
 
 void TrainingTab::refreshAnalytics()
 {
-    if (m_analyticsWidget) m_analyticsWidget->setStats(m_exerciseStats, m_sessionTime);
+    if (m_analyticsWidget) {
+        m_analyticsWidget->setStats(m_exerciseStats, m_sessionTime,
+            static_cast<int>(m_activeExerciseTimeMs / 1000));
+    }
 }
 
 bool TrainingTab::exportResultsToCSV(const QString& filename)
@@ -1066,7 +1071,7 @@ void TrainingTab::loadNextExercise()
 {
     if (m_currentExerciseIndex >= m_exercisePlan.size()) {
         const QVector<ExerciseStats> completed = m_exerciseStats;
-        stopTraining();
+        stopTraining(true);
         emit trainingFinished(completed);
         return;
     }
@@ -1099,7 +1104,7 @@ void TrainingTab::loadNextSeries()
         ++m_currentExerciseIndex;
         if (m_currentExerciseIndex >= m_exercisePlan.size()) {
             const QVector<ExerciseStats> completed = m_exerciseStats;
-            stopTraining();
+            stopTraining(true);
             emit trainingFinished(completed);
         } else {
             m_inRestPeriod = true;
@@ -1231,7 +1236,7 @@ void TrainingTab::finishCurrentSeries()
         ++m_currentExerciseIndex;
         if (m_currentExerciseIndex >= m_exercisePlan.size()) {
             const QVector<ExerciseStats> completed = m_exerciseStats;
-            stopTraining();
+            stopTraining(true);
             emit trainingFinished(completed);
             return;
         }
