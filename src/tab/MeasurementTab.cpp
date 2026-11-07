@@ -524,7 +524,7 @@ void MeasurementTab::setupUI()
     m_unitSelector = new QComboBox(this);
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
     m_unitSelector->addItem("Kilogram-siła (kgf)", static_cast<int>(ForceUnit::Kilograms));
-remove raw unit selector option    m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
+    m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
     m_unitSelector->setMinimumHeight(35);
     m_unitSelector->setFont(QFont("Arial", 10));
     connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
