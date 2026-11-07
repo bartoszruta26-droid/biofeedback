@@ -72,7 +72,7 @@ bool CalibrationProfile::isValidFor(const std::string& expectedDeviceId) const n
     return schemaVersion == CurrentSchemaVersion &&
            !deviceId.empty() &&
            deviceId == expectedDeviceId &&
-           unit == "N" &&
+           unit == "g" &&
            std::isfinite(zeroOffsetRaw) &&
            std::isfinite(scaleFactor) && scaleFactor > 0.0 &&
            std::isfinite(referenceValue) && referenceValue > 0.0 &&
