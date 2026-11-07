@@ -29,6 +29,8 @@ Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać
 
 ## Hardware Requirements
 
+Before force-based training, calibrate the HX711 using a known reference mass and confirm the firmware reports `CAL:1`. See [docs/HX711_CALIBRATION.md](docs/HX711_CALIBRATION.md). Uncalibrated RAW frames are diagnostic only.
+
 - Raspberry Pi 4
 - Arduino Nano
 - HX711 strain gauge sensor module
