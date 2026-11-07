@@ -135,18 +135,35 @@ void MainWindow::setupTabs()
     QLabel* dashboardTitle = new QLabel(tr("Centrum Biofeedback"), dashboard);
     dashboardTitle->setStyleSheet("font-size:24px;font-weight:700;color:#14243a;");
     dashboardLayout->addWidget(dashboardTitle);
-    QLabel* connectionHeading = new QLabel(tr("POŁĄCZENIE Z URZĄDZENIEM"), dashboard);
-    m_dashboardConnectionValue = new QLabel(tr("Rozłączono"), dashboard);
-    m_dashboardConnectionValue->setObjectName("dashboardValue");
-    QLabel* forceHeading = new QLabel(tr("OSTATNI ODCZYT"), dashboard);
-    m_dashboardForceValue = new QLabel(tr("-- N"), dashboard);
-    m_dashboardForceValue->setObjectName("dashboardValue");
     QGridLayout* cards = new QGridLayout();
-    cards->addWidget(connectionHeading, 0, 0);
-    cards->addWidget(m_dashboardConnectionValue, 1, 0);
-    cards->addWidget(forceHeading, 0, 1);
-    cards->addWidget(m_dashboardForceValue, 1, 1);
-    cards->setHorizontalSpacing(40);
+    cards->setHorizontalSpacing(14);
+    cards->setVerticalSpacing(14);
+    auto makeDashboardCard = [dashboard](const QString& heading, const QString& value,
+                                         const QString& detail, QLabel** valueLabelOut) {
+        QFrame* card = new QFrame(dashboard);
+        card->setObjectName("dashboardCard");
+        QVBoxLayout* cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(18, 16, 18, 16);
+        QLabel* headingLabel = new QLabel(heading, card);
+        headingLabel->setStyleSheet("color:#64748b;font-size:10pt;font-weight:600;");
+        QLabel* valueLabel = new QLabel(value, card);
+        valueLabel->setObjectName("dashboardValue");
+        QLabel* detailLabel = new QLabel(detail, card);
+        detailLabel->setStyleSheet("color:#74839a;font-size:9pt;");
+        cardLayout->addWidget(headingLabel);
+        cardLayout->addWidget(valueLabel);
+        cardLayout->addWidget(detailLabel);
+        if (valueLabelOut) *valueLabelOut = valueLabel;
+        return card;
+    };
+    cards->addWidget(makeDashboardCard(tr("POŁĄCZENIE"), tr("Rozłączono"),
+        tr("Urządzenie pomiarowe"), &m_dashboardConnectionValue), 0, 0);
+    cards->addWidget(makeDashboardCard(tr("OSTATNI ODCZYT"), tr("-- N"),
+        tr("Oczekiwanie na próbkę"), &m_dashboardForceValue), 0, 1);
+    cards->addWidget(makeDashboardCard(tr("POMIAR"), tr("Bezczynny"),
+        tr("Brak aktywnej sesji"), nullptr), 1, 0);
+    cards->addWidget(makeDashboardCard(tr("TRYB"), tr("Gotowy"),
+        tr("Aplikacja desktopowa Qt"), nullptr), 1, 1);
     dashboardLayout->addLayout(cards);
     QLabel* hint = new QLabel(tr("Wybierz moduł, aby przejść do pacjentów, pomiarów lub treningu."), dashboard);
     hint->setStyleSheet("color:#74839a;font-size:11pt;");
