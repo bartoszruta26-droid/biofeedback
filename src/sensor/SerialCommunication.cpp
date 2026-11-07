@@ -842,6 +842,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
                                 // Verify CRC
                                 if (verifyCRC8(packet, 9)) {
                                     data.timestamp = timestamp;
+                                    data.hasTimestamp = true;
                                     data.value = value;
                                     data.crc = crc;
                                     data.isValid = true;
@@ -898,6 +899,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
                                     data.timestamp = static_cast<uint32_t>(
                                         std::stoul(resp.substr(timestampPos + 3,
                                             timestampEnd - timestampPos - 3)));
+                                    data.hasTimestamp = true;
                                 } catch (...) {}
                             }
                         }

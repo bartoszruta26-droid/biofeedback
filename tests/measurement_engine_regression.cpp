@@ -1,8 +1,13 @@
 #include "measurement/MeasurementEngine.hpp"
 
 #include <cassert>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cmath>
 #include <limits>
+#include <mutex>
+#include <thread>
 
 using namespace biofeedback::measurement;
 
@@ -16,6 +21,7 @@ int main() {
 
     MeasurementInput input;
     input.deviceTimestampMs = 1234;
+    input.hasTimestamp = true;
     input.rawValue = 250;
     input.value = 2500.0;
     input.sensorValid = true;
@@ -28,6 +34,12 @@ int main() {
     assert(std::abs(grams.value - 2.5) < 1e-9);
     assert(grams.timestampUnixMs > 0);
     assert(grams.sequence == 1);
+
+    MeasurementInput wrappedClockInput = input;
+    wrappedClockInput.deviceTimestampMs = 0;
+    const auto wrappedClockSample = engine.ingest(wrappedClockInput);
+    assert(wrappedClockSample.isValid()); // uint32 device-clock wrap is not a missing timestamp
+    assert(wrappedClockSample.deviceTimestampMs == 0);
 
     input.unit = "mm";
     input.value = 25.0;
@@ -45,24 +57,68 @@ int main() {
     input.sensorValid = false;
     assert(engine.ingest(input).quality == Quality::SensorRejected);
     input.sensorValid = true;
-    input.deviceTimestampMs = 0;
+    input.hasTimestamp = false;
     assert(engine.ingest(input).quality == Quality::MissingTimestamp);
+    input.hasTimestamp = true;
     input.deviceTimestampMs = 1235;
     input.value = std::numeric_limits<double>::infinity();
     assert(engine.ingest(input).quality == Quality::NonFiniteValue);
     input.value = 101.0;
     assert(engine.ingest(input).quality == Quality::OutsideConfiguredRange);
 
-    assert(callbackCount == 8);
+    assert(callbackCount == 9);
     const auto history = engine.history();
     assert(history.size() == 2);
-    assert(history.front().sequence == 7);
-    assert(history.back().sequence == 8);
+    assert(history.front().sequence == 8);
+    assert(history.back().sequence == 9);
 
     engine.unsubscribe(token);
     engine.ingest(input);
-    assert(callbackCount == 8);
+    assert(callbackCount == 9);
     engine.clearHistory();
     assert(engine.history().empty());
+
+    MeasurementEngine concurrentEngine;
+    std::mutex callbackMutex;
+    std::condition_variable callbackEntered;
+    std::condition_variable releaseCallback;
+    bool entered = false;
+    bool release = false;
+    std::atomic<bool> unsubscribeReturned{false};
+    const auto concurrentToken = concurrentEngine.subscribe(
+        [&](const MeasurementSample&) {
+            std::unique_lock<std::mutex> lock(callbackMutex);
+            entered = true;
+            callbackEntered.notify_one();
+            releaseCallback.wait(lock, [&] { return release; });
+        });
+    MeasurementInput concurrentInput;
+    concurrentInput.deviceTimestampMs = 10;
+    concurrentInput.hasTimestamp = true;
+    concurrentInput.value = 1.0;
+    concurrentInput.sensorValid = true;
+    concurrentInput.unit = "N";
+    concurrentInput.source = "unsubscribe-regression";
+    std::thread producer([&] { concurrentEngine.ingest(concurrentInput); });
+    {
+        std::unique_lock<std::mutex> lock(callbackMutex);
+        callbackEntered.wait(lock, [&] { return entered; });
+    }
+    std::thread remover([&] {
+        concurrentEngine.unsubscribe(concurrentToken);
+        unsubscribeReturned.store(true, std::memory_order_release);
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    assert(!unsubscribeReturned.load(std::memory_order_acquire));
+    {
+        std::lock_guard<std::mutex> lock(callbackMutex);
+        release = true;
+    }
+    releaseCallback.notify_one();
+    producer.join();
+    remover.join();
+    assert(unsubscribeReturned.load(std::memory_order_acquire));
+    concurrentEngine.ingest(concurrentInput);
+    assert(concurrentEngine.history().size() == 2);
     return 0;
 }

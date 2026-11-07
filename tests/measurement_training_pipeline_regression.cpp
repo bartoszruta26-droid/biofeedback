@@ -16,6 +16,7 @@ int main() {
     auto ingestForce = [&](std::uint32_t timestamp, double grams) {
         MeasurementInput input;
         input.deviceTimestampMs = timestamp;
+        input.hasTimestamp = true;
         input.rawValue = static_cast<std::int32_t>(grams * 10.0);
         input.value = grams;
         input.sensorValid = true;

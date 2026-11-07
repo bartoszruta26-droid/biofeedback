@@ -167,6 +167,8 @@ void MainWindow::setupTabs()
 
     connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
             m_trainingTab, &tab::TrainingTab::setCurrentPatientContext);
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            m_measurementTab, &tab::MeasurementTab::onPatientChanged);
     connect(m_measurementTab, &tab::MeasurementTab::newForceSample,
             this, [this](double value, double, bool isRaw) {
                 updateWeightDisplay(value, isRaw);

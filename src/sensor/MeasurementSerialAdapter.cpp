@@ -29,6 +29,7 @@ MeasurementSerialAdapter::MeasurementSerialAdapter(
 
             biofeedback::measurement::MeasurementInput input;
             input.deviceTimestampMs = data.timestamp;
+            input.hasTimestamp = data.hasTimestamp;
             input.rawValue = data.value;
             input.value = unitCopy == "count" ? static_cast<double>(data.value)
                                                : data.calibratedValue;
@@ -48,6 +49,7 @@ biofeedback::measurement::MeasurementSample MeasurementSerialAdapter::processSam
     if (!m_engine) return {};
     biofeedback::measurement::MeasurementInput input;
     input.deviceTimestampMs = data.timestamp;
+    input.hasTimestamp = data.hasTimestamp;
     input.rawValue = data.value;
     input.value = m_unit == "count" ? static_cast<double>(data.value) : data.calibratedValue;
     input.sensorValid = data.isValid && (m_unit == "count" || data.hasCalibratedValue);
