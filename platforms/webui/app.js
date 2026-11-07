@@ -70,12 +70,17 @@
     const api = window.BiofeedbackApi.createApiClient();
     try {
       const status = await api.getStatus();
-      apiStatus.textContent = status && status.status ? String(status.status) : "API dostępne";
+      const label = status && status.status ? String(status.status) : "API dostępne";
+      apiStatus.textContent = label;
       apiStatus.classList.remove("status-pending");
       apiStatus.classList.add("status-ok");
+      document.getElementById("apiSummary").textContent = "API dostępne";
+      document.getElementById("apiSummaryDetail").textContent = label;
     } catch (error) {
       apiStatus.textContent = error.status ? "Błąd HTTP " + error.status : "API nieosiągalne";
       apiStatus.title = error.message;
+      document.getElementById("apiSummary").textContent = "API niedostępne";
+      document.getElementById("apiSummaryDetail").textContent = error.message;
     }
   }
   checkApi();
