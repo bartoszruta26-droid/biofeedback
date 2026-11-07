@@ -710,7 +710,7 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     BiomechanicalParams params;
     
     std::vector<double> forces = extractForces(rep.samples);
-    if (forces.empty()) return params;
+    if (forces.size() < 3) return params;
     
     // Parametry siłowe
     params.F_peak = calculatePeakForce(forces);
@@ -760,7 +760,28 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     BiomechanicalParams params;
     
     if (series.reps.empty()) return params;
-    
+
+    const std::uint32_t setDurationMs = series.endTime - series.startTime;
+    if (setDurationMs == 0 || setDurationMs >= 0x80000000u) {
+        params.availability.fill(ParameterAvailability::InvalidInput);
+        return params;
+    }
+    for (const auto& rep : series.reps) {
+        const std::uint32_t durationMs = rep.endTime - rep.startTime;
+        const std::uint32_t concentricMs = rep.peakTime - rep.startTime;
+        const std::uint32_t eccentricMs = rep.endTime - rep.peakTime;
+        const auto validSamples = std::count_if(
+            rep.samples.begin(), rep.samples.end(),
+            [](const SensorSample& sample) {
+                return sample.isValid && std::isfinite(sample.force);
+            });
+        if (validSamples < 3 || durationMs == 0 || durationMs >= 0x80000000u ||
+            concentricMs > durationMs || eccentricMs > durationMs) {
+            params.availability.fill(ParameterAvailability::InvalidInput);
+            return params;
+        }
+    }
+
     std::vector<double> repPeakForces;
     std::vector<double> repMeanForces;
     std::vector<double> repImpulses;
