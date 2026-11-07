@@ -496,7 +496,12 @@ void TrainingTab::startTraining()
         QMessageBox::warning(this, "Brak planu", "Dodaj ćwiczenia przed rozpoczęciem treningu.");
         return;
     }
-    
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        QMessageBox::warning(this, tr("Brak urządzenia"),
+                             tr("Podłącz czujnik HX711 przed rozpoczęciem treningu."));
+        return;
+    }
+
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
