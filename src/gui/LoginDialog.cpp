@@ -17,20 +17,42 @@ LoginDialog::LoginDialog(biofeedback::Authentication& auth, QWidget *parent)
     , m_passwordLabel(nullptr)
     , m_usernameEdit(nullptr)
     , m_passwordEdit(nullptr)
+    , m_confirmPasswordLabel(nullptr)
+    , m_confirmPasswordEdit(nullptr)
     , m_loginButton(nullptr)
     , m_cancelButton(nullptr)
     , m_statusLabel(nullptr)
     , m_loginSuccess(false)
+    , m_firstRun(false)
+    , m_usersLoaded(false)
 {
     setWindowTitle(tr("Logowanie - Biofeedback"));
-    setFixedSize(400, 350);
+    setFixedSize(420, 430);
     setWindowModality(Qt::ApplicationModal);
     
     setupUI();
     createConnections();
     
-    // Wczytaj użytkowników
-    m_authentication.loadUsers();
+    // Existing accounts are never replaced. An empty, valid account store
+    // enables a first-run administrator creation flow instead of a weak seed.
+    m_usersLoaded = m_authentication.loadUsers();
+    m_firstRun = m_usersLoaded && !m_authentication.hasUsers();
+    if (m_firstRun) {
+        setWindowTitle(tr("Pierwsze uruchomienie - Biofeedback"));
+        m_titleLabel->setText(tr("Utwórz konto administratora"));
+        m_confirmPasswordLabel->show();
+        m_confirmPasswordEdit->show();
+        m_loginButton->setText(tr("Utwórz administratora"));
+        m_cancelButton->setText(tr("Zamknij"));
+        m_statusLabel->setText(tr("Hasło administratora musi mieć co najmniej 12 znaków."));
+        m_statusLabel->setStyleSheet("color: #2563eb; font-size: 12px;");
+        m_statusLabel->show();
+    } else if (!m_usersLoaded) {
+        m_loginButton->setEnabled(false);
+        m_statusLabel->setText(tr("Nie można odczytać bazy kont. Sprawdź plik w katalogu konfiguracji użytkownika."));
+        m_statusLabel->setStyleSheet("color: #e74c3c; font-size: 12px;");
+        m_statusLabel->show();
+    }
     
     // Debug logging for initialization
     core::DebugManager::instance().sendDebugMessage(
@@ -113,7 +135,22 @@ void LoginDialog::setupUI()
         "}"
     );
     mainLayout->addWidget(m_passwordEdit);
-    
+
+    m_confirmPasswordLabel = new QLabel(tr("Powtórz hasło administratora:"));
+    m_confirmPasswordLabel->setStyleSheet("font-weight: bold; color: #34495e;");
+    m_confirmPasswordLabel->hide();
+    mainLayout->addWidget(m_confirmPasswordLabel);
+
+    m_confirmPasswordEdit = new QLineEdit();
+    m_confirmPasswordEdit->setPlaceholderText(tr("Wpisz hasło ponownie"));
+    m_confirmPasswordEdit->setEchoMode(QLineEdit::Password);
+    m_confirmPasswordEdit->setMinimumHeight(35);
+    m_confirmPasswordEdit->setStyleSheet(
+        "QLineEdit { border: 2px solid #bdc3c7; border-radius: 5px; padding: 5px 10px; font-size: 14px; }"
+        "QLineEdit:focus { border-color: #3498db; }");
+    m_confirmPasswordEdit->hide();
+    mainLayout->addWidget(m_confirmPasswordEdit);
+
     // Status
     m_statusLabel = new QLabel();
     m_statusLabel->setAlignment(Qt::AlignCenter);
@@ -181,7 +218,8 @@ void LoginDialog::createConnections()
     connect(m_cancelButton, &QPushButton::clicked, this, &LoginDialog::onCancelButtonClicked);
     connect(m_usernameEdit, &QLineEdit::textChanged, this, &LoginDialog::onUsernameTextChanged);
     connect(m_passwordEdit, &QLineEdit::textChanged, this, &LoginDialog::onPasswordTextChanged);
-    
+    connect(m_confirmPasswordEdit, &QLineEdit::textChanged, this, &LoginDialog::onPasswordTextChanged);
+
     // Enter zatwierdza logowanie
     connect(m_passwordEdit, &QLineEdit::returnPressed, this, &LoginDialog::onLoginButtonClicked);
 }
@@ -191,7 +229,13 @@ void LoginDialog::onLoginButtonClicked()
     try {
         std::string username = m_usernameEdit->text().trimmed().toStdString();
         std::string password = m_passwordEdit->text().toStdString();
-        
+
+        if (!m_usersLoaded) {
+            m_statusLabel->setText(tr("Baza kont jest niedostępna. Logowanie i tworzenie kont są zablokowane."));
+            m_statusLabel->show();
+            return;
+        }
+
         // Security: Do not log raw username - use redacted form or just indicate attempt
         core::DebugManager::instance().sendDebugMessage(
             QString("Login attempt for user: [REDACTED] (length: %1)")
@@ -226,6 +270,37 @@ void LoginDialog::onLoginButtonClicked()
             return;
         }
         
+        if (m_firstRun) {
+            const QString passwordText = m_passwordEdit->text();
+            if (passwordText.size() < 12) {
+                m_statusLabel->setText(tr("Hasło musi mieć co najmniej 12 znaków."));
+                m_statusLabel->show();
+                m_passwordEdit->setFocus();
+                return;
+            }
+            if (passwordText != m_confirmPasswordEdit->text()) {
+                m_statusLabel->setText(tr("Wprowadzone hasła są różne."));
+                m_statusLabel->show();
+                m_confirmPasswordEdit->clear();
+                m_confirmPasswordEdit->setFocus();
+                return;
+            }
+            m_loginButton->setEnabled(false);
+            m_cancelButton->setEnabled(false);
+            m_statusLabel->setText(tr("Tworzenie konta administratora..."));
+            m_statusLabel->setStyleSheet("color: #2563eb; font-size: 12px;");
+            m_statusLabel->show();
+            QApplication::processEvents();
+            if (!m_authentication.createInitialAdministrator(username, password)) {
+                m_statusLabel->setText(tr("Nie udało się utworzyć konta. Sprawdź uprawnienia katalogu danych."));
+                m_statusLabel->setStyleSheet("color: #e74c3c; font-size: 12px;");
+                m_loginButton->setEnabled(true);
+                m_cancelButton->setEnabled(true);
+                return;
+            }
+            m_firstRun = false;
+        }
+
         // Blokada przycisków podczas logowania
         m_loginButton->setEnabled(false);
         m_cancelButton->setEnabled(false);
@@ -316,13 +391,17 @@ void LoginDialog::onCancelButtonClicked()
 void LoginDialog::onUsernameTextChanged(const QString& text)
 {
     m_statusLabel->hide();
-    m_loginButton->setEnabled(!text.trimmed().isEmpty() && !m_passwordEdit->text().isEmpty());
+    const bool confirmationReady = !m_firstRun || !m_confirmPasswordEdit->text().isEmpty();
+    m_loginButton->setEnabled(m_usersLoaded && !text.trimmed().isEmpty() &&
+                              !m_passwordEdit->text().isEmpty() && confirmationReady);
 }
 
 void LoginDialog::onPasswordTextChanged(const QString& text)
 {
     m_statusLabel->hide();
-    m_loginButton->setEnabled(!text.isEmpty() && !m_usernameEdit->text().trimmed().isEmpty());
+    const bool confirmationReady = !m_firstRun || !m_confirmPasswordEdit->text().isEmpty();
+    m_loginButton->setEnabled(m_usersLoaded && !text.isEmpty() &&
+                              !m_usernameEdit->text().trimmed().isEmpty() && confirmationReady);
 }
 
 bool LoginDialog::attemptLogin(const std::string& username, const std::string& password)
