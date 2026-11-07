@@ -101,29 +101,36 @@ void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int 
 }
 
 void TrainingAnalyticsWidget::setHistoryFilePath(const QString& filePath) {
-    if (filePath.trimmed().isEmpty()) {
-        m_historyFilePath = QDir(biofeedback::runtime::appDataDirectory())
-            .filePath(QStringLiteral("training_history.json"));
-    } else {
-        m_historyFilePath = filePath;
+    const QString requestedPath = filePath.trimmed().isEmpty()
+        ? QDir(biofeedback::runtime::appDataDirectory()).filePath(QStringLiteral("training_history.json"))
+        : filePath;
+    if (!m_activeSessionHistoryFilePath.isEmpty() && !m_sessionSaved) {
+        // Do not mix a newly selected patient's history into the previous
+        // patient's unsaved session file.
+        m_pendingHistoryFilePath = requestedPath;
+        return;
     }
-    m_historyReadable = true;
 
-    // An unsaved session retains the destination captured when it started,
-    // even if the operator changes the selected patient after stopping.
-    if (m_activeSessionHistoryFilePath.isEmpty()) {
-        m_currentStats.clear();
-        m_durationSeconds = 0;
-        m_sessionSaved = false;
-        setStats({}, 0);
-    }
+    m_historyFilePath = requestedPath;
+    m_historyReadable = true;
+    m_currentStats.clear();
+    m_durationSeconds = 0;
+    m_sessionSaved = false;
+    setStats({}, 0);
     loadHistory();
 }
 
-void TrainingAnalyticsWidget::beginSession() {
+bool TrainingAnalyticsWidget::beginSession() {
+    if (!m_activeSessionHistoryFilePath.isEmpty() && !m_sessionSaved) {
+        const bool hasRepetitions = std::any_of(
+            m_currentStats.cbegin(), m_currentStats.cend(),
+            [](const ExerciseStats& exercise) { return !exercise.repetitions.isEmpty(); });
+        if (hasRepetitions) return false;
+    }
     m_activeSessionHistoryFilePath = m_historyFilePath;
     m_sessionSaved = false;
     m_saveHistoryButton->setEnabled(false);
+    return true;
 }
 
 void TrainingAnalyticsWidget::loadHistory() {
@@ -279,7 +286,13 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
     m_historyEntries = updated;
     m_sessionSaved = true;
     m_activeSessionHistoryFilePath.clear();
-    rebuildHistoryTable();
+    if (!m_pendingHistoryFilePath.isEmpty()) {
+        m_historyFilePath = m_pendingHistoryFilePath;
+        m_pendingHistoryFilePath.clear();
+        loadHistory();
+    } else {
+        rebuildHistoryTable();
+    }
     m_saveHistoryButton->setEnabled(false);
     QMessageBox::information(this, tr("Historia treningów"),
                              tr("Pełny zapis sesji (ćwiczenia, serie i powtórzenia) zapisano lokalnie. Dane nie zawierają identyfikatora pacjenta."));
