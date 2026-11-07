@@ -50,12 +50,11 @@ Aktualny plik budowania aplikacji wymienia źródła:
 - `FlappyBirdGame`
 - `MarioGame`
 
-W menu `OutlineTab` pozostają pozycje Galaga, Archer, Scored Earth i Car Race bez aktywnych implementacji. Są oznaczone jako niedostępne. Nie należy traktować ich jako działających gier ani tworzyć pozornych pustych klas. Pozostają jawnie w planie kolejnych etapów:
+W menu `OutlineTab` pozostają pozycje Archer, Scored Earth i Car Race bez aktywnych implementacji. Są oznaczone jako niedostępne. Nie należy traktować ich jako działających gier ani tworzyć pozornych pustych klas. Pozostają jawnie w planie kolejnych etapów:
 
-1. Galaga — implementacja i testy.
-2. Archer — implementacja i testy.
-3. Scored Earth — implementacja i testy.
-4. Car Race — implementacja i testy.
+1. Archer — implementacja i testy.
+2. Scored Earth — implementacja i testy.
+3. Car Race — implementacja i testy.
 
 ## 5. Ograniczenia walidacji
 
@@ -71,11 +70,10 @@ Przed uznaniem audytu za zamknięty wymagane są:
 ## 6. Kolejność dalszych prac
 
 Po zielonym CI PR #205:
-1. Zweryfikować TanGame i Arkanoid w scenariuszach długiej rozgrywki, zmian trudności i przerw w próbkowaniu.
-2. Galaga — implementacja i testy.
-3. Archer — implementacja i testy.
-4. Scored Earth — implementacja i testy.
-5. Car Race — implementacja i testy.
+1. Zweryfikować TanGame, Arkanoid i Galaga w scenariuszach długiej rozgrywki, zmian trudności i przerw w próbkowaniu.
+2. Archer — implementacja i testy.
+3. Scored Earth — implementacja i testy.
+4. Car Race — implementacja i testy.
 
 
 ## 7. Uzupełniające poprawki — PR #204
@@ -118,3 +116,13 @@ Walidacja PR #205 obejmuje kompilację Qt5, CTest i security-regression. Dopiero
 - Dodano Arkanoid do GameFactory, TrainingTab i MainWindow; pozycja w OutlineTab jest aktywna.
 - Rozszerzono game_factory_regression o utworzenie i cykl życia Arkanoid oraz sprawdzenie poziomów trudności.
 - Czeka na kompilację i CTest PR #206. Testy nie obejmują jeszcze długiej rozgrywki ani sprzętu fizycznego.
+
+
+## 10. Galaga — kolejny etap
+
+- Dodano Galaga jako strzelankę sterowaną położeniem statku przez znormalizowaną siłę z tensometru; strzał gracza jest automatyczny.
+- Zaimplementowano formację przeciwników poruszającą się poziomo i schodzącą w dół, pociski gracza i przeciwników, kolizje, życia, poziomy i punktację.
+- Zabezpieczono utratę życia przed unieważnieniem iteratora pocisków; po trafieniu czyszczone są pociski przeciwnika bez modyfikowania wektora podczas iteracji.
+- Dodano Galaga do GameFactory, TrainingTab, MainWindow i aktywnego wyboru OutlineTab.
+- Rozszerzono game_factory_regression o tworzenie Galaga i sprawdzenie poziomów trudności.
+- PR #207 ma zweryfikować kompilację Qt5, CTest i security-regression; nie deklaruje się testów sprzętowych.
