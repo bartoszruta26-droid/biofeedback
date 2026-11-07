@@ -2126,14 +2126,6 @@ void MeasurementTab::updateRawTableUnits()
 }
 
 
-void MeasurementTab::setupDebugTerminal()
-{
-    // Terminal debugowania jest teraz centralny w DebugTab
-    // Ta metoda może być używana do inicjalizacji jeśli potrzebna
-    addDebugMessage("=== TERMINAL DEBUGOWANIA URUCHOMIONY ===", "INFO");
-    addDebugMessage("Oczekiwanie na dane z Arduino Nano z HX711...", "SERIAL");
-}
-
 void MeasurementTab::addDebugMessage(const QString& message, const QString& type)
 {
     // Wysyłaj wiadomość do centralnego DebugManager, który przekaże ją do DebugTab
