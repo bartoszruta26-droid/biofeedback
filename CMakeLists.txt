@@ -252,7 +252,7 @@ if(Qt5_FOUND)
     )
     set_target_properties(game_engine_regression PROPERTIES AUTOMOC ON)
     target_include_directories(game_engine_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    target_link_libraries(game_engine_regression PRIVATE Qt5::Core Qt5::Widgets)
+    target_link_libraries(game_engine_regression PRIVATE Qt5::Core Qt5::Widgets Threads::Threads)
     add_test(NAME game_engine_regression COMMAND game_engine_regression)
     set_tests_properties(game_engine_regression PROPERTIES
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
