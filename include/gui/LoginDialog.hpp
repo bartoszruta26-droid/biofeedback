@@ -72,6 +72,8 @@ private:
     QLabel* m_passwordLabel;
     QLineEdit* m_usernameEdit;
     QLineEdit* m_passwordEdit;
+    QLabel* m_confirmPasswordLabel;
+    QLineEdit* m_confirmPasswordEdit;
     QPushButton* m_loginButton;
     QPushButton* m_cancelButton;
     QLabel* m_statusLabel;
@@ -80,6 +82,8 @@ private:
     QString m_username;
     QString m_role;
     bool m_loginSuccess;
+    bool m_firstRun;
+    bool m_usersLoaded;
 };
 
 } // namespace gui
