@@ -57,6 +57,7 @@ Jeśli ncurses nie jest dostępne, CMake pomija wyłącznie program TUI.
 ## Training session controls and history
 
 The training screen supports configuration before starting:
+- exercise preset: E cycles through hand grip, wrist flexion, wrist extension and generic exercise;
 - target force: plus/minus in 5 N increments;
 - series count: [ and ];
 - repetitions per series: comma and period;
