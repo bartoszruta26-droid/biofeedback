@@ -16,6 +16,7 @@
 #include <QMessageBox>
 #include <QGridLayout>
 #include <QFrame>
+#include <QMetaObject>
 #include <memory>
 
 namespace gui {
@@ -46,6 +47,8 @@ MainWindow::MainWindow(QWidget *parent)
     , m_samplingRateSpin(nullptr)
     , m_graphDurationSpin(nullptr)
     , m_unitCombo(nullptr)
+    , m_devicePortCombo(nullptr)
+    , m_connectDeviceButton(nullptr)
     , m_updateTimer(nullptr)
     , m_settingsWidget(nullptr)
     , m_isCollectingData(false)
@@ -58,9 +61,19 @@ MainWindow::MainWindow(QWidget *parent)
     setMinimumSize(1280, 800);
     setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:10px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:11px 18px;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:12px;} QLabel#dashboardValue{color:#14243a;font-size:21pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:8px;padding:10px 16px;font-weight:600;} QPushButton:hover{background:#06696c;}");
     
-    // Inicjalizacja połączenia szeregowego
+    // Shared serial service; UI tabs subscribe independently to its data stream.
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
-    
+    m_serialConnectionCallbackToken = m_serialPort->addConnectionCallback(
+        [this](bool connected, const std::string& message) {
+            const QString deviceName = connected ? QString::fromStdString(m_serialPort->getPortName()) : QString();
+            const QString detail = QString::fromStdString(message);
+            QMetaObject::invokeMethod(this, [this, connected, deviceName, detail]() {
+                updateConnectionStatus(connected, deviceName);
+                if (m_connectDeviceButton) m_connectDeviceButton->setText(connected ? tr("Rozłącz") : tr("Połącz"));
+                if (!detail.isEmpty()) addDebugMessage(detail, connected ? "INFO" : "WARNING");
+            }, Qt::QueuedConnection);
+        });
+
     setupUI();
     setupMenuBar();
     setupToolBar();
@@ -72,6 +85,12 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     saveSettings();
+    if (m_serialPort) {
+        m_serialPort->removeConnectionCallback(m_serialConnectionCallbackToken);
+        m_serialConnectionCallbackToken = 0;
+        m_serialPort->stopAsyncReading();
+        m_serialPort->disconnect();
+    }
 }
 
 void MainWindow::setupUI()
