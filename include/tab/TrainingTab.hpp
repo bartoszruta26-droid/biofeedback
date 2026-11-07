@@ -22,6 +22,7 @@
 #include <vector>
 #include "training/RepetitionDetector.hpp"
 #include "training/TrainingSessionClock.hpp"
+#include "training/SessionStateMachine.hpp"
 #include "measurement/MeasurementEngine.hpp"
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -322,8 +323,9 @@ private:
     QElapsedTimer m_sessionClock;
     QElapsedTimer m_restClock;
     biofeedback::training::TrainingSessionClock m_trainingClock;
-qint64 m_restDurationMs{0};
-bool m_isTraining;
+    biofeedback::training::SessionStateMachine m_stateMachine;
+    qint64 m_restDurationMs{0};
+    bool m_isTraining;
     bool m_isPaused;
     
     QVector<TrainingExercise> m_exercisePlan;
