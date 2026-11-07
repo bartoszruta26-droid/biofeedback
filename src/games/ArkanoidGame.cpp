@@ -57,6 +57,13 @@ void ArkanoidGame::setDifficultyLevel(int level)
         m_paddle.moveLeft(qBound(10.0, m_paddle.left(),
                                  qMax(10.0, static_cast<double>(width()) - 10.0 - m_paddle.width())));
     }
+
+    if (isRunning()) {
+        m_level = 1;
+        m_lives = 3;
+        buildLevel();
+        resetBall();
+    }
 }
 
 int ArkanoidGame::getDifficultyLevel() const
