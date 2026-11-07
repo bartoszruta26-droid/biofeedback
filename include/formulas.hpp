@@ -176,7 +176,7 @@ public:
      * @param patientMass Masa pacjenta [kg]
      * @param sampleRate Częstotliwość próbkowania [Hz]
      */
-    Formulas(double k_elastic = 100.0, double patientMass = 70.0, double sampleRate = 100.0);
+    Formulas(double k_elastic = 0.0, double patientMass = 0.0, double sampleRate = 100.0);
     
     /**
      * @brief Oblicza wszystkie parametry biomechaniczne dla serii
@@ -592,9 +592,9 @@ public:
     static double calculateLPT(double currentCTS, double previousCTS);
     
     // Gettery i settery
-    void setElasticConstant(double k) { k_elastic_ = k; }
-    void setPatientMass(double m) { patient_mass_ = m; }
-    void setSampleRate(double rate) { sample_rate_ = rate; }
+    void setElasticConstant(double k) { k_elastic_ = (std::isfinite(k) && k > 0.0) ? k : 0.0; }
+    void setPatientMass(double m) { patient_mass_ = (std::isfinite(m) && m > 0.0) ? m : 0.0; }
+    void setSampleRate(double rate) { sample_rate_ = (std::isfinite(rate) && rate > 0.0) ? rate : 0.0; }
     
     double getElasticConstant() const { return k_elastic_; }
     double getPatientMass() const { return patient_mass_; }
@@ -604,7 +604,6 @@ private:
     double k_elastic_;      // Stała sprężystości taśmy [N/m]
     double patient_mass_;   // Masa pacjenta [kg]
     double sample_rate_;    // Częstotliwość próbkowania [Hz]
-    double dt_;             // Interwał próbkowania [s]
     
     // Funkcje pomocnicze
     static std::vector<double> extractForces(const std::vector<SensorSample>& samples);
