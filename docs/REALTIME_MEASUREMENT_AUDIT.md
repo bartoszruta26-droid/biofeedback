@@ -29,6 +29,7 @@ Ważne rozróżnienie: wykres zakładki MeasurementTab jest realizowany przez `F
 - Poprawiono `seriesSpeed`: liczba powtórzeń jest dzielona przez rzeczywisty czas od początku pierwszego do końca ostatniego powtórzenia. Poprzedni wzór odejmował czasy trwania dwóch pojedynczych powtórzeń, co nie wyznacza czasu serii.
 - Dodano jawne czasy początku i końca powtórzenia do statystyk oraz JSON/CSV. Import CSV nadal obsługuje wcześniejszy układ 14 kolumn.
 - Eksport JSON w wersji 2 obejmuje pełny strumień zarejestrowanych próbek (czas hosta, czas urządzenia, czas sesji, wartość, jednostka, surowy odczyt ADC, źródło i jakość). Można zapisać także sesję, w której nie zakończono jeszcze powtórzenia.
+- Archiwum zachowuje także skalibrowaną masę w kg obok wartości siły w N i surowego ADC. Import JSON odtwarza próbki na wykresie i w tabeli, zachowuje tryb RAW/skalibrowany oraz kontynuuje oś czasu od ostatniego zapisanego znacznika czasu.
 
 ## 3. Ustalenia wymagające dalszej pracy
 
