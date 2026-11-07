@@ -298,10 +298,10 @@ private:
     
     // Note: DebugManager is a singleton, we don't store it as unique_ptr
     
-    // Tabs - using unique_ptr for proper memory management
-    std::unique_ptr<tab::PatientTab> m_patientTab;
-    std::unique_ptr<tab::MeasurementTab> m_measurementTab;
-    std::unique_ptr<tab::OutlineTab> m_outlineTab;
+    // Non-owning observers. MainWindow owns all tab widgets through Qt parent-child ownership.
+    tab::PatientTab* m_patientTab;
+    tab::MeasurementTab* m_measurementTab;
+    tab::OutlineTab* m_outlineTab;
     
     std::atomic<ApplicationState> m_state;       ///< Current application state
     ApplicationStatistics m_statistics;          ///< Operation statistics

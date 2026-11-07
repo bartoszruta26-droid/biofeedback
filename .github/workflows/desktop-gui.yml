@@ -1,0 +1,43 @@
+name: Desktop GUI build
+
+on:
+  push:
+    branches:
+      - feature/gui-platform-foundation
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'CMakeLists.txt'
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  linux-qt5:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config \
+            qtbase5-dev libqt5charts5-dev \
+            libserialport-dev nlohmann-json3-dev libssl-dev
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build core and desktop GUI
+        run: cmake --build build --parallel 2
+
+      - name: Run registered tests
+        run: ctest --test-dir build --output-on-failure

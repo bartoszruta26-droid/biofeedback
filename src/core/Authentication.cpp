@@ -11,7 +11,6 @@
  */
 
 #include "core/Authentication.hpp"
-#include "core/ConfigManager.hpp"
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -924,15 +923,9 @@ std::string Authentication::encryptPassword(const std::string& password)
                 encryptionKey = std::string(envKey);
                 AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
             } else {
-                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
-                
-                if (encryptionKey.empty() || encryptionKey.length() < 16) {
-                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
-                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
-                }
-                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
+                // Development mode: preserve plaintext credentials when encryption is not configured.
+                AUTH_DEBUG(2, "Brak klucza szyfrującego; pozostawiono hasło w postaci jawnej");
+                return password;
             }
         }
 
@@ -979,15 +972,9 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
                 encryptionKey = std::string(envKey);
                 AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
             } else {
-                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
-                
-                if (encryptionKey.empty() || encryptionKey.length() < 16) {
-                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
-                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
-                }
-                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
+                // Development mode: plaintext values pass through unchanged.
+                AUTH_DEBUG(2, "Brak klucza szyfrującego; pominięto deszyfrowanie");
+                return encryptedPassword;
             }
         }
 

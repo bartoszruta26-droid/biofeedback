@@ -3,6 +3,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(biofeedback VERSION 1.0.0 LANGUAGES CXX)
 
+enable_testing()
+
 # C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -53,6 +55,9 @@ target_link_libraries(auth_regression PRIVATE biofeedback_core)
 
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
+
+add_test(NAME auth_regression COMMAND auth_regression)
+add_test(NAME data_manager_regression COMMAND data_manager_regression)
 
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
@@ -166,8 +171,7 @@ file(COPY ${CMAKE_SOURCE_DIR}/config DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
 
-# Testing
-enable_testing()
+# Additional test targets
 add_subdirectory(tests OPTIONAL)
 
 # Documentation
