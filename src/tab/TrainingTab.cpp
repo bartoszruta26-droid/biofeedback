@@ -936,9 +936,17 @@ void TrainingTab::onTimerTick()
 
 void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
-    if (!m_isTraining || m_isPaused || m_inRestPeriod ||
-        !data.isValid || !data.hasCalibratedValue || m_currentExerciseIndex < 0 ||
-        m_currentExerciseIndex >= m_exercisePlan.size()) return;
+    if (!m_isTraining) return;
+
+    // An invalid/missing calibrated frame, pause, or rest period breaks the
+    // contraction continuity. Reset the detector instead of silently skipping
+    // the frame and integrating across an unknown interval.
+    if (m_isPaused || m_inRestPeriod || !data.isValid || !data.hasCalibratedValue ||
+        m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) {
+        biofeedback::training::RepetitionRecord discarded;
+        m_repetitionDetector.process(data.timestamp, 0.0, false, discarded);
+        return;
+    }
 
     // Firmware reports calibrated mass-equivalent values in grams. Training
     // targets are expressed in newtons (SI), so convert exactly once here.
