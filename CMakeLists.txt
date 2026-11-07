@@ -249,6 +249,46 @@ if(Qt5_FOUND)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     )
 
+    # Full TrainingTab integration test. The test launches child processes to
+    # simulate abrupt termination and a fresh application process on recovery.
+    add_executable(training_tab_process_restart_regression
+        tests/training_tab_process_restart_regression.cpp
+        src/tab/TrainingTab.cpp
+        src/tab/TrainingAnalyticsWidget.cpp
+        src/core/DebugManager.cpp
+        src/sensor/SerialCommunication.cpp
+        src/games/GameEngine.cpp
+        src/games/PongGame.cpp
+        src/games/FlappyBirdGame.cpp
+        src/games/MarioGame.cpp
+        src/games/SinGame.cpp
+        include/tab/TrainingTab.hpp
+        include/tab/TrainingAnalyticsWidget.hpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(training_tab_process_restart_regression PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${LIBSERIALPORT_INCLUDE_DIRS}
+    )
+    target_link_directories(training_tab_process_restart_regression PRIVATE
+        ${LIBSERIALPORT_LIBRARY_DIRS}
+    )
+    target_link_libraries(training_tab_process_restart_regression PRIVATE
+        biofeedback_training
+        biofeedback_measurement
+        Qt5::Core Qt5::Widgets Qt5::Charts
+        ${LIBSERIALPORT_LIBRARIES}
+        OpenSSL::SSL OpenSSL::Crypto pthread
+    )
+    add_test(NAME training_tab_process_restart_regression
+        COMMAND training_tab_process_restart_regression
+    )
+    set_tests_properties(training_tab_process_restart_regression PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        TIMEOUT 120
+    )
+
     # Minimal mandatory Qt5 example source.
     add_executable(qt5_mandatory_example examples/qt5_mandatory.cpp)
 
