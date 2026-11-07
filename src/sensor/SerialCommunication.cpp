@@ -690,6 +690,11 @@ double SerialCommunication::tare(int samples) {
         std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
         m_impl->zeroOffset = zero;
         m_impl->tareSampleCount = samples;
+        m_impl->isCalibrated = false;
+        m_impl->scaleFactor = 1.0;
+        m_impl->calibrationReferenceValue = 0.0;
+        m_impl->calibrationReferenceRaw = 0;
+        m_impl->calibrationCreatedAtUtc.clear();
     }
     m_impl->lastError.clear();
     return zero;
@@ -734,6 +739,7 @@ bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double kno
         m_impl->isCalibrated = true;
         m_impl->calibrationReferenceRaw = rawSpan;
         m_impl->calibrationReferenceValue = knownWeight;
+        m_impl->tareSampleCount = std::max(1, m_impl->tareSampleCount);
         m_impl->calibrationCreatedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
     }
     return true;
@@ -762,8 +768,9 @@ bool SerialCommunication::saveCalibrationProfile(const std::string& path, std::s
     profile.sensorModel = info.deviceName.empty() ? "HX711" : info.deviceName;
     {
         std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
-        if (!m_impl->isCalibrated) {
-            if (error) *error = "Cannot save an uncalibrated device";
+        if (!m_impl->isCalibrated || m_impl->tareSampleCount < 1 ||
+            m_impl->calibrationCreatedAtUtc.empty()) {
+            if (error) *error = "Cannot save an incomplete calibration profile";
             return false;
         }
         profile.zeroOffsetRaw = m_impl->zeroOffset;
