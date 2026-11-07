@@ -911,7 +911,7 @@ void TrainingTab::loadNextExercise()
         if (index >= 0) {
             m_gameTypeCombo->setCurrentIndex(index);
         }
-        reconfigureGameForExercise(ex);
+        // The host owns game construction; this tab only selects the configured type.
     }
     
     loadNextSeries();
