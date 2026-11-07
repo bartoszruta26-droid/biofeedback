@@ -571,7 +571,7 @@ int SerialCommunication::readFromPort(uint8_t* buffer, size_t maxLength, int tim
     }
 
     COMMTIMEOUTS readTimeouts = originalTimeouts;
-    readTimeouts.ReadIntervalTimeout = 0;
+    readTimeouts.ReadIntervalTimeout = timeout == 0 ? MAXDWORD : 0;
     readTimeouts.ReadTotalTimeoutMultiplier = 0;
     readTimeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(timeout);
     if (!SetCommTimeouts(handle, &readTimeouts)) {
