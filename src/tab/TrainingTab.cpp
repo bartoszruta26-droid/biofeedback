@@ -511,8 +511,7 @@ void TrainingTab::startTraining()
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
-    m_activeExerciseTimeMs = 0;
-    m_lastClockUpdateMs = 0;
+    m_trainingClock.reset();
     m_sessionClock.start();
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
@@ -764,7 +763,7 @@ void TrainingTab::refreshAnalytics()
 {
     if (m_analyticsWidget) {
         m_analyticsWidget->setStats(m_exerciseStats, m_sessionTime,
-            static_cast<int>(m_activeExerciseTimeMs / 1000));
+            static_cast<int>(m_trainingClock.activeSeconds()));
     }
 }
 
@@ -946,7 +945,7 @@ void TrainingTab::onTimerTick()
     updateSessionClocks();
     if (m_inRestPeriod && !m_isPaused) updateRestDisplay();
 
-    const int activeSeconds = static_cast<int>(m_activeExerciseTimeMs / 1000);
+    const int activeSeconds = static_cast<int>(m_trainingClock.activeSeconds());
     const int activeMinutes = activeSeconds / 60;
     const int activeRemainder = activeSeconds % 60;
     const int minutes = m_sessionTime / 60;
@@ -963,11 +962,8 @@ void TrainingTab::updateSessionClocks()
 {
     if (!m_isTraining || !m_sessionClock.isValid()) return;
     const qint64 elapsedMs = m_sessionClock.elapsed();
-    const qint64 deltaMs = qMax<qint64>(0, elapsedMs - m_lastClockUpdateMs);
-    if (!m_isPaused && !m_inRestPeriod)
-        m_activeExerciseTimeMs += deltaMs;
-    m_lastClockUpdateMs = elapsedMs;
-    m_sessionTime = static_cast<int>(elapsedMs / 1000);
+    m_trainingClock.update(elapsedMs, !m_isPaused && !m_inRestPeriod);
+    m_sessionTime = static_cast<int>(m_trainingClock.sessionSeconds());
 }
 
 void TrainingTab::onMeasurementSample(
