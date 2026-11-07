@@ -833,7 +833,7 @@ void MainWindow::stopGame()
     disconnect(game, nullptr, this, nullptr);
     game->stop();
     m_gameStack->removeWidget(game);
-    delete game;
+    game->deleteLater();
     m_gameStack->hide();
     qDebug() << "Game stopped";
 }
