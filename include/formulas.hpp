@@ -184,6 +184,8 @@ public:
      * @return Obliczone parametry biomechaniczne
      */
     BiomechanicalParams calculateAllParams(const SeriesData& series);
+    /** Aggregate comparable metrics across the current session's exercise sets. */
+    BiomechanicalParams calculateSessionParams(const std::vector<SeriesData>& series);
     
     /**
      * @brief Oblicza parametry dla pojedynczego powtórzenia
