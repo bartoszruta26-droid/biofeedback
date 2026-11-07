@@ -14,6 +14,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <cmath>
+#include <limits>
 #include <utility>
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
