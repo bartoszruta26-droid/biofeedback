@@ -1,37 +1,48 @@
 # Biofeedback TUI
 
 ## Cel
+
 Terminalowy interfejs Biofeedback jest osobnym klientem prezentacyjnym C++17.
-Nie zastępuje aplikacji Qt i nie implementuje odrębnej logiki pomiarowej.
-Docelowo oba interfejsy korzystają z tych samych usług aplikacyjnych i MeasurementEngine.
+Korzysta z tego samego źródła komunikacji szeregowej co aplikacja Desktop Qt;
+nie tworzy odrębnego parsera danych czujnika.
 
 ## Moduły
-- Pulpit — status aplikacji, urządzenia i sesji.
-- Pomiary — podgląd pomiaru i parametrów sesji.
-- Pacjenci — dostęp do wspólnego repozytorium kart.
-- Trening — sesje i ćwiczenia.
-- Urządzenia — porty szeregowe, czujniki i kalibracja.
-- Diagnostyka — stan usług i komunikaty.
-- Ustawienia — konfiguracja interfejsu i urządzeń.
+
+- Pulpit — status aplikacji, połączenia i ostatniej próbki.
+- Pomiary — podgląd wartości z aktywnego strumienia czujnika.
+- Pacjenci — informacja o stanie integracji wspólnego repozytorium kart.
+- Trening — status sesji treningowej.
+- Urządzenia — wykrywanie portów, wybór portu i połączenie/rozłączenie.
+- Diagnostyka — stan adaptera i interfejsu.
+- Ustawienia — skróty sterowania i parametry transmisji.
 
 ## Sterowanie
+
 - Strzałki góra/dół — wybór modułu.
-- Home/End — pierwszy lub ostatni moduł.
+- Enter — otwarcie wybranego modułu.
+- W module Urządzenia: strzałki lewo/prawo — wybór portu.
+- C — połączenie z wybranym portem przy domyślnej prędkości.
+- D — rozłączenie.
+- R — ponowne skanowanie portów.
 - Q lub Esc — wyjście.
 
-Tryby bez interfejsu curses:
-- `biofeedback_tui --status` — tekstowy status aplikacji.
-- `biofeedback_tui --list-ports` — lista wykrytych nazw portów; nie otwiera połączenia.
-- `biofeedback_tui --version` i `--help` — informacje o programie.
+## Tryby bez interfejsu curses
 
-## Zakres wersji 0.1
-To szkielet nawigacyjny z jawnym statusem demonstracyjnym. Nie odczytuje
-czujnika, nie tworzy fikcyjnych kart pacjentów i nie zapisuje danych klinicznych.
-Integracja z usługami pomiarowymi będzie realizowana przez wspólną warstwę
-aplikacyjną, bez duplikowania logiki w TUI.
+- biofeedback_tui --status — status procesu TUI.
+- biofeedback_tui --list-ports — lista portów wykrytych przez adapter systemowy.
+- biofeedback_tui --version i --help — informacje o programie.
+
+## Granice funkcjonalne wersji 0.2
+
+TUI może otworzyć port szeregowy, uruchomić wspólny adapter odczytu i
+wyświetlać ostatnią poprawną próbkę. Nie tworzy kart pacjentów, nie zapisuje
+danych klinicznych i nie uruchamia jeszcze sesji treningowych. Wspólne
+repozytorium pacjentów oraz usługi sesji będą integrowane w kolejnych etapach.
 
 ## Budowanie
+
 Zainstaluj libncurses-dev, a następnie:
+
     cmake -S . -B build
     cmake --build build --target biofeedback_tui
     ./build/biofeedback_tui
