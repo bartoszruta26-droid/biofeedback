@@ -490,36 +490,66 @@ bool SerialCommunication::writeToPort(const uint8_t* data, size_t length) {
         offset += static_cast<size_t>(written);
     }
 #else
+    const int fd = static_cast<int>(m_impl->portHandle);
+    const int originalFlags = fcntl(fd, F_GETFL);
+    if (originalFlags < 0 || fcntl(fd, F_SETFL, originalFlags | O_NONBLOCK) < 0) {
+        m_impl->lastError = "Serial write configuration failed";
+        return false;
+    }
+
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    bool success = true;
     while (offset < length) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now >= deadline) {
+            m_impl->lastError = "Serial write timed out";
+            success = false;
+            break;
+        }
+
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - now);
+        const int timeoutMs = static_cast<int>(std::max<int64_t>(
+            1, std::min<int64_t>(remaining.count(), INT_MAX)));
+
         pollfd descriptor{};
-        descriptor.fd = m_impl->portHandle;
+        descriptor.fd = fd;
         descriptor.events = POLLOUT;
 
-        int ready;
-        do {
-            ready = poll(&descriptor, 1, 1000);
-        } while (ready < 0 && errno == EINTR);
-
+        const int ready = poll(&descriptor, 1, timeoutMs);
+        if (ready < 0 && errno == EINTR) continue;
         if (ready == 0) {
             m_impl->lastError = "Serial write timed out";
-            return false;
+            success = false;
+            break;
         }
-        if (ready < 0 || (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
+        if (ready < 0 ||
+            (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) != 0 ||
+            (descriptor.revents & POLLOUT) == 0) {
             m_impl->lastError = "Serial write failed";
-            return false;
+            success = false;
+            break;
         }
 
-        const ssize_t written = write(m_impl->portHandle, data + offset, length - offset);
+        const ssize_t written = write(fd, data + offset, length - offset);
         if (written > 0) {
             offset += static_cast<size_t>(written);
             continue;
         }
-        if (written < 0 && errno == EINTR) continue;
-        if (written < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) continue;
+        if (written < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) {
+            continue;
+        }
 
         m_impl->lastError = "Serial write failed";
-        return false;
+        success = false;
+        break;
     }
+
+    if (fcntl(fd, F_SETFL, originalFlags) < 0) {
+        m_impl->lastError = "Serial write completed but port flags could not be restored";
+        success = false;
+    }
+    if (!success) return false;
 #endif
     return true;
 }
