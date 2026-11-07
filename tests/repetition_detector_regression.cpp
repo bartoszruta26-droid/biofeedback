@@ -54,6 +54,9 @@ int main() {
     auto corrupt = snapshot;
     ++corrupt.sampleCount;
     assert(!guarded.restore(corrupt));
+    auto unorderedSamples = snapshot;
+    unorderedSamples.samples[1].timestampMs = unorderedSamples.samples[0].timestampMs;
+    assert(!guarded.restore(unorderedSamples));
     assert(guarded.isActive());
     assert(guarded.process(2200, 45.0, true, rep) == false);
     assert(guarded.process(2300, 4.0, true, rep));
