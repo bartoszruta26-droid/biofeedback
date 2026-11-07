@@ -935,6 +935,7 @@ void MeasurementTab::simulateSensorData()
 
 void MeasurementTab::readSingleSample(double forceValue, double forceInNewtons)
 {
+    if (!m_isMeasuring || m_isPaused) return;
     if (m_completedSeriesStats.isEmpty()) ensureCurrentSeriesInitialized();
     ensureSessionClockStarted();
     const double currentTime = QDateTime::currentMSecsSinceEpoch() / 1000.0 - m_sessionStartTime;
@@ -1170,6 +1171,7 @@ void MeasurementTab::onToggleMeasurement()
 
 void MeasurementTab::onReadSingleSample()
 {
+    if (!m_isMeasuring || m_isPaused) return;
     if (m_lastSensorData.isValid) {
         const double forceN = m_lastSensorData.calibratedValue * 9.81 / 1000.0;
         const double displayValue = m_showRawValues ? static_cast<double>(m_lastSensorData.value)
