@@ -3,6 +3,7 @@
 #include <QWidget>
 #include <QVector>
 #include <QJsonArray>
+#include <QJsonObject>
 #include <QUuid>
 
 #include "tab/TrainingTab.hpp"
@@ -30,6 +31,9 @@ public:
     bool beginSession();
     bool saveSessionAutomatically();
     bool saveSessionCheckpoint();
+    void setExecutionState(const QJsonObject& state);
+    bool recoverPendingSession(QJsonObject& entry);
+    QVector<ExerciseStats> currentStats() const;
 
 private slots:
     void saveCurrentSession();
@@ -60,6 +64,7 @@ private:
     QString m_pendingHistoryFilePath;
     bool m_sessionSaved{false};
     bool m_sessionInProgress{false};
+    QJsonObject m_executionState;
     QTableWidget* m_seriesTable{nullptr};
     QTableWidget* m_repetitionTable{nullptr};
     QtCharts::QChartView* m_peakChart{nullptr};
