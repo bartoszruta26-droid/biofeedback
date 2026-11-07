@@ -137,7 +137,7 @@ bool TrainingAnalyticsWidget::recoverPendingSession(QJsonObject& recoveredEntry)
         m_sessionSaved = false;
         m_sessionInProgress = true;
         recoveredEntry = candidate;
-        return candidate.value("execution_state").isObject();
+        return true;
     }
     return false;
 }
