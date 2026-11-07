@@ -1319,11 +1319,12 @@ void TrainingTab::advanceAfterRest()
     if (m_restTimeRemaining > 0) return;
     updateSessionClocks();
     m_restTimer->stop();
+    const auto target = m_stateMachine.restTarget();
     if (m_stateMachine.resting() && !m_stateMachine.paused())
         m_stateMachine.endRest();
     m_lblRestTimer->clear();
-    if (m_stateMachine.restTarget() == biofeedback::training::RestTarget::NextExercise) {
-            loadNextExercise();
+    if (target == biofeedback::training::RestTarget::NextExercise) {
+        loadNextExercise();
     } else {
         loadNextSeries();
     }
