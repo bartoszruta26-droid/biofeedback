@@ -742,7 +742,8 @@ bool TrainingTab::exportResultsToCSV(const QString& filename)
 
     QTextStream out(&file);
     out << "Ćwiczenie,Seria,Powtórzenie,Czas_trwania_ms,Czas_do_szczytu_ms,"
-           "Siła_średnia_N,Siła_szczytowa_N,Próbki,Cel_osiągnięty\n";
+           "Siła_średnia_N,Siła_szczytowa_N,Próbki,Cel_osiągnięty,"
+           "Średni_szczyt_serii_N,Maks_szczyt_serii_N,Cel_serii_pct,CV_serii_pct,Punkty_gry\n";
 
     for (int exerciseIndex = 0; exerciseIndex < m_exerciseStats.size(); ++exerciseIndex) {
         const auto& stats = m_exerciseStats[exerciseIndex];
@@ -753,12 +754,21 @@ bool TrainingTab::exportResultsToCSV(const QString& filename)
         for (const auto& item : stats.repetitions) {
             const auto& rep = item.measurement;
             const bool targetReached = targetForce > 0.0 && rep.peakForceN >= targetForce;
+            const int seriesOffset = item.seriesIndex - 1;
+            const bool hasSeriesSummary = seriesOffset >= 0 && seriesOffset < stats.series.size();
+            const auto seriesSummary = hasSeriesSummary
+                ? stats.series[seriesOffset] : biofeedback::training::SeriesSummary{};
             out << "\"" << escapedName << "\"" << ","
                 << item.seriesIndex << "," << item.repetitionIndex << ","
                 << rep.durationMs << "," << rep.timeToPeakMs << ","
                 << QString::number(rep.meanForceN, 'f', 4) << ","
                 << QString::number(rep.peakForceN, 'f', 4) << ","
-                << rep.sampleCount << "," << (targetReached ? "tak" : "nie") << "\n";
+                << rep.sampleCount << "," << (targetReached ? "tak" : "nie") << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.averagePeakForceN, 'f', 4) : QString()) << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.maximumPeakForceN, 'f', 4) : QString()) << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.targetAchievementPercent, 'f', 2) : QString()) << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.peakForceCoefficientOfVariationPercent, 'f', 2) : QString()) << ","
+                << stats.gameScore << "\n";
         }
     }
 
