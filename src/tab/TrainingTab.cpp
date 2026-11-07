@@ -1320,8 +1320,9 @@ void TrainingTab::advanceAfterRest()
     updateSessionClocks();
     m_restTimer->stop();
     const auto target = m_stateMachine.restTarget();
-    if (m_stateMachine.resting() && !m_stateMachine.paused())
-        m_stateMachine.endRest();
+    if (m_stateMachine.resting() && !m_stateMachine.paused()) {
+        if (!m_stateMachine.endRest()) return;
+    }
     m_lblRestTimer->clear();
     if (target == biofeedback::training::RestTarget::NextExercise) {
         loadNextExercise();
