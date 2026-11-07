@@ -1,6 +1,7 @@
 #include "sensor/CalibrationProfile.hpp"
 
 #include <cassert>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <string>
