@@ -10,7 +10,7 @@ for field in (
     '"schema_version"', '"exercises"', '"series"', '"repetitions"',
     '"start_timestamp_ms"', '"end_timestamp_ms"', '"duration_ms"',
     '"time_to_peak_ms"', '"peak_force_n"', '"mean_force_n"',
-    '"sample_count"', '"game_points"',
+    '"sample_count"', '"samples"', '"timestamp_ms"', '"force_n"', '"game_points"',
 ):
     if field not in save:
         raise SystemExit(f"Training session history is missing {field}")
