@@ -382,14 +382,14 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repPeakForce(0)
     , m_repStartTime(0)
     , m_repPeakTime(0)
-    , m_contractionThreshold(5.0)  // 5 N próg detekcji
-    , m_showRawValues(true)  // Domyślnie pokazujemy wartości surowe (Value z Arduino)
-    , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
     , m_unitSelector(nullptr)
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
     , m_trendsContent(nullptr)
     , m_chkShowTrends(nullptr)
+    , m_currentUnit(ForceUnit::Newtons)
+    , m_showRawValues(true)
+    , m_contractionThreshold(5.0)
     , m_serialPort(nullptr)
     , m_hasArduinoConnection(false)
 {
