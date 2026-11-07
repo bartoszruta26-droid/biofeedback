@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cstdlib>
 
+namespace tab {
 class TrainingTabProcessRestartRegression {
 public:
     static int child(int argc, char** argv)
@@ -166,11 +167,12 @@ private:
         std::_Exit(0);
     }
 };
+} // namespace tab
 
 int main(int argc, char** argv)
 {
     if (argc > 1)
-        return TrainingTabProcessRestartRegression::child(argc, argv);
+        return tab::TrainingTabProcessRestartRegression::child(argc, argv);
 
     QApplication app(argc, argv);
     QTemporaryDir temporary;
