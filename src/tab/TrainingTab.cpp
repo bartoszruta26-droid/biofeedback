@@ -1261,6 +1261,8 @@ void TrainingTab::finishCurrentSeries()
     emit seriesCompleted(m_currentExerciseIndex, completedSeriesIndex);
 
     if (m_currentGame && m_currentGame->isRunning()) m_currentGame->stop();
+    // Stage the next cursor before committing the completed set. If the
+    // process dies after the durable write, this cursor is the next action.
     ++m_currentSeriesIndex;
     m_currentRepIndex = 0;
     m_repetitionDetector.reset();
@@ -1290,14 +1292,18 @@ void TrainingTab::finishCurrentSeries()
     updateProgressWidgets();
     if (m_restTimeRemaining > 0) {
         updateSessionClocks();
-        m_stateMachine.beginRest();
+        if (!m_stateMachine.beginRest()) {
+            addDebugMessage("Nie można rozpocząć odpoczynku z bieżącego stanu.", "ERROR");
+            return;
+        }
         m_restClock.start();
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
         if (!m_stateMachine.paused()) m_restTimer->start();
-        saveExecutionCheckpoint();
     } else {
         advanceAfterRest();
     }
+    if (!saveExecutionCheckpoint())
+        addDebugMessage("Nie udało się zapisać przejścia na następną serię.", "ERROR");
 }
 
 void TrainingTab::advanceAfterRest()
