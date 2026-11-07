@@ -720,6 +720,8 @@ Authentication::~Authentication()
     
     // Bezpieczne czyszczenie wrażliwych danych
     currentUser = nullptr;
+    if (!fileEncryptionKey.empty()) OPENSSL_cleanse(fileEncryptionKey.data(), fileEncryptionKey.size());
+    fileEncryptionKey.clear();
 }
 
 /**
