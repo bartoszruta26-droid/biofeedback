@@ -327,7 +327,7 @@ public:
      * @param waitForResponse Czy czekać na odpowiedź
      * @return Odpowiedź z Arduino (pusta jeśli nie oczekiwano)
      */
-    std::string sendCommand(const std::string& command, bool waitForResponse = true);
+    std::string sendCommand(const std::string& command, bool waitForResponse = true, int timeoutMs = 1000);
     
     /**
      * @brief Wysyła dane binarne do Arduino
