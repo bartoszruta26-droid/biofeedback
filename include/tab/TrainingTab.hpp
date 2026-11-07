@@ -18,6 +18,7 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <memory>
+#include <chrono>
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
@@ -76,6 +77,7 @@ struct TrainingExercise {
  * @brief Statystyki pojedynczego ćwiczenia
  */
 struct ExerciseStats {
+    int metricsVersion{1};
     QString exerciseName;
     int completedSeries;
     int completedReps;
@@ -83,11 +85,22 @@ struct ExerciseStats {
     double maxPeakForce;
     double avgReactionTime;
     double consistencyScore;
+    double minPeakForce;
+    double duration;
+    double completionRate;
+    double averageForceN;
+    double totalImpulseNs;
+    double targetAccuracyPercent;
+    double averageRepetitionDurationSeconds;
+    int aggregatedReps;
+    std::chrono::steady_clock::time_point startTime;
     bool isCompleted;
     
     ExerciseStats() : completedSeries(0), completedReps(0), avgPeakForce(0),
                       maxPeakForce(0), avgReactionTime(0), consistencyScore(0),
-                      isCompleted(false) {}
+                      minPeakForce(0), duration(0), completionRate(0),
+                      averageForceN(0), totalImpulseNs(0), targetAccuracyPercent(0),
+                      averageRepetitionDurationSeconds(0), aggregatedReps(0), isCompleted(false) { startTime = std::chrono::steady_clock::now(); }
 };
 
 /**
@@ -204,10 +217,22 @@ public:
      */
     void addDebugMessage(const QString& message, const QString& type = "INFO");
 
+    // Receives only validated Newton samples and repetition events from MeasurementEngine.
+    void onSharedForceSample(double forceN, double timestampSeconds, bool isRaw);
+    void onSharedRepetitionCompleted(double peakForceN, double durationSeconds,
+                                     double timeToPeakSeconds, double averageForceN,
+                                     double impulseNs, double targetAccuracyPercent);
+    void onSharedSeriesCompleted(int metricsVersion, int repetitionCount, double averagePeakForceN,
+                                 double maximumPeakForceN, double minimumPeakForceN,
+                                 double averageTimeToPeakSeconds, double averageForceN,
+                                 double averageRepetitionDurationSeconds, double totalImpulseNs,
+                                 double targetAccuracyPercent, double consistencyScorePercent);
+
 signals:
     void trainingStarted();
     void trainingStopped();
-    void trainingPaused();
+    void engineSeriesSizeRequested(int repetitionsPerSeries);
+    void trainingPaused(bool paused);
     void trainingResumed();
     void exerciseCompleted(int index, const ExerciseStats& stats);
     void seriesCompleted(int exerciseIndex, int seriesIndex);
@@ -225,7 +250,6 @@ private slots:
     void onPauseResumeClicked();
     void onExerciseSelected(int index);
     void onTimerTick();
-    void onSensorDataReceived(const sensor::SensorData& data);
     void onGameEnded(int score);
     void onGameStarted();
     void onScoreChanged(int score);
@@ -300,6 +324,7 @@ private:
     int m_sessionTime;
     int m_restTimeRemaining;
     bool m_inRestPeriod;
+    bool m_waitingForNextExercise;
     
     double m_currentForce;
     double m_peakForceInRep;

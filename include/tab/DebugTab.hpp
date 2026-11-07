@@ -2,6 +2,9 @@
 #define TAB_DEBUGTAB_HPP
 
 #include <QWidget>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QColor>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -140,6 +143,7 @@ private:
     
     // Dane
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::DataCallbackId m_serialCallbackId{0};
     sensor::SensorData m_lastSensorData;
     bool m_hasArduinoConnection;
     bool m_autoScroll;

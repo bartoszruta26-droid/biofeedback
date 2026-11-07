@@ -20,12 +20,17 @@
 #include <QHeaderView>
 #include <QTextEdit>
 #include <memory>
+#include <thread>
+#include <atomic>
 #include <QComboBox>
 
 #include "sensor/SerialCommunication.hpp"
+#include "core/MeasurementEngine.hpp"
 #include "core/DebugManager.hpp"
 
 namespace tab {
+
+namespace measurement = biofeedback::measurement;
 
 /**
  * @brief Jednostki wyświetlania siły
@@ -69,6 +74,8 @@ public:
     void addSample(double force, double time);
     void clearData();
     void setTargetForce(double force);
+    void setEngineRepetitionsPerSeries(int repetitions);
+    void setMeasurementPaused(bool paused);
     void setMaxTimeWindow(double seconds);
     void setUnit(ForceUnit unit);
     
@@ -89,6 +96,7 @@ private:
  * @brief Statystyki pojedynczego powtórzenia (naciągnięcia)
  */
 struct RepetitionStats {
+    int metricsVersion{1};
     int repNumber;              // Numer powtórzenia
     double peakForce;           // Maksymalny skurcz [N]
     double timeToPeak;          // Czas do osiągnięcia szczytu [s]
@@ -114,6 +122,7 @@ struct RepetitionStats {
  * @brief Statystyki całej serii (8 powtórzeń)
  */
 struct SeriesStats {
+    int metricsVersion{1};
     int seriesNumber;                   // Numer serii (1-3)
     QVector<RepetitionStats> reps;      // Lista powtórzeń
     double avgPeakForce;                // Średnia siła szczytowa serii
@@ -137,6 +146,7 @@ struct SeriesStats {
  * @brief Dane sesji pomiarowej do trendów długoterminowych
  */
 struct MeasurementSession {
+    int metricsVersion{1};
     QString sessionId;                  // Unikalny identyfikator sesji
     QString patientId;                  // ID pacjenta
     QString date;                       // Data pomiaru
@@ -202,7 +212,7 @@ public:
     /**
      * @brief Ręczne wczytanie pojedynczej próbki siły
      */
-    void readSingleSample(double forceValue);
+    void readSingleSample(double forceValue, double forceInNewtons = -1.0);
     
     /**
      * @brief Analizuje serię i zwraca statystyki
@@ -283,6 +293,14 @@ signals:
     void measurementStopped();
     void newForceSample(double force, double timestamp, bool isRaw = false);
     void repetitionCompleted(int seriesNum, int repNum, const RepetitionStats& stats);
+    void sharedRepetitionCompleted(double peakForceN, double durationSeconds,
+                                   double timeToPeakSeconds, double averageForceN,
+                                   double impulseNs, double targetAccuracyPercent);
+    void sharedSeriesCompleted(int metricsVersion, int repetitionCount, double averagePeakForceN,
+                               double maximumPeakForceN, double minimumPeakForceN,
+                               double averageTimeToPeakSeconds, double averageForceN,
+                               double averageRepetitionDurationSeconds, double totalImpulseNs,
+                               double targetAccuracyPercent, double consistencyScorePercent);
     void seriesCompleted(int seriesNum, const SeriesStats& stats);
     void sessionFinished(const QVector<SeriesStats>& allStats);
     void arduinoConnectionStatus(bool connected, const QString& message);
@@ -306,8 +324,8 @@ private:
     void ensureSessionClockStarted();
     void setupUI();
     void updateLiveDisplay(double force);
-    void detectRepetitions();
-    void calculateRepetitionStats();
+    void consumeEngineRepetition(const measurement::RepetitionStats& stats);
+    void consumeEngineSeries(const measurement::SeriesStats& stats);
     void updateStatsTable();
     void updateSeriesProgress();
     double calculateMedian(const QVector<double>& values) const;
@@ -321,6 +339,8 @@ private:
     
     // Metody SerialCommunication
     void connectToArduinoAsync();
+    std::thread m_connectionThread;
+    std::atomic<bool> m_stopConnectionThread{false};
     
     // Konwersja jednostek
     double convertForce(double newtons, ForceUnit targetUnit) const;
@@ -369,6 +389,7 @@ private:
     // Logika i dane
     QTimer* m_timer;
     bool m_isMeasuring;
+    bool m_isPaused{false};
     QString m_patientId;
     
     int m_currentSeries;      // 1-3
@@ -414,8 +435,12 @@ private:
     
     // Połączenie szeregowe z Arduino
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::DataCallbackId m_serialCallbackId{0};
     sensor::SensorData m_lastSensorData;
-    bool m_hasArduinoConnection;
+    std::atomic<bool> m_hasArduinoConnection{false};
+    measurement::MeasurementEngine m_measurementEngine;
+    measurement::SampleSource m_sampleSource{measurement::SampleSource::Device};
+    int m_engineRepetitionsPerSeries{8};
 };
 
 } // namespace tab

@@ -35,11 +35,11 @@ struct DebugMessage {
     DebugLevel level;       ///< Poziom ważności
     QDateTime timestamp;    ///< Czas wystąpienia
     QString source;         ///< Źródło wiadomości (nazwa modułu/funkcji)
-    int threadId;           ///< ID wątku który wygenerował wiadomość
+    quintptr threadId;           ///< ID wątku który wygenerował wiadomość
     
     DebugMessage() : level(DebugLevel::INFO), threadId(0) {}
     DebugMessage(const QString& msg, const QString& t, DebugLevel l = DebugLevel::INFO,
-                 const QString& src = QString(), int tid = 0)
+                 const QString& src = QString(), quintptr tid = 0)
         : message(msg), type(t), level(l), timestamp(QDateTime::currentDateTime()),
           source(src), threadId(tid) {}
 };

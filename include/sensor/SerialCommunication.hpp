@@ -3,11 +3,16 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 #include <cstdint>
+#include <atomic>
 #include <chrono>
 #include <functional>
+#include <cstdint>
 #include <memory>
 #include <map>
+#include <mutex>
+#include "sensor/CalibrationProfile.hpp"
 
 // Default baud rate for serial communication
 #define DEFAULT_BAUD_RATE 115200
@@ -121,6 +126,7 @@ public:
      * @return Nazwa portu lub pusty string jeśli niepołączony
      */
     std::string getPortName() const;
+    int getBaudRate() const;
 
     // ==================== Identyfikacja ====================
     
@@ -170,7 +176,10 @@ public:
      * @brief Rejestruje callback dla nowych danych
      * @param callback Funkcja wywoływana przy nowych danych
      */
-    void setDataCallback(DataCallback callback);
+    using DataCallbackId = std::uint64_t;
+    DataCallbackId addDataCallback(DataCallback callback);
+    void removeDataCallback(DataCallbackId id);
+    void setDataCallback(DataCallback callback); // compatibility wrapper
     
     /**
      * @brief Rejestruje callback dla zmian statusu połączenia
@@ -243,16 +252,24 @@ public:
     /**
      * @brief Kalibruje czujnik (tare)
      * @param samples Liczba próbek do uśrednienia
-     * @return Wartość tare
+     * @return Mediana surowych próbek; NaN przy błędzie odczytu
      */
     double tare(int samples = 10);
     
     /**
      * @brief Ustawia punkt kalibracyjny
      * @param rawValue Surowa wartość z czujnika
-     * @param knownValue Znana wartość wzorcowa
+     * @param knownValue Znana wartość wzorcowa w jednostkach wyniku kalibracji (po uprzednim tare)
      */
     void setCalibrationPoint(int32_t rawValue, double knownValue);
+
+    /** Stable identifier used to bind a calibration profile to one device. */
+    std::string getCalibrationDeviceId() const;
+
+    /** Persist or apply a versioned calibration profile for the connected device. */
+    bool saveCalibrationProfile(const std::string& path, std::string* error = nullptr) const;
+    bool loadCalibrationProfile(const std::string& path, std::string* error = nullptr);
+    bool isCalibrated() const;
     
     /**
      * @brief Kalibruje czujnik używając dwóch punktów
@@ -315,7 +332,7 @@ public:
      * @param waitForResponse Czy czekać na odpowiedź
      * @return Odpowiedź z Arduino (pusta jeśli nie oczekiwano)
      */
-    std::string sendCommand(const std::string& command, bool waitForResponse = true);
+    std::string sendCommand(const std::string& command, bool waitForResponse = true, int timeoutMs = 1000);
     
     /**
      * @brief Wysyła dane binarne do Arduino

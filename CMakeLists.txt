@@ -25,12 +25,15 @@ find_package(Qt5 REQUIRED COMPONENTS Core)
 
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
+    src/sensor/CalibrationProfile.cpp
+    src/sensor/ProtocolParser.cpp
     src/core/Logger.cpp
     src/core/PasswordHasher.cpp
     src/core/Authentication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
     src/data/LegacyXorMigration.cpp
+    src/core/MeasurementEngine.cpp
 )
 
 target_include_directories(biofeedback_core
@@ -74,6 +77,27 @@ add_executable(legacy_xor_migration_regression tests/legacy_xor_migration_regres
 target_link_libraries(legacy_xor_migration_regression PRIVATE biofeedback_core)
 add_test(NAME legacy_xor_migration_regression COMMAND legacy_xor_migration_regression)
 
+add_executable(protocol_parser_regression tests/protocol_parser_regression.cpp)
+target_link_libraries(protocol_parser_regression PRIVATE biofeedback_core)
+add_test(NAME protocol_parser_regression COMMAND protocol_parser_regression)
+
+add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
+target_link_libraries(measurement_engine_regression PRIVATE biofeedback_core)
+add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
+
+# ConfigManager regression (Qt Core only; exercises load/validate/save locking).
+add_executable(config_manager_regression
+    tests/config_manager_regression.cpp
+    src/core/ConfigManager.cpp
+)
+target_include_directories(config_manager_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(config_manager_regression PRIVATE Qt5::Core)
+add_test(NAME config_manager_regression COMMAND config_manager_regression)
+
+add_executable(calibration_profile_regression tests/calibration_profile_regression.cpp)
+target_link_libraries(calibration_profile_regression PRIVATE biofeedback_core)
+add_test(NAME calibration_profile_regression COMMAND calibration_profile_regression)
+
 # Build GUI app only when Qt5 development packages are available.
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
 if(Qt5_FOUND)
@@ -90,6 +114,7 @@ if(Qt5_FOUND)
         src/main.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
+        src/core/DebugManager.cpp
         src/core/PasswordHasher.cpp
         src/core/ConfigManager.cpp
         src/core/Authentication.cpp
@@ -102,6 +127,9 @@ if(Qt5_FOUND)
         src/tab/TrainingTab.cpp
         src/tab/DebugTab.cpp
         src/sensor/SerialCommunication.cpp
+        src/sensor/ProtocolParser.cpp
+        src/sensor/CalibrationProfile.cpp
+        src/core/MeasurementEngine.cpp
         src/data/DataManager.cpp
         src/data/Encryption.cpp
         src/games/GameEngine.cpp
@@ -116,6 +144,7 @@ if(Qt5_FOUND)
     set(HEADERS
         include/core/Application.hpp
         include/core/Logger.hpp
+        include/core/DebugManager.hpp
         include/core/ConfigManager.hpp
         include/core/Authentication.hpp
         include/gui/MainWindow.hpp
@@ -127,6 +156,9 @@ if(Qt5_FOUND)
         include/tab/TrainingTab.hpp
         include/tab/DebugTab.hpp
         include/sensor/SerialCommunication.hpp
+        include/sensor/ProtocolParser.hpp
+        include/sensor/CalibrationProfile.hpp
+        include/core/MeasurementEngine.hpp
         include/data/DataManager.hpp
         include/data/Encryption.hpp
         include/games/GameEngine.hpp

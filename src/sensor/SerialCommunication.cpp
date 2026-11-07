@@ -16,10 +16,15 @@
  */
 
 #include "sensor/SerialCommunication.hpp"
+#include "sensor/ProtocolParser.hpp"
+#include "sensor/CalibrationProfile.hpp"
 #include "core/DebugManager.hpp"
 #include <chrono>
 #include <cstring>
+#include <cmath>
+#include <utility>
 #include <algorithm>
+#include <limits>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -29,6 +34,7 @@
 #include <climits>
 #include <cstdio>
 #include <stdexcept>
+#include <QDateTime>
 #include <system_error>
 
 // ============================================================================
@@ -164,19 +170,29 @@ bool SerialCommunication::verifyCRC8(const uint8_t* data, size_t length) {
 class SerialCommunication::Impl {
 public:
     int portHandle = -1;
-    bool isConnected = false;
+    std::atomic<bool> isConnected{false};
     int baudRate = DEFAULT_BAUD_RATE;
+    std::string portName;
+    mutable std::mutex stateMutex;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
     double zeroOffset = 0.0;
     double scaleFactor = 1.0;
     bool isCalibrated = false;
+    mutable std::mutex calibrationMutex;
+    int tareSampleCount = 0;
+    double calibrationReferenceValue = 0.0;
+    int32_t calibrationReferenceRaw = 0;
+    std::string calibrationCreatedAtUtc;
     ArduinoInfo arduinoInfo;
-    DataCallback dataCallback;
+    std::vector<std::pair<DataCallbackId, DataCallback>> dataCallbacks;
+    DataCallbackId nextDataCallbackId = 1;
+    std::mutex callbackMutex;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
     std::thread asyncThread;
     std::mutex readMutex;
+    ProtocolParser protocolParser;
     std::string lastError;
     bool verbose = true;
     int32_t timestampOffset = 0;
@@ -329,7 +345,10 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             disconnect();
         }
         
-        m_impl->baudRate = baudRate;
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+            m_impl->baudRate = baudRate;
+        }
         
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -406,7 +425,11 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         int fl = fcntl(fd, F_GETFL); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
         m_impl->portHandle = fd;
 #endif
-        m_impl->isConnected = true;
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+            m_impl->portName = portName;
+            m_impl->isConnected = true;
+        }
         m_impl->lastActivityTime = std::chrono::steady_clock::now();
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
@@ -421,7 +444,17 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         if (m_impl->verbose) {
             std::cout << "[SerialComm] Connected to " << portName << " at " << baudRate << " baud" << std::endl;
         }
-        
+        ConnectionCallback connectionCallback;
+        {
+            std::lock_guard<std::mutex> callbackLock(m_impl->callbackMutex);
+            connectionCallback = m_impl->connectionCallback;
+        }
+        if (connectionCallback) {
+            try { connectionCallback(true, "Connected to " + portName); }
+            catch (...) { core::DebugManager::instance().sendDebugMessage(
+                "Connection callback threw an exception", core::DebugLevel::WARNING,
+                "SerialCommunication::openPort"); }
+        }
         return true;
         
     } catch (const std::exception& e) {
@@ -449,16 +482,39 @@ void SerialCommunication::disconnect() {
 #else
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
-    m_impl->portHandle = -1; m_impl->isConnected = false;
+    m_impl->portHandle = -1;
+    {
+        std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+        m_impl->isConnected = false;
+        m_impl->portName.clear();
+    }
+    ConnectionCallback connectionCallback;
+    {
+        std::lock_guard<std::mutex> callbackLock(m_impl->callbackMutex);
+        connectionCallback = m_impl->connectionCallback;
+    }
+    if (connectionCallback) {
+        try { connectionCallback(false, "Serial device disconnected"); }
+        catch (...) { core::DebugManager::instance().sendDebugMessage(
+            "Connection callback threw an exception", core::DebugLevel::WARNING,
+            "SerialCommunication::disconnect"); }
+    }
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
-std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? "Unknown" : ""; }
+std::string SerialCommunication::getPortName() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+    return m_impl->isConnected ? m_impl->portName : "";
+}
+int SerialCommunication::getBaudRate() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+    return m_impl->baudRate;
+}
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
     if (!m_impl->isConnected) return info;
-    std::string resp = sendCommand("ID", true);
+    std::string resp = sendCommand("ID", true, timeout);
     if (resp.find("DEVICE:") != std::string::npos) {
         std::istringstream iss(resp); std::string line;
         while (std::getline(iss, line)) {
@@ -467,7 +523,10 @@ ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
             else if (line.find("FW:") == 0) info.firmwareVersion = line.substr(3);
         }
         info.isConnected = true; info.boardId = 1;
-        m_impl->arduinoInfo = info;
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+            m_impl->arduinoInfo = info;
+        }
     }
     return info;
 }
@@ -494,7 +553,10 @@ bool SerialCommunication::autoConnect(int maxAttempts) {
     return false;
 }
 
-ArduinoInfo SerialCommunication::getArduinoInfo() const { return m_impl->arduinoInfo; }
+ArduinoInfo SerialCommunication::getArduinoInfo() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->stateMutex);
+    return m_impl->arduinoInfo;
+}
 
 SensorData SerialCommunication::readData(int timeout) {
     SensorData data;
@@ -516,9 +578,27 @@ SensorData SerialCommunication::readData(int timeout) {
     std::vector<uint8_t> rawData;
     auto start = std::chrono::steady_clock::now();
     bool gotBinaryData = false;
-    
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::steady_clock::now() - start).count() < 2000) {
+    const auto assignFrame = [this, &data](const ProtocolFrame& frame) {
+        data.timestamp = frame.timestampMs;
+        data.value = frame.rawValue;
+        data.crc = frame.crc;
+        {
+            std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+            data.calibratedValue = m_impl->isCalibrated
+                ? (static_cast<double>(frame.rawValue) - m_impl->zeroOffset) * m_impl->scaleFactor
+                : 0.0;
+        }
+        data.isValid = true;
+    };
+    if (auto queuedFrame = m_impl->protocolParser.takeFrame()) {
+        assignFrame(*queuedFrame);
+        gotBinaryData = true;
+    }
+
+    const int effectiveTimeoutMs = std::max(1, timeout);
+    while (!gotBinaryData &&
+           std::chrono::duration_cast<std::chrono::milliseconds>(
+           std::chrono::steady_clock::now() - start).count() < effectiveTimeoutMs) {
         int rd = 0;
 #ifdef _WIN32
         DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
@@ -526,50 +606,16 @@ SensorData SerialCommunication::readData(int timeout) {
         rd = read(m_impl->portHandle, buf, 255);
 #endif
         if (rd > 0) {
-            for (int i = 0; i < rd; ++i) {
-                rawData.push_back(static_cast<uint8_t>(buf[i]));
-                
-                // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
-                // followed by end markers 0xAA 0x55
-                if (rawData.size() >= 11) {
-                    // Look for end marker pattern
-                    if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
-                        // Extract binary packet (9 bytes before end markers)
-                        if (rawData.size() >= 11) {
-                            size_t packetStart = rawData.size() - 11;
-                            
-                            // Safety check - ensure we have enough data
-                            if (packetStart + 9 <= rawData.size()) {
-                                // Copy data to local buffer to avoid vector reallocation issues
-                                uint8_t packet[9];
-                                for (size_t j = 0; j < 9; ++j) {
-                                    packet[j] = rawData[packetStart + j];
-                                }
-                                
-                                // Parse binary packet: timestamp(4) + value(4) + crc(1)
-                                uint32_t timestamp;
-                                int32_t value;
-                                uint8_t crc;
-                                
-                                std::memcpy(&timestamp, packet, 4);
-                                std::memcpy(&value, packet + 4, 4);
-                                crc = packet[8];
-                                
-                                // Verify CRC
-                                if (verifyCRC8(packet, 9)) {
-                                    data.timestamp = timestamp;
-                                    data.value = value;
-                                    data.crc = crc;
-                                    data.isValid = true;
-                                    gotBinaryData = true;
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
+            rawData.insert(rawData.end(), reinterpret_cast<uint8_t*>(buf),
+                           reinterpret_cast<uint8_t*>(buf) + rd);
+            m_impl->protocolParser.feed(reinterpret_cast<const uint8_t*>(buf),
+                                        static_cast<std::size_t>(rd));
+            if (auto frame = m_impl->protocolParser.takeFrame()) {
+                assignFrame(*frame);
+                gotBinaryData = true;
+                break;
             }
-            
+
             // Also check for text response as fallback
             std::string resp(rawData.begin(), rawData.end());
             if (!gotBinaryData && resp.find("FORCE:") != std::string::npos) {
@@ -627,8 +673,30 @@ SensorData SerialCommunication::readData(int timeout) {
 }
 
 bool SerialCommunication::tryReadData(SensorData& data) { data = readData(100); return data.isValid; }
-void SerialCommunication::setDataCallback(DataCallback cb) { m_impl->dataCallback = cb; }
-void SerialCommunication::setConnectionCallback(ConnectionCallback cb) { m_impl->connectionCallback = cb; }
+SerialCommunication::DataCallbackId SerialCommunication::addDataCallback(DataCallback cb) {
+    if (!cb) return 0;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    const DataCallbackId id = m_impl->nextDataCallbackId++;
+    m_impl->dataCallbacks.emplace_back(id, std::move(cb));
+    return id;
+}
+
+void SerialCommunication::removeDataCallback(DataCallbackId id) {
+    if (id == 0) return;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataCallbacks.erase(
+        std::remove_if(m_impl->dataCallbacks.begin(), m_impl->dataCallbacks.end(),
+            [id](const auto& entry) { return entry.first == id; }),
+        m_impl->dataCallbacks.end());
+}
+
+void SerialCommunication::setDataCallback(DataCallback cb) {
+    (void)addDataCallback(std::move(cb));
+}
+void SerialCommunication::setConnectionCallback(ConnectionCallback cb) {
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->connectionCallback = std::move(cb);
+}
 
 void SerialCommunication::startAsyncReading() {
     if (m_impl->asyncReading) return;
@@ -636,7 +704,29 @@ void SerialCommunication::startAsyncReading() {
     m_impl->asyncThread = std::thread([this]() {
         while (m_impl->asyncReading && m_impl->isConnected) {
             SensorData d = readData(100);
-            if (d.isValid && m_impl->dataCallback) m_impl->dataCallback(d);
+            if (d.isValid) {
+                std::vector<DataCallback> callbacks;
+                {
+                    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+                    callbacks.reserve(m_impl->dataCallbacks.size());
+                    for (const auto& entry : m_impl->dataCallbacks)
+                        callbacks.push_back(entry.second);
+                }
+                for (const auto& callback : callbacks) {
+                    if (!callback) continue;
+                    try {
+                        callback(d);
+                    } catch (const std::exception& exception) {
+                        core::DebugManager::instance().sendDebugMessage(
+                            QString("Sensor callback failed: %1").arg(exception.what()),
+                            core::DebugLevel::ERROR, "SerialCommunication::startAsyncReading");
+                    } catch (...) {
+                        core::DebugManager::instance().sendDebugMessage(
+                            "Sensor callback failed with an unknown exception",
+                            core::DebugLevel::ERROR, "SerialCommunication::startAsyncReading");
+                    }
+                }
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
         }
     });
@@ -656,18 +746,165 @@ int SerialCommunication::getTimeSinceLastActivity() const {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count();
 }
 
-double SerialCommunication::tare(int samples) { if (m_impl->isConnected) sendCommand("TARE", true); m_impl->zeroOffset = 0.0; return 0.0; }
-void SerialCommunication::setCalibrationPoint(int32_t raw, double known) { if (raw != 0) { m_impl->scaleFactor = known/raw; m_impl->isCalibrated = true; } }
-bool SerialCommunication::calibrate(int32_t, int32_t, double knownWeight) {
-    if (!m_impl->isConnected) return false;
-    std::string r = sendCommand("CAL:" + std::to_string(knownWeight), true);
-    m_impl->isCalibrated = (r.find("Calibrated!") != std::string::npos);
+double SerialCommunication::tare(int samples) {
+    if (!m_impl->isConnected || samples <= 0 || samples > 1000) {
+        m_impl->lastError = "Tare requires a connected device and 1..1000 samples";
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    std::vector<int32_t> readings;
+    readings.reserve(static_cast<std::size_t>(samples));
+    for (int i = 0; i < samples; ++i) {
+        const SensorData sample = readData(300);
+        if (!sample.isValid) {
+            m_impl->lastError = "Tare aborted: invalid or missing sensor sample";
+            return std::numeric_limits<double>::quiet_NaN();
+        }
+        readings.push_back(sample.value);
+    }
+    const auto zeroResult = CalibrationMath::medianRaw(readings);
+    if (!zeroResult) {
+        m_impl->lastError = "Tare sample set is invalid";
+        return std::numeric_limits<double>::quiet_NaN();
+    }
+    const double zero = *zeroResult;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        m_impl->zeroOffset = zero;
+        m_impl->tareSampleCount = samples;
+        m_impl->isCalibrated = false;
+        m_impl->scaleFactor = 1.0;
+        m_impl->calibrationReferenceValue = 0.0;
+        m_impl->calibrationReferenceRaw = 0;
+        m_impl->calibrationCreatedAtUtc.clear();
+    }
+    m_impl->lastError.clear();
+    return zero;
+}
+
+void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
+    if (!std::isfinite(known) || known <= 0.0) {
+        m_impl->lastError = "Calibration reference must be finite and positive";
+        return;
+    }
+
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    const auto scaleResult = CalibrationMath::scaleFromReference(m_impl->zeroOffset, raw, known);
+    if (!scaleResult) {
+        m_impl->lastError = "Calibration point must be above the tare baseline with a finite positive reference";
+        return;
+    }
+    m_impl->scaleFactor = *scaleResult;
+    m_impl->isCalibrated = true;
+    m_impl->calibrationReferenceRaw = raw;
+    m_impl->calibrationReferenceValue = known;
+    m_impl->calibrationCreatedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
+    m_impl->lastError.clear();
+}
+bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight) {
+    const int64_t span = static_cast<int64_t>(rawSpan) - static_cast<int64_t>(rawZero);
+    if (span == 0 || !std::isfinite(knownWeight) || knownWeight <= 0.0) {
+        return false;
+    }
+
+    const auto scaleResult = CalibrationMath::scaleFromReference(
+        static_cast<double>(rawZero), rawSpan, knownWeight);
+    if (!scaleResult) return false;
+    const double scale = *scaleResult;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        m_impl->zeroOffset = static_cast<double>(rawZero);
+        m_impl->scaleFactor = scale;
+        m_impl->isCalibrated = true;
+        m_impl->calibrationReferenceRaw = rawSpan;
+        m_impl->calibrationReferenceValue = knownWeight;
+        m_impl->tareSampleCount = std::max(1, m_impl->tareSampleCount);
+        m_impl->calibrationCreatedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODate).toStdString();
+    }
+    return true;
+}
+double SerialCommunication::convertToCalibrated(int32_t raw) const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    const auto converted = CalibrationMath::convertRaw(raw, m_impl->zeroOffset, m_impl->scaleFactor);
+    return converted.value_or(0.0);
+}
+std::string SerialCommunication::getCalibrationDeviceId() const {
+    const ArduinoInfo info = getArduinoInfo();
+    if (!info.serialNumber.empty()) return "serial:" + info.serialNumber;
+    if (info.deviceName.empty() || info.firmwareVersion.empty() || getPortName().empty()) return {};
+    return "device:" + info.deviceName + "|" + info.firmwareVersion + "|" + getPortName();
+}
+
+bool SerialCommunication::saveCalibrationProfile(const std::string& path, std::string* error) const {
+    CalibrationProfile profile;
+    profile.deviceId = getCalibrationDeviceId();
+    if (profile.deviceId.empty()) {
+        if (error) *error = "Connected device has no stable identifier";
+        return false;
+    }
+    const ArduinoInfo info = getArduinoInfo();
+    profile.firmwareVersion = info.firmwareVersion;
+    profile.sensorModel = info.deviceName.empty() ? "HX711" : info.deviceName;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        if (!m_impl->isCalibrated || m_impl->tareSampleCount < 1 ||
+            m_impl->calibrationCreatedAtUtc.empty()) {
+            if (error) *error = "Cannot save an incomplete calibration profile";
+            return false;
+        }
+        profile.zeroOffsetRaw = m_impl->zeroOffset;
+        profile.scaleFactor = m_impl->scaleFactor;
+        profile.referenceValue = m_impl->calibrationReferenceValue;
+        profile.referenceRaw = m_impl->calibrationReferenceRaw;
+        profile.sampleCount = std::max(1, m_impl->tareSampleCount);
+        profile.createdAtUtc = m_impl->calibrationCreatedAtUtc;
+    }
+    return CalibrationProfileStore::save(path, profile, error);
+}
+
+bool SerialCommunication::loadCalibrationProfile(const std::string& path, std::string* error) {
+    const std::string deviceId = getCalibrationDeviceId();
+    if (deviceId.empty()) {
+        if (error) *error = "Connected device has no stable identifier";
+        return false;
+    }
+    const auto profile = CalibrationProfileStore::load(path, deviceId, error);
+    if (!profile) return false;
+    {
+        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+        m_impl->zeroOffset = profile->zeroOffsetRaw;
+        m_impl->scaleFactor = profile->scaleFactor;
+        m_impl->isCalibrated = true;
+        m_impl->calibrationReferenceRaw = profile->referenceRaw;
+        m_impl->calibrationReferenceValue = profile->referenceValue;
+        m_impl->tareSampleCount = profile->sampleCount;
+        m_impl->calibrationCreatedAtUtc = profile->createdAtUtc;
+    }
+    return true;
+}
+
+bool SerialCommunication::isCalibrated() const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
     return m_impl->isCalibrated;
 }
-double SerialCommunication::convertToCalibrated(int32_t raw) const { return (raw - m_impl->zeroOffset) * m_impl->scaleFactor; }
-double SerialCommunication::getCalibrationScale() const { return m_impl->scaleFactor; }
-int32_t SerialCommunication::getCalibrationOffset() const { return static_cast<int32_t>(m_impl->zeroOffset); }
-void SerialCommunication::resetCalibration() { m_impl->zeroOffset = 0.0; m_impl->scaleFactor = 1.0; m_impl->isCalibrated = false; }
+
+double SerialCommunication::getCalibrationScale() const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    return m_impl->scaleFactor;
+}
+int32_t SerialCommunication::getCalibrationOffset() const {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    return static_cast<int32_t>(m_impl->zeroOffset);
+}
+void SerialCommunication::resetCalibration() {
+    std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    m_impl->scaleFactor = 1.0;
+    m_impl->isCalibrated = false;
+    m_impl->tareSampleCount = 0;
+    m_impl->calibrationReferenceValue = 0.0;
+    m_impl->calibrationReferenceRaw = 0;
+    m_impl->calibrationCreatedAtUtc.clear();
+}
 
 uint32_t SerialCommunication::getCurrentTimestamp() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -694,7 +931,7 @@ int32_t SerialCommunication::getTimestampOffset() const {
     return m_impl->timestampOffset; 
 }
 
-std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
+std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse, int timeoutMs) {
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
     std::string toSend = cmd + "\n";
@@ -705,9 +942,10 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
 #endif
     m_impl->lastActivityTime = std::chrono::steady_clock::now();
     if (!waitForResponse) return "";
+    if (timeoutMs <= 0) return "";
     std::string resp; char buf[256];
     auto start = std::chrono::steady_clock::now();
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() < 2000) {
+    while (std::chrono::steady_clock::now() - start < std::chrono::milliseconds(timeoutMs)) {
         int rd = 0;
 #ifdef _WIN32
         DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
@@ -732,6 +970,9 @@ bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
 
 void SerialCommunication::setVerbose(bool v) { m_impl->verbose = v; }
 std::string SerialCommunication::getLastError() const { return m_impl->lastError; }
-void SerialCommunication::setCRCPolynomial(uint8_t) {}
+void SerialCommunication::setCRCPolynomial(uint8_t) {
+    // CRC-8 polynomial is part of the currently fixed Arduino wire protocol (0x07).
+    // Runtime polynomial changes are intentionally unsupported until firmware negotiation exists.
+}
 
 } // namespace sensor

@@ -42,9 +42,9 @@ MainWindow::MainWindow(QWidget *parent)
     , m_graphDurationSpin(nullptr)
     , m_unitCombo(nullptr)
     , m_updateTimer(nullptr)
+    , m_settingsWidget(nullptr)
     , m_isCollectingData(false)
     , m_isConnected(false)
-    , m_settingsWidget(nullptr)
     , m_debugTerminal(nullptr)
     , m_debugMaxLines(500)
     , m_serialPort(nullptr)
@@ -66,6 +66,11 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     saveSettings();
+    // Stop the shared serial reader before Qt destroys child tabs whose
+    // callbacks are registered with this device service.
+    if (m_serialPort) {
+        m_serialPort->stopAsyncReading();
+    }
 }
 
 void MainWindow::setupUI()
@@ -118,10 +123,11 @@ void MainWindow::setupTabs()
     
     // Udostępnij połączenie szeregowe wszystkim zakładkom
     if (m_serialPort) {
-        m_measurementTab->setSerialConnection(m_serialPort);
+        // Register every consumer before MeasurementTab starts device discovery.
         m_outlineTab->setSerialConnection(m_serialPort);
         m_trainingTab->setSerialConnection(m_serialPort);
         m_debugTab->setSerialConnection(m_serialPort);
+        m_measurementTab->setSerialConnection(m_serialPort);
     }
     
     // Add tabs to widget - DebugTab jako ostatnia zakładka
@@ -386,6 +392,28 @@ void MainWindow::createConnections()
     connect(m_updateTimer, &QTimer::timeout, this, &MainWindow::onUpdateTimerTimeout);
     m_updateTimer->start();
     
+    // One validated measurement stream feeds training, games and the main UI.
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample,
+            m_trainingTab, &tab::TrainingTab::onSharedForceSample, Qt::QueuedConnection);
+    connect(m_measurementTab, &tab::MeasurementTab::sharedRepetitionCompleted,
+            m_trainingTab, &tab::TrainingTab::onSharedRepetitionCompleted, Qt::QueuedConnection);
+    connect(m_measurementTab, &tab::MeasurementTab::sharedSeriesCompleted,
+            m_trainingTab, &tab::TrainingTab::onSharedSeriesCompleted, Qt::QueuedConnection);
+    connect(m_trainingTab, &tab::TrainingTab::engineSeriesSizeRequested,
+            m_measurementTab, &tab::MeasurementTab::setEngineRepetitionsPerSeries);
+    connect(m_trainingTab, &tab::TrainingTab::trainingStarted, this, [this]() {
+        m_measurementTab->resetSession();
+        m_measurementTab->startMeasurement();
+    });
+    connect(m_trainingTab, &tab::TrainingTab::trainingStopped,
+            m_measurementTab, &tab::MeasurementTab::stopMeasurement);
+    connect(m_trainingTab, &tab::TrainingTab::trainingPaused,
+            m_measurementTab, &tab::MeasurementTab::setMeasurementPaused);
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample, this,
+            [this](double forceN, double, bool isRaw) {
+                if (!isRaw) forwardSensorToGame(forceN);
+            }, Qt::QueuedConnection);
+
     // Connect tabs to game system
     connect(m_outlineTab, &tab::OutlineTab::requestGameStart,
             this, [this](const QString& gameId, const tab::ExerciseData& exerciseData) {
