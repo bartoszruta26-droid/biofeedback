@@ -1031,6 +1031,7 @@ void MeasurementTab::updateLiveDisplay(double force)
     std::cout << "[DEBUG] updateLiveDisplay: Before updating UI components" << std::endl;
     m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
     m_forceBar->setValue(static_cast<int>(displayForce));
+    m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
     
     double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
     std::cout << "[DEBUG] updateLiveDisplay: Before addSample, force=" << force << " time=" << lastTime << std::endl;
@@ -1109,6 +1110,7 @@ void MeasurementTab::calculateRepetitionStats()
     
     std::cout << "[DEBUG] calculateRepetitionStats: Setting repNumber=" << (m_currentRepInSeries + 1) << std::endl;
     
+    m_currentRepStats = RepetitionStats();
     m_currentRepStats.repNumber = m_currentRepInSeries + 1;
     m_currentRepStats.peakForce = m_repPeakForce;
     m_currentRepStats.timeToPeak = m_repPeakTime - m_repStartTime;
@@ -1118,16 +1120,21 @@ void MeasurementTab::calculateRepetitionStats()
         m_currentRepStats.riseRate = (m_repPeakForce - m_repStartForce) / (m_repPeakTime - m_repStartTime);
     }
     
-    // Fall rate (szybkość opadania) - znajdź punkt gdzie siła spada poniżej progu
+    // Average force decay rate from the peak to the first post-peak
+    // sample at or below 10% of peak force.
     double fallEndTime = m_repPeakTime;
-    for (int i = m_currentRepForces.size() - 1; i >= 0; --i) {
-        if (m_currentRepForces[i] < m_repPeakForce * 0.1) {
+    double fallEndForce = m_repPeakForce;
+    for (int i = 0; i < m_currentRepForces.size(); ++i) {
+        if (m_currentRepTimes[i] > m_repPeakTime &&
+            m_currentRepForces[i] <= m_repPeakForce * 0.1) {
             fallEndTime = m_currentRepTimes[i];
+            fallEndForce = m_currentRepForces[i];
             break;
         }
     }
-    if (fallEndTime - m_repPeakTime > 0) {
-        m_currentRepStats.fallRate = (m_repPeakForce - m_currentRepForces.last()) / (fallEndTime - m_repPeakTime);
+    if (fallEndTime > m_repPeakTime) {
+        m_currentRepStats.fallRate =
+            (m_repPeakForce - fallEndForce) / (fallEndTime - m_repPeakTime);
     }
     
     // Czas trwania
