@@ -23,6 +23,16 @@ int main()
 
     std::string error;
     assert(profile.isValidFor("device-123"));
+    const auto oddMedian = sensor::CalibrationMath::medianRaw({10, 100, 20});
+    const auto evenMedian = sensor::CalibrationMath::medianRaw({10, 20, 30, 40});
+    assert(oddMedian && *oddMedian == 20.0);
+    assert(evenMedian && *evenMedian == 25.0);
+    assert(!sensor::CalibrationMath::medianRaw({}).has_value());
+    const auto scale = sensor::CalibrationMath::scaleFromReference(100000.0, 123357, 9.81);
+    assert(scale && *scale > 0.0);
+    assert(!sensor::CalibrationMath::scaleFromReference(100.0, 100, 9.81).has_value());
+    const auto converted = sensor::CalibrationMath::convertRaw(123357, 100000.0, *scale);
+    assert(converted && std::abs(*converted - 9.81) < 1e-9);
     assert(!profile.isValidFor("different-device"));
     assert(sensor::CalibrationProfileStore::save(path, profile, &error));
 
