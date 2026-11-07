@@ -5,6 +5,8 @@
 #include "core/DebugManager.hpp"
 #include "core/RuntimePaths.hpp"
 #include <QDir>
+#include <QFile>
+#include <QFileDevice>
 #include "gui/MainWindow.hpp"
 #include "gui/LoginDialog.hpp"
 #include "data/DataManager.hpp"
@@ -367,18 +369,65 @@ void Application::setupConnections()
                 }
             });
     
-    // Connect PatientTab signals
+    // Persist patient charts through DataManager so the configured AES-256-GCM policy applies.
     connect(m_patientTab, &tab::PatientTab::patientAdded,
-            this, [this](const QString& pesel, const QString& firstName, const QString& lastName) {
-                m_logger->info(QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel).toStdString());
-                if (m_mainWindow && m_mainWindow->debugTerminal()) {
-                    m_mainWindow->addDebugMessage(
-                        QString("Patient added: %1 %2 (%3)").arg(firstName).arg(lastName).arg(pesel),
-                        "INFO"
-                    );
-                }
+            this, [this](const QString&, const QString&, const QString&) {
+                if (m_logger) m_logger->info("Patient chart added [personal fields redacted]");
             });
-    
+    connect(m_patientTab, &tab::PatientTab::patientRecordChanged,
+            this, [this](const QString& pesel, const QString& firstName,
+                         const QString& lastName, const QDate& birthDate,
+                         const QString& gender, const QString& notes) {
+                if (!m_dataManager || pesel.isEmpty()) return;
+                PatientData patient;
+                patient.id = pesel.toStdString();
+                patient.pesel = pesel.toStdString();
+                patient.firstName = firstName.toStdString();
+                patient.lastName = lastName.toStdString();
+                patient.birthDate = birthDate.toString(Qt::ISODate).toStdString();
+                patient.gender = gender.toStdString();
+                patient.medicalHistory = notes.toStdString();
+                const QString filePath = QDir(runtime::patientDirectory(pesel))
+                    .filePath(QStringLiteral("patient.json"));
+                if (!m_dataManager->savePatientData(patient, filePath.toStdString())) {
+                    if (m_logger) m_logger->error("Failed to persist patient chart [identifier redacted]");
+                    if (m_mainWindow && m_mainWindow->debugTerminal())
+                        m_mainWindow->addDebugMessage("Nie udało się zapisać kartoteki pacjenta.", "ERROR");
+                    return;
+                }
+                QFile::setPermissions(filePath, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+            });
+    connect(m_patientTab, &tab::PatientTab::patientRecordDeleted,
+            this, [this](const QString& pesel) {
+                if (pesel.isEmpty()) return;
+                const QString filePath = QDir(runtime::patientDirectory(pesel))
+                    .filePath(QStringLiteral("patient.json"));
+                if (QFile::exists(filePath) && !QFile::remove(filePath) && m_logger)
+                    m_logger->warning("Could not remove patient chart file [identifier redacted]");
+                // The training-history directory is intentionally retained for audit/retention.
+            });
+
+    // Reload saved patient charts after lifecycle handlers are connected.
+    const QString patientRootPath = QDir(runtime::appDataDirectory()).filePath(QStringLiteral("patients"));
+    QDir patientRoot(patientRootPath);
+    const QStringList patientDirectories = patientRoot.entryList(
+        QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QString& directoryName : patientDirectories) {
+        const QString patientFile = QDir(patientRoot.filePath(directoryName))
+            .filePath(QStringLiteral("patient.json"));
+        if (!QFile::exists(patientFile) || !m_dataManager) continue;
+        const PatientData patient = m_dataManager->loadPatientData(patientFile.toStdString());
+        if (patient.id.empty()) continue;
+        const QString pesel = QString::fromStdString(patient.pesel);
+        m_patientTab->addPatient(
+            pesel,
+            QString::fromStdString(patient.firstName),
+            QString::fromStdString(patient.lastName),
+            QDate::fromString(QString::fromStdString(patient.birthDate), Qt::ISODate),
+            QString::fromStdString(patient.gender),
+            QString::fromStdString(patient.medicalHistory));
+    }
+
     // Connect PatientTab to MeasurementTab for automatic data loading when patient changes
     connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
             m_measurementTab, &tab::MeasurementTab::onPatientChanged);
