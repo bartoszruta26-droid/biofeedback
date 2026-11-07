@@ -43,10 +43,10 @@ Linux CI wykonało pełną kompilację aplikacji Qt, CTest, kontrolę zależnoś
 
 ## Otwarte ryzyka / dalsze prace
 
-1. **Cykl życia callbacków:** `MeasurementEngine::ingest()` kopiuje callbacki pod blokadą, a następnie wywołuje je poza blokadą. `unsubscribe()` usuwa wpis z mapy, ale nie czeka na callback, który został już skopiowany. Callbacki GUI przechwytują surowe `this`; należy rozważyć bezpieczny mechanizm wygaszania subskrypcji lub token z synchronizacją in-flight, aby wykluczyć wyścig podczas niszczenia widgetu.
+1. **Cykl życia callbacków — poprawione w aktualizacji PR #200:** `MeasurementEngine` przechowuje współdzielone wpisy subskrypcji, liczy callbacki będące w toku i `unsubscribe()` czeka na ich zakończenie. Dzięki temu destruktor `MeasurementTab` i `TrainingTab` nie wraca z rejestracji, gdy callback przechwytujący widget nadal działa. Dodano regresję wielowątkową: callback blokuje się, odsubskrybowanie musi poczekać, po czym nowe próbki nie uruchamiają już callbacku.
 2. **HTTP API:** obecny lokalny serwer API udostępnia zdrowie/status, natomiast operacje urządzenia i pomiaru pozostają jawnie wyłączone (`CAPABILITY_NOT_AVAILABLE`). To świadome ograniczenie granicy usługi, a nie potwierdzona integracja API z silnikiem pomiarowym.
 3. **Walidacja sprzętowa:** CI potwierdza zachowanie programowe i testy regresyjne; nie zastępuje pomiaru na rzeczywistym HX711/Arduino, testu długiego czasu pracy ani walidacji klinicznej.
 
 ## Status
 
-PR #200 zawiera dwie poprawki integracyjne i testy regresyjne. Jest otwarty względem `integration/all-work`; nie został scalony. Gałąź `main` nie była modyfikowana.
+PR #200 zawiera poprawki routingu pacjenta, semantyki zawijania timestampu oraz synchronizacji cyklu życia callbacków, wraz z regresjami. CI zweryfikowano ponownie na aktualnym HEAD PR po tych zmianach. PR pozostaje skierowany do `integration/all-work`; `main` nie jest celem integracji.
