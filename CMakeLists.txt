@@ -77,9 +77,15 @@ add_test(NAME tui_model_regression COMMAND tui_model_regression)
 # Build the interactive terminal UI when ncurses development files are available.
 find_package(Curses QUIET)
 if(CURSES_FOUND)
-    add_executable(biofeedback_tui src/tui/main.cpp)
+    add_executable(biofeedback_tui
+        src/tui/main.cpp
+        src/sensor/SerialCommunication.cpp
+        src/core/DebugManager.cpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(biofeedback_tui PROPERTIES AUTOMOC ON)
     target_include_directories(biofeedback_tui PRIVATE ${CMAKE_SOURCE_DIR}/include ${CURSES_INCLUDE_DIRS})
-    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model ${CURSES_LIBRARIES})
+    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model Qt5::Core ${CURSES_LIBRARIES})
     install(TARGETS biofeedback_tui DESTINATION bin)
 else()
     message(STATUS "ncurses not found - skipping optional biofeedback_tui target")
