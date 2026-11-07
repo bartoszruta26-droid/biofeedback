@@ -16,6 +16,11 @@ struct RepDetectorConfig {
     std::uint32_t maximumSampleGapMs{500};
 };
 
+struct ForceSample {
+    std::uint32_t timestampMs{0};
+    double forceN{0.0};
+};
+
 struct RepetitionRecord {
     std::uint32_t startTimestampMs{0};
     std::uint32_t endTimestampMs{0};
@@ -24,6 +29,7 @@ struct RepetitionRecord {
     double peakForceN{0.0};
     double meanForceN{0.0};
     std::size_t sampleCount{0};
+    std::vector<ForceSample> samples;
 };
 
 struct SeriesSummary {
@@ -60,6 +66,7 @@ private:
     double m_areaForceMs{0.0};
     double m_previousForceN{0.0};
     std::size_t m_sampleCount{0};
+    std::vector<ForceSample> m_samples;
 };
 
 SeriesSummary summarizeSeries(const std::vector<RepetitionRecord>& repetitions,
