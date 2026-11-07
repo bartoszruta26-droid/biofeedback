@@ -436,7 +436,17 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         if (m_impl->verbose) {
             std::cout << "[SerialComm] Connected to " << portName << " at " << baudRate << " baud" << std::endl;
         }
-        
+        ConnectionCallback connectionCallback;
+        {
+            std::lock_guard<std::mutex> callbackLock(m_impl->callbackMutex);
+            connectionCallback = m_impl->connectionCallback;
+        }
+        if (connectionCallback) {
+            try { connectionCallback(true, "Connected to " + portName); }
+            catch (...) { core::DebugManager::instance().sendDebugMessage(
+                "Connection callback threw an exception", core::DebugLevel::WARNING,
+                "SerialCommunication::openPort"); }
+        }
         return true;
         
     } catch (const std::exception& e) {
@@ -465,6 +475,17 @@ void SerialCommunication::disconnect() {
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
     m_impl->portHandle = -1; m_impl->isConnected = false; m_impl->portName.clear();
+    ConnectionCallback connectionCallback;
+    {
+        std::lock_guard<std::mutex> callbackLock(m_impl->callbackMutex);
+        connectionCallback = m_impl->connectionCallback;
+    }
+    if (connectionCallback) {
+        try { connectionCallback(false, "Serial device disconnected"); }
+        catch (...) { core::DebugManager::instance().sendDebugMessage(
+            "Connection callback threw an exception", core::DebugLevel::WARNING,
+            "SerialCommunication::disconnect"); }
+    }
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
@@ -632,7 +653,10 @@ void SerialCommunication::setDataCallback(DataCallback cb) {
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
     m_impl->dataCallbacks.push_back(std::move(cb));
 }
-void SerialCommunication::setConnectionCallback(ConnectionCallback cb) { m_impl->connectionCallback = cb; }
+void SerialCommunication::setConnectionCallback(ConnectionCallback cb) {
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->connectionCallback = std::move(cb);
+}
 
 void SerialCommunication::startAsyncReading() {
     if (m_impl->asyncReading) return;
@@ -647,7 +671,18 @@ void SerialCommunication::startAsyncReading() {
                     callbacks = m_impl->dataCallbacks;
                 }
                 for (const auto& callback : callbacks) {
-                    if (callback) callback(d);
+                    if (!callback) continue;
+                    try {
+                        callback(d);
+                    } catch (const std::exception& exception) {
+                        core::DebugManager::instance().sendDebugMessage(
+                            QString("Sensor callback failed: %1").arg(exception.what()),
+                            core::DebugLevel::ERROR, "SerialCommunication::startAsyncReading");
+                    } catch (...) {
+                        core::DebugManager::instance().sendDebugMessage(
+                            "Sensor callback failed with an unknown exception",
+                            core::DebugLevel::ERROR, "SerialCommunication::startAsyncReading");
+                    }
                 }
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(12));
