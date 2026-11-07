@@ -177,13 +177,14 @@ void PongGame::updateAIPaddle(double deltaTime) {
     }
     
     // Ograniczenie do obszaru gry
-    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, static_cast<float>(height() - m_paddleHeight));
+    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, qMax(0.0f, static_cast<float>(height()) - m_paddleHeight));
     m_rightPaddle.setY(m_rightPaddleY);
 }
 
 void PongGame::checkCollisions() {
     // Aktualizacja pozycji paletki gracza na podstawie siły
-    m_leftPaddleY = (1.0f - static_cast<float>(m_currentForce)) * (height() - m_paddleHeight);
+    const float maxPaddleY = qMax(0.0f, static_cast<float>(height()) - m_paddleHeight);
+    m_leftPaddleY = (1.0f - static_cast<float>(m_currentForce)) * maxPaddleY;
     m_leftPaddle.setY(m_leftPaddleY);
     
     // Kolizja piłki z górną i dolną krawędzią
