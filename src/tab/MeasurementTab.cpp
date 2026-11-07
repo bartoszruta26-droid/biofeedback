@@ -1386,7 +1386,16 @@ void MeasurementTab::onToggleMeasurement()
 
 void MeasurementTab::onReadSingleSample()
 {
-    // Manual capture reuses the latest frame from the shared asynchronous reader.
+    // During an active session the asynchronous stream already records every
+    // sample. Replaying the latest frame here would duplicate its timestamp,
+    // distort the trace and reset repetition detection.
+    if (m_isMeasuring) {
+        m_lblStatus->setText(tr("Status: AKTYWNY POMIAR ZAPISUJE PRÓBKI AUTOMATYCZNIE"));
+        m_lblStatus->setStyleSheet("color: blue; font-weight: bold;");
+        return;
+    }
+
+    // Manual capture is a one-shot operation available only while idle.
     if (!m_serialPort || !m_serialPort->isConnected()) {
         m_lblStatus->setText(tr("Status: BRAK CZUJNIKA"));
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
