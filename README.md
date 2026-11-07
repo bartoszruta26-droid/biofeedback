@@ -21,7 +21,7 @@ A professional medical-grade biofeedback application built with C++, Qt5, and Ar
 - **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
 - **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
 
-Wersje TUI, WebUI i Android są obecnie warstwami prezentacji w trybie podglądu. Nie udają aktywnego pomiaru ani nie tworzą fikcyjnych danych pacjentów. Integracja z backendem i wspólnym strumieniem pomiarowym jest kolejnym etapem.
+Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać rzeczywiste próbki z podłączonego czujnika. WebUI i Android pozostają warstwami prezentacji w trybie podglądu do czasu wdrożenia API. Żaden interfejs nie tworzy fikcyjnych danych pacjentów.
 
 ## Hardware Requirements
 
