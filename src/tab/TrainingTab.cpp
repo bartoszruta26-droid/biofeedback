@@ -488,6 +488,14 @@ void TrainingTab::startTraining()
         stats.minPeakForce = 0.0;
         stats.duration = 0.0;
         stats.completionRate = 0.0;
+        stats.averageForceN = 0.0;
+        stats.totalImpulseNs = 0.0;
+        stats.targetAccuracyPercent = 0.0;
+        stats.averageRepetitionDurationSeconds = 0.0;
+        stats.avgReactionTime = 0.0;
+        stats.completedSeries = 0;
+        stats.completedReps = 0;
+        stats.isCompleted = false;
     }
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
@@ -590,140 +598,22 @@ bool TrainingTab::isTrainingPaused() const
 
 void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
-    if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback w wątku sensora - używamy QMetaObject dla bezpieczeństwa
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
-    }
+    // Retained for device status and compatibility only. Data is consumed from
+    // MeasurementTab's validated MeasurementEngine stream, never directly here.
+    m_serialPort = std::move(serial);
 }
 
 void TrainingTab::setGameEngine(games::GameEngine* game)
 {
+    if (m_currentGame == game) return;
+    if (m_currentGame) disconnect(m_currentGame, nullptr, this, nullptr);
     m_currentGame = game;
-    
-    if (m_currentGame) {
-        // Podłączenie sygnałów gry
-        connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
-        connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
-        connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
-        
-        // Jeśli mamy SerialCommunication, podłącz go do gry
-        if (m_serialPort) {
-            // Spróbuj rzutować na konkretny typ gry i podłącz SerialCommunication
-            auto pongGame = dynamic_cast<games::PongGame*>(m_currentGame);
-            if (pongGame) {
-                pongGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto flappyGame = dynamic_cast<games::FlappyBirdGame*>(m_currentGame);
-            if (flappyGame) {
-                flappyGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto marioGame = dynamic_cast<games::MarioGame*>(m_currentGame);
-            if (marioGame) {
-                marioGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto sinGame = dynamic_cast<games::SinGame*>(m_currentGame);
-            if (sinGame) {
-                sinGame->setSerialConnection(m_serialPort);
-            }
-        }
-    }
-}
+    if (!m_currentGame) return;
 
-QVector<ExerciseStats> TrainingTab::getTrainingStats() const
-{
-    return m_exerciseStats;
-}
-
-bool TrainingTab::exportResultsToCSV(const QString& filename)
-{
-    QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-    
-    QTextStream out(&file);
-    
-    // Nagłówek
-    out << "Ćwiczenie,Seria,Powtórzenie,Siła szczytowa,Czas do szczytu,Wynik\n";
-    
-    for (const auto& stats : m_exerciseStats) {
-        out << stats.exerciseName << ","
-            << stats.completedSeries << ","
-            << stats.completedReps << ","
-            << stats.avgPeakForce << ","
-            << stats.avgReactionTime << ","
-            << stats.consistencyScore << "\n";
-    }
-    
-    file.close();
-    return true;
-}
-
-bool TrainingTab::importTrainingPlan(const QString& filename)
-{
-    QFile file(filename);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return false;
-    }
-    
-    clearPlan();
-    
-    QTextStream in(&file);
-    QString line = in.readLine();  // Nagłówek
-    
-    while (!in.atEnd()) {
-        line = in.readLine();
-        QStringList parts = line.split(",");
-        if (parts.size() >= 5) {
-            TrainingExercise ex;
-            ex.name = parts[0];
-            ex.seriesCount = parts[1].toInt();
-            ex.repsPerSeries = parts[2].toInt();
-            ex.targetForce = parts[3].toDouble();
-            ex.restTime = parts[4].toDouble();
-            if (parts.size() > 5) {
-                ex.gameType = parts[5];
-            }
-            addExercise(ex);
-        }
-    }
-    
-    file.close();
-    return true;
-}
-
-bool TrainingTab::exportTrainingPlan(const QString& filename)
-{
-    QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-    
-    QTextStream out(&file);
-    
-    // Nagłówek
-    out << "Nazwa,Serie,Powtórzenia,Siła_celu,Odpoczynek,Typ_gry\n";
-    
-    for (const auto& ex : m_exercisePlan) {
-        out << ex.name << ","
-            << ex.seriesCount << ","
-            << ex.repsPerSeries << ","
-            << ex.targetForce << ","
-            << ex.restTime << ","
-            << ex.gameType << "\n";
-    }
-    
-    file.close();
-    return true;
+    connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
+    connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
+    connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
+    // Games receive normalized force through onSharedForceSample().
 }
 
 void TrainingTab::onSaveResults()
@@ -815,47 +705,62 @@ void TrainingTab::onTimerTick()
     updateProgressWidgets();
 }
 
-void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
+void TrainingTab::onSharedForceSample(double forceN, double timestampSeconds, bool isRaw)
 {
-    if (!m_isTraining || m_isPaused) return;
-    
-    double force = data.calibratedValue;
-    m_currentForce = force;
-    
-    // Dodaj dane z Arduino do terminala debugowania
-    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
-        .arg(data.value)
-        .arg(data.calibratedValue);
-    addDebugMessage(arduinoDebug, "ARDUINO");
-    
-    // Śledzenie siły szczytowej w powtórzeniu
-    if (force > m_peakForceInRep) {
-        m_peakForceInRep = force;
-    }
-    
-    // Aktualizacja UI
-    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 1));
-    m_progressWidget->setCurrentForce(force);
-    
-    double targetForce = 0.0;
-    if (!m_exercisePlan.isEmpty() && m_currentExerciseIndex < m_exercisePlan.size()) {
-        targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
-    }
-    int barValue = targetForce > 0 ? static_cast<int>((force / targetForce) * 100) : 0;
+    Q_UNUSED(timestampSeconds);
+    if (!m_isTraining || m_isPaused || m_inRestPeriod || isRaw ||
+        m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) return;
+
+    m_currentForce = forceN;
+    m_peakForceInRep = std::max(m_peakForceInRep, forceN);
+    m_lblCurrentForce->setText(QString("%1 N").arg(forceN, 0, 'f', 1));
+    m_progressWidget->setCurrentForce(forceN);
+
+    const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
+    const int barValue = targetForce > 0.0
+        ? static_cast<int>((forceN / targetForce) * 100.0) : 0;
     m_forceBar->setValue(qBound(0, barValue, 100));
-    
-    // Przekazanie danych do gry
-    if (m_currentGame && m_currentGame->isRunning()) {
-        m_currentGame->handleSensorInput(force);
+
+    if (m_currentGame && m_currentGame->isRunning() && !m_currentGame->isPaused())
+        m_currentGame->handleSensorInput(forceN);
+
+    emit newForceSample(forceN);
+}
+
+void TrainingTab::onSharedRepetitionCompleted(double peakForceN, double durationSeconds,
+                                               double timeToPeakSeconds, double averageForceN,
+                                               double impulseNs, double targetAccuracyPercent)
+{
+    if (!m_isTraining || m_isPaused || m_inRestPeriod ||
+        m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) return;
+
+    const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
+    if (m_currentRepIndex >= exercise.repsPerSeries) return;
+
+    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    stats.peakForcePerRep.append(peakForceN);
+    stats.avgReactionTime += timeToPeakSeconds;
+    stats.averageForceN += averageForceN;
+    stats.totalImpulseNs += impulseNs;
+    stats.targetAccuracyPercent += targetAccuracyPercent;
+    stats.averageRepetitionDurationSeconds += durationSeconds;
+
+    m_peakForceInRep = peakForceN;
+    ++m_currentRepIndex;
+    stats.completedReps = stats.peakForcePerRep.size();
+    updateProgressWidgets();
+
+    if (m_currentRepIndex >= exercise.repsPerSeries) {
+        ++m_currentSeriesIndex;
+        stats.completedSeries = m_currentSeriesIndex;
+        checkExerciseCompletion();
     }
-    
-    emit newForceSample(force);
 }
 
 void TrainingTab::onGameEnded(int /*score*/)
 {
-    // Gra zakończona - można zarejestrować wynik
-    calculateExerciseStats();
+    // A game ending does not complete a clinical exercise. Repetition and
+    // exercise completion are driven exclusively by MeasurementEngine events.
 }
 
 void TrainingTab::onGameStarted()
@@ -1000,58 +905,47 @@ void TrainingTab::checkExerciseCompletion()
 
 void TrainingTab::calculateExerciseStats()
 {
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exerciseStats.size()) return;
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    const TrainingExercise& exercise = m_exercisePlan[m_currentExerciseIndex];
+    const int completedCount = stats.peakForcePerRep.size();
+
     stats.completedSeries = m_currentSeriesIndex;
-    stats.completedReps = m_currentRepIndex;
-    
-    // Obliczenie pełnych statystyk ćwiczenia
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    // Średnia siła szczytowa na powtórzenie
-    if (stats.peakForcePerRep.size() > 0) {
-        double totalPeakForce = 0.0;
-        for (double peakForce : stats.peakForcePerRep) {
-            totalPeakForce += peakForce;
-        }
-        stats.avgPeakForce = totalPeakForce / static_cast<double>(stats.peakForcePerRep.size());
-    } else {
-        stats.avgPeakForce = 0.0;
-    }
-    
-    // Maksymalna siła szczytowa
+    stats.completedReps = completedCount;
+    stats.avgPeakForce = 0.0;
     stats.maxPeakForce = 0.0;
-    for (double peakForce : stats.peakForcePerRep) {
-        if (peakForce > stats.maxPeakForce) {
-            stats.maxPeakForce = peakForce;
+    stats.minPeakForce = 0.0;
+
+    if (completedCount > 0) {
+        double sum = 0.0;
+        stats.minPeakForce = stats.peakForcePerRep.front();
+        for (double peak : stats.peakForcePerRep) {
+            sum += peak;
+            stats.maxPeakForce = std::max(stats.maxPeakForce, peak);
+            stats.minPeakForce = std::min(stats.minPeakForce, peak);
         }
-    }
-    
-    // Minimalna siła szczytowa
-    if (!stats.peakForcePerRep.empty()) {
-        stats.minPeakForce = stats.peakForcePerRep[0];
-        for (double peakForce : stats.peakForcePerRep) {
-            if (peakForce < stats.minPeakForce) {
-                stats.minPeakForce = peakForce;
-            }
+        stats.avgPeakForce = sum / static_cast<double>(completedCount);
+        stats.avgReactionTime /= static_cast<double>(completedCount);
+        stats.averageForceN /= static_cast<double>(completedCount);
+        stats.targetAccuracyPercent /= static_cast<double>(completedCount);
+        stats.averageRepetitionDurationSeconds /= static_cast<double>(completedCount);
+
+        double variance = 0.0;
+        for (double peak : stats.peakForcePerRep) {
+            const double delta = peak - stats.avgPeakForce;
+            variance += delta * delta;
         }
-    } else {
-        stats.minPeakForce = 0.0;
+        const double standardDeviation = std::sqrt(variance / static_cast<double>(completedCount));
+        stats.consistencyScore = stats.avgPeakForce > 0.0
+            ? std::max(0.0, 100.0 - 100.0 * standardDeviation / stats.avgPeakForce) : 0.0;
     }
-    
-    // Czas trwania ćwiczenia
+
     stats.duration = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - stats.startTime
-    ).count();
-    
-    // Współczynnik wykonania (procent ukończonych serii i powtórzeń)
-    if (ex.seriesCount > 0 && ex.repsPerSeries > 0) {
-        int totalExpectedReps = ex.seriesCount * ex.repsPerSeries;
-        int actualReps = stats.completedSeries * ex.repsPerSeries + stats.completedReps;
-        stats.completionRate = static_cast<double>(actualReps) / static_cast<double>(totalExpectedReps) * 100.0;
-    } else {
-        stats.completionRate = 0.0;
-    }
-    
+        std::chrono::steady_clock::now() - stats.startTime).count();
+    const int expectedReps = exercise.seriesCount * exercise.repsPerSeries;
+    stats.completionRate = expectedReps > 0
+        ? 100.0 * static_cast<double>(completedCount) / static_cast<double>(expectedReps)
+        : 0.0;
     stats.isCompleted = true;
 }
 
