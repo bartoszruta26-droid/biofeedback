@@ -1,6 +1,16 @@
 #include "tab/TrainingAnalyticsWidget.hpp"
+#include "core/RuntimePaths.hpp"
 
 #include <QHeaderView>
+#include <QPushButton>
+#include <QMessageBox>
+#include <QFile>
+#include <QFileInfo>
+#include <QDateTime>
+#include <QDir>
+#include <QSaveFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QLabel>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -21,6 +31,11 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
     m_summaryLabel = new QLabel(tr("Brak zarejestrowanych powtórzeń."), this);
     m_summaryLabel->setWordWrap(true);
     layout->addWidget(m_summaryLabel);
+    m_saveHistoryButton = new QPushButton(tr("Zapisz sesję w historii"), this);
+    m_saveHistoryButton->setEnabled(false);
+    layout->addWidget(m_saveHistoryButton, 0, Qt::AlignLeft);
+    connect(m_saveHistoryButton, &QPushButton::clicked,
+            this, &TrainingAnalyticsWidget::saveCurrentSession);
 
     m_tabs = new QTabWidget(this);
     m_seriesTable = new QTableWidget(m_tabs);
@@ -46,20 +61,137 @@ TrainingAnalyticsWidget::TrainingAnalyticsWidget(QWidget* parent)
         table->verticalHeader()->setVisible(false);
     }
 
+    m_historyTable = new QTableWidget(m_tabs);
+    m_historyTable->setColumnCount(8);
+    m_historyTable->setHorizontalHeaderLabels({
+        tr("Zapisano"), tr("Czas [s]"), tr("Ćwiczenia"), tr("Serie"),
+        tr("Powtórzenia"), tr("Śr. szczyt [N]"), tr("Maks. [N]"), tr("Punkty gier")
+    });
+    m_historyTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_historyTable->setSelectionBehavior(QAbstractItemView::SelectRows);
+    m_historyTable->setAlternatingRowColors(true);
+    m_historyTable->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    m_historyTable->horizontalHeader()->setStretchLastSection(true);
+    m_historyTable->verticalHeader()->setVisible(false);
+
     m_peakChart = new QtCharts::QChartView(m_tabs);
     m_peakChart->setRenderHint(QPainter::Antialiasing);
     m_peakChart->setMinimumHeight(260);
     m_tabs->addTab(m_peakChart, tr("Wykres siły"));
     m_tabs->addTab(m_seriesTable, tr("Analiza serii"));
     m_tabs->addTab(m_repetitionTable, tr("Powtórzenia"));
+    m_tabs->addTab(m_historyTable, tr("Historia sesji"));
     layout->addWidget(m_tabs, 1);
+    loadHistory();
 }
 
-void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats) {
+void TrainingAnalyticsWidget::setStats(const QVector<ExerciseStats>& stats, int durationSeconds) {
+    m_currentStats = stats;
+    m_durationSeconds = durationSeconds;
+    bool hasRepetitions = false;
+    for (const auto& exercise : stats)
+        hasRepetitions = hasRepetitions || !exercise.repetitions.isEmpty();
+    m_saveHistoryButton->setEnabled(hasRepetitions && m_historyReadable);
     rebuildSummary(stats);
     rebuildSeriesTable(stats);
     rebuildRepetitionTable(stats);
     rebuildPeakChart(stats);
+}
+
+void TrainingAnalyticsWidget::loadHistory() {
+    const QString path = QDir(biofeedback::runtime::appDataDirectory())
+        .filePath(QStringLiteral("training_history.json"));
+    QFile file(path);
+    if (!file.exists()) {
+        m_historyEntries = QJsonArray();
+        rebuildHistoryTable();
+        return;
+    }
+    if (!file.open(QIODevice::ReadOnly)) {
+        m_historyReadable = false;
+        m_saveHistoryButton->setEnabled(false);
+        m_summaryLabel->setText(tr("Nie można odczytać lokalnej historii treningów."));
+        return;
+    }
+    QJsonParseError error;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+    file.close();
+    if (error.error != QJsonParseError::NoError || !document.isArray()) {
+        m_historyReadable = false;
+        m_saveHistoryButton->setEnabled(false);
+        m_summaryLabel->setText(tr("Historia treningów ma nieprawidłowy format. Plik zachowano bez zmian."));
+        return;
+    }
+    m_historyEntries = document.array();
+    rebuildHistoryTable();
+}
+
+void TrainingAnalyticsWidget::rebuildHistoryTable() {
+    m_historyTable->setRowCount(0);
+    for (const auto& value : m_historyEntries) {
+        if (!value.isObject()) continue;
+        const QJsonObject entry = value.toObject();
+        const QStringList values = {
+            entry.value("saved_at").toString(),
+            QString::number(entry.value("duration_seconds").toInt()),
+            QString::number(entry.value("exercise_count").toInt()),
+            QString::number(entry.value("series_count").toInt()),
+            QString::number(entry.value("repetition_count").toInt()),
+            QString::number(entry.value("average_peak_force_n").toDouble(), 'f', 2),
+            QString::number(entry.value("maximum_peak_force_n").toDouble(), 'f', 2),
+            QString::number(entry.value("game_points").toInt())
+        };
+        const int row = m_historyTable->rowCount();
+        m_historyTable->insertRow(row);
+        for (int column = 0; column < values.size(); ++column)
+            m_historyTable->setItem(row, column, new QTableWidgetItem(values[column]));
+    }
+}
+
+void TrainingAnalyticsWidget::saveCurrentSession() {
+    int repetitions = 0, seriesCount = 0, gamePoints = 0, exerciseCount = 0;
+    double weightedPeak = 0.0, maximumPeak = 0.0;
+    for (const auto& exercise : m_currentStats) {
+        if (!exercise.repetitions.isEmpty()) ++exerciseCount;
+        repetitions += exercise.completedReps;
+        seriesCount += exercise.completedSeries;
+        gamePoints += exercise.gameScore;
+        weightedPeak += exercise.avgPeakForce * exercise.completedReps;
+        maximumPeak = std::max(maximumPeak, exercise.maxPeakForce);
+    }
+    if (repetitions == 0) {
+        QMessageBox::information(this, tr("Historia treningów"),
+                                 tr("Sesja nie zawiera zarejestrowanych powtórzeń."));
+        return;
+    }
+
+    QJsonObject entry;
+    entry.insert("saved_at", QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    entry.insert("duration_seconds", m_durationSeconds);
+    entry.insert("exercise_count", exerciseCount);
+    entry.insert("series_count", seriesCount);
+    entry.insert("repetition_count", repetitions);
+    entry.insert("average_peak_force_n", weightedPeak / repetitions);
+    entry.insert("maximum_peak_force_n", maximumPeak);
+    entry.insert("game_points", gamePoints);
+    QJsonArray updated = m_historyEntries;
+    updated.append(entry);
+
+    const QString path = QDir(biofeedback::runtime::appDataDirectory())
+        .filePath(QStringLiteral("training_history.json"));
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) ||
+        file.write(QJsonDocument(updated).toJson(QJsonDocument::Indented)) < 0 ||
+        !file.commit()) {
+        QMessageBox::warning(this, tr("Historia treningów"),
+                             tr("Nie udało się zapisać historii: %1").arg(file.errorString()));
+        return;
+    }
+    QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    m_historyEntries = updated;
+    rebuildHistoryTable();
+    QMessageBox::information(this, tr("Historia treningów"),
+                             tr("Podsumowanie sesji zapisano lokalnie. Dane nie zawierają identyfikatora pacjenta."));
 }
 
 void TrainingAnalyticsWidget::rebuildSummary(const QVector<ExerciseStats>& stats) {
