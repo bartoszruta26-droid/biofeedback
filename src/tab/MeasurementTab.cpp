@@ -747,6 +747,12 @@ void MeasurementTab::startMeasurement()
         return;
     }
 
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        QMessageBox::warning(this, tr("Brak urządzenia"),
+                             tr("Połącz skalibrowany czujnik HX711 przed rozpoczęciem pomiaru."));
+        return;
+    }
+
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
     ensureCurrentSeriesInitialized();
     m_isMeasuring = true;
