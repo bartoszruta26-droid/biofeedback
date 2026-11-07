@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Biofeedback
+GenericName=Biofeedback Measurement and Training
+Comment=Pomiar siły, analiza serii i trening biofeedback
+Exec=biofeedback
+Icon=biofeedback
+Terminal=false
+Categories=Education;Science;Utility;
+StartupNotify=true
