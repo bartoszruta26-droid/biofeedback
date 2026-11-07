@@ -80,6 +80,10 @@ OutlineTab::OutlineTab(QWidget *parent)
 
 OutlineTab::~OutlineTab()
 {
+    if (m_serialPort && m_dataCallbackToken) {
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_dataCallbackToken = 0;
+    }
     if (m_isSessionActive) {
         stopSession();
     }
@@ -900,11 +904,13 @@ QVector<OutlineData> OutlineTab::getOutlines() const
 
 void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
+    if (m_serialPort && m_dataCallbackToken) {
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_dataCallbackToken = 0;
+    }
     m_serialPort = serial;
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback przychodzi z wątku odczytu szeregowego -
-            // przekaż dane bezpiecznie do wątku GUI.
+        m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
             QMetaObject::invokeMethod(this, [this, data]() {
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
