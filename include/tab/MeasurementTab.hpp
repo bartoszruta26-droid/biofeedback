@@ -2,6 +2,7 @@
 #define TAB_MEASUREMENTTAB_HPP
 
 #include <QWidget>
+#include <QElapsedTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -379,6 +380,7 @@ private:
     double m_sampleRate;      // Hz
     double m_targetForce;     // N
     double m_sessionStartTime;
+    QElapsedTimer m_sessionElapsedTimer;
     
     // Bufory danych
     QVector<double> m_rawForceBuffer;
