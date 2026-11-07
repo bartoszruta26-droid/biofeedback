@@ -24,6 +24,7 @@ public:
     explicit TrainingAnalyticsWidget(QWidget* parent = nullptr);
     void setStats(const QVector<ExerciseStats>& stats, int durationSeconds = 0);
     void setHistoryFilePath(const QString& filePath);
+    void beginSession();
 
 private slots:
     void saveCurrentSession();
@@ -44,6 +45,8 @@ private:
     QJsonArray m_historyEntries;
     bool m_historyReadable{true};
     QString m_historyFilePath;
+    QString m_activeSessionHistoryFilePath;
+    bool m_sessionSaved{false};
     QTableWidget* m_seriesTable{nullptr};
     QTableWidget* m_repetitionTable{nullptr};
     QtCharts::QChartView* m_peakChart{nullptr};
