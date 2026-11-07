@@ -74,6 +74,7 @@ public:
     void addSample(double force, double time);
     void clearData();
     void setTargetForce(double force);
+    void setEngineRepetitionsPerSeries(int repetitions);
     void setMaxTimeWindow(double seconds);
     void setUnit(ForceUnit unit);
     
@@ -291,6 +292,11 @@ signals:
     void sharedRepetitionCompleted(double peakForceN, double durationSeconds,
                                    double timeToPeakSeconds, double averageForceN,
                                    double impulseNs, double targetAccuracyPercent);
+    void sharedSeriesCompleted(int repetitionCount, double averagePeakForceN,
+                               double maximumPeakForceN, double minimumPeakForceN,
+                               double averageTimeToPeakSeconds, double averageForceN,
+                               double averageRepetitionDurationSeconds, double totalImpulseNs,
+                               double targetAccuracyPercent, double consistencyScorePercent);
     void seriesCompleted(int seriesNum, const SeriesStats& stats);
     void sessionFinished(const QVector<SeriesStats>& allStats);
     void arduinoConnectionStatus(bool connected, const QString& message);
@@ -429,6 +435,7 @@ private:
     std::atomic<bool> m_hasArduinoConnection{false};
     measurement::MeasurementEngine m_measurementEngine;
     measurement::SampleSource m_sampleSource{measurement::SampleSource::Device};
+    int m_engineRepetitionsPerSeries{8};
 };
 
 } // namespace tab
