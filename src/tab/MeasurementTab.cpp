@@ -1986,7 +1986,7 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 {
     switch (targetUnit) {
         case ForceUnit::Kilograms:
-            // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
+            // Convert force to kilogram-force using standard gravity.
             return newtons / biofeedback::measurement::standardGravityMetersPerSecondSquared;  // zwraca w kgf
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
@@ -2022,7 +2022,7 @@ void MeasurementTab::updateUnitDisplay()
     QString unitLabel;
     switch (m_currentUnit) {
         case ForceUnit::Kilograms:
-            unitLabel = "kg";
+            unitLabel = "kgf";
             break;
         case ForceUnit::Raw:
             unitLabel = "ADC";
@@ -2053,7 +2053,7 @@ void MeasurementTab::updateStatsTableUnits()
     QString unitLabel;
     switch (m_currentUnit) {
         case ForceUnit::Kilograms:
-            unitLabel = "kg";
+            unitLabel = "kgf";
             break;
         case ForceUnit::Raw:
             unitLabel = "ADC";
@@ -2086,7 +2086,7 @@ void MeasurementTab::updateRawTableUnits()
     QString unitLabel;
     switch (m_currentUnit) {
         case ForceUnit::Kilograms:
-            unitLabel = "kg";
+            unitLabel = "kgf";
             break;
         case ForceUnit::Raw:
             unitLabel = "ADC";
