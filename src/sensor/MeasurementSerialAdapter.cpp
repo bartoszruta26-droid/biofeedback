@@ -30,7 +30,8 @@ MeasurementSerialAdapter::MeasurementSerialAdapter(
             biofeedback::measurement::MeasurementInput input;
             input.deviceTimestampMs = data.timestamp;
             input.rawValue = data.value;
-            input.value = m_serial.convertToCalibrated(data.value);
+            input.value = unitCopy == "count" ? static_cast<double>(data.value)
+                                               : data.calibratedValue;
             input.sensorValid = data.isValid;
             input.unit = unitCopy;
             input.source = sourceCopy;
@@ -41,6 +42,18 @@ MeasurementSerialAdapter::MeasurementSerialAdapter(
 MeasurementSerialAdapter::~MeasurementSerialAdapter() {
     if (m_active) m_active->store(false);
     if (m_token != 0) m_serial.removeDataCallback(m_token);
+}
+
+biofeedback::measurement::MeasurementSample MeasurementSerialAdapter::processSample(const SensorData& data) {
+    if (!m_engine) return {};
+    biofeedback::measurement::MeasurementInput input;
+    input.deviceTimestampMs = data.timestamp;
+    input.rawValue = data.value;
+    input.value = m_unit == "count" ? static_cast<double>(data.value) : data.calibratedValue;
+    input.sensorValid = data.isValid;
+    input.unit = m_unit;
+    input.source = m_source;
+    return m_engine->ingest(input);
 }
 
 bool MeasurementSerialAdapter::isAttached() const noexcept {
