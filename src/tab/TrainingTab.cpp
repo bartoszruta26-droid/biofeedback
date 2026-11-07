@@ -1264,13 +1264,16 @@ void TrainingTab::finishCurrentSeries()
     emit seriesCompleted(m_currentExerciseIndex, completedSeriesIndex);
 
     if (m_currentGame && m_currentGame->isRunning()) m_currentGame->stop();
-    // Stage the next cursor before committing the completed set. If the
-    // process dies after the durable write, this cursor is the next action.
-    ++m_currentSeriesIndex;
+    // Compute the next cursor but do not publish it until all statistics
+    // and the rest target have been staged.
+    const bool exerciseWillFinish = (m_currentSeriesIndex + 1 >= exercise.seriesCount);
+    const int nextSeriesIndex = exerciseWillFinish ? 0 : m_currentSeriesIndex + 1;
+    const int nextExerciseIndex = exerciseWillFinish ? m_currentExerciseIndex + 1 : m_currentExerciseIndex;
+    m_currentSeriesIndex = nextSeriesIndex;
     m_currentRepIndex = 0;
     m_repetitionDetector.reset();
 
-    if (m_currentSeriesIndex >= exercise.seriesCount) {
+    if (exerciseWillFinish) {
         calculateExerciseStats();
         stats.isCompleted = true;
         emit exerciseCompleted(m_currentExerciseIndex, stats);
