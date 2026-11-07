@@ -31,6 +31,8 @@ int main(){
  assert(recovered.restore(SessionState::Paused, SessionState::Resting));
  assert(recovered.running() && recovered.paused() && recovered.resting());
  assert(recovered.resume() && recovered.state()==SessionState::Resting);
+ // Recovery always starts paused so a process restart cannot implicitly
+ // restart the timer or deliver live sensor samples before user confirmation.
  assert(!recovered.restore(SessionState::Paused, SessionState::Completed));
  assert(!recovered.restore(static_cast<SessionState>(99), SessionState::Active));
  return 0;
