@@ -20,7 +20,7 @@ checks = {
     "rest transitions checkpoint": "saveExecutionCheckpoint()" in tab[tab.index("void TrainingTab::advanceAfterRest"):tab.index("void TrainingTab::calculateExerciseStats")],
     "recovery offered after loading patient history": "recoverPendingSession(recovered)" in tab and "Odzyskiwanie treningu" in tab,
     "recovery validates cursor bounds": "exerciseIndex >= plan.size()" in tab and "seriesIndex >= plan[exerciseIndex].seriesCount" in tab,
-    "restoring starts paused and retains resume state": "SessionState::Paused, resumeState" in tab,
+    "restoring starts paused and retains resume state": "restore(biofeedback::training::SessionState::Paused," in tab,
     "session clock restores elapsed values": "m_trainingClock.restore(sessionMs, activeMs)" in tab and "m_sessionElapsedOffsetMs + elapsedMs" in tab,
     "state machine restore validates state": "bool restore(SessionState state" in machine,
     "session clock restore is monotonic": "void restore(std::int64_t sessionMs, std::int64_t activeMs)" in clock,
