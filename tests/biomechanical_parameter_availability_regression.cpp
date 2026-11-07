@@ -115,22 +115,23 @@ int main()
     RepetitionData powerRep;
     powerRep.startTime = 0;
     powerRep.peakTime = 200;
-    powerRep.endTime = 300;
+    powerRep.endTime = 400;
     powerRep.startForce = 0.0;
     powerRep.peakForce = 20.0;
-    powerRep.endForce = 0.0;
+    powerRep.endForce = 20.0;
     powerRep.samples = {
         SensorSample(0, 0.0),
         SensorSample(100, 10.0),
         SensorSample(200, 20.0),
-        SensorSample(300, 0.0)
+        SensorSample(300, 20.0),
+        SensorSample(400, 20.0)
     };
     const BiomechanicalParams powerResult = formulas.calculateRepParams(powerRep);
-    // Mean absolute extension speed = (10+10+20)/100 / 0.3 = 1.333... m/s.
-    assert(near(powerResult.v_avg, 4.0 / 3.0));
-    // Instantaneous peak power is max(F_i * |dF/dt| / k) = 10 W,
-    // not max(F) multiplied by a velocity peak from another instant.
-    assert(near(powerResult.P_peak, 10.0));
+    // Mean absolute extension speed = 20 N / (100 N/m * 0.4 s) = 0.5 m/s.
+    assert(near(powerResult.v_avg, 0.5));
+    // Interval power peaks at mean force 15 N * 1 m/s = 15 W.
+    // A peak-force * peak-velocity shortcut would incorrectly report 20 W.
+    assert(near(powerResult.P_peak, 15.0));
 
     SensorSample invalidEccentricSample(175, 1000.0);
     invalidEccentricSample.isValid = false;
