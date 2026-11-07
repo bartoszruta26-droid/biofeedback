@@ -185,7 +185,8 @@ public:
     int32_t calibrationReferenceRaw = 0;
     std::string calibrationCreatedAtUtc;
     ArduinoInfo arduinoInfo;
-    std::vector<DataCallback> dataCallbacks;
+    std::vector<std::pair<DataCallbackId, DataCallback>> dataCallbacks;
+    DataCallbackId nextDataCallbackId = 1;
     std::mutex callbackMutex;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
@@ -672,10 +673,25 @@ SensorData SerialCommunication::readData(int timeout) {
 }
 
 bool SerialCommunication::tryReadData(SensorData& data) { data = readData(100); return data.isValid; }
-void SerialCommunication::setDataCallback(DataCallback cb) {
-    if (!cb) return;
+SerialCommunication::DataCallbackId SerialCommunication::addDataCallback(DataCallback cb) {
+    if (!cb) return 0;
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
-    m_impl->dataCallbacks.push_back(std::move(cb));
+    const DataCallbackId id = m_impl->nextDataCallbackId++;
+    m_impl->dataCallbacks.emplace_back(id, std::move(cb));
+    return id;
+}
+
+void SerialCommunication::removeDataCallback(DataCallbackId id) {
+    if (id == 0) return;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataCallbacks.erase(
+        std::remove_if(m_impl->dataCallbacks.begin(), m_impl->dataCallbacks.end(),
+            [id](const auto& entry) { return entry.first == id; }),
+        m_impl->dataCallbacks.end());
+}
+
+void SerialCommunication::setDataCallback(DataCallback cb) {
+    (void)addDataCallback(std::move(cb));
 }
 void SerialCommunication::setConnectionCallback(ConnectionCallback cb) {
     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
@@ -692,7 +708,9 @@ void SerialCommunication::startAsyncReading() {
                 std::vector<DataCallback> callbacks;
                 {
                     std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
-                    callbacks = m_impl->dataCallbacks;
+                    callbacks.reserve(m_impl->dataCallbacks.size());
+                    for (const auto& entry : m_impl->dataCallbacks)
+                        callbacks.push_back(entry.second);
                 }
                 for (const auto& callback : callbacks) {
                     if (!callback) continue;
