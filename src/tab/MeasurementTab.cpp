@@ -60,8 +60,9 @@ void TrendsPlotWidget::clearData()
     m_dates.clear();
     m_avgForces.clear();
     m_maxForces.clear();
-    m_maxForce = 100.0;
-    m_minForce = 0.0;
+    m_maxForce = 5.0;
+    m_maxObservedForce = 0.0;
+    m_minObservedForce = 0.0;
     update();
 }
 
@@ -167,8 +168,9 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     : QWidget(parent)
     , m_targetForce(50.0)
     , m_maxTimeWindow(10.0)
-    , m_maxForce(100.0)
-    , m_minForce(0.0)
+    , m_maxForce(5.0)
+    , m_maxObservedForce(0.0)
+    , m_minObservedForce(0.0)
     , m_unit(ForceUnit::Newtons)
 {
     setMinimumHeight(200);
@@ -198,17 +200,14 @@ void ForcePlotWidget::addSample(double force, double time)
     m_forces.append(force);
     m_times.append(time);
     
-    // Aktualizuj zakres osi Y uwzględniając wartości ujemne i dodatnie
-    if (force > m_maxForce) {
-        m_maxForce = force * 1.2;
-        std::cout << "[DEBUG] ForcePlotWidget::addSample: Updated m_maxForce to " << m_maxForce << std::endl;
-    }
-    // Track the negative and positive range per widget/session.
-    if (force < m_minForce)
-        m_minForce = force * 1.2;
-    const double absMax = std::max(std::abs(m_maxForce), std::abs(m_minForce));
-    m_maxForce = absMax * 1.2;
-    std::cout << "[DEBUG] ForcePlotWidget::addSample: Final m_maxForce=" << m_maxForce << std::endl;
+    // Keep raw extrema separate from the display range. Applying the margin
+    // to an already-expanded range on every sample caused exponential growth.
+    m_maxObservedForce = std::max(m_maxObservedForce, force);
+    m_minObservedForce = std::min(m_minObservedForce, force);
+    const double observedMagnitude = std::max(
+        std::abs(m_maxObservedForce), std::abs(m_minObservedForce));
+    m_maxForce = std::max(5.0, observedMagnitude * 1.2);
+    std::cout << "[DEBUG] ForcePlotWidget::addSample: Display range=" << m_maxForce << std::endl;
     
     // Usuń stare dane poza oknem czasowym
     while (!m_times.isEmpty() && (time - m_times.first()) > m_maxTimeWindow) {
