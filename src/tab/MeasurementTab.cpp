@@ -396,6 +396,12 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
     m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
         *m_serialPort, m_measurementEngine, "desktop-hx711", "g");
+    m_measurementCallbackToken = m_measurementEngine->subscribe(
+        [this](const biofeedback::measurement::MeasurementSample& sample) {
+            QMetaObject::invokeMethod(this, [this, sample]() {
+                onMeasurementSample(sample);
+            }, Qt::QueuedConnection);
+        });
     m_lastSensorData = sensor::SensorData();
     
     // Device discovery and connection are owned by MainWindow's explicit device controls.
@@ -410,6 +416,10 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
+    if (m_measurementEngine && m_measurementCallbackToken) {
+        m_measurementEngine->unsubscribe(m_measurementCallbackToken);
+        m_measurementCallbackToken = 0;
+    }
     m_measurementAdapter.reset();
     if (m_serialPort && m_dataCallbackToken) {
         m_serialPort->removeDataCallback(m_dataCallbackToken);
@@ -1935,13 +1945,22 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 
     if (!m_isMeasuring) return;
 
-    // All movement metrics are calculated in SI force. Unit selection affects
-    // presentation only; raw ADC mode is a diagnostic capture, not biomechanics.
-    const double value = m_showRawValues
-        ? static_cast<double>(data.value)
-        : biofeedback::measurement::gramsToNewtons(data.calibratedValue);
-    if (!std::isfinite(value)) return;
-    readSingleSample(value);
+    // Calibrated biomechanical samples are delivered through MeasurementEngine.
+    // Raw ADC capture remains a diagnostic-only path and is never treated as force.
+    if (m_isMeasuring && m_showRawValues)
+        readSingleSample(static_cast<double>(data.value));
+}
+
+void MeasurementTab::onMeasurementSample(
+    const biofeedback::measurement::MeasurementSample& sample)
+{
+    if (!m_isMeasuring || m_showRawValues || !sample.isValid() || sample.unit != "kg")
+        return;
+
+    const double force = sample.value *
+        biofeedback::measurement::standardGravityMetersPerSecondSquared;
+    if (!std::isfinite(force) || force < 0.0) return;
+    readSingleSample(force);
 }
 
 // ============================================================================
