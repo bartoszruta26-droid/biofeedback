@@ -194,6 +194,25 @@ void MainWindow::setupTabs()
     QPushButton* trainingButton = new QPushButton(tr("Trening"), dashboard);
     actions->addWidget(patientsButton); actions->addWidget(measurementsButton); actions->addWidget(trainingButton); actions->addStretch();
     dashboardLayout->addLayout(actions);
+
+    QLabel* deviceHeading = new QLabel(tr("Połączenie z urządzeniem"), dashboard);
+    deviceHeading->setStyleSheet("font-size:14px;font-weight:700;color:#24364d;");
+    dashboardLayout->addWidget(deviceHeading);
+    QHBoxLayout* deviceControls = new QHBoxLayout();
+    m_devicePortCombo = new QComboBox(dashboard);
+    m_devicePortCombo->setMinimumWidth(260);
+    m_devicePortCombo->setMinimumHeight(40);
+    QPushButton* scanPortsButton = new QPushButton(tr("Skanuj porty"), dashboard);
+    m_connectDeviceButton = new QPushButton(tr("Połącz"), dashboard);
+    deviceControls->addWidget(m_devicePortCombo, 2);
+    deviceControls->addWidget(scanPortsButton);
+    deviceControls->addWidget(m_connectDeviceButton);
+    deviceControls->addStretch();
+    dashboardLayout->addLayout(deviceControls);
+    connect(scanPortsButton, &QPushButton::clicked, this, &MainWindow::refreshSerialPorts);
+    connect(m_connectDeviceButton, &QPushButton::clicked, this, &MainWindow::toggleSerialConnection);
+    refreshSerialPorts();
+
     dashboardLayout->addStretch();
     m_tabWidget->addTab(dashboard, tr("⌂ Pulpit"));
     m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));
