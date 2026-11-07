@@ -4,6 +4,9 @@
 #include <cstdio>
 #include <clocale>
 #include <cstdlib>
+#include <filesystem>
+#include <system_error>
+#include <vector>
 #include <string>
 namespace {
 constexpr int kMinimumColumns = 72;
@@ -42,6 +45,24 @@ void drawDashboard() {
     drawText(14, left + 2, "Strzalki: wybor modulu   Enter: otworz");
     drawText(15, left + 2, "Dane demonstracyjne nie sa danymi pacjenta ani odczytem czujnika.");
 }
+std::vector<std::string> scanSerialPortCandidates() {
+    std::vector<std::string> ports;
+#if !defined(_WIN32)
+    std::error_code error;
+    const std::filesystem::path deviceDirectory("/dev");
+    if (!std::filesystem::exists(deviceDirectory, error) || error) return ports;
+    for (const auto& entry : std::filesystem::directory_iterator(deviceDirectory, error)) {
+        if (error) break;
+        const std::string name = entry.path().filename().string();
+        if (name.rfind("ttyUSB", 0) == 0 || name.rfind("ttyACM", 0) == 0 ||
+            name.rfind("ttyS", 0) == 0 || name.rfind("cu.", 0) == 0) {
+            ports.push_back(entry.path().string());
+        }
+    }
+    std::sort(ports.begin(), ports.end());
+#endif
+    return ports;
+}
 void drawModule(tui::Screen screen) {
     const auto& info = tui::TuiModel::info(screen);
     const int x = 25, width = COLS - x - 2;
@@ -62,11 +83,20 @@ void drawModule(tui::Screen screen) {
         drawText(8, x + 2, "Brak aktywnej sesji treningowej.");
         drawText(10, x + 2, "Moduly treningowe i gry sa obecnie dostepne w aplikacji Desktop Qt.");
         break;
-    case tui::Screen::Devices:
-        drawText(8, x + 2, "Port szeregowy: nieustawiony");
-        drawText(10, x + 2, "Stan czujnika: niepodlaczony");
-        drawText(12, x + 2, "Ta wersja TUI nie wysyla komend do urzadzenia.");
+    case tui::Screen::Devices: {
+        drawText(8, x + 2, "Kandydaci portow szeregowych w systemie:");
+        const auto ports = scanSerialPortCandidates();
+        if (ports.empty()) {
+            drawText(10, x + 2, "Nie znaleziono portow ttyUSB, ttyACM, ttyS ani cu.*.");
+        } else {
+            for (std::size_t i = 0; i < ports.size() && i < 6; ++i) {
+                drawText(10 + static_cast<int>(i), x + 2, ports[i]);
+            }
+        }
+        drawText(17, x + 2, "Skanowanie wykrywa nazwy portow; nie oznacza aktywnego polaczenia.");
+        drawText(18, x + 2, "Ta wersja TUI nie otwiera portu i nie wysyla komend.");
         break;
+    }
     case tui::Screen::Diagnostics:
         drawText(8, x + 2, "Interfejs terminalowy: aktywny");
         drawText(10, x + 2, "Backend pomiarowy: oczekuje na adapter aplikacyjny");
