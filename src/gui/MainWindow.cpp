@@ -148,6 +148,13 @@ void MainWindow::setupTabs()
         m_trainingTab->setSerialConnection(m_serialPort);
         m_debugTab->setSerialConnection(m_serialPort);
     }
+
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            m_trainingTab, &tab::TrainingTab::setCurrentPatientContext);
+    connect(m_trainingTab, &tab::TrainingTab::trainingStarted,
+            m_patientTab, [this]() { m_patientTab->setEnabled(false); });
+    connect(m_trainingTab, &tab::TrainingTab::trainingStopped,
+            m_patientTab, [this]() { m_patientTab->setEnabled(true); });
     
     QWidget* dashboard = new QWidget(m_tabWidget);
     QVBoxLayout* dashboardLayout = new QVBoxLayout(dashboard);
