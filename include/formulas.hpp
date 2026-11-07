@@ -7,6 +7,8 @@
 #include <cmath>
 #include <numeric>
 #include <algorithm>
+#include <array>
+#include <cstddef>
 
 /**
  * @brief Struktura reprezentująca pojedynczą próbkę danych z czujnika
@@ -49,10 +51,32 @@ struct SeriesData {
     SeriesData() : seriesNumber(0), startTime(0), endTime(0) {}
 };
 
+/** Availability is separate from the numeric value: zero is a valid result,
+ * while missing inputs must never be represented as a measured zero. */
+enum class ParameterAvailability : std::uint8_t {
+    InsufficientData,
+    Available,
+    RequiresCalibration,
+    RequiresAdditionalSensor,
+    RequiresHistory,
+    InvalidInput
+};
+
 /**
  * @brief Struktura zawierająca wszystkie obliczone parametry biomechaniczne
  */
 struct BiomechanicalParams {
+    static constexpr std::size_t ParameterCount = 65;
+    std::array<ParameterAvailability, ParameterCount> availability{};
+
+    void setAvailability(std::size_t index, ParameterAvailability status) noexcept {
+        if (index < ParameterCount) availability[index] = status;
+    }
+    ParameterAvailability availabilityAt(std::size_t index) const noexcept {
+        return index < ParameterCount ? availability[index]
+                                       : ParameterAvailability::InvalidInput;
+    }
+    static const char* parameterName(std::size_t index) noexcept;
     // Kategoria 1: Parametry Siłowe (1-10)
     double F_peak;              // 1. Maksymalna Siła Chwilowa [N]
     double F_mean;              // 2. Średnia Siła z Powtórzenia [N]
