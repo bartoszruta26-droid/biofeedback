@@ -406,6 +406,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
             }, Qt::QueuedConnection);
         });
     m_lastSensorData = sensor::SensorData();
+    m_repetitionDetector.setTargetForce(m_targetForce);
     
     // Device discovery and connection are owned by MainWindow's explicit device controls.
     // This widget never starts a detached background connection worker.
@@ -743,6 +744,7 @@ void MeasurementTab::loadAllHistoricalMeasurements()
 void MeasurementTab::setTargetForce(double force)
 {
     m_targetForce = force;
+    m_repetitionDetector.setTargetForce(force);
     m_forcePlot->setTargetForce(force);
 }
 
@@ -768,6 +770,7 @@ void MeasurementTab::startMeasurement()
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
     ensureCurrentSeriesInitialized();
     m_inContraction = false;
+    m_repetitionDetector.reset();
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_isMeasuring = true;
@@ -806,11 +809,9 @@ void MeasurementTab::stopMeasurement()
     
     m_isMeasuring = false;
     
-    // Jeśli trwa powtórzenie, zakończ je
-    if (m_inContraction && !m_currentRepForces.isEmpty() && !m_showRawValues) {
-        std::cout << "[DEBUG] stopMeasurement: Ending current repetition before stopping" << std::endl;
-        calculateRepetitionStats();
-    }
+    // An unfinished contraction is discarded; it must not be stored as a
+    // completed repetition with an artificial end boundary.
+    m_repetitionDetector.reset();
     m_inContraction = false;
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
@@ -932,7 +933,7 @@ void MeasurementTab::simulateSensorData()
     readSingleSample(currentForce);
 }
 
-void MeasurementTab::readSingleSample(double forceValue)
+void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTimestampMs)
 {
     std::cout << "[DEBUG] readSingleSample START: forceValue=" << forceValue 
               << " m_completedSeriesStats.size()=" << m_completedSeriesStats.size() << std::endl;
@@ -961,10 +962,31 @@ void MeasurementTab::readSingleSample(double forceValue)
     if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(false);
     if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 
-    // ADC counts are diagnostic only and must never be interpreted as newtons.
+    // Repetition boundaries and all derived biomechanics use the same
+    // detector implementation as TrainingTab. A missing device timestamp
+    // breaks continuity rather than inventing an interval.
     if (!m_showRawValues) {
-        m_currentRepForces.append(forceValue);
-        m_currentRepTimes.append(currentTime);
+        biofeedback::training::RepetitionRecord repetition;
+        if (deviceTimestampMs == 0) {
+            m_repetitionDetector.reset();
+        } else if (m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)) {
+            m_currentRepForces.clear();
+            m_currentRepTimes.clear();
+            for (const auto& sample : repetition.samples) {
+                const std::uint32_t elapsedMs = sample.timestampMs - repetition.startTimestampMs;
+                m_currentRepForces.append(sample.forceN);
+                m_currentRepTimes.append(static_cast<double>(elapsedMs) / 1000.0);
+            }
+            if (!repetition.samples.empty()) {
+                m_repStartForce = repetition.samples.front().forceN;
+                m_repPeakForce = repetition.peakForceN;
+                m_repStartTime = 0.0;
+                m_repPeakTime = static_cast<double>(repetition.timeToPeakMs) / 1000.0;
+                calculateRepetitionStats();
+            }
+            m_currentRepForces.clear();
+            m_currentRepTimes.clear();
+        }
     }
     
     std::cout << "[DEBUG] readSingleSample: Data prepared for display - rawForceBuffer.size()=" 
@@ -987,11 +1009,7 @@ void MeasurementTab::readSingleSample(double forceValue)
     updateLiveDisplay(forceValue);
     std::cout << "[DEBUG] readSingleSample: updateLiveDisplay completed" << std::endl;
     
-    if (!m_showRawValues) {
-        std::cout << "[DEBUG] readSingleSample Before detectRepetitions" << std::endl;
-        detectRepetitions();
-        std::cout << "[DEBUG] readSingleSample: detectRepetitions completed" << std::endl;
-    }
+
     
     std::cout << "[DEBUG] readSingleSample END" << std::endl;
     
@@ -1057,59 +1075,6 @@ void MeasurementTab::updateLiveDisplay(double force)
     std::cout << "[DEBUG] updateLiveDisplay: Before addSample, force=" << force << " time=" << lastTime << std::endl;
     m_forcePlot->addSample(force, lastTime);
     std::cout << "[DEBUG] updateLiveDisplay END" << std::endl;
-}
-
-void MeasurementTab::detectRepetitions()
-{
-    std::cout << "[DEBUG] detectRepetitions START: m_currentRepForces.size()=" 
-              << m_currentRepForces.size() << std::endl;
-    
-    if (m_currentRepForces.isEmpty()) {
-        std::cout << "[DEBUG] detectRepetitions END: m_currentRepForces is empty" << std::endl;
-        return;
-    }
-    
-    double currentForce = m_currentRepForces.last();
-    double currentTime = m_currentRepTimes.last();
-    
-    std::cout << "[DEBUG] detectRepetitions: currentForce=" << currentForce 
-              << " currentTime=" << currentTime
-              << " m_inContraction=" << m_inContraction 
-              << " m_contractionThreshold=" << m_contractionThreshold << std::endl;
-    
-    // Detekcja początku skurcza
-    if (!m_inContraction && currentForce > m_contractionThreshold) {
-        std::cout << "[DEBUG] detectRepetitions: Detected contraction START" << std::endl;
-        m_inContraction = true;
-        m_repStartTime = currentTime;
-        m_repStartForce = currentForce;
-        m_repPeakForce = currentForce;
-        m_repPeakTime = currentTime;
-        m_currentRepForces.clear();
-        m_currentRepTimes.clear();
-        m_currentRepForces.append(currentForce);
-        m_currentRepTimes.append(currentTime);
-        std::cout << "[DEBUG] detectRepetitions: Contraction started, repStartTime=" << m_repStartTime << std::endl;
-    }
-    // Śledzenie szczytu
-    else if (m_inContraction && currentForce > m_repPeakForce) {
-        std::cout << "[DEBUG] detectRepetitions: New peak force=" << currentForce << std::endl;
-        m_repPeakForce = currentForce;
-        m_repPeakTime = currentTime;
-    }
-    // Detekcja końca skurcza
-    else if (m_inContraction && currentForce < m_contractionThreshold * 0.5) {
-        std::cout << "[DEBUG] detectRepetitions: Detected contraction END, calling calculateRepetitionStats" << std::endl;
-        // Koniec powtórzenia
-        calculateRepetitionStats();
-        
-        m_inContraction = false;
-        m_currentRepForces.clear();
-        m_currentRepTimes.clear();
-        std::cout << "[DEBUG] detectRepetitions: Contraction ended, reset state" << std::endl;
-    }
-    
-    std::cout << "[DEBUG] detectRepetitions END" << std::endl;
 }
 
 void MeasurementTab::calculateRepetitionStats()
@@ -1433,7 +1398,7 @@ void MeasurementTab::onReadSingleSample()
     if (!std::isfinite(value)) return;
     if (m_sessionStartTime <= 0.0) ensureSessionClockStarted();
     ensureCurrentSeriesInitialized();
-    readSingleSample(value);
+    readSingleSample(value, m_lastSensorData.timestamp);
     m_lblStatus->setText(tr("Status: PRÓBKA ZAPISANA"));
     m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
 }
@@ -1951,19 +1916,25 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     // Calibrated biomechanical samples are delivered through MeasurementEngine.
     // Raw ADC capture remains a diagnostic-only path and is never treated as force.
     if (m_isMeasuring && m_showRawValues)
-        readSingleSample(static_cast<double>(data.value));
+        readSingleSample(static_cast<double>(data.value), data.timestamp);
 }
 
 void MeasurementTab::onMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
-    if (!m_isMeasuring || m_showRawValues || !sample.isValid() || sample.unit != "kg")
+    if (!m_isMeasuring || m_showRawValues) return;
+    if (!sample.isValid() || sample.unit != "kg") {
+        m_repetitionDetector.reset();
         return;
+    }
 
     const double force = sample.value *
         biofeedback::measurement::standardGravityMetersPerSecondSquared;
-    if (!std::isfinite(force) || force < 0.0) return;
-    readSingleSample(force);
+    if (!std::isfinite(force) || force < 0.0) {
+        m_repetitionDetector.reset();
+        return;
+    }
+    readSingleSample(force, sample.deviceTimestampMs);
 }
 
 // ============================================================================
