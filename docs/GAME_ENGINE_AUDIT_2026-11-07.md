@@ -50,21 +50,20 @@ Aktualny plik budowania aplikacji wymienia źródła:
 - `FlappyBirdGame`
 - `MarioGame`
 
-W menu `OutlineTab` pozostają pozycje Arkanoid, Galaga, Archer, Scored Earth i Car Race, ale nie mają jeszcze aktywnych implementacji. Są oznaczone jako niedostępne. Nie należy traktować ich jako działających gier ani tworzyć pozornych pustych klas. Pozostają jawnie w planie kolejnych etapów:
+W menu `OutlineTab` pozostają pozycje Galaga, Archer, Scored Earth i Car Race bez aktywnych implementacji. Są oznaczone jako niedostępne. Nie należy traktować ich jako działających gier ani tworzyć pozornych pustych klas. Pozostają jawnie w planie kolejnych etapów:
 
-1. Arkanoid — implementacja i testy.
-2. Galaga — implementacja i testy.
-3. Archer — implementacja i testy.
-4. Scored Earth — implementacja i testy.
-5. Car Race — implementacja i testy.
+1. Galaga — implementacja i testy.
+2. Archer — implementacja i testy.
+3. Scored Earth — implementacja i testy.
+4. Car Race — implementacja i testy.
 
 ## 5. Ograniczenia walidacji
 
-Poprawki silnika i czterech istniejących gier scalono do `integration/all-work` przez PR #204; Linux Qt5 i security-regression zakończyły się powodzeniem. TanGame i wspólny factory są proponowane w PR #205. `main` nie jest celem tych integracji.
+Poprawki silnika i czterech pierwotnych gier scalono do `integration/all-work` przez PR #204; TanGame i GameFactory przez PR #205. Arkanoid jest rozwijany w PR #206. `main` nie jest celem tych integracji.
 
 Przed uznaniem audytu za zamknięty wymagane są:
 - zielona kompilacja Qt5 oraz testy `game_engine_regression` i `game_factory_regression`;
-- scenariuszowe testy rozgrywki wszystkich pięciu dostępnych gier;
+- scenariuszowe testy rozgrywki wszystkich sześciu dostępnych gier;
 - testy kolizji Pong i Flappy przy granicznych deltaTime;
 - testy ładowania skoku i upadku w luki w Mario;
 - walidacja kalibracji wejścia sensora i progów dla każdej gry.
@@ -72,12 +71,11 @@ Przed uznaniem audytu za zamknięty wymagane są:
 ## 6. Kolejność dalszych prac
 
 Po zielonym CI PR #205:
-1. Zweryfikować TanGame w scenariuszach długiej rozgrywki, zmian trudności i przerw w próbkowaniu.
-2. Arkanoid — implementacja i testy.
-3. Galaga — implementacja i testy.
-4. Archer — implementacja i testy.
-5. Scored Earth — implementacja i testy.
-6. Car Race — implementacja i testy.
+1. Zweryfikować TanGame i Arkanoid w scenariuszach długiej rozgrywki, zmian trudności i przerw w próbkowaniu.
+2. Galaga — implementacja i testy.
+3. Archer — implementacja i testy.
+4. Scored Earth — implementacja i testy.
+5. Car Race — implementacja i testy.
 
 
 ## 7. Uzupełniające poprawki — PR #204
@@ -111,3 +109,12 @@ Target testowy linkuje DebugManager.cpp i Threads::Threads oraz jest jawnie budo
 - Dodano game_factory_regression, sprawdzający utworzenie pięciu dostępnych gier, ich cykl życia i odrzucanie nieznanych identyfikatorów.
 
 Walidacja PR #205 obejmuje kompilację Qt5, CTest i security-regression. Dopiero zielone przebiegi dla aktualnego HEAD uprawniają do scalenia. Symulowane próbki nie zastępują testu fizycznego czujnika.
+
+
+## 9. Arkanoid — PR #206
+
+- Dodano grę Arkanoid sterowaną położeniem paletki wyznaczanym przez znormalizowaną siłę z tensometru.
+- Zaimplementowano odbicia od ścian, paletki i klocków, wielokrotne trafienia wybranych klocków, życia, poziomy oraz ograniczenie maksymalnej prędkości piłki.
+- Dodano Arkanoid do GameFactory, TrainingTab i MainWindow; pozycja w OutlineTab jest aktywna.
+- Rozszerzono game_factory_regression o utworzenie i cykl życia Arkanoid oraz sprawdzenie poziomów trudności.
+- Czeka na kompilację i CTest PR #206. Testy nie obejmują jeszcze długiej rozgrywki ani sprzętu fizycznego.
