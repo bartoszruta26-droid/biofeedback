@@ -753,13 +753,18 @@ void MeasurementTab::setupTrendsUI()
 
 void MeasurementTab::setPatientId(const QString& id)
 {
+    if (m_patientId != id && m_patientMassInput) {
+        const QSignalBlocker blocker(m_patientMassInput);
+        m_patientMassInput->setValue(0.0);
+        recalculateBiomechanicalResults();
+    }
     m_patientId = id;
 }
 
 void MeasurementTab::onPatientChanged(const QString& pesel, const QString& /*patientDataPath*/)
 {
-    // Ustaw ID pacjenta
-    m_patientId = pesel;
+    // Zmiana pacjenta unieważnia masę przypisaną do poprzedniej osoby.
+    setPatientId(pesel);
     
     // Zaktualizuj etykietę w trendach długoterminowych
     if (m_trendsContent) {
