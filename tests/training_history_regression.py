@@ -25,7 +25,7 @@ if "m_activeSessionHistoryFilePath" not in save:
     raise SystemExit("Session save must use the original patient destination")
 if "m_sessionInProgress" not in widget or "!m_sessionInProgress" not in widget:
     raise SystemExit("Manual save must not finalize an actively checkpointed session")
-if "saveSessionCheckpoint" not in widget or "session_id" not in save or "in_progress" not in save:
+if "saveSessionCheckpoint" not in widget or "session_id" not in save or "in_progress" not in save or '"execution_state"' not in save:
     raise SystemExit("Active sessions must be checkpointed and updated in place")
 if "saveSessionAutomatically" not in save:
     raise SystemExit("Interrupted sessions must be saved automatically")
