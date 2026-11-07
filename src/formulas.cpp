@@ -716,9 +716,10 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     // A single repetition can support these metrics directly. Values that
     // require calibrated mechanics or additional context remain unavailable.
     for (std::size_t index : {0u, 1u, 2u, 3u, 10u, 11u, 12u, 13u,
-                              20u, 25u, 35u, 37u, 38u})
+                              25u, 35u, 37u, 38u})
         params.setAvailability(index, ParameterAvailability::Available);
     params.setAvailability(6, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(20, ParameterAvailability::RequiresCalibration);
     params.setAvailability(21, ParameterAvailability::RequiresCalibration);
     params.setAvailability(28, ParameterAvailability::RequiresCalibration);
 
