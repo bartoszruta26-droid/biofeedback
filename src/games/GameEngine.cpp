@@ -4,7 +4,9 @@
 #include <QResizeEvent>
 #include <QThread>
 #include <QMetaObject>
+#include <QPointer>
 #include <cmath>
+#include <limits>
 
 namespace games {
 
@@ -17,6 +19,8 @@ GameEngine::GameEngine(QWidget *parent)
     , m_lastFrameTime(0)
     , m_accumulatedSessionMs(0)
     , m_simulationAccumulator(0.0)
+    , m_frameCount(0)
+    , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
     // Konfiguracja timera gry - 60 FPS (ok. 16ms)
@@ -42,8 +46,9 @@ GameEngine::~GameEngine()
 
 void GameEngine::start()
 {
-    if (m_isRunning && !m_isPaused) {
-        return; // Gra już trwa
+    // Start nie może niszczyć sesji, która jest tylko wstrzymana.
+    if (m_isRunning) {
+        return;
     }
     
     // Reset stanu gry
@@ -148,17 +153,24 @@ QString GameEngine::getGameStats() const
     qint64 elapsed = m_accumulatedSessionMs;
     if (m_monotonicClock.isValid())
         elapsed += m_monotonicClock.elapsed();
-    return QStringLiteral("score=%1; elapsed_ms=%2")
-        .arg(m_score).arg(elapsed);
+    const QString state = !m_isRunning ? QStringLiteral("stopped")
+        : (m_isPaused ? QStringLiteral("paused") : QStringLiteral("running"));
+    return QStringLiteral("game=%1; state=%2; score=%3; elapsed_ms=%4; frames=%5; invalid_inputs=%6")
+        .arg(gameName()).arg(state).arg(m_score).arg(elapsed)
+        .arg(static_cast<qulonglong>(m_frameCount))
+        .arg(static_cast<qulonglong>(m_invalidInputCount));
 }
 
 void GameEngine::resetGameStats()
 {
     setScore(0);
     m_accumulatedSessionMs = 0;
+    m_frameCount = 0;
+    m_invalidInputCount = 0;
     if (m_isRunning && !m_isPaused) {
         m_monotonicClock.restart();
         m_lastFrameTime = 0;
+        m_simulationAccumulator = 0.0;
     } else {
         m_monotonicClock.invalidate();
     }
@@ -178,6 +190,8 @@ void GameEngine::reset()
     m_monotonicClock.invalidate();
     m_lastFrameTime = 0;
     m_simulationAccumulator = 0.0;
+    m_frameCount = 0;
+    m_invalidInputCount = 0;
     
     // Wymuszenie odświeżenia widoku
     QWidget::update();
@@ -209,6 +223,7 @@ void GameEngine::gameLoop()
         m_simulationAccumulator -= fixedStep;
         ++steps;
     }
+    m_frameCount += static_cast<quint64>(steps);
     if (steps == 12 && m_simulationAccumulator >= fixedStep)
         m_simulationAccumulator = 0.0;
 
@@ -220,13 +235,17 @@ void GameEngine::handleSensorInput(double value)
     // Sensor callbacks may originate on the serial worker thread. QWidget and
     // every derived game state must only be touched on the GUI thread.
     if (QThread::currentThread() != thread()) {
-        QMetaObject::invokeMethod(this, [this, value] {
-            handleSensorInput(value);
+        QPointer<GameEngine> guard(this);
+        QMetaObject::invokeMethod(this, [guard, value] {
+            if (guard)
+                guard->handleSensorInput(value);
         }, Qt::QueuedConnection);
         return;
     }
-    if (!std::isfinite(value))
+    if (!std::isfinite(value)) {
+        ++m_invalidInputCount;
         return;
+    }
     m_sensorValue = value;
     handleInput(value);
     QWidget::update();
@@ -242,9 +261,11 @@ void GameEngine::setScore(int score)
 
 void GameEngine::addScore(int points)
 {
-    if (points != 0) {
-        setScore(m_score + points);
-    }
+    if (points == 0)
+        return;
+    const qint64 total = static_cast<qint64>(m_score) + points;
+    setScore(static_cast<int>(qBound<qint64>(
+        std::numeric_limits<int>::min(), total, std::numeric_limits<int>::max())));
 }
 
 void GameEngine::paintEvent(QPaintEvent* event)
