@@ -481,6 +481,13 @@ void MeasurementTab::ensureCurrentSeriesInitialized()
 bool MeasurementTab::openSampleJournal()
 {
     if (m_sampleJournal.isOpen()) return true;
+    if (m_sampleJournalFailed) {
+        // Keep the failed journal for recovery and start a fresh segment.
+        m_sampleJournalPath.clear();
+        m_activeSessionId.clear();
+        m_sampleJournalPendingWrites = 0;
+        m_sampleJournalFailed = false;
+    }
     if (m_sampleJournalPath.isEmpty()) {
         const QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
         if (!QDir().mkpath(dataDir)) return false;
