@@ -11,7 +11,7 @@ checks = {
     "connection diagnostics disabled": r"constexpr\s+bool\s+DEBUG_CONNECTION\s*=\s*false\s*;",
     "packet diagnostics disabled": r"constexpr\s+bool\s+DEBUG_DATA_PACKETS\s*=\s*false\s*;",
     "CRC diagnostics disabled": r"constexpr\s+bool\s+DEBUG_CRC\s*=\s*false\s*;",
-    "verbose serial output disabled by default": r"bool\s+verbose\s*=\s*false\s*;",
+    "verbose serial output disabled by default": r"(?:bool\s+verbose\s*=\s*false\s*;|std::atomic<bool>\s+verbose\s*\{false\}\s*;)",
 }
 failed = [label for label, pattern in checks.items() if not re.search(pattern, source)]
 if "if (m_impl->verbose && !resp.empty()) std::cout" not in source:
