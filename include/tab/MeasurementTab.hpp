@@ -128,12 +128,12 @@ struct SeriesStats {
     double avgPeakForce;                // Średnia siła szczytowa serii
     double medianPeakForce;             // Mediana sił szczytowych
     double fatigueIndex;                // Wskaźnik zmęczenia [% spadku]
-    double totalWork;                   // Całkowita praca (suma pól pod krzywą) [N·s]
+    double totalWork;                   // Praca mechaniczna [J]; status w biomechanicalParams
     double avgRiseRate;                 // Średnia szybkość narastania [N/s]
     double avgFallRate;                 // Średnia szybkość opadania [N/s]
     double seriesSpeed;                 // Szybkość wykonania serii [rep/s]
     double consistencyScore;            // Wskaźnik powtarzalności [%]
-    double impulseTotal;                // Całkowity impuls [N·s]
+    double impulseTotal;                // Całkowity impuls siły [N·s]
     QString sessionDate;                // Data sesji pomiarowej
     BiomechanicalParams biomechanicalParams; // 65 parametrów z oceną dostępności
     
