@@ -1,4 +1,5 @@
 #include "core/Authentication.hpp"
+#include "core/PasswordHasher.hpp"
 
 #include <cstdio>
 #include <fstream>
@@ -49,6 +50,15 @@ void expect(bool condition, const std::string& message)
 int main()
 {
     try {
+        const std::string hash1 = biofeedback::PasswordHasher::hash("correct horse battery staple");
+        const std::string hash2 = biofeedback::PasswordHasher::hash("correct horse battery staple");
+        expect(biofeedback::PasswordHasher::isEncodedHash(hash1), "format hasha powinien być rozpoznany");
+        expect(hash1 != hash2, "każdy hash powinien używać odrębnej losowej soli");
+        expect(biofeedback::PasswordHasher::verify("correct horse battery staple", hash1), "poprawne hasło powinno przejść weryfikację");
+        expect(!biofeedback::PasswordHasher::verify("wrong password", hash1), "błędne hasło powinno zostać odrzucone");
+        expect(!biofeedback::PasswordHasher::verify("correct horse battery staple", "plain-text-password"), "jawne hasło nie może być uznane za hash");
+        expect(!biofeedback::PasswordHasher::verify("x", "pbkdf2-sha256$v1$1$00$00"), "hash z parametrami poza zakresem powinien zostać odrzucony");
+
         writeUsersJson();
 
         biofeedback::Authentication auth(kUsersFile);
