@@ -25,6 +25,9 @@ int main() {
     assert(std::abs(rep.peakForceN - 50.0) < 1e-9);
     assert(rep.meanForceN > 0.0);
     assert(rep.sampleCount == 5);
+    assert(rep.samples.size() == rep.sampleCount);
+    assert(rep.samples.front().timestampMs == rep.startTimestampMs);
+    assert(rep.samples.back().timestampMs == rep.endTimestampMs);
     assert(!detector.isActive());
 
     // A short spike is discarded, not counted as a repetition.
