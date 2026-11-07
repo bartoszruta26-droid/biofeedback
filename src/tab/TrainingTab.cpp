@@ -578,7 +578,7 @@ void TrainingTab::pauseTraining()
     
     m_btnPauseResume->setText("Wznów");
     
-    emit trainingPaused();
+    emit trainingPaused(true);
 }
 
 void TrainingTab::resumeTraining()
@@ -597,6 +597,7 @@ void TrainingTab::resumeTraining()
     
     m_btnPauseResume->setText("Pauza");
     
+    emit trainingPaused(m_inRestPeriod);
     emit trainingResumed();
 }
 
