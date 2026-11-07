@@ -21,6 +21,7 @@ nie tworzy odrębnego parsera danych czujnika.
 - Strzałki góra/dół — wybór modułu.
 - Enter — otwarcie wybranego modułu.
 - W module Urządzenia: strzałki lewo/prawo — wybór portu.
+- W module Trening: S — start/stop, P — pauza/wznowienie, + / - — cel siły.
 - C — połączenie z wybranym portem przy domyślnej prędkości.
 - D — rozłączenie.
 - R — ponowne skanowanie portów.
@@ -34,10 +35,14 @@ nie tworzy odrębnego parsera danych czujnika.
 
 ## Granice funkcjonalne wersji 0.2
 
-TUI może otworzyć port szeregowy, uruchomić wspólny adapter odczytu i
-wyświetlać ostatnią poprawną próbkę. Nie tworzy kart pacjentów, nie zapisuje
-danych klinicznych i nie uruchamia jeszcze sesji treningowych. Wspólne
-repozytorium pacjentów oraz usługi sesji będą integrowane w kolejnych etapach.
+TUI otwiera port szeregowy przez wspólny adapter i wyświetla próbki z HX711.
+Moduł Pomiary pokazuje siłę w N oraz krótki przebieg ostatnich próbek. Moduł
+Trening oferuje sesję 3 x 8 z detekcją powtórzeń opartą na progach aktywacji i
+zwolnienia, podglądem serii oraz regulowanym celem siły. Sterowanie: S — start/
+stop, P — pauza/wznowienie, + / - — zmiana celu. Dane są przetwarzane w pamięci;
+TUI nadal nie tworzy kart pacjentów ani nie zapisuje dokumentacji klinicznej.
+Przed treningiem urządzenie musi być podłączone i skalibrowane, a jednostka
+kalibracji firmware musi odpowiadać założeniu gramów równoważnych.
 
 ## Budowanie
 
