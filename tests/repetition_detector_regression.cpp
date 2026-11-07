@@ -50,6 +50,10 @@ int main() {
     auto corrupt = snapshot;
     ++corrupt.sampleCount;
     assert(!recovered.restore(corrupt));
+    assert(recovered.isActive()); // rejected restore must be non-destructive
+    assert(recovered.process(2400, 4.0, true, rep));
+    assert(rep.startTimestampMs == 2000 && rep.endTimestampMs == 2400);
+    assert(!recovered.process(2500, 0.0, true, rep)); // one result, no duplicate
 
     // A short spike is discarded, not counted as a repetition.
     detector.reset();
