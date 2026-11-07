@@ -495,7 +495,7 @@ void OutlineTab::populateGameCombo()
     // Nie pokazuj jako dostępnych gier, których implementacje nie są jeszcze
     // dołączone do aplikacji. Identyfikatory pozostają rozpoznawalne przy
     // odczycie starszych konspektów, ale użytkownik nie może ich wybrać.
-    const int unavailableIndexes[] = {7, 8, 9, 10};
+    const int unavailableIndexes[] = {8, 9, 10};
     if (auto* model = qobject_cast<QStandardItemModel*>(m_gameCombo->model())) {
         for (const int index : unavailableIndexes) {
             if (QStandardItem* item = model->item(index)) {
