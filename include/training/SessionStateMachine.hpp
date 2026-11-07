@@ -5,6 +5,13 @@ class SessionStateMachine {
 public:
  SessionState state() const noexcept { return state_; }
  SessionState resumeState() const noexcept { return resumeState_; }
+ bool restore(SessionState state, SessionState resumeState = SessionState::Active) noexcept {
+  const bool validState = state == SessionState::Idle || state == SessionState::Active || state == SessionState::Paused || state == SessionState::Resting || state == SessionState::Completed || state == SessionState::Interrupted;
+  const bool validResume = resumeState == SessionState::Active || resumeState == SessionState::Resting;
+  if (!validState || !validResume || (state == SessionState::Paused && !validResume)) return false;
+  if (state == SessionState::Resting && resumeState != SessionState::Active) return false;
+  state_ = state; resumeState_ = resumeState; return true;
+ }
  bool canStart() const noexcept { return state_==SessionState::Idle || state_==SessionState::Completed || state_==SessionState::Interrupted; }
  bool start() noexcept { if(!canStart()) return false; state_=SessionState::Active; resumeState_=SessionState::Active; return true; }
  bool pause() noexcept {
