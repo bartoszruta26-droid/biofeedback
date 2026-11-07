@@ -18,4 +18,12 @@ if "QSaveFile" not in save or "!file.commit()" not in save:
     raise SystemExit("Training history must use atomic file replacement")
 if "QFileDevice::ReadOwner | QFileDevice::WriteOwner" not in save:
     raise SystemExit("Training history must use owner-only file permissions")
-print("Complete training history regression passed")
+widget = Path("src/tab/TrainingAnalyticsWidget.cpp").read_text(encoding="utf-8")
+if "void TrainingAnalyticsWidget::beginSession()" not in widget:
+    raise SystemExit("Training session must snapshot its history destination at start")
+if "m_activeSessionHistoryFilePath" not in save:
+    raise SystemExit("Session save must use the original patient destination")
+main = Path("src/gui/MainWindow.cpp").read_text(encoding="utf-8")
+if "MeasurementTab::measurementStarted" not in main or "MeasurementTab::measurementStopped" not in main:
+    raise SystemExit("Patient switching must be locked during measurement acquisition")
+print("Complete training history and patient-context regression passed")
