@@ -204,8 +204,9 @@ void LoginDialog::setupUI()
         "   background-color: #bdc3c7; "
         "}"
     );
+    m_loginButton->setEnabled(false);
     buttonLayout->addWidget(m_loginButton);
-    
+
     mainLayout->addLayout(buttonLayout);
     
     // Domyślne skupienie na polu nazwy użytkownika
@@ -299,6 +300,11 @@ void LoginDialog::onLoginButtonClicked()
                 return;
             }
             m_firstRun = false;
+            m_confirmPasswordLabel->hide();
+            m_confirmPasswordEdit->hide();
+            setWindowTitle(tr("Logowanie - Biofeedback"));
+            m_titleLabel->setText(tr("🔐 Logowanie do systemu"));
+            m_loginButton->setText(tr("Zaloguj"));
         }
 
         // Blokada przycisków podczas logowania
