@@ -64,3 +64,14 @@ Wartość consistencyScore w aplikacji jest roboczym wskaźnikiem 0–100 równy
 Algorytm rozpoznaje cykl narastania i zwolnienia siły. Nie rozdziela jeszcze fazy koncentrycznej i ekscentrycznej, nie ocenia toru ruchu ani jakości techniki ćwiczenia. Ruch izometryczny bez zejścia poniżej progu zwolnienia nie zostanie policzony jako powtórzenie. Próg aktywacji jest na razie domyślny i powinien być weryfikowany dla rodzaju ćwiczenia oraz czujnika.
 
 Testy syntetyczne obejmują histerezę, minimalny czas, niepoprawne próbki, utratę próbek, przepełnienie 32-bitowego zegara urządzenia i statystyki serii. Ostateczny odbiór wymaga porównania z obserwacją rzeczywistych powtórzeń oraz wzorcem siły po kalibracji HX711. Oprogramowanie nie jest samo w sobie wyrobem medycznym ani zwalidowanym narzędziem diagnostycznym.
+
+## Desktop analysis and session history
+
+The desktop Training tab now exposes a dedicated analytics panel:
+- peak-force trace across repetitions, separated by exercise;
+- series-level table with mean and maximum peak force, average repetition duration, target achievement and peak-force coefficient of variation;
+- repetition-level table with peak/mean force, duration, time-to-peak and sample count.
+
+The operator can explicitly save a session summary to the local history. The history file is stored with owner-only filesystem permissions. When a patient is selected, the history file is stored in that patient's application data directory; otherwise it uses the unassigned application history. The history JSON contains aggregate training metrics and does not embed the patient's name or PESEL. It is not encrypted by this widget; configure the application's existing encryption facilities and protect the operating-system account and backups accordingly.
+
+The Training tab instantiates the selected Pong, Flappy Bird, Mario Run or sinusoidal game. Sensor force is mapped to a 0–100 game input relative to the exercise target force. Game points are kept separate from sensor-derived repetition counts and are displayed in the session analytics.
