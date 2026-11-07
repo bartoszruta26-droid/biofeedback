@@ -24,6 +24,8 @@ if "gramsToNewtons(data.calibratedValue)" not in training:
     raise SystemExit("TrainingTab must convert calibrated grams to SI force")
 if "!data.isValid" not in training:
     raise SystemExit("TrainingTab must reject invalid sensor frames")
+if "!data.hasCalibratedValue" not in training:
+    raise SystemExit("TrainingTab must reject raw-only binary frames")
 if "if (!m_serialPort || !m_serialPort->isConnected())" not in training:
     raise SystemExit("Training must refuse to start without a connected sensor")
 if "m_sensorThreshold(30.0)" not in Path("src/games/MarioGame.cpp").read_text(encoding="utf-8"):
