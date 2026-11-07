@@ -25,7 +25,7 @@ struct CalibrationProfile {
     std::string deviceId;
     std::string firmwareVersion;
     std::string sensorModel{"HX711"};
-    std::string unit{"N"};
+    std::string unit{"g"};
     double zeroOffsetRaw{0.0};
     double scaleFactor{0.0};
     double referenceValue{0.0};
