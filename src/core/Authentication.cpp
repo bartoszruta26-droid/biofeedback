@@ -1064,6 +1064,43 @@ bool Authentication::createUser(const std::string& username,const std::string& p
     return false;
 }
 
+bool Authentication::hasUsers() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return !users.empty();
+}
+
+bool Authentication::createInitialAdministrator(
+    const std::string& username, const std::string& password)
+{
+    if (username.empty() || password.size() < 12) return false;
+
+    UserData administrator{};
+    administrator.username = username;
+    try {
+        administrator.password = PasswordHasher::hash(password);
+    } catch (...) {
+        return false;
+    }
+    administrator.role = "administrator";
+    administrator.encrypted = true;
+    administrator.mustChangePassword = false;
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!users.empty()) return false;
+        users.push_back(administrator);
+        currentUser = nullptr;
+    }
+
+    if (saveUsers()) return true;
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    users.clear();
+    currentUser = nullptr;
+    return false;
+}
+
 bool Authentication::isLoggedIn() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
