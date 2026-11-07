@@ -72,6 +72,7 @@ public:
 
     bool isInContraction() const noexcept { return m_inContraction; }
     std::size_t rejectedSampleCount() const noexcept { return m_rejectedSamples; }
+    bool lastSampleAccepted() const noexcept { return m_lastSampleAccepted; }
 
 private:
     EngineConfig m_config;
@@ -80,6 +81,7 @@ private:
     std::vector<SeriesStats> m_completedSeries;
     bool m_inContraction{false};
     std::size_t m_rejectedSamples{0};
+    bool m_lastSampleAccepted{false};
     double m_lastTimestampSeconds{-1.0};
     std::optional<SampleSource> m_lastSource;
 
