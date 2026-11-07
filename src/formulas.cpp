@@ -827,6 +827,20 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.T_rep_avg = calculateAvgRepTime(repTimes);
     params.f_rep = calculateRepFrequency(series.reps.size(), params.T_set);
     params.v_avg = calculateVelocity(params.F_range, params.T_rep_avg);
+
+    double totalInterRepRest = 0.0;
+    std::size_t interRepRestIntervals = 0;
+    for (std::size_t i = 1; i < series.reps.size(); ++i) {
+        const std::uint32_t restMs =
+            series.reps[i].startTime - series.reps[i - 1].endTime;
+        if (restMs > 0 && restMs < 0x80000000u) {
+            totalInterRepRest += static_cast<double>(restMs) / 1000.0;
+            ++interRepRestIntervals;
+        }
+    }
+    if (interRepRestIntervals > 0)
+        params.T_rest_rep = totalInterRepRest /
+                            static_cast<double>(interRepRestIntervals);
     
     // Średni czas koncentryczny i ekscentryczny
     double totalConc = 0.0, totalEcc = 0.0;
@@ -967,7 +981,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
         ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration);
 
     // Explicit external dependencies; do not fabricate proxy values.
-    params.setAvailability(14, ParameterAvailability::InsufficientData);
+    params.setAvailability(14, interRepRestIntervals > 0
+        ? ParameterAvailability::Available : ParameterAvailability::InsufficientData);
     params.setAvailability(16, ParameterAvailability::InsufficientData);
     params.setAvailability(18, ParameterAvailability::RequiresCalibration);
     params.setAvailability(29, ParameterAvailability::RequiresAdditionalSensor);
