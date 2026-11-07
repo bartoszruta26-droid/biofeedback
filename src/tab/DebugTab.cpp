@@ -7,6 +7,8 @@
 #include <QFont>
 #include <QScrollBar>
 #include <QMessageBox>
+#include <QMetaObject>
+#include <QFile>
 #include <QThread>
 #include <iostream>
 #include <mutex>
@@ -46,9 +48,12 @@ DebugTab::DebugTab(QWidget *parent)
     registerAsDebugReceiver();
 }
 
-DebugTab::~DebugTab() override
+DebugTab::~DebugTab()
 {
-    // Odłącz callback przy niszczeniu
+    if (m_serialPort) {
+        m_serialPort->setDataCallback({});
+        m_serialPort->setConnectionCallback({});
+    }
     core::DebugManager::instance().unregisterDebugCallback();
 }
 
@@ -260,17 +265,32 @@ bool DebugTab::exportLogsToFile(const QString& filename)
 
 void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
     if (m_serialPort) {
-        // Połącz sygnały SerialCommunication z slotami DebugTab
-        connect(m_serialPort.get(), &sensor::SerialCommunication::sensorDataReady,
-                this, &DebugTab::onSensorDataReceived, Qt::QueuedConnection);
-        
-        connect(m_serialPort.get(), &sensor::SerialCommunication::connectionStatusChanged,
-                this, &DebugTab::onConnectionStatusChanged, Qt::QueuedConnection);
-        
-        addDebugMessage("Połączenie z SerialCommunication nawiązane", "SERIAL");
+        m_serialPort->setDataCallback({});
+        m_serialPort->setConnectionCallback({});
+    }
+    m_serialPort = std::move(serial);
+
+    if (!m_serialPort) return;
+
+    // SerialCommunication is a plain C++ service, not a QObject. Bridge its
+    // callbacks onto the Qt GUI thread explicitly.
+    m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, [this, data]() {
+            onSensorDataReceived(data);
+        }, Qt::QueuedConnection);
+    });
+    m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
+        const QString qtMessage = QString::fromStdString(message);
+        QMetaObject::invokeMethod(this, [this, connected, qtMessage]() {
+            onConnectionStatusChanged(connected, qtMessage);
+        }, Qt::QueuedConnection);
+    });
+
+    if (m_serialPort->isConnected()) {
+        onConnectionStatusChanged(true, tr("Połączenie aktywne"));
+    } else {
+        addDebugMessage("Usługa SerialCommunication gotowa; brak aktywnego połączenia", "SERIAL");
     }
 }
 
@@ -338,7 +358,7 @@ void DebugTab::onConnectionStatusChanged(bool connected, const QString& message)
     m_hasArduinoConnection = connected;
     
     if (connected) {
-        m_currentPort = m_serialPort ? m_serialPort->getPortName() : "Unknown";
+        m_currentPort = m_serialPort ? QString::fromStdString(m_serialPort->getPortName()) : tr("Nieznany");
         m_baudRate = m_serialPort ? m_serialPort->getBaudRate() : 0;
         
         m_lblPortName->setText(QString("Port: %1").arg(m_currentPort));
