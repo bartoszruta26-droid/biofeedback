@@ -458,19 +458,16 @@ MeasurementTab::~MeasurementTab()
 
 void MeasurementTab::ensureCurrentSeriesInitialized()
 {
-    std::cout << "[DEBUG] ensureCurrentSeriesInitialized START: m_completedSeriesStats.size()=" 
-              << m_completedSeriesStats.size() << std::endl;
-    
-    if (!m_completedSeriesStats.isEmpty()) {
-        std::cout << "[DEBUG] ensureCurrentSeriesInitialized END: already initialized" << std::endl;
+    if (m_currentSeries < 1 || m_currentSeries > 3)
         return;
-    }
 
-    SeriesStats initialSeries;
-    initialSeries.seriesNumber = 1;
-    m_completedSeriesStats.append(initialSeries);
-    std::cout << "[DEBUG] ensureCurrentSeriesInitialized END: created initial series, size now=" 
-              << m_completedSeriesStats.size() << std::endl;
+    if (!m_completedSeriesStats.isEmpty() &&
+        m_completedSeriesStats.last().seriesNumber == m_currentSeries)
+        return;
+
+    SeriesStats currentSeries;
+    currentSeries.seriesNumber = m_currentSeries;
+    m_completedSeriesStats.append(currentSeries);
 }
 
 void MeasurementTab::ensureSessionClockStarted()
@@ -989,8 +986,7 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
 {
     if (!std::isfinite(forceValue)) return;
 
-    if (m_completedSeriesStats.isEmpty())
-        ensureCurrentSeriesInitialized();
+    ensureCurrentSeriesInitialized();
     if (m_sessionStartTime <= 0.0 || !m_sessionElapsedTimer.isValid())
         ensureSessionClockStarted();
 
@@ -1103,9 +1099,10 @@ void MeasurementTab::calculateRepetitionStats()
         return;
     }
     
-    if (m_completedSeriesStats.isEmpty()) {
-        std::cerr << "[ERROR] calculateRepetitionStats: m_completedSeriesStats is EMPTY - this should not happen!" << std::endl;
-        ensureCurrentSeriesInitialized();
+    ensureCurrentSeriesInitialized();
+    if (m_completedSeriesStats.isEmpty() || m_currentSeries > 3) {
+        std::cerr << "[ERROR] calculateRepetitionStats: no active series is available" << std::endl;
+        return;
     }
     
     std::cout << "[DEBUG] calculateRepetitionStats: Setting repNumber=" << (m_currentRepInSeries + 1) << std::endl;
