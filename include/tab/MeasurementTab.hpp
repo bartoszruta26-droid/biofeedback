@@ -339,7 +339,7 @@ private:
     void setupTrendsUI();
     void updateTrendsView();
     QString serializeSessionToJSON(const MeasurementSession& session) const;
-    MeasurementSession deserializeSessionFromJSON(const QString& json) const;
+    MeasurementSession deserializeSessionFromJSON(const QString& json, bool includeSamples = true) const;
     
     // Konwersja jednostek
     double convertForce(double newtons, ForceUnit targetUnit) const;
