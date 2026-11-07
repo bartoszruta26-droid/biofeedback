@@ -397,6 +397,7 @@ private:
     QDoubleSpinBox* m_elasticConstantInput;
     QDoubleSpinBox* m_patientMassInput;
     QComboBox* m_biomechSeriesSelector;
+    BiomechanicalParams m_sessionBiomechanicalParams;
     
     // Tabela surowych danych
     QGroupBox* m_rawBox;
