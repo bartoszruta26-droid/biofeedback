@@ -932,7 +932,7 @@ void TrainingTab::onTimerTick()
 void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
 {
     if (!m_isTraining || m_isPaused || m_inRestPeriod ||
-        !data.isValid || m_currentExerciseIndex < 0 ||
+        !data.isValid || !data.hasCalibratedValue || m_currentExerciseIndex < 0 ||
         m_currentExerciseIndex >= m_exercisePlan.size()) return;
 
     // Firmware reports calibrated mass-equivalent values in grams. Training
