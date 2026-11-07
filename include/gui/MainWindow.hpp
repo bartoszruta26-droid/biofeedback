@@ -83,7 +83,7 @@ public:
      * @brief Aktualizuje wyświetlaną wartość wagi
      * @param weight Wartość wagi do wyświetlenia
      */
-    void updateWeightDisplay(double weight);
+    void updateWeightDisplay(double value, bool isRaw = false);
 
     /**
      * @brief Aktualizuje status połączenia z urządzeniem
