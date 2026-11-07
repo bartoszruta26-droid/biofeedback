@@ -55,6 +55,7 @@ int main()
         const std::string name = BiomechanicalParams::parameterName(i);
         assert(!name.empty());
         assert(names.insert(name).second);
+        assert(std::string(BiomechanicalParams::parameterUnit(i)).size() > 0);
     }
 
     SeriesData series;
