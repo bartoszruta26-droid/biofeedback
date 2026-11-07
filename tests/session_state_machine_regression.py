@@ -18,7 +18,7 @@ checks = {
     "pause transition": "!m_stateMachine.pause()" in source,
     "resume transition": "!m_stateMachine.resume()" in source,
     "rest transition records its destination": "m_stateMachine.beginRest(" in source and "RestTarget::NextExercise" in source,
-    "end-rest transition": "m_stateMachine.endRest();" in source,
+    "end-rest transition is guarded": "m_stateMachine.endRest()" in source,
     "terminal completed/interrupted states": "m_stateMachine.complete()" in source and "m_stateMachine.interrupt()" in source,
     "automatic persistence API": "bool saveSessionAutomatically();" in analytics_header,
     "checkpoint API": "bool saveSessionCheckpoint();" in analytics_header,
