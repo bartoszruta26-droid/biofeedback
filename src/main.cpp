@@ -150,14 +150,7 @@ namespace {
      * Helper function to dump diagnostic information about the application state.
      * Useful for troubleshooting startup/shutdown issues.
      */
-    void printDebugState() {
-#if DEBUG_VERBOSE
-        std::cout << "[DEBUG] Application State:" << std::endl;
-        std::cout << "  - Global app pointer: " << (g_app ? "Valid" : "Null") << std::endl;
-        std::cout << "  - Shutdown in progress: " << (g_shutdown_in_progress ? "Yes" : "No") << std::endl;
-#endif
-    }
-} // namespace anonymous
+     // namespace anonymous
 
 // ============================================================================
 // MAIN FUNCTION - Entry Point
