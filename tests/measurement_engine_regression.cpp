@@ -67,6 +67,11 @@ int main()
     assert(seriesResults.size() == 1);
     assert(seriesResults.front().repetitionCount == 2);
     assert(std::abs(seriesResults.front().averagePeakForceN - 8.0) < 1e-9);
+    assert(std::abs(seriesResults.front().maximumPeakForceN - 8.0) < 1e-9);
+    assert(std::abs(seriesResults.front().minimumPeakForceN - 8.0) < 1e-9);
+    assert(seriesResults.front().averageTimeToPeakSeconds > 0.0);
+    assert(seriesResults.front().averageForceN > 0.0);
+    assert(seriesResults.front().averageRepetitionDurationSeconds > 0.0);
     assert(seriesResults.front().totalImpulseNs > 0.0);
     assert(seriesResults.front().targetAccuracyPercent > 0.0);
 
