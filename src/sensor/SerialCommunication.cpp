@@ -16,6 +16,7 @@
  */
 
 #include "sensor/SerialCommunication.hpp"
+#include "sensor/ProtocolParser.hpp"
 #include "core/DebugManager.hpp"
 #include <chrono>
 #include <cstring>
@@ -180,6 +181,7 @@ public:
     std::atomic<bool> asyncReading{false};
     std::thread asyncThread;
     std::mutex readMutex;
+    ProtocolParser protocolParser;
     std::string lastError;
     bool verbose = true;
     int32_t timestampOffset = 0;
@@ -530,51 +532,20 @@ SensorData SerialCommunication::readData(int timeout) {
         rd = read(m_impl->portHandle, buf, 255);
 #endif
         if (rd > 0) {
-            for (int i = 0; i < rd; ++i) {
-                rawData.push_back(static_cast<uint8_t>(buf[i]));
-                
-                // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
-                // followed by end markers 0xAA 0x55
-                if (rawData.size() >= 11) {
-                    // Look for end marker pattern
-                    if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
-                        // Extract binary packet (9 bytes before end markers)
-                        if (rawData.size() >= 11) {
-                            size_t packetStart = rawData.size() - 11;
-                            
-                            // Safety check - ensure we have enough data
-                            if (packetStart + 9 <= rawData.size()) {
-                                // Copy data to local buffer to avoid vector reallocation issues
-                                uint8_t packet[9];
-                                for (size_t j = 0; j < 9; ++j) {
-                                    packet[j] = rawData[packetStart + j];
-                                }
-                                
-                                // Parse binary packet: timestamp(4) + value(4) + crc(1)
-                                uint32_t timestamp;
-                                int32_t value;
-                                uint8_t crc;
-                                
-                                std::memcpy(&timestamp, packet, 4);
-                                std::memcpy(&value, packet + 4, 4);
-                                crc = packet[8];
-                                
-                                // Verify CRC
-                                if (verifyCRC8(packet, 9)) {
-                                    data.timestamp = timestamp;
-                                    data.value = value;
-                                    data.crc = crc;
-                                    data.calibratedValue = m_impl->isCalibrated ? convertToCalibrated(value) : 0.0;
-                                    data.isValid = true;
-                                    gotBinaryData = true;
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
+            rawData.insert(rawData.end(), reinterpret_cast<uint8_t*>(buf),
+                           reinterpret_cast<uint8_t*>(buf) + rd);
+            m_impl->protocolParser.feed(reinterpret_cast<const uint8_t*>(buf),
+                                        static_cast<std::size_t>(rd));
+            if (auto frame = m_impl->protocolParser.takeFrame()) {
+                data.timestamp = frame->timestampMs;
+                data.value = frame->rawValue;
+                data.crc = frame->crc;
+                data.calibratedValue = m_impl->isCalibrated
+                    ? convertToCalibrated(frame->rawValue) : 0.0;
+                data.isValid = true;
+                gotBinaryData = true;
             }
-            
+
             // Also check for text response as fallback
             std::string resp(rawData.begin(), rawData.end());
             if (!gotBinaryData && resp.find("FORCE:") != std::string::npos) {
