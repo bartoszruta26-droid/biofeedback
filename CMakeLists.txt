@@ -94,6 +94,22 @@ add_executable(tui_model_regression tests/tui_model_regression.cpp)
 target_link_libraries(tui_model_regression PRIVATE biofeedback_tui_model)
 add_test(NAME tui_model_regression COMMAND tui_model_regression)
 
+# POSIX pseudo-terminal integration test for the production serial implementation.
+# This compiles the real SerialCommunication and DebugManager sources and exercises
+# command writes, response reads, bounded read timeouts, and raw binary writes.
+if(UNIX)
+    add_executable(serial_pty_regression
+        tests/serial_pty_regression.cpp
+        src/sensor/SerialCommunication.cpp
+        src/core/DebugManager.cpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(serial_pty_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(serial_pty_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(serial_pty_regression PRIVATE Qt5::Core pthread)
+    add_test(NAME serial_pty_regression COMMAND serial_pty_regression)
+endif()
+
 # Build the interactive terminal UI when ncurses development files are available.
 find_package(Curses QUIET)
 if(CURSES_FOUND)
