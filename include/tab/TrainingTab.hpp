@@ -77,6 +77,7 @@ struct TrainingExercise {
  * @brief Statystyki pojedynczego ćwiczenia
  */
 struct ExerciseStats {
+    int metricsVersion{1};
     QString exerciseName;
     int completedSeries;
     int completedReps;
@@ -221,7 +222,7 @@ public:
     void onSharedRepetitionCompleted(double peakForceN, double durationSeconds,
                                      double timeToPeakSeconds, double averageForceN,
                                      double impulseNs, double targetAccuracyPercent);
-    void onSharedSeriesCompleted(int repetitionCount, double averagePeakForceN,
+    void onSharedSeriesCompleted(int metricsVersion, int repetitionCount, double averagePeakForceN,
                                  double maximumPeakForceN, double minimumPeakForceN,
                                  double averageTimeToPeakSeconds, double averageForceN,
                                  double averageRepetitionDurationSeconds, double totalImpulseNs,
