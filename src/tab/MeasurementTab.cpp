@@ -918,6 +918,7 @@ void MeasurementTab::readSingleSample(double forceValue, double forceInNewtons)
 
     const bool hasNewtonSample = std::isfinite(forceInNewtons) && forceInNewtons >= 0.0;
     std::optional<measurement::RepetitionStats> completedRepetition;
+    bool acceptedByEngine = false;
     if (hasNewtonSample) {
         measurement::Sample sample;
         sample.timestampSeconds = currentTime;
@@ -926,12 +927,12 @@ void MeasurementTab::readSingleSample(double forceValue, double forceInNewtons)
         sample.source = m_sampleSource;
         sample.valid = true;
         completedRepetition = m_measurementEngine.addSample(sample);
-        if (m_measurementEngine.lastSampleAccepted())
-            emit newForceSample(forceInNewtons, currentTime, false);
+        acceptedByEngine = m_measurementEngine.lastSampleAccepted();
+        if (acceptedByEngine) emit newForceSample(forceInNewtons, currentTime, false);
     }
 
     updateLiveDisplay(forceValue);
-    if (hasNewtonSample) m_forcePlot->addSample(forceInNewtons, currentTime);
+    if (acceptedByEngine) m_forcePlot->addSample(forceInNewtons, currentTime);
     if (completedRepetition) {
         consumeEngineRepetition(*completedRepetition);
         for (const auto& series : m_measurementEngine.takeCompletedSeries())
