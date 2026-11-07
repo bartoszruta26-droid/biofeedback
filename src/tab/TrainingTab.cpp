@@ -1136,7 +1136,6 @@ void TrainingTab::loadNextSeries()
             stopTraining(true);
             emit trainingFinished(completed);
         } else {
-            m_stateMachine.beginRest();
             if (!m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise)) return;
             m_restTimeRemaining = 120;
             m_restDurationMs = 120000;
@@ -1225,6 +1224,7 @@ void TrainingTab::finishCurrentSeries()
         return;
 
     const int completedSeriesIndex = m_currentSeriesIndex;
+    const int completedExerciseIndex = m_currentExerciseIndex;
     const auto& exercise = m_exercisePlan[m_currentExerciseIndex];
     const auto summary = biofeedback::training::summarizeSeries(
         m_currentSeriesRepetitions, exercise.targetForce);
@@ -1277,7 +1277,6 @@ void TrainingTab::finishCurrentSeries()
         }
         m_currentSeriesIndex = 0;
         m_currentRepIndex = 0;
-        if (!m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise)) return;
         m_restTimeRemaining = 120;
         m_restDurationMs = 120000;
     } else {
@@ -1288,7 +1287,10 @@ void TrainingTab::finishCurrentSeries()
     updateProgressWidgets();
     if (m_restTimeRemaining > 0) {
         updateSessionClocks();
-        if (!m_stateMachine.beginRest()) {
+        const auto target = m_currentExerciseIndex != completedExerciseIndex
+            ? biofeedback::training::RestTarget::NextExercise
+            : biofeedback::training::RestTarget::NextSeries;
+        if (!m_stateMachine.beginRest(target)) {
             addDebugMessage("Nie można rozpocząć odpoczynku z bieżącego stanu.", "ERROR");
             return;
         }
