@@ -666,8 +666,9 @@ PatientData DataManager::loadPatientData(const std::string& filename, bool decry
     try {
         const std::string stored = readFile(filename);
         if (stored.empty()) return PatientData();
-        const std::string plaintext = stored.rfind("BFENC:v1:", 0) == 0
-            ? Encryption::decrypt(stored, encryptionKey) : stored;
+        const bool encryptedFile = stored.rfind("BFENC:v1:", 0) == 0;
+        if (encryptionEnabled && !encryptedFile) { ++statistics.errors; return PatientData(); }
+        const std::string plaintext = encryptedFile ? Encryption::decrypt(stored, encryptionKey) : stored;
         PatientData patient = PatientData::fromJson(plaintext);
         if (patient.id.empty()) { ++statistics.errors; return PatientData(); }
         ++statistics.filesRead; if (stored.rfind("BFENC:v1:", 0) == 0) ++statistics.decryptionOps; ++statistics.jsonParseOps;
@@ -747,11 +748,13 @@ bool DataManager::saveExerciseResults(const std::vector<ExerciseResult>& results
 std::vector<ExerciseResult> DataManager::loadExerciseResults(const std::string& filename, bool decrypt) {
     (void)decrypt;
     std::vector<ExerciseResult> results;
-    if (!encryptionEnabled || encryptionKey.empty()) return results;
+    if (encryptionEnabled && encryptionKey.empty()) return results;
     try {
         const std::string encrypted=readFile(filename);
         if (encrypted.empty()) return results;
-        const std::string content=Encryption::decrypt(encrypted, encryptionKey);
+        const bool encryptedFile = encrypted.rfind("BFENC:v1:", 0) == 0;
+        if (encryptionEnabled && !encryptedFile) { ++statistics.errors; return results; }
+        const std::string content = encryptedFile ? Encryption::decrypt(encrypted, encryptionKey) : encrypted;
         for (const auto& objectJson : splitJsonObjectsFromArray(content)) {
             ExerciseResult result=ExerciseResult::fromJson(objectJson);
             if(!result.id.empty()||!result.exerciseId.empty()||!result.patientId.empty())results.push_back(result);
@@ -773,8 +776,9 @@ TrainingPlan DataManager::loadTrainingPlan(const std::string& filename, bool dec
     try {
         const std::string encrypted=readFile(filename);
         if(encrypted.empty())return TrainingPlan();
-        const std::string plaintext = encrypted.rfind("BFENC:v1:", 0) == 0
-            ? Encryption::decrypt(encrypted, encryptionKey) : encrypted;
+        const bool encryptedFile = encrypted.rfind("BFENC:v1:", 0) == 0;
+        if (encryptionEnabled && !encryptedFile) { ++statistics.errors; return TrainingPlan(); }
+        const std::string plaintext = encryptedFile ? Encryption::decrypt(encrypted, encryptionKey) : encrypted;
         return TrainingPlan::fromJson(plaintext);
     } catch (...) { ++statistics.errors; return TrainingPlan(); }
 }
@@ -814,7 +818,13 @@ bool DataManager::exportToJson(const std::string& data, const std::string& filen
 
 std::string DataManager::importFromJson(const std::string& filename) {
     if (encryptionEnabled && encryptionKey.empty()) return "";
-    try { const std::string value=readFile(filename); return value.empty() ? "" : (value.rfind("BFENC:v1:", 0) == 0 ? Encryption::decrypt(value, encryptionKey) : value); }
+    try {
+        const std::string value=readFile(filename);
+        if (value.empty()) return "";
+        const bool encryptedFile = value.rfind("BFENC:v1:", 0) == 0;
+        if (encryptionEnabled && !encryptedFile) return "";
+        return encryptedFile ? Encryption::decrypt(value, encryptionKey) : value;
+    }
     catch (...) { ++statistics.errors; return ""; }
 }
 
