@@ -8,6 +8,7 @@
 #include <QFont>
 #include <QRectF>
 #include <QRandomGenerator>
+#include <cmath>
 
 namespace games {
 
@@ -107,7 +108,6 @@ void FlappyBirdGame::setDifficultyLevel(int level) {
             break;
     }
     
-    emit scoreChanged(0);
 }
 
 int FlappyBirdGame::getDifficultyLevel() const {
@@ -115,7 +115,9 @@ int FlappyBirdGame::getDifficultyLevel() const {
 }
 
 void FlappyBirdGame::setGameSpeed(float speed) {
-    m_gameSpeed = qBound(0.5f, speed, 2.0f);
+    if (std::isfinite(speed)) {
+        m_gameSpeed = qBound(0.5f, speed, 2.0f);
+    }
 }
 
 float FlappyBirdGame::getGameSpeed() const {
@@ -196,13 +198,16 @@ void FlappyBirdGame::spawnObstacle() {
     obs.xPosition = static_cast<float>(width());
     obs.passed = false;
     
-    // Losowa wysokość luki
-    float availableHeight = static_cast<float>(height()) - m_minGapHeight;
-    float minGapY = m_minGapHeight / 2.0f;
-    float maxGapY = availableHeight - m_minGapHeight / 2.0f;
-    
-    obs.gapY = minGapY + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (maxGapY - minGapY);
-    obs.gapHeight = m_minGapHeight + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (m_maxGapHeight - m_minGapHeight);
+    // Najpierw losujemy rozmiar luki, następnie jej środek tak,
+    // aby cała luka i promień ptaka mieściły się w polu gry.
+    const float safeHeight = qMax(0.0f, static_cast<float>(height()) - 2.0f * m_birdRadius);
+    const float minGap = qMin(m_minGapHeight, safeHeight);
+    const float maxGap = qMax(minGap, qMin(m_maxGapHeight, safeHeight));
+    obs.gapHeight = minGap + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (maxGap - minGap);
+    const float minGapY = m_birdRadius + obs.gapHeight / 2.0f;
+    const float maxGapY = static_cast<float>(height()) - m_birdRadius - obs.gapHeight / 2.0f;
+    const float centerRange = qMax(0.0f, maxGapY - minGapY);
+    obs.gapY = minGapY + static_cast<float>(QRandomGenerator::global()->generateDouble()) * centerRange;
     
     m_obstacles.push_back(obs);
 }
@@ -297,6 +302,7 @@ void FlappyBirdGame::update(double deltaTime) {
     
     // Aktualizacja ptaka
     updateBird(deltaTime);
+    if (!isRunning()) return;
     
     // Aktualizacja przeszkód
     updateObstacles(deltaTime);
