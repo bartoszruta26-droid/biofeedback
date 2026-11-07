@@ -130,6 +130,15 @@ int main()
     const BiomechanicalParams rejected = formulas.calculateAllParams(undersampled);
     assert(rejected.availabilityAt(0) == ParameterAvailability::InvalidInput);
 
+    SeriesData outOfOrder = series;
+    outOfOrder.reps[0].samples = {
+        SensorSample(0, 0.0),
+        SensorSample(200, 20.0),
+        SensorSample(100, 0.0)
+    };
+    const BiomechanicalParams invalidClock = formulas.calculateAllParams(outOfOrder);
+    assert(invalidClock.availabilityAt(0) == ParameterAvailability::InvalidInput);
+
     // A missing historical or sensor-dependent metric is never advertised as
     // a measured result merely because its reset numeric field happens to be 0.
     assert(result.availabilityAt(53) != ParameterAvailability::Available);
