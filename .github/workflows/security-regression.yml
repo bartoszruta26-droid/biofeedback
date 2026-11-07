@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - integration/all-work
+      - feature/configurable-file-encryption
   pull_request:
     branches:
       - main
+      - integration/all-work
 
 jobs:
   core-regressions:
