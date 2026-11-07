@@ -14,6 +14,15 @@ A professional medical-grade biofeedback application built with C++, Qt5, and Ar
 - **Data Security**: JSON storage with optional encryption for sensitive medical data
 - **Medical Standards**: Comprehensive logging, data validation, and audit trails
 
+## Interfejsy użytkownika
+
+- **Desktop GUI (Qt5)** — główna aplikacja okienkowa: pacjenci, pomiary, trening i diagnostyka; pulpit statusowy z szybką nawigacją.
+- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia. Zobacz `docs/TUI_DESIGN.md`.
+- **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
+- **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
+
+Wersje TUI, WebUI i Android są obecnie warstwami prezentacji w trybie podglądu. Nie udają aktywnego pomiaru ani nie tworzą fikcyjnych danych pacjentów. Integracja z backendem i wspólnym strumieniem pomiarowym jest kolejnym etapem.
+
 ## Hardware Requirements
 
 - Raspberry Pi 4
