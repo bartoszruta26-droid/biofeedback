@@ -2050,6 +2050,25 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
             }
             repObj["biomechanicalValues"] = repBiomechanicalValues;
             repObj["biomechanicalAvailability"] = repBiomechanicalAvailability;
+
+            QJsonObject biomechanicalInput;
+            biomechanicalInput["repNumber"] = rep.biomechanicalData.repNumber;
+            biomechanicalInput["startTime"] = static_cast<qint64>(rep.biomechanicalData.startTime);
+            biomechanicalInput["peakTime"] = static_cast<qint64>(rep.biomechanicalData.peakTime);
+            biomechanicalInput["endTime"] = static_cast<qint64>(rep.biomechanicalData.endTime);
+            biomechanicalInput["startForce"] = rep.biomechanicalData.startForce;
+            biomechanicalInput["peakForce"] = rep.biomechanicalData.peakForce;
+            biomechanicalInput["endForce"] = rep.biomechanicalData.endForce;
+            QJsonArray biomechanicalSamples;
+            for (const auto& sample : rep.biomechanicalData.samples) {
+                QJsonObject sampleObject;
+                sampleObject["timestamp"] = static_cast<qint64>(sample.timestamp);
+                sampleObject["force"] = sample.force;
+                sampleObject["isValid"] = sample.isValid;
+                biomechanicalSamples.append(sampleObject);
+            }
+            biomechanicalInput["samples"] = biomechanicalSamples;
+            repObj["biomechanicalInput"] = biomechanicalInput;
             repsArray.append(repObj);
         }
         seriesObj["repetitions"] = repsArray;
@@ -2158,6 +2177,29 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
                     status <= static_cast<int>(ParameterAvailability::InvalidInput))
                     rep.biomechanicalParams.setAvailability(
                         static_cast<std::size_t>(i), static_cast<ParameterAvailability>(status));
+            }
+
+            const QJsonObject biomechanicalInput = repObj["biomechanicalInput"].toObject();
+            rep.biomechanicalData.repNumber = biomechanicalInput["repNumber"].toInt();
+            rep.biomechanicalData.startTime = static_cast<std::uint32_t>(
+                biomechanicalInput["startTime"].toVariant().toULongLong());
+            rep.biomechanicalData.peakTime = static_cast<std::uint32_t>(
+                biomechanicalInput["peakTime"].toVariant().toULongLong());
+            rep.biomechanicalData.endTime = static_cast<std::uint32_t>(
+                biomechanicalInput["endTime"].toVariant().toULongLong());
+            rep.biomechanicalData.startForce = biomechanicalInput["startForce"].toDouble();
+            rep.biomechanicalData.peakForce = biomechanicalInput["peakForce"].toDouble();
+            rep.biomechanicalData.endForce = biomechanicalInput["endForce"].toDouble();
+            const QJsonArray biomechanicalSamples = biomechanicalInput["samples"].toArray();
+            rep.biomechanicalData.samples.reserve(
+                static_cast<std::size_t>(biomechanicalSamples.size()));
+            for (const auto& sampleValue : biomechanicalSamples) {
+                const QJsonObject sampleObject = sampleValue.toObject();
+                SensorSample sample(
+                    static_cast<std::uint32_t>(sampleObject["timestamp"].toVariant().toULongLong()),
+                    sampleObject["force"].toDouble());
+                sample.isValid = sampleObject["isValid"].toBool();
+                rep.biomechanicalData.samples.push_back(sample);
             }
             series.reps.append(rep);
         }
