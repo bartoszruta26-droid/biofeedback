@@ -20,6 +20,8 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
+#include "games/TanGame.hpp"
+#include "games/GameFactory.hpp"
 
 namespace tab {
 
@@ -268,6 +270,7 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Flappy Bird", "flappy");
     m_gameTypeCombo->addItem("Mario", "mario");
     m_gameTypeCombo->addItem("Sinusoidalna", "sin");
+    m_gameTypeCombo->addItem("Tangensoidalna", "tan");
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_gameTypeCombo);
@@ -728,6 +731,8 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
             game->setSerialConnection(m_serialPort);
         if (auto* game = dynamic_cast<games::SinGame*>(m_currentGame))
             game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::TanGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
     }
 }
 
@@ -757,13 +762,8 @@ void TrainingTab::configureGameForExercise()
 
     m_activeGameType = type;
     games::GameEngine* selectedGame = nullptr;
-    if (type == "pong") selectedGame = new games::PongGame(m_gameBox);
-    else if (type == "flappy" || type == "flappy_bird")
-        selectedGame = new games::FlappyBirdGame(m_gameBox);
-    else if (type == "mario" || type == "mario_run")
-        selectedGame = new games::MarioGame(m_gameBox);
-    else if (type == "sin")
-        selectedGame = new games::SinGame(m_gameBox);
+    if (type != "none")
+        selectedGame = games::createGame(type, m_gameBox);
 
     if (selectedGame) {
         m_gameBox->layout()->addWidget(selectedGame);

@@ -11,6 +11,7 @@
 #include <QPainter>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QStandardItemModel>
 
 namespace tab {
 
@@ -490,6 +491,19 @@ void OutlineTab::populateGameCombo()
     m_gameCombo->addItem(tr("Archer"), "archer");
     m_gameCombo->addItem(tr("Scored Earth"), "scored_earth");
     m_gameCombo->addItem(tr("Car Race"), "car_race");
+
+    // Nie pokazuj jako dostępnych gier, których implementacje nie są jeszcze
+    // dołączone do aplikacji. Identyfikatory pozostają rozpoznawalne przy
+    // odczycie starszych konspektów, ale użytkownik nie może ich wybrać.
+    const int unavailableIndexes[] = {5, 7, 8, 9, 10};
+    if (auto* model = qobject_cast<QStandardItemModel*>(m_gameCombo->model())) {
+        for (const int index : unavailableIndexes) {
+            if (QStandardItem* item = model->item(index)) {
+                item->setEnabled(false);
+                item->setText(item->text() + tr(" (w przygotowaniu)"));
+            }
+        }
+    }
     m_gameCombo->blockSignals(false);
 }
 

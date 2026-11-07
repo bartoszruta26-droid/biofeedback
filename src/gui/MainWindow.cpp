@@ -7,6 +7,11 @@
 #include "tab/DebugTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
+#include "games/PongGame.hpp"
+#include "games/FlappyBirdGame.hpp"
+#include "games/MarioGame.hpp"
+#include "games/TanGame.hpp"
+#include "games/GameFactory.hpp"
 #include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QApplication>
@@ -766,64 +771,68 @@ void MainWindow::onUpdateTimerTimeout()
 void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerciseData)
 {
     qDebug() << "Starting game:" << gameId << "for exercise:" << exerciseData.name;
-    
-    // Stop existing game if any
+
     stopGame();
-    
-    // Create appropriate game based on ID
-    if (gameId == "sin_game") {
-        if (!m_serialPort || !m_serialPort->isConnected()) {
-            QMessageBox::warning(this, tr("Brak urządzenia"),
-                                 tr("Podłącz czujnik HX711 przed uruchomieniem gry."));
-            return;
-        }
-        auto* sinGame = new games::SinGame(this);
-        sinGame->setSerialConnection(m_serialPort);
-        m_currentGame = sinGame;
-        
-        // Connect game signals
-        connect(m_currentGame, &games::GameEngine::gameEnded,
-                this, [this](int score) {
-                    onGameFinished(score);
-                });
-        
-        // Add game to stack
-        m_gameStack->addWidget(m_currentGame);
-        m_gameStack->setCurrentWidget(m_currentGame);
-        m_gameStack->show();
-        
-        // Start the game
-        m_currentGame->start();
-        
-        qDebug() << "SinGame started successfully";
-    }
-    else if (gameId == "tan_game") {
-        // Placeholder for TanGame - can be implemented similarly
-        QMessageBox::information(this, tr("Gra"), 
-                                tr("Gra TanGame będzie dostępna w przyszłej wersji."));
-    }
-    else if (gameId.isEmpty() || gameId == "-- Wybierz grę --") {
-        QMessageBox::warning(this, tr("Brak gry"), 
-                            tr("Nie wybrano gry do uruchomienia."));
+
+    if (gameId.trimmed().isEmpty() || gameId == "-- Wybierz grę --") {
+        QMessageBox::warning(this, tr("Brak gry"),
+                             tr("Nie wybrano gry do uruchomienia."));
         return;
     }
-    else {
-        QMessageBox::warning(this, tr("Nieznana gra"), 
-                            tr("Nieznany identyfikator gry: %1").arg(gameId));
+
+    games::GameEngine* selectedGame = games::createGame(gameId, this);
+    if (!selectedGame) {
+        QMessageBox::warning(this, tr("Gra niedostępna"),
+                             tr("Ta gra nie ma jeszcze aktywnej implementacji: %1").arg(gameId));
         return;
     }
+
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        delete selectedGame;
+        QMessageBox::warning(this, tr("Brak urządzenia"),
+                             tr("Podłącz czujnik HX711 przed uruchomieniem gry."));
+        return;
+    }
+
+    if (auto* game = dynamic_cast<games::PongGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::FlappyBirdGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::MarioGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::SinGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::TanGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+
+    m_currentGame = selectedGame;
+    connect(m_currentGame, &games::GameEngine::gameEnded,
+            this, [this](int score) { onGameFinished(score); });
+
+    m_gameStack->addWidget(m_currentGame);
+    m_gameStack->setCurrentWidget(m_currentGame);
+    m_gameStack->show();
+    m_currentGame->start();
+
+    qDebug() << "Game started successfully:" << m_currentGame->gameName();
 }
 
 void MainWindow::stopGame()
 {
-    if (m_currentGame) {
-        m_currentGame->stop();
-        m_gameStack->removeWidget(m_currentGame);
-        delete m_currentGame;
-        m_currentGame = nullptr;
-        m_gameStack->hide();
-        qDebug() << "Game stopped";
-    }
+    if (!m_currentGame)
+        return;
+
+    // Odłącz callback przed stop(): gameEnded może wywołać onGameFinished(),
+    // które również sprząta widget. Ustawienie wskaźnika na nullptr przed
+    // emisją sygnałów chroni przed rekurencyjnym i podwójnym usuwaniem.
+    games::GameEngine* game = m_currentGame;
+    m_currentGame = nullptr;
+    disconnect(game, nullptr, this, nullptr);
+    game->stop();
+    m_gameStack->removeWidget(game);
+    delete game;
+    m_gameStack->hide();
+    qDebug() << "Game stopped";
 }
 
 void MainWindow::forwardSensorToGame(double value)

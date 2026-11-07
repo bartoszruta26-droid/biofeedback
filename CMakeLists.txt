@@ -204,6 +204,7 @@ if(Qt5_FOUND)
         src/data/Encryption.cpp
         src/games/GameEngine.cpp
         src/games/SinGame.cpp
+        src/games/TanGame.cpp
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
@@ -233,6 +234,8 @@ if(Qt5_FOUND)
         include/data/Encryption.hpp
         include/games/GameEngine.hpp
         include/games/SinGame.hpp
+        include/games/TanGame.hpp
+        include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
@@ -255,6 +258,36 @@ if(Qt5_FOUND)
     target_include_directories(game_engine_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
     target_link_libraries(game_engine_regression PRIVATE Qt5::Core Qt5::Widgets Threads::Threads)
 
+
+    # Smoke-test factory creation and lifecycle for every currently supported game.
+    add_executable(game_factory_regression
+        tests/game_factory_regression.cpp
+        src/games/GameEngine.cpp
+        src/games/SinGame.cpp
+        src/games/TanGame.cpp
+        src/games/PongGame.cpp
+        src/games/FlappyBirdGame.cpp
+        src/games/MarioGame.cpp
+        src/sensor/SerialCommunication.cpp
+        src/core/DebugManager.cpp
+        include/games/GameEngine.hpp
+        include/games/SinGame.hpp
+        include/games/TanGame.hpp
+        include/games/PongGame.hpp
+        include/games/FlappyBirdGame.hpp
+        include/games/MarioGame.hpp
+        include/sensor/SerialCommunication.hpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(game_factory_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(game_factory_regression PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${LIBSERIALPORT_INCLUDE_DIRS}
+    )
+    target_link_directories(game_factory_regression PRIVATE ${LIBSERIALPORT_LIBRARY_DIRS})
+    target_link_libraries(game_factory_regression PRIVATE
+        Qt5::Core Qt5::Widgets Threads::Threads ${LIBSERIALPORT_LIBRARIES}
+    )
 
     # Process-restart regression for durable analytics and checkpoint history.
     add_executable(training_history_restart_regression
@@ -287,6 +320,7 @@ if(Qt5_FOUND)
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
         src/games/SinGame.cpp
+        src/games/TanGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
@@ -297,6 +331,8 @@ if(Qt5_FOUND)
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
         include/games/SinGame.hpp
+        include/games/TanGame.hpp
+        include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
     target_include_directories(training_tab_process_restart_regression PRIVATE
@@ -383,6 +419,10 @@ enable_testing()
 if(TARGET game_engine_regression)
     add_test(NAME game_engine_regression COMMAND game_engine_regression)
     set_tests_properties(game_engine_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
+if(TARGET game_factory_regression)
+    add_test(NAME game_factory_regression COMMAND game_factory_regression)
+    set_tests_properties(game_factory_regression PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
 add_subdirectory(tests OPTIONAL)
 
