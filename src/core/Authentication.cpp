@@ -917,23 +917,17 @@ std::string Authentication::encryptPassword(const std::string& password)
     }
     
     try {
+        // P0: Never fall back to hardcoded keys or ConfigManager - key must be set via setEncryptionKey()
+        // This ensures the key set during Application initialization is always used
         if (encryptionKey.empty()) {
-            // Pobranie klucza z zmiennej środowiskowej lub ConfigManager
-            const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-            if (envKey && std::string(envKey).length() >= 16) {
-                encryptionKey = std::string(envKey);
-                AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
-            } else {
-                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
-                
-                if (encryptionKey.empty() || encryptionKey.length() < 16) {
-                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
-                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
-                }
-                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
-            }
+            AUTH_ERROR("Klucz szyfrujący nie został ustawiony. Należy wywołać setEncryptionKey() podczas inicjalizacji aplikacji.");
+            throw std::runtime_error("Niepoprawny klucz szyfrujący - klucz musi być ustawiony poprzez setEncryptionKey()");
+        }
+        
+        // P1: Validate key length before use for medical-grade security
+        if (encryptionKey.length() < 16) {
+            AUTH_ERROR("Klucz szyfrujący jest zbyt krótki (min. 16 znaków wymagane). Długość klucza: " << encryptionKey.length());
+            throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
         }
 
         std::string result = Encryption::encrypt(password, encryptionKey);
@@ -972,23 +966,17 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
     }
     
     try {
+        // P0: Never fall back to hardcoded keys or ConfigManager - key must be set via setEncryptionKey()
+        // This ensures the key set during Application initialization is always used
         if (encryptionKey.empty()) {
-            // Pobranie klucza z zmiennej środowiskowej lub ConfigManager
-            const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-            if (envKey && std::string(envKey).length() >= 16) {
-                encryptionKey = std::string(envKey);
-                AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
-            } else {
-                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
-                
-                if (encryptionKey.empty() || encryptionKey.length() < 16) {
-                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
-                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
-                }
-                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
-            }
+            AUTH_ERROR("Klucz szyfrujący nie został ustawiony. Należy wywołać setEncryptionKey() podczas inicjalizacji aplikacji.");
+            throw std::runtime_error("Niepoprawny klucz szyfrujący - klucz musi być ustawiony poprzez setEncryptionKey()");
+        }
+        
+        // P1: Validate key length before use for medical-grade security
+        if (encryptionKey.length() < 16) {
+            AUTH_ERROR("Klucz szyfrujący jest zbyt krótki (min. 16 znaków wymagane). Długość klucza: " << encryptionKey.length());
+            throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
         }
 
         std::string result = Encryption::decrypt(encryptedPassword, encryptionKey);
