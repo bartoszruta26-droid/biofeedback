@@ -177,13 +177,14 @@ void PongGame::updateAIPaddle(double deltaTime) {
     }
     
     // Ograniczenie do obszaru gry
-    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, static_cast<float>(height() - m_paddleHeight));
+    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, qMax(0.0f, static_cast<float>(height()) - m_paddleHeight));
     m_rightPaddle.setY(m_rightPaddleY);
 }
 
 void PongGame::checkCollisions() {
     // Aktualizacja pozycji paletki gracza na podstawie siły
-    m_leftPaddleY = (1.0f - static_cast<float>(m_currentForce)) * (height() - m_paddleHeight);
+    const float maxPaddleY = qMax(0.0f, static_cast<float>(height()) - m_paddleHeight);
+    m_leftPaddleY = (1.0f - static_cast<float>(m_currentForce)) * maxPaddleY;
     m_leftPaddle.setY(m_leftPaddleY);
     
     // Kolizja piłki z górną i dolną krawędzią
@@ -249,16 +250,19 @@ void PongGame::checkCollisions() {
 
 void PongGame::update(double deltaTime) {
     if (!isRunning()) return;
-    
-    // Aktualizacja pozycji piłki
-    m_ballPos.setX(m_ballPos.x() + m_ballVel.x() * deltaTime);
-    m_ballPos.setY(m_ballPos.y() + m_ballVel.y() * deltaTime);
-    
-    // Aktualizacja AI
-    updateAIPaddle(deltaTime);
-    
-    // Sprawdzenie kolizji
-    checkCollisions();
+
+    // Podział kroku ogranicza ryzyko przenikania piłki przez wąskie paletki
+    // przy spadku liczby klatek lub wysokiej prędkości piłki.
+    constexpr double maxPhysicsStep = 1.0 / 120.0;
+    const int steps = qMax(1, static_cast<int>(std::ceil(deltaTime / maxPhysicsStep)));
+    const double stepTime = steps > 0 ? deltaTime / steps : 0.0;
+
+    for (int step = 0; step < steps && isRunning(); ++step) {
+        m_ballPos.setX(m_ballPos.x() + m_ballVel.x() * stepTime);
+        m_ballPos.setY(m_ballPos.y() + m_ballVel.y() * stepTime);
+        updateAIPaddle(stepTime);
+        checkCollisions();
+    }
 }
 
 void PongGame::render(QPainter &painter) {
