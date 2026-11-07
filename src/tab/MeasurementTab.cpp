@@ -61,6 +61,7 @@ void TrendsPlotWidget::clearData()
     m_avgForces.clear();
     m_maxForces.clear();
     m_maxForce = 100.0;
+    m_minForce = 0.0;
     update();
 }
 
@@ -167,6 +168,7 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     , m_targetForce(50.0)
     , m_maxTimeWindow(10.0)
     , m_maxForce(100.0)
+    , m_minForce(0.0)
     , m_unit(ForceUnit::Newtons)
 {
     setMinimumHeight(200);
@@ -201,14 +203,10 @@ void ForcePlotWidget::addSample(double force, double time)
         m_maxForce = force * 1.2;
         std::cout << "[DEBUG] ForcePlotWidget::addSample: Updated m_maxForce to " << m_maxForce << std::endl;
     }
-    // Dodaj obsługę wartości ujemnych - rozszerz zakres w dół
-    static double minForce = 0.0;
-    if (force < minForce) {
-        minForce = force * 1.2;
-        std::cout << "[DEBUG] ForcePlotWidget::addSample: Updated minForce to " << minForce << std::endl;
-    }
-    // Zaktualizuj m_maxForce aby uwzględniał zakres symetryczny
-    double absMax = std::max(std::abs(m_maxForce), std::abs(minForce));
+    // Track the negative and positive range per widget/session.
+    if (force < m_minForce)
+        m_minForce = force * 1.2;
+    const double absMax = std::max(std::abs(m_maxForce), std::abs(m_minForce));
     m_maxForce = absMax * 1.2;
     std::cout << "[DEBUG] ForcePlotWidget::addSample: Final m_maxForce=" << m_maxForce << std::endl;
     
