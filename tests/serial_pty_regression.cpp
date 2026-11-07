@@ -172,6 +172,49 @@ int main() {
         return 1;
     }
 
+    // Reconnect and verify a data callback may request disconnect from the
+    // asynchronous reader thread without attempting to join itself.
+    if (!serial.connect(slaveName, 115200)) {
+        std::cerr << "PTY reconnect before async lifecycle check failed\n";
+        ::close(master);
+        return 1;
+    }
+    std::atomic<bool> callbackDisconnected{false};
+    serial.addDataCallback([&](const sensor::SensorData&) {
+        serial.disconnect();
+        callbackDisconnected.store(true, std::memory_order_release);
+    });
+    serial.startAsyncReading();
+    if (!readLine(master, command, 1000) || command != "DATA\n") {
+        std::cerr << "Async reader did not issue DATA command\n";
+        serial.stopAsyncReading();
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+    const uint8_t callbackByte = 0x42;
+    if (::write(master, &callbackByte, sizeof(callbackByte)) != sizeof(callbackByte)) {
+        std::cerr << "Could not provide PTY data for async callback check\n";
+        serial.stopAsyncReading();
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+    const auto callbackDeadline = std::chrono::steady_clock::now() +
+                                  std::chrono::seconds(2);
+    while (!callbackDisconnected.load(std::memory_order_acquire) &&
+           std::chrono::steady_clock::now() < callbackDeadline) {
+        std::this_thread::yield();
+    }
+    // An external stop must reap the worker left joinable by its self-stop.
+    serial.stopAsyncReading();
+    if (!callbackDisconnected.load(std::memory_order_acquire) || serial.isConnected()) {
+        std::cerr << "Async callback disconnect did not complete safely\n";
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+
     ::close(master);
     std::cout << "SerialCommunication PTY integration checks passed\n";
     return 0;
