@@ -80,6 +80,15 @@ add_executable(force_units_regression tests/force_units_regression.cpp)
 target_include_directories(force_units_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
 add_test(NAME force_units_regression COMMAND force_units_regression)
 
+# Biomechanical formulas and availability metadata are tested independently of Qt Widgets.
+add_executable(biomechanical_parameter_availability_regression
+    tests/biomechanical_parameter_availability_regression.cpp
+    src/formulas.cpp
+)
+target_include_directories(biomechanical_parameter_availability_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+add_test(NAME biomechanical_parameter_availability_regression
+    COMMAND biomechanical_parameter_availability_regression)
+
 # Local loopback HTTP API. Sensitive and hardware operations remain disabled
 # until authentication, authorization and measurement services are integrated.
 add_executable(biofeedback_api
