@@ -247,9 +247,14 @@ double Formulas::calculateWork(const std::vector<SensorSample>& samples) const {
             !std::isfinite(samples[i].force) || !std::isfinite(samples[i + 1].force))
             continue;
         const double dF = samples[i + 1].force - samples[i].force;
-        work += samples[i].force * dF;
+        // Hooke-law displacement is dx = dF/k. Trapezoidal integration
+        // estimates each segment's work; absolute segment work counts both
+        // loading and controlled unloading as mechanical work magnitude.
+        const double meanForce =
+            0.5 * (samples[i].force + samples[i + 1].force);
+        work += std::abs(meanForce * dF) / k_elastic_;
     }
-    return work / k_elastic_;
+    return work;
 }
 
 double Formulas::calculateAvgWorkPerRep(double totalWork, int numReps) {
@@ -739,7 +744,24 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
 
     // Parametry siłowe
     params.F_peak = calculatePeakForce(forces);
-    params.F_mean = calculateMeanForce(forces);
+    // Time-weighted mean force: sample-count averaging is biased when
+    // serial delivery intervals are non-uniform.
+    double forceTimeIntegral = 0.0;
+    double validDurationSeconds = 0.0;
+    for (std::size_t i = 0; i + 1 < rep.samples.size(); ++i) {
+        const auto& current = rep.samples[i];
+        const auto& next = rep.samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force))
+            continue;
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        forceTimeIntegral += 0.5 * (current.force + next.force) * dt;
+        validDurationSeconds += dt;
+    }
+    params.F_mean = validDurationSeconds > 0.0
+        ? forceTimeIntegral / validDurationSeconds : calculateMeanForce(forces);
     params.F_min = calculateMinForce(forces);
     params.F_range = calculateForceRange(params.F_peak, params.F_min);
     
