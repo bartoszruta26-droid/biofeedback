@@ -467,6 +467,7 @@ void SerialCommunication::disconnect() {
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
 std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? "Unknown" : ""; }
+int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
