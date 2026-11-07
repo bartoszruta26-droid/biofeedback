@@ -53,3 +53,15 @@ Zainstaluj libncurses-dev, a następnie:
     ./build/biofeedback_tui
 
 Jeśli ncurses nie jest dostępne, CMake pomija wyłącznie program TUI.
+
+## Training session controls and history
+
+The training screen supports configuration before starting:
+- target force: plus/minus in 5 N increments;
+- series count: [ and ];
+- repetitions per series: comma and period;
+- rest duration: semicolon decreases and apostrophe increases by 5 seconds (0–600 seconds).
+
+After each completed series, the TUI pauses repetition detection during the configured rest interval. The rest countdown is suspended while the session is paused. Completed repetitions are retained in memory and appended to the local CSV session history when the operator stops the session, exits the application, or completes the plan. The file is stored under the user's Biofeedback XDG application data directory with owner-only permissions.
+
+The Diagnostics screen reports valid and rejected sample counts, the last sample-quality classification, the last repetition's peak and mean force, duration and time-to-peak, and the history-file path. TUI session history is local and unencrypted; it does not include a patient identifier. It is not a substitute for the encrypted patient record workflow.
