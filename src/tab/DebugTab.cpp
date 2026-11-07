@@ -230,14 +230,16 @@ void DebugTab::addDebugMessage(const QString& message, const QString& type)
 
 void DebugTab::clearTerminal()
 {
-    std::lock_guard<std::mutex> lock(m_messageMutex);
-    
-    if (m_debugTerminal) {
-        m_debugTerminal->clear();
-        m_messageCount = 0;
-        m_lblMessageCount->setText("Wiadomości: 0");
-        addDebugMessage("Terminal wyczyszczony", "INFO");
+    {
+        std::lock_guard<std::mutex> lock(m_messageMutex);
+        if (m_debugTerminal) {
+            m_debugTerminal->clear();
+            m_messageCount = 0;
+            if (m_lblMessageCount) m_lblMessageCount->setText("Wiadomości: 0");
+        }
     }
+    // addDebugMessage acquires the same mutex; call it after releasing the lock.
+    addDebugMessage("Terminal wyczyszczony", "INFO");
 }
 
 bool DebugTab::exportLogsToFile(const QString& filename)
@@ -269,7 +271,7 @@ void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> 
         m_serialPort->setDataCallback({});
         m_serialPort->setConnectionCallback({});
     }
-    m_serialPort = std::move(serial);
+    m_serialPort = serial;
 
     if (!m_serialPort) return;
 
