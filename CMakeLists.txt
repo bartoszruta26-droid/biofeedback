@@ -57,6 +57,10 @@ add_executable(measurement_engine_regression tests/measurement_engine_regression
 target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement)
 add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
 
+add_executable(force_units_regression tests/force_units_regression.cpp)
+target_include_directories(force_units_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+add_test(NAME force_units_regression COMMAND force_units_regression)
+
 # Local loopback HTTP API. Sensitive and hardware operations remain disabled
 # until authentication, authorization and measurement services are integrated.
 add_executable(biofeedback_api
