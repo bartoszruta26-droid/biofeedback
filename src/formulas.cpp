@@ -1090,13 +1090,12 @@ BiomechanicalParams Formulas::calculateSessionParams(const std::vector<SeriesDat
         setResults.push_back(setParams);
         const std::size_t repsInSet = set.reps.size();
         totalReps += repsInSet;
-        if (setParams.availabilityAt(1) == ParameterAvailability::Available) {
+        if (setParams.availabilityAt(4) == ParameterAvailability::Available) {
             weightedMeanForce += setParams.F_set_mean * static_cast<double>(repsInSet);
         }
         for (const auto& rep : set.reps) {
             const auto repParams = calculateRepParams(rep);
-            if (repParams.availabilityAt(8) == ParameterAvailability::Available)
-                totalImpulse += repParams.I_impulse;
+            totalImpulse += repParams.I_impulse;
             repForceRanges.emplace_back(repParams.F_mean, repParams.F_range);
         }
         fatigueIndices.push_back(setParams.FI_set);
