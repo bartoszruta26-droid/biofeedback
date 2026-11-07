@@ -18,6 +18,8 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <memory>
+#include <vector>
+#include "training/RepetitionDetector.hpp"
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
@@ -70,6 +72,15 @@ struct TrainingExercise {
     
     TrainingExercise() : seriesCount(3), repsPerSeries(8), targetForce(50.0),
                          restTime(60.0), isCompleted(false) {}
+};
+
+/**
+ * @brief Pojedyncze, wykryte powtórzenie przypisane do serii.
+ */
+struct TrainingRepetitionRecord {
+    int seriesIndex{0};
+    int repetitionIndex{0};
+    biofeedback::training::RepetitionRecord measurement;
 };
 
 /**
@@ -239,6 +250,9 @@ private:
     void loadNextRep();
     void checkExerciseCompletion();
     void calculateExerciseStats();
+    void onRepetitionDetected(const biofeedback::training::RepetitionRecord& repetition);
+    void finishCurrentSeries();
+    void advanceAfterRest();
     void startRestTimer();
     void updateRestDisplay();
     
@@ -300,7 +314,10 @@ private:
     int m_sessionTime;
     int m_restTimeRemaining;
     bool m_inRestPeriod;
-    
+    bool m_restAdvancesExercise;
+    biofeedback::training::RepetitionDetector m_repetitionDetector;
+    std::vector<biofeedback::training::RepetitionRecord> m_currentSeriesRepetitions;
+
     double m_currentForce;
     double m_peakForceInRep;
     
