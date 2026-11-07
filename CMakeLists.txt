@@ -67,6 +67,24 @@ add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 add_test(NAME data_manager_regression COMMAND data_manager_regression)
 
+# Shared terminal-interface model is independent of ncurses and is always testable.
+add_library(biofeedback_tui_model STATIC src/tui/TuiModel.cpp)
+target_include_directories(biofeedback_tui_model PUBLIC ${CMAKE_SOURCE_DIR}/include)
+add_executable(tui_model_regression tests/tui_model_regression.cpp)
+target_link_libraries(tui_model_regression PRIVATE biofeedback_tui_model)
+add_test(NAME tui_model_regression COMMAND tui_model_regression)
+
+# Build the interactive terminal UI when ncurses development files are available.
+find_package(Curses QUIET)
+if(CURSES_FOUND)
+    add_executable(biofeedback_tui src/tui/main.cpp)
+    target_include_directories(biofeedback_tui PRIVATE ${CMAKE_SOURCE_DIR}/include ${CURSES_INCLUDE_DIRS})
+    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model ${CURSES_LIBRARIES})
+    install(TARGETS biofeedback_tui DESTINATION bin)
+else()
+    message(STATUS "ncurses not found - skipping optional biofeedback_tui target")
+endif()
+
 # Explicit, offline-only legacy migration utility and synthetic regression.
 add_executable(biofeedback_legacy_migrate src/tools/legacy_xor_migrate.cpp)
 target_link_libraries(biofeedback_legacy_migrate PRIVATE biofeedback_core)
