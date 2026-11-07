@@ -1,7 +1,7 @@
 #include "games/MarioGame.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QPaintEvent>
-#include <QTime>
+#include <QElapsedTimer>
 #include <cmath>
 
 namespace games {
@@ -94,7 +94,7 @@ void MarioGame::update(double deltaTime)
     updatePlayer(deltaTime);
     
     // Generowanie i aktualizacja przeszkód
-    generateObstacles();
+    generateObstacles(deltaTime);
     updateObstacles(deltaTime);
     
     // Aktualizacja chmurek
@@ -146,9 +146,9 @@ void MarioGame::updatePlayer(double deltaTime)
     }
 }
 
-void MarioGame::generateObstacles()
+void MarioGame::generateObstacles(double deltaTime)
 {
-    m_timeSinceLastObstacle += 0.016; // Zakładamy ~60 FPS
+    m_timeSinceLastObstacle += qMax(0.0, deltaTime);
     
     if (m_timeSinceLastObstacle >= m_obstacleSpawnInterval) {
         m_timeSinceLastObstacle = 0.0;
@@ -248,11 +248,11 @@ bool MarioGame::handleInput(double value)
         // Rozpoczęcie ładowania skoku
         m_player.isCharging = true;
         m_player.frame = 0; // Zatrzymanie animacji biegu
-        m_chargeStartTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
+        m_chargeClock.start();
     } else if (!isPressing && m_player.isCharging && m_player.isOnGround) {
         // Zwolnienie tensometru - wykonanie skoku
-        double currentTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
-        double chargeDuration = currentTime - m_chargeStartTime;
+        double chargeDuration = m_chargeClock.isValid() ? m_chargeClock.elapsed() / 1000.0 : 0.0;
+        m_chargeClock.invalidate();
         
         // Obliczenie siły skoku na podstawie czasu ładowania
         double chargeRatio = qMin(1.0, chargeDuration / MAX_CHARGE_TIME);
