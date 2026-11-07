@@ -1,13 +1,13 @@
 /**
  * @file SerialCommunication.cpp
  * @brief Implementacja komunikacji szeregowej z Arduino NANO HX711
- * 
+ *
  * @section DEBUG_FEATURES Funkcje Debugowania
  * - Szczegółowe logowanie operacji na portach szeregowych
  * - Śledzenie stanu połączenia i aktywności
  * - Monitorowanie błędów CRC i retry operations
  * - Statystyki transmisji danych
- * 
+ *
  * @section ERROR_HANDLING Obsługa Błędów
  * - Walidacja parametrów przed operacjami
  * - Obsługa wyjątków podczas otwierania portu
@@ -36,26 +36,37 @@
 // DEBUG FLAGS AND CONFIGURATION
 // ============================================================================
 
-/// Enable detailed debug logging for serial operations
-constexpr bool DEBUG_SERIAL_COMM = true;
+// Diagnostics are opt-in. Enable explicitly in a local diagnostic build only.
+constexpr bool DEBUG_SERIAL_COMM = false;
 
-/// Enable verbose data packet debugging
+// Enable verbose data packet debugging
 constexpr bool DEBUG_DATA_PACKETS = false;
 
-/// Enable connection state debugging
-constexpr bool DEBUG_CONNECTION = true;
+// Connection diagnostics can reveal device topology and are disabled by default.
+constexpr bool DEBUG_CONNECTION = false;
 
-/// Enable CRC validation debugging
+// Enable CRC validation debugging
 constexpr bool DEBUG_CRC = false;
 
-/// Maximum number of connection retries
+// Maximum number of connection retries
 constexpr int MAX_CONNECTION_RETRIES = 3;
 
-/// Delay between connection retries in milliseconds
+// Delay between connection retries in milliseconds
 constexpr int CONNECTION_RETRY_DELAY_MS = 500;
 
 #define DEFAULT_BAUD_RATE 115200
 #define WATCHDOG_DEFAULT_TIMEOUT_MS 5000
+
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <dirent.h>
+    #include <unistd.h>
+    #include <termios.h>
+    #include <fcntl.h>
+    #include <sys/ioctl.h>
+    #include <cerrno>
+#endif
 
 #ifdef _WIN32
     #include <windows.h>
@@ -184,7 +195,7 @@ public:
     std::thread asyncThread;
     std::mutex readMutex;
     std::string lastError;
-    bool verbose = true;
+    bool verbose = false;
     int32_t timestampOffset = 0;
 };
 
