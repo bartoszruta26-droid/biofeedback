@@ -136,6 +136,7 @@ void TrainingAnalyticsWidget::setHistoryFilePath(const QString& filePath) {
 }
 
 bool TrainingAnalyticsWidget::beginSession() {
+    if (!m_historyReadable) return false;
     // Never discard an unfinished session, including a session interrupted
     // before its first repetition. It must be persisted before a new one starts.
     if (!m_activeSessionHistoryFilePath.isEmpty() && !m_sessionSaved)
