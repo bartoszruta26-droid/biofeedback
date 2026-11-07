@@ -1,8 +1,10 @@
 #include "tab/MeasurementTab.hpp"
+#include <utility>
 #include "sensor/SerialCommunication.hpp"
 #include <QFileInfo>
 #include <QTextStream>
 #include <QDateTime>
+#include <QSignalBlocker>
 #include <QRandomGenerator>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -181,7 +183,7 @@ void ForcePlotWidget::setUnit(ForceUnit unit)
 QString ForcePlotWidget::getUnitLabel() const
 {
     switch (m_unit) {
-        case ForceUnit::Kilograms: return "kg";
+        case ForceUnit::Kilograms: return "kgf";
         case ForceUnit::Raw: return "ADC";
         default: return "N";
     }
@@ -369,7 +371,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_statsTable(nullptr)
     , m_rawBox(nullptr)
     , m_rawTable(nullptr)
-    , m_timer(nullptr)
     , m_isMeasuring(false)
     , m_currentSeries(1)
     , m_currentRepInSeries(0)
@@ -383,8 +384,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_repStartTime(0)
     , m_repPeakTime(0)
     , m_contractionThreshold(5.0)  // 5 N próg detekcji
-    , m_showRawValues(true)  // Domyślnie pokazujemy wartości surowe (Value z Arduino)
     , m_currentUnit(ForceUnit::Newtons)  // Domyślna jednostka: Newtony
+    , m_showRawValues(false)  // Domyślnie używamy skalibrowanej siły
     , m_unitSelector(nullptr)
     , m_trendsBox(nullptr)
     , m_trendsScrollArea(nullptr)
@@ -397,20 +398,13 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     m_btnSaveJSON = nullptr;
     m_btnLoadJSON = nullptr;
     
-    // Inicjalizacja połączenia szeregowego
-    m_serialPort = std::make_shared<sensor::SerialCommunication>();
+    // Wspólne połączenie jest wstrzykiwane przez MainWindow.
+    // Nie twórz osobnego portu ani wątku przed ustawieniem właściciela połączenia.
     m_lastSensorData = sensor::SensorData();
-    
-    // Próba automatycznego podłączenia do Arduino w tle
-    connectToArduinoAsync();
     
     // MeasurementTab nie posiada własnego terminala debugowego.
     // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
     // który przekazuje je do centralnej zakładki DebugTab.
-    
-    m_timer = new QTimer(this);
-    m_timer->setInterval(10);  // 10 ms = 100 Hz
-    connect(m_timer, &QTimer::timeout, this, &MeasurementTab::onTimerTick);
     
     setupUI();
     setupTrendsUI();
@@ -418,6 +412,12 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
+    m_connectionSearchActive.store(false);
+    if (m_connectionThread.joinable()) m_connectionThread.join();
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     // Qt automatycznie czyści widgety z parentem
 }
 
@@ -491,23 +491,37 @@ void MeasurementTab::setupUI()
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
     // Przełącznik trybu Raw/Calibrated - zablokowany podczas aktywnej sesji
-    m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
+    m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI SKALIBROWANE", this);
     m_btnToggleRaw->setCheckable(true);
-    m_btnToggleRaw->setChecked(true);  // Domyślnie włączone (wartości surowe)
+    m_btnToggleRaw->setChecked(false);  // Binarny firmware przekazuje siłę skalibrowaną, bez surowego ADC.
     m_btnToggleRaw->setEnabled(false);  // Domyślnie wyłączone
     m_btnToggleRaw->setMinimumHeight(35);
     m_btnToggleRaw->setFont(QFont("Arial", 9));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
+        if (checked && !m_lastSensorData.hasRawValue) {
+            const QSignalBlocker blocker(m_btnToggleRaw);
+            m_btnToggleRaw->setChecked(false);
+            checked = false;
+        }
         m_showRawValues = checked;
         if (checked) {
+            m_currentUnit = ForceUnit::Raw;
             m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
             m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
         } else {
+            if (m_currentUnit == ForceUnit::Raw) m_currentUnit = ForceUnit::Newtons;
             m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
             m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
         }
+        if (m_unitSelector) {
+            const QSignalBlocker blocker(m_unitSelector);
+            m_unitSelector->setCurrentIndex(
+                m_unitSelector->findData(static_cast<int>(m_currentUnit)));
+        }
+        if (m_forcePlot) m_forcePlot->setUnit(m_currentUnit);
+        updateUnitDisplay();
     });
-    m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
+    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
     m_btnReset->setMinimumHeight(35);
@@ -752,7 +766,6 @@ void MeasurementTab::startMeasurement()
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
-    m_timer->start();
     
     std::cout << "[DEBUG] startMeasurement: Locking Raw/Calibrated button" << std::endl;
     
@@ -784,7 +797,6 @@ void MeasurementTab::stopMeasurement()
         return;
     }
     
-    m_timer->stop();
     m_isMeasuring = false;
     
     // Jeśli trwa powtórzenie, zakończ je
@@ -797,7 +809,7 @@ void MeasurementTab::stopMeasurement()
     
     // Odblokuj przycisk zmiany trybu Raw/Calibrated po zatrzymaniu pomiaru
     if (m_btnToggleRaw) {
-        m_btnToggleRaw->setEnabled(true);
+        m_btnToggleRaw->setEnabled(m_lastSensorData.hasRawValue);
         // Przywróć odpowiedni kolor w zależności od stanu
         if (m_showRawValues) {
             m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
@@ -991,8 +1003,8 @@ void MeasurementTab::updateLiveDisplay(double force)
     if (!m_showRawValues) {
         switch (m_currentUnit) {
             case ForceUnit::Kilograms:
-                displayForce = force * 1000.0 / 9.81;  // N -> kg
-                unitLabel = "kg";
+                displayForce = force / 9.81;  // N -> kgf
+                unitLabel = "kgf";
                 std::cout << "[DEBUG] updateLiveDisplay: Converted to kg, displayForce=" << displayForce << std::endl;
                 break;
             case ForceUnit::Raw:
@@ -1373,64 +1385,37 @@ void MeasurementTab::onToggleMeasurement()
 
 void MeasurementTab::onReadSingleSample()
 {
-    // Odczyt z Arduino Nano z HX711 przez SerialCommunication
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data = m_serialPort->readData(500);
-        if (data.isValid) {
-            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-            readSingleSample(valueToUse);
-            m_lastSensorData = data;
-        } else {
-            // Jeśli dane nie są poprawne, wyświetl komunikat
-            m_lblStatus->setText("Status: BŁĄD ODCZYTU");
-            m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
-        }
-    } else {
-        // Brak podłączonego Arduino - wyświetl komunikat
+    // Korzystaj z ostatniej próbki wspólnego odbiornika. Nie wykonuj
+    // konkurencyjnego readData() na porcie obsługiwanym przez async reader.
+    if (!m_serialPort || !m_serialPort->isConnected()) {
         m_lblStatus->setText("Status: BRAK ARDUINO NANO Z HX711");
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
         emit arduinoConnectionStatus(false, "Nie wykryto Arduino Nano z HX711. Sprawdź połączenie USB.");
+        return;
     }
-}
+    if (!m_lastSensorData.isValid) {
+        m_lblStatus->setText("Status: OCZEKIWANIE NA PRÓBKĘ");
+        return;
+    }
+    if (m_showRawValues) {
+        m_lblStatus->setText(m_lastSensorData.hasRawValue
+            ? "Status: RAW ADC — TRYB DIAGNOSTYCZNY, PRÓBKA NIE JEST SIŁĄ"
+            : "Status: FIRMWARE NIE UDOSTĘPNIA SUROWEGO ADC");
+        return;
+    }
+    if (m_lastSensorData.calibrationStatus != sensor::CalibrationStatus::Calibrated ||
+        m_lastSensorData.unit != sensor::MeasurementUnit::Grams ||
+        !std::isfinite(m_lastSensorData.calibratedValue)) {
+        m_lblStatus->setText("Status: BRAK POTWIERDZONEJ KALIBRACJI W GRAMACH");
+        return;
+    }
 
-void MeasurementTab::onTimerTick()
-{
-    // Pobieranie danych z prawdziwego Arduino zamiast symulacji
-    if (m_serialPort && m_serialPort->isConnected()) {
-        sensor::SensorData data;
-        if (m_serialPort->tryReadData(data)) {
-            if (data.isValid) {
-                std::cout << "[DEBUG] onTimerTick: RAW DATA FROM ARDUINO - timestamp=" << data.timestamp 
-                          << " value=" << data.value << " calibratedValue=" << data.calibratedValue 
-                          << " isValid=" << data.isValid << " crc=" << static_cast<int>(data.crc) << std::endl;
-                
-                m_lastSensorData = data;
-                // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-                double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-                std::cout << "[DEBUG] onTimerTick: valueToUse after conversion=" << valueToUse 
-                          << " m_showRawValues=" << m_showRawValues << std::endl;
-                
-                // Safety check before calling readSingleSample
-                try {
-                    std::cout << "[DEBUG] onTimerTick: About to call readSingleSample with value=" << valueToUse << std::endl;
-                    readSingleSample(valueToUse);
-                    std::cout << "[DEBUG] onTimerTick: readSingleSample completed successfully" << std::endl;
-                } catch (const std::exception& e) {
-                    std::cerr << "[ERROR] onTimerTick: Exception in readSingleSample: " << e.what() << std::endl;
-                } catch (...) {
-                    std::cerr << "[ERROR] onTimerTick: Unknown exception in readSingleSample" << std::endl;
-                }
-            } else {
-                std::cout << "[DEBUG] onTimerTick: Received invalid data" << std::endl;
-            }
-        } else {
-            std::cout << "[DEBUG] onTimerTick: tryReadData returned false" << std::endl;
-        }
-    } else {
-        std::cout << "[DEBUG] onTimerTick: Serial port not connected" << std::endl;
+    const double forceNewtons = m_lastSensorData.calibratedValue * 9.81 / 1000.0;
+    if (!std::isfinite(forceNewtons)) {
+        m_lblStatus->setText("Status: NIEPRAWIDŁOWA WARTOŚĆ SIŁY");
+        return;
     }
-    // Jeśli Arduino nie jest podłączone, nie wykonujemy symulacji - czekamy na podłączenie
+    readSingleSample(forceNewtons);
 }
 
 void MeasurementTab::onSelectionChanged()
@@ -1898,15 +1883,23 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
 
 void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
+    // Zatrzymaj poprzednie wyszukiwanie przed podmianą współdzielonego portu.
+    m_connectionSearchActive.store(false);
+    if (m_connectionThread.joinable()) m_connectionThread.join();
+
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    m_serialPort = std::move(serial);
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback przychodzi z wątku odczytu szeregowego -
-            // przekaż dane bezpiecznie do wątku GUI.
+        m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
             QMetaObject::invokeMethod(this, [this, data]() {
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
         });
+        if (!m_serialPort->isConnected()) connectToArduinoAsync();
+        else m_serialPort->startAsyncReading();
     }
 }
 
@@ -1917,118 +1910,121 @@ bool MeasurementTab::isArduinoConnected() const
 
 void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
-    std::cout << "[DEBUG] onSensorDataReceived: data.isValid=" << data.isValid 
-              << " m_isMeasuring=" << m_isMeasuring << std::endl;
-    
-    if (data.isValid) {
-        m_lastSensorData = data;
-        
-        // Dodaj dane z Arduino do terminala debugowania (zawsze, nie tylko podczas pomiaru)
-        QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
-            .arg(data.value)
-            .arg(data.calibratedValue);
-        addDebugMessage(arduinoDebug, "ARDUINO");
-        
-        if (m_isMeasuring) {
-            // Wybierz wartość w zależności od trybu: raw value czy skalibrowana
-            double valueToUse = m_showRawValues ? static_cast<double>(data.value) : data.calibratedValue;
-            
-            std::cout << "[DEBUG] onSensorDataReceived: showRawValues=" << m_showRawValues 
-                      << " currentUnit=" << static_cast<int>(m_currentUnit) 
-                      << " valueToUse(before conversion)=" << valueToUse << std::endl;
-            
-            // Jeśli nie używamy wartości surowej, przelicz na wybraną jednostkę
-            if (!m_showRawValues && m_currentUnit != ForceUnit::Newtons) {
-                // calibratedValue jest w gramach, przelicz na Newtony najpierw
-                double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
-                valueToUse = convertForce(forceInNewtons, m_currentUnit);
-                std::cout << "[DEBUG] onSensorDataReceived: Converted to unit, valueToUse=" << valueToUse << std::endl;
-            } else if (m_showRawValues) {
-                // Wartość surowa - nie przeliczaj
-                valueToUse = static_cast<double>(data.value);
-                std::cout << "[DEBUG] onSensorDataReceived: Using raw value=" << valueToUse << std::endl;
-            } else {
-                // calibratedValue jest w gramach, przelicz na Newtony
-                valueToUse = data.calibratedValue * 9.81 / 1000.0;
-                std::cout << "[DEBUG] onSensorDataReceived: Converted to Newtons, valueToUse=" << valueToUse << std::endl;
-            }
-            
-            std::cout << "[DEBUG] onSensorDataReceived: Calling readSingleSample with value=" << valueToUse << std::endl;
-            readSingleSample(valueToUse);
-        } else {
-            std::cout << "[DEBUG] onSensorDataReceived: Not measuring, ignoring data" << std::endl;
-        }
-    } else {
-        std::cout << "[DEBUG] onSensorDataReceived: Received invalid data" << std::endl;
-        addDebugMessage("Otrzymano nieprawidłowe dane z Arduino", "WARNING");
+    if (!data.isValid) return;
+
+    m_lastSensorData = data;
+
+    if (!data.hasRawValue && m_currentUnit == ForceUnit::Raw)
+        setCurrentUnit(ForceUnit::Newtons);
+
+    if (!data.hasRawValue && m_showRawValues && m_btnToggleRaw)
+        m_btnToggleRaw->setChecked(false);
+    if (m_btnToggleRaw && !m_isMeasuring)
+        m_btnToggleRaw->setEnabled(data.hasRawValue);
+
+    const bool calibratedGramsAvailable =
+        data.calibrationStatus == sensor::CalibrationStatus::Calibrated &&
+        data.unit == sensor::MeasurementUnit::Grams &&
+        std::isfinite(data.calibratedValue);
+
+    const QString frameValue = data.hasRawValue
+        ? QString("RAW_ADC_COUNTS=%1").arg(data.value)
+        : QString("FORCE_VALUE=%1").arg(
+              calibratedGramsAvailable
+                  ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
+                  : QStringLiteral("UNKNOWN_UNIT"));
+    addDebugMessage(frameValue, "ARDUINO");
+
+    // Raw ADC is diagnostic data, never a force measurement. It must not enter
+    // session buffers, statistics, graphs or exports with force units.
+    if (m_showRawValues) {
+        if (data.hasRawValue && m_lblStatus)
+            m_lblStatus->setText(QString("Status: DIAGNOSTYKA RAW ADC (%1) — PRÓBKA NIE JEST SIŁĄ").arg(data.value));
+        return;
     }
+
+    if (!calibratedGramsAvailable) {
+        if (m_isMeasuring && m_lblStatus &&
+            m_lblStatus->text() != "Status: BRAK POTWIERDZONEJ KALIBRACJI W GRAMACH")
+            m_lblStatus->setText("Status: BRAK POTWIERDZONEJ KALIBRACJI W GRAMACH");
+        return;
+    }
+
+    if (!m_isMeasuring) return;
+
+    const double forceNewtons = data.calibratedValue * 9.81 / 1000.0;
+    if (!std::isfinite(forceNewtons)) return;
+    readSingleSample(forceNewtons);
 }
 
 void MeasurementTab::connectToArduinoAsync()
 {
-    // Uruchomienie wątku do automatycznego łączenia z Arduino
-    std::thread([this]() {
+    if (!m_serialPort || m_connectionSearchActive.exchange(true)) return;
+    if (m_connectionThread.joinable()) m_connectionThread.join();
+
+    const auto serial = m_serialPort;
+    m_connectionThread = std::thread([this, serial]() {
         std::cout << "[MeasurementTab] Searching for Arduino Nano with HX711..." << std::endl;
-        
-        bool connected = false;
         int retryCount = 0;
-        
-        while (!connected) {
-            auto ports = sensor::SerialCommunication::scanAvailablePorts();
-            
-            if (ports.empty()) {
-                if (retryCount % 10 == 0) {
-                    std::cerr << "[MeasurementTab] No serial ports found. Check USB connection." << std::endl;
+
+        while (m_connectionSearchActive.load() && !serial->isConnected()) {
+            const auto ports = sensor::SerialCommunication::scanAvailablePorts();
+            for (const auto& port : ports) {
+                if (!m_connectionSearchActive.load()) break;
+
+                sensor::SerialConfig config;
+                config.portName = port;
+                config.baudRate = 115200;
+                config.dataBits = 8;
+                config.parity = 'N';
+                config.stopBits = 1.0f;
+                config.timeout = 1000;
+
+                if (!serial->connect(config)) continue;
+
+                // Daj urządzeniu czas na restart po otwarciu portu.
+                for (int waited = 0; waited < 1500 && m_connectionSearchActive.load(); waited += 50)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+                if (!m_connectionSearchActive.load()) {
+                    serial->disconnect();
+                    break;
                 }
-            } else {
-                for (const auto& port : ports) {
-                    std::cout << "[MeasurementTab] Trying port: " << port << std::endl;
-                    
-                    sensor::SerialConfig config;
-                    config.portName = port;
-                    config.baudRate = 115200;
-                    config.dataBits = 8;
-                    config.parity = 'N';
-                    config.stopBits = 1.0f;
-                    config.timeout = 1000;
-                    
-                    if (m_serialPort->connect(config)) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
-                        
-                        auto info = m_serialPort->identifyArduino(2000);
-                        if (info.isConnected) {
-                            std::cout << "[MeasurementTab] FOUND Arduino Nano on " << port << std::endl;
-                            std::cout << "[MeasurementTab] Device: " << info.deviceName << std::endl;
-                            std::cout << "[MeasurementTab] Firmware: " << info.firmwareVersion << std::endl;
-                            
-                            m_hasArduinoConnection = true;
-                            connected = true;
-                            
-                            // Emituj sygnał w głównym wątku
-                            QMetaObject::invokeMethod(this, [this, info]() {
-                                m_lblStatus->setText("Status: ARDUINO PODŁĄCZONE");
-                                m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
-                                emit arduinoConnectionStatus(true, QString("Wykryto Arduino: %1").arg(QString::fromStdString(info.deviceName)));
-                            }, Qt::QueuedConnection);
-                            
-                            break;
-                        } else {
-                            m_serialPort->disconnect();
+
+                const auto info = serial->identifyArduino(2000);
+                if (!m_connectionSearchActive.load()) {
+                    serial->disconnect();
+                    return;
+                }
+                if (info.isConnected) {
+                    serial->startAsyncReading();
+                    m_connectionSearchActive.store(false);
+                    QMetaObject::invokeMethod(this, [this, info]() {
+                        m_hasArduinoConnection = true;
+                        if (m_lblStatus) {
+                            m_lblStatus->setText("Status: ARDUINO PODŁĄCZONE");
+                            m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
                         }
-                    }
+                        emit arduinoConnectionStatus(
+                            true, QString("Wykryto Arduino: %1")
+                                      .arg(QString::fromStdString(info.deviceName)));
+                    }, Qt::QueuedConnection);
+                    std::cout << "[MeasurementTab] FOUND Arduino Nano on " << port << std::endl;
+                    return;
                 }
+
+                serial->disconnect();
             }
-            
-            if (!connected) {
-                retryCount++;
-                if (retryCount % 5 == 0) {
-                    std::cerr << "[MeasurementTab] Arduino not found. Retrying... (" << retryCount << ")" << std::endl;
-                    std::cerr << "[MeasurementTab] Please connect Arduino Nano with HX711 to USB port." << std::endl;
-                }
-                std::this_thread::sleep_for(std::chrono::seconds(2));
-            }
+
+            if (!m_connectionSearchActive.load()) break;
+            ++retryCount;
+            if (retryCount % 5 == 0)
+                std::cerr << "[MeasurementTab] Arduino not found. Retrying... (" << retryCount << ")" << std::endl;
+            for (int waited = 0; waited < 2000 && m_connectionSearchActive.load(); waited += 50)
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
-    }).detach();
+        m_connectionSearchActive.store(false);
+    });
 }
 
 // ============================================================================
@@ -2039,8 +2035,8 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 {
     switch (targetUnit) {
         case ForceUnit::Kilograms:
-            // 1 kgf = 9.81 N, więc dzielimy przez 9.81 i mnożymy przez 1000 (gramy -> kg)
-            return newtons * 1000.0 / 9.81;  // zwraca w kg
+            // 1 kgf = 9.81 N.
+            return newtons / 9.81;  // kgf
         case ForceUnit::Raw:
             // Wartość surowa nie jest konwertowana z Newtonów
             return newtons;
@@ -2052,8 +2048,23 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
 
 void MeasurementTab::setCurrentUnit(ForceUnit unit)
 {
+    if (unit == ForceUnit::Raw && !m_lastSensorData.hasRawValue) {
+        unit = ForceUnit::Newtons;
+        addDebugMessage("Firmware nie udostępnia surowych zliczeń ADC; pozostawiono niutony.", "WARNING");
+        if (m_unitSelector) {
+            const QSignalBlocker blocker(m_unitSelector);
+            m_unitSelector->setCurrentIndex(m_unitSelector->findData(static_cast<int>(ForceUnit::Newtons)));
+        }
+    }
+
+    const bool rawMode = unit == ForceUnit::Raw;
+    if (m_btnToggleRaw && m_btnToggleRaw->isChecked() != rawMode)
+        m_btnToggleRaw->setChecked(rawMode);
+    else
+        m_showRawValues = rawMode;
+
     m_currentUnit = unit;
-    
+
     // Aktualizuj wykres siły
     if (m_forcePlot) {
         m_forcePlot->setUnit(unit);
@@ -2066,7 +2077,7 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
     
     std::cout << "[MeasurementTab] Changed force unit to: " 
               << (unit == ForceUnit::Newtons ? "Newtons" : 
-                  unit == ForceUnit::Kilograms ? "Kilograms" : "Raw") 
+                  unit == ForceUnit::Kilograms ? "Kilogram-force (kgf)" : "Raw") 
               << std::endl;
 }
 
@@ -2092,7 +2103,7 @@ void MeasurementTab::updateUnitDisplay()
         double displayForce = currentForce;
         
         if (!m_showRawValues && m_currentUnit == ForceUnit::Kilograms) {
-            displayForce = currentForce * 1000.0 / 9.81;
+            displayForce = currentForce / 9.81;
         }
         
         m_lblCurrentForce->setText(QString("Aktualna siła: %1 %2").arg(displayForce, 0, 'f', 1).arg(unitLabel));
@@ -2156,14 +2167,6 @@ void MeasurementTab::updateRawTableUnits()
     }
 }
 
-
-void MeasurementTab::setupDebugTerminal()
-{
-    // Terminal debugowania jest teraz centralny w DebugTab
-    // Ta metoda może być używana do inicjalizacji jeśli potrzebna
-    addDebugMessage("=== TERMINAL DEBUGOWANIA URUCHOMIONY ===", "INFO");
-    addDebugMessage("Oczekiwanie na dane z Arduino Nano z HX711...", "SERIAL");
-}
 
 void MeasurementTab::addDebugMessage(const QString& message, const QString& type)
 {

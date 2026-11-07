@@ -9,7 +9,6 @@
 #include <QTableWidget>
 #include <QGroupBox>
 #include <QProgressBar>
-#include <QTimer>
 #include <QVector>
 #include <QString>
 #include <QPainter>
@@ -20,6 +19,8 @@
 #include <QHeaderView>
 #include <QTextEdit>
 #include <memory>
+#include <atomic>
+#include <thread>
 #include <QComboBox>
 
 #include "sensor/SerialCommunication.hpp"
@@ -298,7 +299,6 @@ public slots:
 private slots:
     void onToggleMeasurement();
     void onReadSingleSample();
-    void onTimerTick();
     void onSelectionChanged();
 
 private:
@@ -367,7 +367,6 @@ private:
     QTableWidget* m_rawTable;
     
     // Logika i dane
-    QTimer* m_timer;
     bool m_isMeasuring;
     QString m_patientId;
     
@@ -414,6 +413,9 @@ private:
     
     // Połączenie szeregowe z Arduino
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
+    std::atomic<bool> m_connectionSearchActive{false};
+    std::thread m_connectionThread;
     sensor::SensorData m_lastSensorData;
     bool m_hasArduinoConnection;
 };

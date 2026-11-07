@@ -3,9 +3,10 @@
 
 #include <string>
 #include <vector>
-#include <cstdint>
 #include <chrono>
 #include <functional>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <map>
 
@@ -15,16 +16,32 @@
 namespace sensor {
 
 /**
- * @brief Struktura reprezentująca dane z czujnika
+ * Status kalibracji i jednostka są niezależne od poprawności ramki/CRC.
+ * UNKNOWN oznacza, że firmware nie przekazał wiarygodnej informacji.
+ */
+enum class CalibrationStatus { Unknown, NotCalibrated, Calibrated, Error };
+enum class MeasurementUnit { Unknown, RawAdcCounts, Grams, Newtons };
+
+/**
+ * @brief Struktura reprezentująca dane z czujnika.
+ * isValid oznacza wyłącznie poprawność ramki/protokołu, nie kalibrację.
  */
 struct SensorData {
     uint32_t timestamp;      ///< Timestamp w milisekundach
-    int32_t value;           ///< Wartość surowa z czujnika
-    double calibratedValue;  ///< Wartość po kalibracji
+    int32_t value;           ///< Pole surowe/transportowe; interpretować zgodnie z hasRawValue i unit
+    bool hasRawValue;        ///< Czy value zawiera surowe zliczenia ADC
+    double calibratedValue;  ///< Wartość skalibrowana; NaN, jeśli niepotwierdzona
+    MeasurementUnit unit;    ///< Jednostka calibratedValue
+    CalibrationStatus calibrationStatus; ///< Stan kalibracji zgłoszony/potwierdzony przez firmware
     uint8_t crc;             ///< Suma kontrolna CRC
-    bool isValid;            ///< Flagi poprawności danych
-    
-    SensorData() : timestamp(0), value(0), calibratedValue(0.0), crc(0), isValid(false) {}
+    bool isValid;            ///< Poprawność ramki, niezależnie od kalibracji
+
+    SensorData()
+        : timestamp(0), value(0), hasRawValue(false),
+          calibratedValue(std::numeric_limits<double>::quiet_NaN()),
+          unit(MeasurementUnit::Unknown),
+          calibrationStatus(CalibrationStatus::Unknown),
+          crc(0), isValid(false) {}
 };
 
 /**
@@ -72,6 +89,7 @@ public:
      * @brief Typ funkcji callback dla nowych danych
      */
     using DataCallback = std::function<void(const SensorData&)>;
+    using SubscriptionId = std::uint64_t;
     
     /**
      * @brief Typ funkcji callback dla statusu połączenia
@@ -121,6 +139,7 @@ public:
      * @return Nazwa portu lub pusty string jeśli niepołączony
      */
     std::string getPortName() const;
+    int getBaudRate() const;
 
     // ==================== Identyfikacja ====================
     
@@ -171,6 +190,12 @@ public:
      * @param callback Funkcja wywoływana przy nowych danych
      */
     void setDataCallback(DataCallback callback);
+
+    /** Rejestruje niezależnego odbiorcę próbek. */
+    SubscriptionId subscribeDataCallback(DataCallback callback);
+    void unsubscribeDataCallback(SubscriptionId id);
+    SubscriptionId subscribeConnectionCallback(ConnectionCallback callback);
+    void unsubscribeConnectionCallback(SubscriptionId id);
     
     /**
      * @brief Rejestruje callback dla zmian statusu połączenia
@@ -250,7 +275,8 @@ public:
     /**
      * @brief Ustawia punkt kalibracyjny
      * @param rawValue Surowa wartość z czujnika
-     * @param knownValue Znana wartość wzorcowa
+     * @param knownValue Znana wartość wzorcowa w gramach
+     * @note Pomocnicza konwersja hosta; nie stosować ponownie do skalibrowanej ramki firmware.
      */
     void setCalibrationPoint(int32_t rawValue, double knownValue);
     
@@ -258,7 +284,7 @@ public:
      * @brief Kalibruje czujnik używając dwóch punktów
      * @param rawZero Surowa wartość dla zera
      * @param rawSpan Surowa wartość dla znanej wagi
-     * @param knownWeight Znana waga w jednostkach użytkownika
+     * @param knownWeight Znana masa wzorcowa w gramach
      * @return true jeśli kalibracja pomyślna
      */
     bool calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight);
@@ -266,7 +292,8 @@ public:
     /**
      * @brief Konwertuje surową wartość na skalibrowaną
      * @param rawValue Surowa wartość
-     * @return Skalibrowana wartość
+     * @return Skalibrowana wartość w gramach; NaN przed ustawieniem kalibracji hosta
+     * @note Ramka binarna firmware zawiera już skalibrowaną wartość i nie korzysta z tej metody.
      */
     double convertToCalibrated(int32_t rawValue) const;
     
@@ -315,7 +342,7 @@ public:
      * @param waitForResponse Czy czekać na odpowiedź
      * @return Odpowiedź z Arduino (pusta jeśli nie oczekiwano)
      */
-    std::string sendCommand(const std::string& command, bool waitForResponse = true);
+    std::string sendCommand(const std::string& command, bool waitForResponse = true, int timeoutMs = 2000);
     
     /**
      * @brief Wysyła dane binarne do Arduino
@@ -351,6 +378,7 @@ private:
     bool writeToPort(const uint8_t* data, size_t length);
     SensorData parseSensorData(const std::vector<uint8_t>& rawData);
     void updateWatchdog();
+    void notifyConnectionCallbacks(bool connected, const std::string& message);
 };
 
 } // namespace sensor

@@ -7,7 +7,11 @@
 #include "tab/DebugTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
+#include "games/PongGame.hpp"
+#include "games/FlappyBirdGame.hpp"
+#include "games/MarioGame.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "core/DebugManager.hpp"
 #include <QApplication>
 #include <QSettings>
 #include <QDateTime>
@@ -168,7 +172,10 @@ void MainWindow::setupControlPanel()
 
 void MainWindow::addDebugMessage(const QString& message, const QString& type)
 {
-    if (!m_debugTerminal) return;
+    if (!m_debugTerminal) {
+        core::DebugManager::instance().sendDebugMessage(message, type);
+        return;
+    }
     
     QString timestamp = QDateTime::currentDateTime().toString("hh:mm:ss.zzz");
     QString coloredMessage;
@@ -203,6 +210,10 @@ void MainWindow::addDebugMessage(const QString& message, const QString& type)
 
 void MainWindow::clearDebugTerminal()
 {
+    if (m_debugTab) {
+        m_debugTab->clearTerminal();
+        return;
+    }
     if (m_debugTerminal) {
         m_debugTerminal->clear();
         addDebugMessage("Debug terminal cleared", "INFO");
@@ -394,6 +405,34 @@ void MainWindow::createConnections()
     
     connect(m_outlineTab, &tab::OutlineTab::gameFinished,
             this, &MainWindow::onGameFinished);
+
+    // TrainingTab requests a game by stable type ID. The widget is parented
+    // to TrainingTab, which owns its lifetime; the Outline game path remains separate.
+    connect(m_trainingTab, &tab::TrainingTab::gameTypeRequested, this,
+            [this](const QString& gameType) {
+        if (!m_trainingTab) return;
+
+        // TrainingTab is the only serial subscriber for this session and
+        // forwards each sample through handleSensorInput(). Do not attach the
+        // game's optional serial subscription here (that would duplicate input).
+        games::GameEngine* game = nullptr;
+        if (gameType == "pong") {
+            game = new games::PongGame(m_trainingTab);
+        } else if (gameType == "flappy") {
+            game = new games::FlappyBirdGame(m_trainingTab);
+        } else if (gameType == "mario") {
+            game = new games::MarioGame(m_trainingTab);
+        } else if (gameType == "sin" || gameType == "sin_game") {
+            game = new games::SinGame(m_trainingTab);
+        }
+
+        if (!game) {
+            m_trainingTab->setGameEngine(nullptr, gameType);
+            addDebugMessage(QString("Nieobsługiwany typ gry treningowej: %1").arg(gameType), "ERROR");
+            return;
+        }
+        m_trainingTab->setGameEngine(game, gameType);
+    });
     
     // GraphWidget is now managed by MeasurementTab - no need for tab change handling here
 }
@@ -499,7 +538,7 @@ void MainWindow::exportData()
 {
     // Export functionality is now handled by MeasurementTab
     if (m_measurementTab) {
-        m_measurementTab->onSaveMeasurementJSON();  // Or onSaveData() for CSV export
+        m_measurementTab->onSaveData();
     } else {
         QMessageBox::warning(this, tr("Błąd"), tr("Zakładka pomiarów nie jest zainicjalizowana."));
     }

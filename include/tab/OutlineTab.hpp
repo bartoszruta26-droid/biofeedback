@@ -324,6 +324,7 @@ private:
     
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
     
 public:
     /**

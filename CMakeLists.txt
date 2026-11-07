@@ -22,10 +22,12 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 find_package(PkgConfig REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(nlohmann_json REQUIRED)
 
 # Core library (no Qt dependency) available in all environments.
 add_library(biofeedback_core STATIC
     src/core/Logger.cpp
+    src/core/ConfigManager.cpp
     src/core/Authentication.cpp
     src/data/DataManager.cpp
     src/data/Encryption.cpp
@@ -45,6 +47,7 @@ target_link_libraries(biofeedback_core
         OpenSSL::Crypto
         pthread
         Qt5::Core
+        nlohmann_json::nlohmann_json
 )
 
 # Regression targets that can be built without Qt.
@@ -54,10 +57,27 @@ target_link_libraries(auth_regression PRIVATE biofeedback_core)
 add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 
-# Build GUI app only when Qt5 development packages are available.
+add_executable(rep_detector_regression tests/rep_detector_regression.cpp)
+target_include_directories(rep_detector_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+
+# Build GUI app only when requested and Qt5 development packages are available.
+option(BIOFEEDBACK_BUILD_GUI "Build the Qt desktop application" ON)
 find_package(Qt5 QUIET COMPONENTS Core Widgets Charts)
-if(Qt5_FOUND)
-    find_package(nlohmann_json REQUIRED)
+
+# Real serial callback fan-out regression test (Linux PTY emulator).
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(serial_subscription_regression
+        tests/serial_subscription_regression.cpp
+        src/sensor/SerialCommunication.cpp
+        src/core/DebugManager.cpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(serial_subscription_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(serial_subscription_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(serial_subscription_regression PRIVATE Qt5::Core pthread util)
+endif()
+
+if(BIOFEEDBACK_BUILD_GUI AND Qt5_FOUND)
     pkg_check_modules(LIBSERIALPORT REQUIRED libserialport)
 
     # Qt5 MOC headers
@@ -70,6 +90,7 @@ if(Qt5_FOUND)
         src/main.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
+        src/core/DebugManager.cpp
         src/core/ConfigManager.cpp
         src/core/Authentication.cpp
         src/gui/MainWindow.cpp
@@ -95,6 +116,7 @@ if(Qt5_FOUND)
     set(HEADERS
         include/core/Application.hpp
         include/core/Logger.hpp
+        include/core/DebugManager.hpp
         include/core/ConfigManager.hpp
         include/core/Authentication.hpp
         include/gui/MainWindow.hpp
@@ -150,6 +172,7 @@ if(Qt5_FOUND)
         Qt5::Widgets
         Qt5::Charts
     )
+
 else()
     message(WARNING "Qt5 not found - GUI target '${PROJECT_NAME}' will not be built. Core/regression targets remain available.")
 endif()

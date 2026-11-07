@@ -18,6 +18,8 @@
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
 #include <chrono>
+#include <cmath>
+#include <limits>
 #include <cstring>
 #include <algorithm>
 #include <fstream>
@@ -29,7 +31,13 @@
 #include <climits>
 #include <cstdio>
 #include <stdexcept>
+#include <unordered_map>
+#include <utility>
 #include <system_error>
+#include <condition_variable>
+#ifndef _WIN32
+#include <poll.h>
+#endif
 
 // ============================================================================
 // DEBUG FLAGS AND CONFIGURATION
@@ -68,6 +76,47 @@ constexpr int CONNECTION_RETRY_DELAY_MS = 500;
 #endif
 
 namespace sensor {
+
+namespace {
+thread_local std::vector<const void*> activeSubscriptionCallbacks;
+
+template <typename Callback>
+struct CallbackSlot {
+    explicit CallbackSlot(Callback value) : callback(std::move(value)) {}
+    std::mutex mutex;
+    std::condition_variable idle;
+    bool active = true;
+    std::size_t inFlight = 0;
+    Callback callback;
+};
+
+template <typename Slot, typename Invoke>
+void invokeSubscription(const std::shared_ptr<Slot>& slot, Invoke invoke)
+{
+    {
+        std::lock_guard<std::mutex> lock(slot->mutex);
+        if (!slot->active) return;
+        ++slot->inFlight;
+    }
+    activeSubscriptionCallbacks.push_back(slot.get());
+    try { invoke(slot->callback); } catch (...) {}
+    activeSubscriptionCallbacks.pop_back();
+    {
+        std::lock_guard<std::mutex> lock(slot->mutex);
+        if (--slot->inFlight == 0) slot->idle.notify_all();
+    }
+}
+
+template <typename Slot>
+void deactivateSubscription(const std::shared_ptr<Slot>& slot)
+{
+    if (!slot) return;
+    std::unique_lock<std::mutex> lock(slot->mutex);
+    slot->active = false;
+    if (std::find(activeSubscriptionCallbacks.begin(), activeSubscriptionCallbacks.end(), slot.get()) == activeSubscriptionCallbacks.end())
+        slot->idle.wait(lock, [&slot]() { return slot->inFlight == 0; });
+}
+} // namespace
 
 // ============================================================================
 // HELPER FUNCTIONS - CRC CALCULATION
@@ -163,20 +212,34 @@ bool SerialCommunication::verifyCRC8(const uint8_t* data, size_t length) {
 
 class SerialCommunication::Impl {
 public:
-    int portHandle = -1;
-    bool isConnected = false;
+    std::intptr_t portHandle = -1;
+    std::atomic<bool> isConnected{false};
     int baudRate = DEFAULT_BAUD_RATE;
+    std::string portName;
+    mutable std::mutex watchdogMutex;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
+    mutable std::mutex calibrationMutex;
     double zeroOffset = 0.0;
     double scaleFactor = 1.0;
-    bool isCalibrated = false;
+    bool isCalibrated = false; // host-side raw ADC conversion calibration
+    bool firmwareCalibrationConfirmed = false; // set only after explicit firmware CAL acknowledgement
     ArduinoInfo arduinoInfo;
     DataCallback dataCallback;
+    std::mutex callbackMutex;
+    std::unordered_map<SubscriptionId, std::shared_ptr<CallbackSlot<DataCallback>>> dataSubscribers;
+    std::unordered_map<SubscriptionId, std::shared_ptr<CallbackSlot<ConnectionCallback>>> connectionSubscribers;
+    SubscriptionId nextSubscriptionId = 1;
     ConnectionCallback connectionCallback;
     std::atomic<bool> asyncReading{false};
+    std::mutex asyncThreadMutex;
+    std::condition_variable asyncThreadCondition;
     std::thread asyncThread;
-    std::mutex readMutex;
+    std::thread::id asyncReaderId{};
+    std::mutex openMutex; // serializes concurrent openPort/connect attempts
+    bool asyncStopping = false;       // guarded by asyncThreadMutex
+    bool connectionClosing = false;  // blocks new readers while disconnect closes the port
+    mutable std::mutex readMutex;
     std::string lastError;
     bool verbose = true;
     int32_t timestampOffset = 0;
@@ -328,8 +391,20 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 #endif
             disconnect();
         }
-        
-        m_impl->baudRate = baudRate;
+
+        // Serialize the full open sequence. A second concurrent connect must
+        // not overwrite the handle or leak the descriptor created by the first.
+        std::unique_lock<std::mutex> openLock(m_impl->openMutex);
+        if (m_impl->isConnected.load()) {
+            std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+            return m_impl->portName == portName && m_impl->baudRate == baudRate;
+        }
+
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+            m_impl->baudRate = baudRate;
+            m_impl->portName = portName;
+        }
         
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
@@ -365,7 +440,10 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         }
         COMMTIMEOUTS to{}; to.ReadIntervalTimeout = 50; to.ReadTotalTimeoutConstant = 50;
         SetCommTimeouts(h, &to);
-        m_impl->portHandle = reinterpret_cast<int>(h);
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+            m_impl->portHandle = reinterpret_cast<std::intptr_t>(h);
+        }
 #else
         int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
         if (fd < 0) { 
@@ -404,10 +482,17 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             return false; 
         }
         int fl = fcntl(fd, F_GETFL); fcntl(fd, F_SETFL, fl & ~O_NONBLOCK);
-        m_impl->portHandle = fd;
+        {
+            std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+            m_impl->portHandle = fd;
+        }
 #endif
-        m_impl->isConnected = true;
-        m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        {
+            std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+            m_impl->firmwareCalibrationConfirmed = false;
+        }
+        m_impl->isConnected.store(true);
+        { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
 #if DEBUG_CONNECTION
@@ -421,7 +506,10 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         if (m_impl->verbose) {
             std::cout << "[SerialComm] Connected to " << portName << " at " << baudRate << " baud" << std::endl;
         }
-        
+        // User callbacks may themselves request a reconnect; release the
+        // open-serialization mutex before invoking external code.
+        openLock.unlock();
+        notifyConnectionCallbacks(true, "Connected to " + portName);
         return true;
         
     } catch (const std::exception& e) {
@@ -442,23 +530,75 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 }
 
 void SerialCommunication::disconnect() {
-    stopAsyncReading();
-    if (!m_impl->isConnected) return;
-#ifdef _WIN32
-    if (m_impl->portHandle > 0) CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
-#else
-    if (m_impl->portHandle >= 0) close(m_impl->portHandle);
-#endif
-    m_impl->portHandle = -1; m_impl->isConnected = false;
-}
+    bool wasConnected = false;
+    std::thread readerToJoin;
+    bool ownsStop = false;
 
+    {
+        std::unique_lock<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        m_impl->connectionClosing = true;
+        m_impl->asyncReading.store(false);
+
+        // A callback running on the reader cannot wait for an external joiner:
+        // that joiner may be waiting for this callback to return.
+        const bool calledFromReader = m_impl->asyncReaderId == std::this_thread::get_id();
+        if (!calledFromReader) {
+            m_impl->asyncThreadCondition.wait(threadLock, [this]() {
+                return !m_impl->asyncStopping;
+            });
+            if (m_impl->asyncThread.joinable()) {
+                m_impl->asyncStopping = true;
+                ownsStop = true;
+                readerToJoin = std::move(m_impl->asyncThread);
+            }
+        }
+    }
+
+    // Never hold asyncThreadMutex while joining.
+    if (readerToJoin.joinable()) readerToJoin.join();
+
+    {
+        std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+        wasConnected = m_impl->isConnected.load();
+        if (wasConnected) {
+#ifdef _WIN32
+            if (m_impl->portHandle != -1)
+                CloseHandle(reinterpret_cast<HANDLE>(m_impl->portHandle));
+#else
+            if (m_impl->portHandle >= 0) close(static_cast<int>(m_impl->portHandle));
+#endif
+            m_impl->portHandle = -1;
+            m_impl->isConnected.store(false);
+            m_impl->portName.clear();
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        if (ownsStop) {
+            m_impl->asyncStopping = false;
+            m_impl->asyncReaderId = std::thread::id{};
+        }
+        m_impl->connectionClosing = false;
+    }
+    m_impl->asyncThreadCondition.notify_all();
+
+    if (wasConnected) notifyConnectionCallbacks(false, "Serial connection closed");
+}
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
-std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? "Unknown" : ""; }
+std::string SerialCommunication::getPortName() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+    return m_impl->isConnected.load() ? m_impl->portName : std::string();
+}
+int SerialCommunication::getBaudRate() const {
+    std::lock_guard<std::mutex> stateLock(m_impl->readMutex);
+    return m_impl->baudRate;
+}
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
     if (!m_impl->isConnected) return info;
-    std::string resp = sendCommand("ID", true);
+    std::string resp = sendCommand("ID", true, timeout);
     if (resp.find("DEVICE:") != std::string::npos) {
         std::istringstream iss(resp); std::string line;
         while (std::getline(iss, line)) {
@@ -501,6 +641,7 @@ SensorData SerialCommunication::readData(int timeout) {
     if (!m_impl->isConnected) return data;
     
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
+    if (!m_impl->isConnected.load()) return data;
     
     // Send DATA command
     std::string toSend = "DATA\n";
@@ -509,7 +650,7 @@ SensorData SerialCommunication::readData(int timeout) {
 #else
     write(m_impl->portHandle, toSend.c_str(), toSend.size());
 #endif
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
     
     // Read response - look for binary packet followed by text
     char buf[256];
@@ -517,94 +658,110 @@ SensorData SerialCommunication::readData(int timeout) {
     auto start = std::chrono::steady_clock::now();
     bool gotBinaryData = false;
     
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(
-           std::chrono::steady_clock::now() - start).count() < 2000) {
+    while (true) {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count();
+        const int remaining = std::max(0, timeout - static_cast<int>(elapsed));
+        if (remaining == 0) break;
         int rd = 0;
 #ifdef _WIN32
-        DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
+        COMMTIMEOUTS timeouts{};
+        if (GetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts)) {
+            timeouts.ReadIntervalTimeout = MAXDWORD;
+            timeouts.ReadTotalTimeoutMultiplier = 0;
+            timeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(remaining);
+            SetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts);
+        }
+        DWORD dw = 0;
+        if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr))
+            rd = static_cast<int>(dw);
 #else
-        rd = read(m_impl->portHandle, buf, 255);
+        pollfd descriptor{static_cast<int>(m_impl->portHandle), POLLIN, 0};
+        const int ready = poll(&descriptor, 1, remaining);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready <= 0 || !(descriptor.revents & (POLLIN | POLLHUP))) break;
+        rd = static_cast<int>(read(m_impl->portHandle, buf, 255));
 #endif
         if (rd > 0) {
             for (int i = 0; i < rd; ++i) {
                 rawData.push_back(static_cast<uint8_t>(buf[i]));
-                
-                // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
-                // followed by end markers 0xAA 0x55
-                if (rawData.size() >= 11) {
-                    // Look for end marker pattern
-                    if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
-                        // Extract binary packet (9 bytes before end markers)
-                        if (rawData.size() >= 11) {
-                            size_t packetStart = rawData.size() - 11;
-                            
-                            // Safety check - ensure we have enough data
-                            if (packetStart + 9 <= rawData.size()) {
-                                // Copy data to local buffer to avoid vector reallocation issues
-                                uint8_t packet[9];
-                                for (size_t j = 0; j < 9; ++j) {
-                                    packet[j] = rawData[packetStart + j];
-                                }
-                                
-                                // Parse binary packet: timestamp(4) + value(4) + crc(1)
-                                uint32_t timestamp;
-                                int32_t value;
-                                uint8_t crc;
-                                
-                                std::memcpy(&timestamp, packet, 4);
-                                std::memcpy(&value, packet + 4, 4);
-                                crc = packet[8];
-                                
-                                // Verify CRC
-                                if (verifyCRC8(packet, 9)) {
-                                    data.timestamp = timestamp;
-                                    data.value = value;
-                                    data.crc = crc;
-                                    data.isValid = true;
-                                    gotBinaryData = true;
-                                }
-                            }
-                        }
-                        break;
+
+                // Firmware frame: 0xAA | timestamp(4) | calibrated force(4) |
+                // CRC-8(1) | 0x55. CRC covers the first 9 bytes, including sync.
+                if (rawData.size() < 11) continue;
+
+                for (std::size_t packetStart = 0;
+                     packetStart + 11 <= rawData.size(); ++packetStart) {
+                    if (rawData[packetStart] != 0xAA ||
+                        rawData[packetStart + 10] != 0x55) continue;
+
+                    uint8_t packet[10];
+                    std::memcpy(packet, rawData.data() + packetStart, sizeof(packet));
+                    if (!verifyCRC8(packet, 10)) continue;
+
+                    std::memcpy(&data.timestamp, packet + 1, sizeof(data.timestamp));
+                    std::memcpy(&data.value, packet + 5, sizeof(data.value));
+                    // Legacy binary frame carries no machine-readable unit or
+                    // calibration-state field. CRC validates transport only.
+                    data.calibratedValue = std::numeric_limits<double>::quiet_NaN();
+                    data.unit = MeasurementUnit::Unknown;
+                    {
+                        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+                        data.calibrationStatus = m_impl->firmwareCalibrationConfirmed
+                            ? CalibrationStatus::Calibrated : CalibrationStatus::Unknown;
                     }
+                    data.crc = packet[9];
+                    data.isValid = true;
+                    gotBinaryData = true;
+                    break;
                 }
+                if (gotBinaryData) break;
             }
-            
+
             // Also check for text response as fallback
             std::string resp(rawData.begin(), rawData.end());
             if (!gotBinaryData && resp.find("FORCE:") != std::string::npos) {
-                size_t fp = resp.find("FORCE:");
-                size_t gp = resp.find("g,", fp);
+                const size_t fp = resp.find("FORCE:");
+                const size_t gp = resp.find("g,", fp);
+                bool parsedForce = false;
                 if (gp != std::string::npos) {
                     try {
-                        data.calibratedValue = std::stod(resp.substr(fp+6, gp-fp-6));
+                        data.calibratedValue = std::stod(resp.substr(fp + 6, gp - fp - 6));
+                        parsedForce = std::isfinite(data.calibratedValue);
                     } catch (...) {}
                 }
-                size_t rp = resp.find("RAW:", gp);
-                if (rp != std::string::npos) {
-                    size_t cp = resp.find(",", rp+4);
-                    if (cp != std::string::npos) {
-                        try {
-                            data.value = std::stoi(resp.substr(rp+4, cp-rp-4));
-                        } catch (...) {}
-                    }
-                    size_t tp = resp.find("TS:", rp);
-                    if (tp != std::string::npos) {
-                        size_t mp = resp.find("ms", tp);
-                        if (mp != std::string::npos) {
+                if (parsedForce) {
+                    const size_t rp = resp.find("RAW:", gp);
+                    if (rp != std::string::npos) {
+                        const size_t cp = resp.find(",", rp + 4);
+                        if (cp != std::string::npos) {
                             try {
-                                data.timestamp = std::stoul(resp.substr(tp+3, mp-tp-3));
+                                data.value = std::stoi(resp.substr(rp + 4, cp - rp - 4));
+                                data.hasRawValue = true;
                             } catch (...) {}
                         }
+                        const size_t tp = resp.find("TS:", rp);
+                        if (tp != std::string::npos) {
+                            const size_t mp = resp.find("ms", tp);
+                            if (mp != std::string::npos) {
+                                try {
+                                    data.timestamp = std::stoul(resp.substr(tp + 3, mp - tp - 3));
+                                } catch (...) {}
+                            }
+                        }
                     }
+                    data.unit = MeasurementUnit::Grams;
+                    {
+                        std::lock_guard<std::mutex> calibrationLock(m_impl->calibrationMutex);
+                        data.calibrationStatus = m_impl->firmwareCalibrationConfirmed
+                            ? CalibrationStatus::Calibrated : CalibrationStatus::NotCalibrated;
+                    }
+                    data.isValid = true;
+                    break;
                 }
-                data.isValid = true;
-                break;
             }
-            
-            if (resp.find("[DATA_SENT]") != std::string::npos && gotBinaryData) {
-                break;
-            }
+
+            if (gotBinaryData) break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
@@ -622,52 +779,246 @@ SensorData SerialCommunication::readData(int timeout) {
         std::cout << std::endl;
     }
     
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+    { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
     return data;
 }
 
 bool SerialCommunication::tryReadData(SensorData& data) { data = readData(100); return data.isValid; }
-void SerialCommunication::setDataCallback(DataCallback cb) { m_impl->dataCallback = cb; }
-void SerialCommunication::setConnectionCallback(ConnectionCallback cb) { m_impl->connectionCallback = cb; }
+void SerialCommunication::setDataCallback(DataCallback cb) {
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->dataCallback = std::move(cb);
+}
+
+SerialCommunication::SubscriptionId SerialCommunication::subscribeDataCallback(DataCallback callback) {
+    if (!callback) return 0;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    const SubscriptionId id = m_impl->nextSubscriptionId++;
+    m_impl->dataSubscribers.emplace(id, std::make_shared<CallbackSlot<DataCallback>>(std::move(callback)));
+    return id;
+}
+
+void SerialCommunication::unsubscribeDataCallback(SubscriptionId id) {
+    if (id == 0) return;
+    std::shared_ptr<CallbackSlot<DataCallback>> slot;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        const auto it = m_impl->dataSubscribers.find(id);
+        if (it == m_impl->dataSubscribers.end()) return;
+        slot = it->second;
+        m_impl->dataSubscribers.erase(it);
+    }
+    deactivateSubscription(slot);
+}
+void SerialCommunication::notifyConnectionCallbacks(bool connected, const std::string& message) {
+    ConnectionCallback primaryCallback;
+    std::vector<std::shared_ptr<CallbackSlot<ConnectionCallback>>> subscribers;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        primaryCallback = m_impl->connectionCallback;
+        subscribers.reserve(m_impl->connectionSubscribers.size());
+        for (const auto& entry : m_impl->connectionSubscribers) {
+            subscribers.push_back(entry.second);
+        }
+    }
+    if (primaryCallback) {
+        try { primaryCallback(connected, message); } catch (...) {}
+    }
+    for (const auto& slot : subscribers)
+        invokeSubscription(slot, [&](const ConnectionCallback& callback) {
+            if (callback) callback(connected, message);
+        });
+}
+
+void SerialCommunication::setConnectionCallback(ConnectionCallback cb) {
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    m_impl->connectionCallback = std::move(cb);
+}
+
+SerialCommunication::SubscriptionId SerialCommunication::subscribeConnectionCallback(ConnectionCallback callback) {
+    if (!callback) return 0;
+    std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+    const SubscriptionId id = m_impl->nextSubscriptionId++;
+    m_impl->connectionSubscribers.emplace(id, std::make_shared<CallbackSlot<ConnectionCallback>>(std::move(callback)));
+    return id;
+}
+
+void SerialCommunication::unsubscribeConnectionCallback(SubscriptionId id) {
+    if (id == 0) return;
+    std::shared_ptr<CallbackSlot<ConnectionCallback>> slot;
+    {
+        std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+        const auto it = m_impl->connectionSubscribers.find(id);
+        if (it == m_impl->connectionSubscribers.end()) return;
+        slot = it->second;
+        m_impl->connectionSubscribers.erase(it);
+    }
+    deactivateSubscription(slot);
+}
 
 void SerialCommunication::startAsyncReading() {
-    if (m_impl->asyncReading) return;
-    m_impl->asyncReading = true;
-    m_impl->asyncThread = std::thread([this]() {
-        while (m_impl->asyncReading && m_impl->isConnected) {
-            SensorData d = readData(100);
-            if (d.isValid && m_impl->dataCallback) m_impl->dataCallback(d);
-            std::this_thread::sleep_for(std::chrono::milliseconds(12));
+    std::thread staleReader;
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        if (!m_impl->isConnected.load() || m_impl->asyncReading.load() ||
+            m_impl->connectionClosing || m_impl->asyncStopping) return;
+
+        if (m_impl->asyncThread.joinable()) {
+            if (m_impl->asyncReaderId == std::this_thread::get_id()) return;
+            m_impl->asyncStopping = true;
+            staleReader = std::move(m_impl->asyncThread);
         }
-    });
+    }
+
+    // Reap a completed reader outside the control mutex.
+    const bool reapedStaleReader = staleReader.joinable();
+    if (reapedStaleReader) staleReader.join();
+
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        if (reapedStaleReader) {
+            m_impl->asyncStopping = false;
+            m_impl->asyncReaderId = std::thread::id{};
+            m_impl->asyncThreadCondition.notify_all();
+        }
+        if (!m_impl->isConnected.load() || m_impl->asyncReading.load() ||
+            m_impl->connectionClosing || m_impl->asyncStopping) return;
+
+        m_impl->asyncReading.store(true);
+        try {
+            m_impl->asyncThread = std::thread([this]() {
+                while (m_impl->asyncReading.load() && m_impl->isConnected.load()) {
+                    SensorData data = readData(100);
+                    if (data.isValid) {
+                        DataCallback primaryCallback;
+                        std::vector<std::shared_ptr<CallbackSlot<DataCallback>>> subscribers;
+                        {
+                            std::lock_guard<std::mutex> lock(m_impl->callbackMutex);
+                            primaryCallback = m_impl->dataCallback;
+                            subscribers.reserve(m_impl->dataSubscribers.size());
+                            for (const auto& entry : m_impl->dataSubscribers)
+                                subscribers.push_back(entry.second);
+                        }
+                        if (primaryCallback) {
+                            try { primaryCallback(data); } catch (...) {}
+                        }
+                        for (const auto& slot : subscribers)
+                            invokeSubscription(slot, [&](const DataCallback& callback) {
+                                if (callback) callback(data);
+                            });
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(12));
+                }
+            });
+            m_impl->asyncReaderId = m_impl->asyncThread.get_id();
+        } catch (...) {
+            m_impl->asyncReading.store(false);
+            m_impl->asyncReaderId = std::thread::id{};
+            throw;
+        }
+    }
 }
 
 void SerialCommunication::stopAsyncReading() {
-    m_impl->asyncReading = false;
-    if (m_impl->asyncThread.joinable()) m_impl->asyncThread.join();
+    std::thread readerToJoin;
+    {
+        std::unique_lock<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        m_impl->asyncReading.store(false);
+        if (m_impl->asyncReaderId == std::this_thread::get_id()) return;
+
+        m_impl->asyncThreadCondition.wait(threadLock, [this]() {
+            return !m_impl->asyncStopping;
+        });
+        if (!m_impl->asyncThread.joinable()) return;
+
+        m_impl->asyncStopping = true;
+        readerToJoin = std::move(m_impl->asyncThread);
+    }
+
+    // Joining outside asyncThreadMutex prevents callback -> stop/disconnect
+    // lock inversion and the GUI-thread/reader-thread deadlock.
+    if (readerToJoin.joinable()) readerToJoin.join();
+
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        m_impl->asyncStopping = false;
+        m_impl->asyncReaderId = std::thread::id{};
+    }
+    m_impl->asyncThreadCondition.notify_all();
 }
 
-void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) { m_impl->watchdogTimeoutMs = enabled ? timeoutMs : INT_MAX; }
-void SerialCommunication::resetWatchdog() { m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
+void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) {
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    m_impl->watchdogTimeoutMs = enabled ? std::max(1, timeoutMs) : INT_MAX;
+}
+void SerialCommunication::resetWatchdog() {
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    m_impl->lastActivityTime = std::chrono::steady_clock::now();
+}
 bool SerialCommunication::isWatchdogOK() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count() < m_impl->watchdogTimeoutMs;
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - m_impl->lastActivityTime).count() < m_impl->watchdogTimeoutMs;
 }
 int SerialCommunication::getTimeSinceLastActivity() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - m_impl->lastActivityTime).count();
+    std::lock_guard<std::mutex> lock(m_impl->watchdogMutex);
+    return static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - m_impl->lastActivityTime).count());
 }
 
-double SerialCommunication::tare(int samples) { if (m_impl->isConnected) sendCommand("TARE", true); m_impl->zeroOffset = 0.0; return 0.0; }
-void SerialCommunication::setCalibrationPoint(int32_t raw, double known) { if (raw != 0) { m_impl->scaleFactor = known/raw; m_impl->isCalibrated = true; } }
-bool SerialCommunication::calibrate(int32_t, int32_t, double knownWeight) {
-    if (!m_impl->isConnected) return false;
-    std::string r = sendCommand("CAL:" + std::to_string(knownWeight), true);
-    m_impl->isCalibrated = (r.find("Calibrated!") != std::string::npos);
-    return m_impl->isCalibrated;
+double SerialCommunication::tare(int samples) {
+    (void)samples;
+    if (m_impl->isConnected) sendCommand("TARE", true);
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    return 0.0;
 }
-double SerialCommunication::convertToCalibrated(int32_t raw) const { return (raw - m_impl->zeroOffset) * m_impl->scaleFactor; }
-double SerialCommunication::getCalibrationScale() const { return m_impl->scaleFactor; }
-int32_t SerialCommunication::getCalibrationOffset() const { return static_cast<int32_t>(m_impl->zeroOffset); }
-void SerialCommunication::resetCalibration() { m_impl->zeroOffset = 0.0; m_impl->scaleFactor = 1.0; m_impl->isCalibrated = false; }
+void SerialCommunication::setCalibrationPoint(int32_t raw, double known) {
+    if (raw == 0 || !std::isfinite(known)) return;
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    m_impl->scaleFactor = known / static_cast<double>(raw);
+    m_impl->isCalibrated = true;
+}
+bool SerialCommunication::calibrate(int32_t rawZero, int32_t rawSpan, double knownWeight) {
+    if (!m_impl->isConnected || rawSpan == rawZero ||
+        !std::isfinite(knownWeight) || knownWeight <= 0.0) return false;
+
+    // A new calibration attempt invalidates the previous firmware confirmation.
+    // Only a fresh explicit acknowledgement may restore the Calibrated state.
+    {
+        std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+        m_impl->firmwareCalibrationConfirmed = false;
+    }
+    const std::string response = sendCommand("CAL:" + std::to_string(knownWeight), true);
+    if (response.find("Calibrated!") == std::string::npos) return false;
+
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = static_cast<double>(rawZero);
+    m_impl->scaleFactor = knownWeight / (static_cast<double>(rawSpan) - static_cast<double>(rawZero));
+    m_impl->isCalibrated = true;
+    m_impl->firmwareCalibrationConfirmed = true;
+    return true;
+}
+double SerialCommunication::convertToCalibrated(int32_t raw) const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    if (!m_impl->isCalibrated) return std::numeric_limits<double>::quiet_NaN();
+    return (static_cast<double>(raw) - m_impl->zeroOffset) * m_impl->scaleFactor;
+}
+double SerialCommunication::getCalibrationScale() const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return m_impl->scaleFactor;
+}
+int32_t SerialCommunication::getCalibrationOffset() const {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    return static_cast<int32_t>(m_impl->zeroOffset);
+}
+void SerialCommunication::resetCalibration() {
+    std::lock_guard<std::mutex> lock(m_impl->calibrationMutex);
+    m_impl->zeroOffset = 0.0;
+    m_impl->scaleFactor = 1.0;
+    m_impl->isCalibrated = false;
+    m_impl->firmwareCalibrationConfirmed = false;
+}
 
 uint32_t SerialCommunication::getCurrentTimestamp() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -694,35 +1045,69 @@ int32_t SerialCommunication::getTimestampOffset() const {
     return m_impl->timestampOffset; 
 }
 
-std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse) {
+std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitForResponse, int timeoutMs) {
     if (!m_impl->isConnected) return "";
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
-    std::string toSend = cmd + "\n";
+    if (!m_impl->isConnected.load()) return "";
+    const std::string toSend = cmd + "\n";
 #ifdef _WIN32
-    DWORD w; WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), toSend.c_str(), toSend.size(), &w, nullptr);
+    DWORD written = 0;
+    if (!WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), toSend.c_str(),
+                   static_cast<DWORD>(toSend.size()), &written, nullptr) ||
+        written != toSend.size()) return "";
 #else
-    write(m_impl->portHandle, toSend.c_str(), toSend.size());
+    if (write(m_impl->portHandle, toSend.c_str(), toSend.size()) !=
+        static_cast<ssize_t>(toSend.size())) return "";
 #endif
-    m_impl->lastActivityTime = std::chrono::steady_clock::now();
-    if (!waitForResponse) return "";
-    std::string resp; char buf[256];
-    auto start = std::chrono::steady_clock::now();
-    while (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count() < 2000) {
-        int rd = 0;
+    { std::lock_guard<std::mutex> watchdogLock(m_impl->watchdogMutex); m_impl->lastActivityTime = std::chrono::steady_clock::now(); }
+    if (!waitForResponse || timeoutMs <= 0) return "";
+
+    std::string response;
+    char buffer[256];
+    const auto start = std::chrono::steady_clock::now();
+    while (true) {
+        const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - start).count();
+        const int remaining = std::max(0, timeoutMs - static_cast<int>(elapsed));
+        if (remaining == 0) break;
+        int bytesRead = 0;
 #ifdef _WIN32
-        DWORD dw; if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buf, 255, &dw, nullptr)) rd = dw;
+        COMMTIMEOUTS timeouts{};
+        if (GetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts)) {
+            timeouts.ReadIntervalTimeout = MAXDWORD;
+            timeouts.ReadTotalTimeoutMultiplier = 0;
+            timeouts.ReadTotalTimeoutConstant = static_cast<DWORD>(remaining);
+            SetCommTimeouts(reinterpret_cast<HANDLE>(m_impl->portHandle), &timeouts);
+        }
+        DWORD count = 0;
+        if (ReadFile(reinterpret_cast<HANDLE>(m_impl->portHandle), buffer, 255, &count, nullptr))
+            bytesRead = static_cast<int>(count);
 #else
-        rd = read(m_impl->portHandle, buf, 255);
+        pollfd descriptor{static_cast<int>(m_impl->portHandle), POLLIN, 0};
+        const int ready = poll(&descriptor, 1, remaining);
+        if (ready < 0 && errno == EINTR) continue;
+        if (ready <= 0 || !(descriptor.revents & (POLLIN | POLLHUP))) break;
+        bytesRead = static_cast<int>(read(m_impl->portHandle, buffer, 255));
 #endif
-        if (rd > 0) { buf[rd] = 0; resp += buf; if (resp.find("[DATA_SENT]")!=std::string::npos || resp.find("OK")!=std::string::npos || resp.find("FORCE:")!=std::string::npos) break; }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        if (bytesRead > 0) {
+            buffer[bytesRead] = 0;
+            response.append(buffer, static_cast<std::size_t>(bytesRead));
+            if (response.find("[DATA_SENT]") != std::string::npos ||
+                response.find("OK") != std::string::npos ||
+                response.find("FORCE:") != std::string::npos ||
+                response.find("DEVICE:") != std::string::npos ||
+                response.find("Calibrated!") != std::string::npos) break;
+        }
     }
-    if (m_impl->verbose && !resp.empty()) std::cout << "[SerialComm] " << resp << std::endl;
-    return resp;
+    if (m_impl->verbose && !response.empty())
+        std::cout << "[SerialComm] " << response << std::endl;
+    return response;
 }
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
-    if (!m_impl->isConnected || !data || len == 0) return false;
+    if (!data || len == 0) return false;
+    std::lock_guard<std::mutex> lock(m_impl->readMutex);
+    if (!m_impl->isConnected.load()) return false;
 #ifdef _WIN32
     DWORD w; return WriteFile(reinterpret_cast<HANDLE>(m_impl->portHandle), data, len, &w, nullptr) && w == len;
 #else

@@ -3,7 +3,7 @@
  * @brief Implementacja systemu autentykacji użytkowników
  * 
  * Ten plik zawiera implementację mechanizmów autentykacji, zarządzania użytkownikami
- * oraz szyfrowania haseł. Kod zawiera rozbudowane mechanizmy debugowania, obsługi 
+ * oraz jednokierunkowego haszowania haseł. Kod zawiera rozbudowane mechanizmy debugowania, obsługi 
  * błędów, wyjątków oraz logowania operacji.
  * 
  * @author AI Assistant
@@ -22,6 +22,11 @@
 #include <stdexcept>
 #include <mutex>
 #include <cstdlib>
+#include <vector>
+#include <limits>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include <openssl/crypto.h>
 
 // ============================================================================
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
@@ -583,6 +588,92 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
     }
 }
 
+
+std::string bytesToHex(const unsigned char* bytes, std::size_t length)
+{
+    static const char digits[] = "0123456789abcdef";
+    std::string result;
+    result.reserve(length * 2);
+    for (std::size_t i = 0; i < length; ++i) {
+        result.push_back(digits[(bytes[i] >> 4) & 0x0F]);
+        result.push_back(digits[bytes[i] & 0x0F]);
+    }
+    return result;
+}
+bool hexToBytes(const std::string& hex, std::vector<unsigned char>& bytes)
+{
+    if (hex.empty() || (hex.size() % 2) != 0) return false;
+    const auto nibble = [](char c) -> int {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        return -1;
+    };
+    bytes.clear();
+    bytes.reserve(hex.size() / 2);
+    for (std::size_t i = 0; i < hex.size(); i += 2) {
+        const int high = nibble(hex[i]), low = nibble(hex[i + 1]);
+        if (high < 0 || low < 0) return false;
+        bytes.push_back(static_cast<unsigned char>((high << 4) | low));
+    }
+    return true;
+}
+constexpr int PASSWORD_HASH_ITERATIONS = 600000;
+constexpr std::size_t PASSWORD_SALT_BYTES = 16;
+constexpr std::size_t PASSWORD_HASH_BYTES = 32;
+constexpr const char* PASSWORD_HASH_PREFIX = "pbkdf2_sha256$";
+std::string hashPasswordPbkdf2(const std::string& password)
+{
+    if (password.empty() || password.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        throw std::invalid_argument("Nieprawidłowy rozmiar hasła");
+    unsigned char salt[PASSWORD_SALT_BYTES], derived[PASSWORD_HASH_BYTES];
+    if (RAND_bytes(salt, sizeof(salt)) != 1)
+        throw std::runtime_error("Nie można wygenerować bezpiecznej soli");
+    if (PKCS5_PBKDF2_HMAC(password.data(), static_cast<int>(password.size()), salt, sizeof(salt),
+                          PASSWORD_HASH_ITERATIONS, EVP_sha256(), sizeof(derived), derived) != 1) {
+        OPENSSL_cleanse(salt, sizeof(salt));
+        throw std::runtime_error("PBKDF2-HMAC-SHA256 nie powiodło się");
+    }
+    const std::string encoded = std::string(PASSWORD_HASH_PREFIX) +
+        std::to_string(PASSWORD_HASH_ITERATIONS) + "$" + bytesToHex(salt, sizeof(salt)) +
+        "$" + bytesToHex(derived, sizeof(derived));
+    OPENSSL_cleanse(salt, sizeof(salt));
+    OPENSSL_cleanse(derived, sizeof(derived));
+    return encoded;
+}
+bool isPbkdf2PasswordHash(const std::string& stored)
+{
+    return stored.rfind(PASSWORD_HASH_PREFIX, 0) == 0;
+}
+bool verifyPasswordPbkdf2(const std::string& password, const std::string& stored)
+{
+    if (!isPbkdf2PasswordHash(stored)) return false;
+    const std::size_t prefixLength = std::char_traits<char>::length(PASSWORD_HASH_PREFIX);
+    const std::size_t firstSeparator = stored.find('$', prefixLength);
+    const std::size_t secondSeparator = firstSeparator == std::string::npos
+        ? std::string::npos : stored.find('$', firstSeparator + 1);
+    if (firstSeparator == std::string::npos || secondSeparator == std::string::npos ||
+        stored.find('$', secondSeparator + 1) != std::string::npos) return false;
+    int iterations = 0;
+    try {
+        const std::string text = stored.substr(prefixLength, firstSeparator - prefixLength);
+        std::size_t parsed = 0;
+        iterations = std::stoi(text, &parsed);
+        if (parsed != text.size() || iterations < 100000 || iterations > 2000000) return false;
+    } catch (...) { return false; }
+    std::vector<unsigned char> salt, expected;
+    if (!hexToBytes(stored.substr(firstSeparator + 1, secondSeparator - firstSeparator - 1), salt) ||
+        !hexToBytes(stored.substr(secondSeparator + 1), expected) ||
+        salt.size() != PASSWORD_SALT_BYTES || expected.size() != PASSWORD_HASH_BYTES ||
+        password.size() > static_cast<std::size_t>(std::numeric_limits<int>::max())) return false;
+    unsigned char derived[PASSWORD_HASH_BYTES];
+    const int ok = PKCS5_PBKDF2_HMAC(password.data(), static_cast<int>(password.size()),
+        salt.data(), static_cast<int>(salt.size()), iterations, EVP_sha256(), sizeof(derived), derived);
+    const bool matches = ok == 1 && CRYPTO_memcmp(derived, expected.data(), PASSWORD_HASH_BYTES) == 0;
+    OPENSSL_cleanse(derived, sizeof(derived));
+    return matches;
+}
+
 } // namespace
 
 // ============================================================================
@@ -899,64 +990,20 @@ UserData* Authentication::findUser(const std::string& username)
 }
 
 /**
- * @brief Szyfruje hasło za pomocą klucza
+ * @brief Tworzy jednokierunkowy skrót PBKDF2-HMAC-SHA256
  * 
- * @param password Hasło do zaszyfrowania
- * @return Zaszyfrowane hasło lub oryginalne jeśli błąd
+ * @param password Hasło wejściowe
+ * @return Skrót hasła; przy błędzie zgłasza wyjątek (fail-closed)
  */
 std::string Authentication::encryptPassword(const std::string& password)
 {
-    #if DEBUG_PASSWORD_ENCRYPTION
-    AUTH_DEBUG(2, "Szyfrowanie hasła, długość: " << password.length());
-    #endif
-    
-    // Gentle code: obsługa pustego hasła
-    if (password.empty()) {
-        AUTH_WARN("Próba szyfrowania pustego hasła");
-        return "";
-    }
-    
-    try {
-        if (encryptionKey.empty()) {
-            // Pobranie klucza z zmiennej środowiskowej lub ConfigManager
-            const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-            if (envKey && std::string(envKey).length() >= 16) {
-                encryptionKey = std::string(envKey);
-                AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
-            } else {
-                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
-                
-                if (encryptionKey.empty() || encryptionKey.length() < 16) {
-                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
-                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
-                }
-                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
-            }
-        }
-
-        std::string result = Encryption::encrypt(password, encryptionKey);
-        
-        #if DEBUG_PASSWORD_ENCRYPTION
-        AUTH_DEBUG(2, "Szyfrowanie hasła zakończone sukcesem");
-        #endif
-        
-        return result;
-        
-    } catch (const std::invalid_argument& e) {
-        AUTH_ERROR("Błąd argumentu podczas szyfrowania hasła: " << e.what());
-        return password;  // Gentle code: zwracamy oryginał
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Błąd szyfrowania hasła: " << e.what());
-        return password;  // Gentle code: zwracamy oryginał zamiast rzucać wyjątek
-    }
+    return hashPasswordPbkdf2(password);
 }
 
 /**
- * @brief Deszyfruje hasło za pomocą klucza
+ * @brief Odczytuje wyłącznie stare rekordy XOR/Base64 (zgodność wsteczna)
  * 
- * @param encryptedPassword Zaszyfrowane hasło
+ * @param encryptedPassword Stary rekord XOR/Base64
  * @return Odszyfrowane hasło lub pusty string jeśli błąd
  */
 std::string Authentication::decryptPassword(const std::string& encryptedPassword)
@@ -980,8 +1027,11 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
                 AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
             } else {
                 // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
+                ConfigManager config;
+                if (!config.load("config/config.json", false)) {
+                    throw std::runtime_error("Nie można wczytać konfiguracji klucza szyfrującego");
+                }
+                encryptionKey = config.getString("encryption.key");
                 
                 if (encryptionKey.empty() || encryptionKey.length() < 16) {
                     AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
@@ -1009,59 +1059,50 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
 }
 
 /**
- * @brief Szyfruje hasła wszystkich nieszyfrowanych użytkowników
+ * @brief Migruje jawne hasła do skrótów PBKDF2
  * 
- * @param key Klucz szyfrujący
- * @return Liczba zaszyfrowanych haseł
+ * @param key Klucz legacy potrzebny wyłącznie do migracji starych rekordów
+ * @return Liczba haseł zapisanych jako skróty PBKDF2
  */
 int Authentication::encryptPasswordsIfNeeded(const std::string& key)
 {
-    AUTH_DEBUG(1, "Rozpoczynanie szyfrowania haseł");
-    
-    // Walidacja parametru
-    if (key.empty()) {
-        AUTH_ERROR("Klucz szyfrujący jest pusty");
-        return 0;
-    }
-    
-    int encryptedCount = 0;
-    
+    if (key.size() < 16) return 0;
+    std::vector<UserData> originalUsers, stagedUsers;
+    std::string previousKey;
+    int hashedCount = 0;
+    bool keyChanged = false;
+    bool usersReplaced = false;
     try {
-        encryptionKey = key;
-        AUTH_DEBUG(2, "Ustawiono klucz szyfrujący");
-
-        for (auto& user : users) {
-            try {
-                if (!user.encrypted && !user.password.empty()) {
-                    // Zaszyfruj hasło
-                    user.password = encryptPassword(user.password);
-                    user.encrypted = true;
-                    encryptedCount++;
-                    
-                    #if DEBUG_PASSWORD_ENCRYPTION
-                    // Security: Do not log raw username - use redacted form
-                    AUTH_DEBUG(2, "Zaszyfrowano hasło dla użytkownika: [REDACTED] (length: " << user.username.length() << ")");
-                    #endif
-                }
-            } catch (const std::exception& e) {
-                // Security: Do not log raw username in error message
-                AUTH_WARN("Błąd podczas szyfrowania hasła dla użytkownika: [REDACTED]: " << e.what());
-                // Kontynuujemy z następnym użytkownikiem (gentle code)
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            originalUsers = users;
+            stagedUsers = users;
+            previousKey = encryptionKey;
+            encryptionKey = key;
+            keyChanged = true;
+            for (auto& user : stagedUsers) {
+                if (user.encrypted || user.password.empty()) continue;
+                user.password = encryptPassword(user.password);
+                user.encrypted = true;
+                ++hashedCount;
             }
+            users = stagedUsers;
+            usersReplaced = true;
+            currentUser = nullptr;
         }
-
-        // Zapisz zaktualizowane dane
-        if (encryptedCount > 0) {
-            AUTH_DEBUG(2, "Zapisywanie zaktualizowanych danych użytkowników");
-            saveUsers();
+        if (hashedCount > 0 && !saveUsers()) {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            users = std::move(originalUsers);
+            encryptionKey = std::move(previousKey);
+            return 0;
         }
-
-        AUTH_DEBUG(1, "Zaszyfrowano " << encryptedCount << " haseł");
-        return encryptedCount;
-        
+        return hashedCount;
     } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas szyfrowania haseł: " << e.what());
-        return encryptedCount;  // Zwracamy to co udało się zrobić
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (usersReplaced) users = std::move(originalUsers);
+        if (keyChanged) encryptionKey = std::move(previousKey);
+        AUTH_ERROR("Migracja haseł przerwana: " << e.what());
+        return 0;
     }
 }
 
@@ -1074,65 +1115,48 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
  */
 bool Authentication::login(const std::string& username, const std::string& password)
 {
-    // Security: Do not log raw username - use redacted form with length only
-    AUTH_DEBUG(1, "Próba logowania użytkownika: [REDACTED] (length: " << username.length() << ")");
-    
-    // Walidacja parametrów - gentle code
-    if (username.empty()) {
-        AUTH_WARN("Pusta nazwa użytkownika");
-        return false;
-    }
-    
-    // Uwaga: puste hasło może być dozwolone w niektórych systemach
-    
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
+    if (username.empty() || password.empty()) return false;
+    std::unique_lock<std::mutex> lock(m_mutex);
     try {
         UserData* user = findUser(username);
-
-        if (user == nullptr) {
-            currentUser = nullptr;
-            // Security: Do not log the username that was not found
-            AUTH_DEBUG(2, "Nie znaleziono użytkownika: [REDACTED]");
-            return false;
-        }
-
-        std::string storedPassword;
-
-        try {
-            if (user->encrypted) {
-                // Hasło jest zaszyfrowane - musimy je odszyfrować do porównania
-                #if DEBUG_PASSWORD_ENCRYPTION
-                AUTH_DEBUG(3, "Hasło jest zaszyfrowane - deszyfrowanie");
-                #endif
-                storedPassword = decryptPassword(user->password);
+        if (!user) { currentUser = nullptr; return false; }
+        bool matches = false, upgrade = false;
+        if (user->encrypted && isPbkdf2PasswordHash(user->password)) {
+            matches = verifyPasswordPbkdf2(password, user->password);
+        } else if (user->encrypted) {
+            // Previous fail-open releases could mark a plaintext value as
+            // encrypted. Accept it only on exact password match, then upgrade
+            // it immediately to PBKDF2 before login succeeds.
+            if (user->password == password) {
+                matches = true;
+                upgrade = true;
             } else {
-                // Hasło nie jest zaszyfrowane - używamy bezpośrednio
-                #if DEBUG_PASSWORD_ENCRYPTION
-                AUTH_DEBUG(3, "Hasło nie jest zaszyfrowane");
-                #endif
-                storedPassword = user->password;
+                const std::string legacy = decryptPassword(user->password);
+                matches = !legacy.empty() && legacy == password;
+                upgrade = matches;
             }
-        } catch (const std::exception& e) {
-            AUTH_ERROR("Błąd podczas deszyfrowania hasła: " << e.what());
-            currentUser = nullptr;
-            return false;
+        } else {
+            matches = user->password == password;
+            upgrade = matches;
         }
-
-        if (storedPassword == password) {
+        if (!matches) { currentUser = nullptr; return false; }
+        if (upgrade) {
+            user->password = encryptPassword(password);
+            user->encrypted = true;
             currentUser = user;
-            // Security: Log success without exposing username, only role
-            AUTH_DEBUG(1, "Zalogowano użytkownika: [REDACTED] (rola: " << user->role << ")");
+            lock.unlock();
+            if (!saveUsers()) {
+                std::lock_guard<std::mutex> resetLock(m_mutex);
+                currentUser = nullptr;
+                return false;
+            }
             return true;
         }
-
-        currentUser = nullptr;
-        // Security: Do not reveal which username had invalid password
-        AUTH_DEBUG(2, "Nieprawidłowe hasło dla użytkownika: [REDACTED]");
-        return false;
-        
+        currentUser = user;
+        return true;
     } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas logowania: " << e.what());
+        AUTH_ERROR("Błąd logowania: " << e.what());
+        if (!lock.owns_lock()) lock.lock();
         currentUser = nullptr;
         return false;
     }
@@ -1203,11 +1227,10 @@ void Authentication::setEncryptionKey(const std::string& key)
     
     std::lock_guard<std::mutex> lock(m_mutex);
     
-    // Walidacja parametru - gentle code
-    if (key.empty()) {
-        AUTH_WARN("Próba ustawienia pustego klucza szyfrującego");
+    if (key.size() < 16) {
+        throw std::invalid_argument("Klucz szyfrujący musi mieć co najmniej 16 znaków");
     }
-    
+
     encryptionKey = key;
     
     #if DEBUG_PASSWORD_ENCRYPTION

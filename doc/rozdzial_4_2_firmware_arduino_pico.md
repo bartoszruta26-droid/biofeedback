@@ -338,11 +338,13 @@ Firmware Arduino implementuje binarny protokół komunikacyjny zoptymalizowany p
 |--------|---------|------|------|
 | 0 | 1 bajt | Sync Byte | 0xAA (synchronization marker) |
 | 1–4 | 4 bajty | Timestamp | Czas w milisekundach (uint32_t, little-endian) |
-| 5–8 | 4 bajty | Force Value | Wartość siły po filtracji (int32_t, little-endian) |
+| 5–8 | 4 bajty | Force Value | Wartość całkowita po filtracji (int32_t, little-endian); jednostka i stan kalibracji nie są kodowane |
 | 9 | 1 bajt | CRC-8 | Suma kontrolna CRC-8 (polynomial 0x07) |
 | 10 | 1 bajt | End Marker | 0x55 (frame end delimiter) |
 
 **Łączny rozmiar ramki:** 11 bajtów.
+
+**Ograniczenie kontraktu:** ramka 11-bajtowa nie zawiera identyfikatora jednostki ani flagi kalibracji. Komentarz firmware'u „calibrated force” nie definiuje, czy pole jest wyrażone w gramach, kilogramach-siły czy niutonach. Odbiornik musi zatem traktować jednostkę i stan kalibracji jako UNKNOWN; poprawne CRC potwierdza wyłącznie integralność transmisji. Takiej próbki nie wolno używać do obliczeń siły, treningu ani statystyk. Przed dopuszczeniem tego formatu do pomiarów należy rozszerzyć protokół o wersję, jednostkę i jawny stan kalibracji albo uzgodnić i przetestować jednoznaczny kontrakt firmware–host.
 
 Przy częstotliwości próbkowania 80 Hz, przepustowość łącza wynosi:
 $$80 \text{ packets/s} \times 11 \text{ bytes/packet} \times 8 \text{ bits/byte} = 7040 \text{ bps}$$
@@ -928,6 +930,8 @@ Firmware Pico implementuje ten sam podstawowy protokół binarny co Arduino Nano
 
 **Łączny rozmiar:** 14 bajtów vs 11 bajtów dla Arduino.
 
+**Status zgodności z hostem:** 14-bajtowa ramka rozszerzona oraz opisany niżej eksperymentalny wariant z timestampem w mikrosekundach nie są obsługiwane przez bieżący parser aplikacji. Host przyjmuje obecnie wyłącznie ramkę 11-bajtową, w której timestamp jest wyrażony w milisekundach. Nie wolno wysyłać formatu 14- ani 12-bajtowego do tej wersji aplikacji ani interpretować mikrosekund jako milisekund. Przed wdrożeniem Pico wymagane jest uzgodnienie jednego formatu, jego wersjonowanie oraz jawne określenie jednostki timestampu i wartości pomiarowej.
+
 ---
 
 ## 4.2.4. Synchronizacja czasowa między mikrokontrolerami a Raspberry Pi
@@ -1036,7 +1040,7 @@ Testy laboratoryjne przeprowadzone z użyciem oscyloskopu cyfrowego (pomiar czas
 
 ### 4.2.4.3. Korekcja jitteru próbkowania
 
-Mimo zastosowania hardware'owych timerów, rzeczywiste odstępy między próbkami mogą wykazywać niewielki jitter (±50–100 µs) spowodowany niedokładnością kwarcu lub interferencjami. Firmware Pico implementuje mechanizm **timestampowania każdej próbki** z rozdzielczością mikrosekund, co pozwala Raspberry Pi na późniejszą interpolację i rekonstrukcję równomiernego sygnału.
+Mimo zastosowania hardware'owych timerów, rzeczywiste odstępy między próbkami mogą wykazywać niewielki jitter (±50–100 µs) spowodowany niedokładnością kwarcu lub interferencjami. Poniższy przykład z timestampem w mikrosekundach jest wariantem projektowym, a nie formatem zgodnym z bieżącym parserem hosta. W obecnej wersji aplikacji timestamp ramki 11-bajtowej jest interpretowany wyłącznie jako milisekundy.
 
 ```cpp
 // Pico firmware: include microsecond-resolution timestamp
@@ -1315,7 +1319,7 @@ Rozdział 4.2 przedstawił kompleksową architekturę firmware'u dla mikrokontro
 
 4. **Protokół komunikacyjny z integralnością danych:** Opracowanie binarnego protokołu UART z ramką 11-bajtową (Arduino) lub 14-bajtową (Pico), zawierającą synchronizację (0xAA), timestamp 32-bit, wartość siły 32-bit, sumę kontrolną CRC-8 i marker końca (0x55). Protokół osiąga 0% packet loss przy prędkości 115200 baud i wykorzystuje jedynie 6.1% dostępnego pasma, pozostawiając margines na komendy sterujące.
 
-5. **Mechanizmy synchronizacji czasowej:** Implementacja uproszczonego protokołu NTP-like do synchronizacji zegarów mikrokontrolerów z Raspberry Pi, osiągającego dokładność ±0.8 ms (średnio) i ±2.3 ms (95 percentyl). Synchronizacja wykonywana jest co 60 sekund, kompensując dryft kwarców rzędu 50 ppm. Dodatkowo, firmware Pico timestampuje każdą próbkę z rozdzielczością mikrosekund, umożliwiając późniejszą interpolację i korekcję jitteru.
+5. **Mechanizmy synchronizacji czasowej:** Opisano uproszczony protokół NTP-like do synchronizacji zegarów mikrokontrolerów z Raspberry Pi. Timestamp w aktualnie obsługiwanej ramce Arduino jest wyrażony w milisekundach. Wariant Pico z rozdzielczością mikrosekund pozostaje propozycją wymagającą osobnego, wersjonowanego parsera hosta; nie jest zgodny z bieżącym odbiornikiem 11-bajtowym.
 
 6. **Bezpieczeństwo i niezawodność:** Wdrożenie mechanizmów watchdog timer (2s timeout dla Arduino, hardware watchdog dla Pico), detekcji brownout (reset przy VCC < 2.7 V), monitorowania napięcia zasilania poprzez pomiar wewnętrznego referencyjnego napięcia 1.1 V oraz procedur auto-resetu HX711 po wykryciu timeoutu komunikacji. Firmware Pico dodatkowo monitoruje temperaturę rdzenia i ostrzega przy przekroczeniu 60°C.
 

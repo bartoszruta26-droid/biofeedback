@@ -16,7 +16,7 @@ struct UserData {
     std::string username;
     std::string password;
     std::string role;
-    bool encrypted;
+    bool encrypted; // true for PBKDF2 hashes or legacy XOR records
     
     // Konwersja do JSON
     std::string toJson() const;
@@ -31,8 +31,8 @@ struct UserData {
  * 
  * Authentication zapewnia:
  * - Wczytywanie danych użytkowników z pliku JSON
- * - Szyfrowanie haseł jeśli nie są zaszyfrowane
- * - Weryfikację loginu i hasła
+ * - Jednokierunkowe haszowanie haseł PBKDF2-HMAC-SHA256
+ * - Weryfikację skrótu hasła i migrację rekordów legacy
  * - Zarządzanie sesją użytkownika
  */
 class Authentication {
@@ -92,15 +92,15 @@ public:
     std::string getCurrentUserRole() const;
     
     /**
-     * @brief Szyfruje hasła użytkowników które nie są zaszyfrowane
-     * @param encryptionKey Klucz szyfrujący
-     * @return liczba zaszyfrowanych haseł
+     * @brief Migruje hasła w postaci jawnej do jednokierunkowych skrótów PBKDF2-HMAC-SHA256
+     * @param encryptionKey Klucz legacy XOR, potrzebny wyłącznie do odczytu starych rekordów
+     * @return liczba haseł zapisanych jako skróty PBKDF2
      */
     int encryptPasswordsIfNeeded(const std::string& encryptionKey);
     
     /**
-     * @brief Ustawia klucz szyfrujący
-     * @param key Klucz szyfrujący
+     * @brief Ustawia klucz zgodności dla starych rekordów XOR
+     * @param key Klucz legacy (co najmniej 16 znaków)
      */
     void setEncryptionKey(const std::string& key);
 
@@ -119,9 +119,9 @@ private:
     UserData* findUser(const std::string& username);
     
     /**
-     * @brief Szyfruje pojedyncze hasło
+     * @brief Tworzy jednokierunkowy skrót PBKDF2-HMAC-SHA256 pojedynczego hasła
      * @param password Hasło do zaszyfrowania
-     * @return Zaszyfrowane hasło
+     * @return Skrót hasła (bez możliwości odszyfrowania)
      */
     std::string encryptPassword(const std::string& password);
     

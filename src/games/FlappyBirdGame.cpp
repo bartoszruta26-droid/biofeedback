@@ -9,6 +9,8 @@
 #include <QRectF>
 #include <QRandomGenerator>
 
+#include <cmath>
+
 namespace games {
 
 FlappyBirdGame::FlappyBirdGame(QWidget *parent)
@@ -54,21 +56,33 @@ void FlappyBirdGame::initialize() {
     m_obstacles.clear();
     m_obstacleSpawnTimer = 0.0f;
     
-    // Jeśli mamy podłączonego seriala, ustaw callbacki
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
-        
-        m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
-            QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(bool, connected),
-                                     Q_ARG(std::string, message));
-        });
+        subscribeSensorData();
+        subscribeConnectionStatus();
     }
+}
+
+void FlappyBirdGame::subscribeSensorData() {
+    if (!m_serialPort) return;
+    if (m_dataSubscriptionId) m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+    m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, [this, data]() {
+            onSensorDataReceived(data);
+        }, Qt::QueuedConnection);
+    });
+}
+
+void FlappyBirdGame::subscribeConnectionStatus() {
+    if (!m_serialPort) return;
+    if (m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
+    m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
+        QMetaObject::invokeMethod(this, [this, connected, message]() {
+            onConnectionStatusChanged(connected, message);
+        }, Qt::QueuedConnection);
+    });
 }
 
 void FlappyBirdGame::setDifficultyLevel(int level) {
@@ -136,6 +150,14 @@ float FlappyBirdGame::getGameSpeed() const {
 }
 
 void FlappyBirdGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial) {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
@@ -143,6 +165,10 @@ void FlappyBirdGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
     
     m_serialPort = serial;
     m_ownSerial = false;
+    if (m_serialPort) {
+        subscribeSensorData();
+        subscribeConnectionStatus();
+    }
     
     if (m_serialPort && m_serialPort->isConnected()) {
         emit serialConnected();
@@ -150,6 +176,14 @@ void FlappyBirdGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
 }
 
 void FlappyBirdGame::disconnectSerial() {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
@@ -167,11 +201,14 @@ bool FlappyBirdGame::isSerialConnected() const {
 }
 
 void FlappyBirdGame::onSensorDataReceived(const sensor::SensorData& data) {
-    if (!data.isValid) {
+    if (!data.isValid ||
+        data.calibrationStatus != sensor::CalibrationStatus::Calibrated ||
+        data.unit != sensor::MeasurementUnit::Grams ||
+        !std::isfinite(data.calibratedValue)) {
         return;
     }
     
-    normalizeForceValue(data.calibratedValue);
+    normalizeForceValue(data.calibratedValue * 9.81 / 1000.0);
 }
 
 void FlappyBirdGame::onConnectionStatusChanged(bool connected, const std::string& message) {

@@ -1,4 +1,5 @@
 #include "tab/OutlineTab.hpp"
+#include <utility>
 #include "games/GameEngine.hpp"
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
@@ -11,6 +12,7 @@
 #include <QPainter>
 #include <QDesktopServices>
 #include <QUrl>
+#include <cmath>
 
 namespace tab {
 
@@ -80,6 +82,10 @@ OutlineTab::OutlineTab(QWidget *parent)
 
 OutlineTab::~OutlineTab()
 {
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
     if (m_isSessionActive) {
         stopSession();
     }
@@ -900,11 +906,13 @@ QVector<OutlineData> OutlineTab::getOutlines() const
 
 void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    m_serialPort = std::move(serial);
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback przychodzi z wątku odczytu szeregowego -
-            // przekaż dane bezpiecznie do wątku GUI.
+        m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
             QMetaObject::invokeMethod(this, [this, data]() {
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);
@@ -926,15 +934,16 @@ void OutlineTab::onSensorDataReceived(const sensor::SensorData& data)
         return;
     }
     
-    // Jeśli trwa sesja i gra jest aktywna, przekaż dane do gry
-    if (m_isSessionActive && !m_isPaused && m_currentGame) {
-        // Przekazanie danych do aktywnej gry
-        // Wartość skalibrowana w gramach, konwersja na Newtony
-        double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
-        
-        // Gra otrzymuje dane jako parametr
-        // Implementacja zależy od konkretnej gry
-        // Przykład: m_currentGame->updateInput(forceInNewtons);
+    // Konspekt ma własny kanał wejściowy: przekaż próbkę wyłącznie do
+    // aktywnej gry tej sesji. Wartość skalibrowana jest wyrażona w gramach.
+    if (m_isSessionActive && !m_isPaused && m_currentGame &&
+        m_currentGame->isRunning() && !m_currentGame->isPaused() &&
+        data.isValid &&
+        data.calibrationStatus == sensor::CalibrationStatus::Calibrated &&
+        data.unit == sensor::MeasurementUnit::Grams &&
+        std::isfinite(data.calibratedValue)) {
+        const double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
+        m_currentGame->handleSensorInput(forceInNewtons);
     }
     
     // Debug logging

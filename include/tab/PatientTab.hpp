@@ -50,7 +50,7 @@ public:
      */
     void addPatient(const QString& pesel, const QString& firstName, 
                    const QString& lastName, const QDate& birthDate, 
-                   const QString& gender);
+                   const QString& gender, const QString& notes = QString());
 
     /**
      * @brief Pobiera liczbę pacjentów
@@ -160,6 +160,7 @@ public slots:
 private slots:
     void onSelectionChanged();
     void onTableRowDoubleClicked(int row, int column);
+    void refreshTable();
 
 private:
     void setupUI();

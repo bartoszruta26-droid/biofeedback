@@ -21,6 +21,7 @@
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
+#include "tab/RepDetector.hpp"
 
 namespace tab {
 
@@ -69,7 +70,7 @@ struct TrainingExercise {
     bool isCompleted;             // Czy ćwiczenie zakończone
     
     TrainingExercise() : seriesCount(3), repsPerSeries(8), targetForce(50.0),
-                         restTime(60.0), isCompleted(false) {}
+                         restTime(60.0), gameType("pong"), isCompleted(false) {}
 };
 
 /**
@@ -172,7 +173,7 @@ public:
     /**
      * @brief Podłącza silnik gry
      */
-    void setGameEngine(games::GameEngine* game);
+    void setGameEngine(games::GameEngine* game, const QString& gameType = QString());
     
     /**
      * @brief Pobiera aktualny wynik treningu
@@ -214,6 +215,7 @@ signals:
     void repetitionCompleted(int exerciseIndex, int seriesIndex, int repIndex);
     void newForceSample(double force);
     void trainingFinished(const QVector<ExerciseStats>& allStats);
+    void gameTypeRequested(const QString& gameType);
 
 public slots:
     void onSaveResults();
@@ -235,11 +237,9 @@ private:
     void updateDisplay();
     void updateProgressWidgets();
     void loadNextExercise();
+    void reconfigureGameForExercise(const TrainingExercise& exercise);
+    void completeCurrentRepetition(double peakForce);
     void loadNextSeries();
-    void loadNextRep();
-    void checkExerciseCompletion();
-    void calculateExerciseStats();
-    void startRestTimer();
     void updateRestDisplay();
     
     // Komponenty UI
@@ -279,6 +279,9 @@ private:
     // Widget gry (embedowany)
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
+    QString m_currentGameType;
+    training::RepDetector m_repDetector;
+    bool m_restForNextExercise;
     
     // Tabela statystyk
     QGroupBox* m_statsBox;
@@ -302,9 +305,9 @@ private:
     bool m_inRestPeriod;
     
     double m_currentForce;
-    double m_peakForceInRep;
     
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::SubscriptionId m_dataSubscriptionId = 0;
     
     // Pomocnicze
     QString getExerciseDisplayName(int index) const;

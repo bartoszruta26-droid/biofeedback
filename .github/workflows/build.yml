@@ -1,0 +1,50 @@
+name: Build and regression tests
+
+on:
+  push:
+    branches:
+      - main
+      - feature/ui-refactor-safe
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  linux-qt5:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build g++ pkg-config \
+            libssl-dev qtbase5-dev libqt5charts5-dev \
+            libserialport-dev nlohmann-json3-dev
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBIOFEEDBACK_BUILD_GUI=OFF
+      - name: Build
+        run: cmake --build build --parallel 2 --target auth_regression data_manager_regression rep_detector_regression serial_subscription_regression
+      - name: Run regression tests
+        run: ctest --test-dir build --output-on-failure
+
+  linux-qt5-gui:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake ninja-build g++ pkg-config \
+            libssl-dev qtbase5-dev libqt5charts5-dev \
+            libserialport-dev nlohmann-json3-dev
+      - name: Configure full GUI
+        run: cmake -S . -B build-gui -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBIOFEEDBACK_BUILD_GUI=ON
+      - name: Build full GUI application
+        run: cmake --build build-gui --parallel 2 --target biofeedback

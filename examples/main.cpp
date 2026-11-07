@@ -14,6 +14,7 @@
 #include "sensor/SerialCommunication.hpp"
 #include <iostream>
 #include <iomanip>
+#include <cmath>
 #include <thread>
 #include <chrono>
 
@@ -34,9 +35,20 @@ void printArduinoInfo(const ArduinoInfo& info) {
 
 void printSensorData(const SensorData& data) {
     std::cout << "=== Dane z Czujnika ===" << std::endl;
-    std::cout << "Wartość surowa: " << std::fixed << std::setprecision(4) 
-              << data.value << std::endl;
-    std::cout << "Wartość skalibrowana: " << data.calibratedValue << std::endl;
+    if (data.hasRawValue) {
+        std::cout << "Wartość surowa ADC: " << std::fixed << std::setprecision(4)
+                  << data.value << std::endl;
+    } else {
+        std::cout << "Wartość surowa ADC: niedostępna w ramce binarnej" << std::endl;
+    }
+    if (data.calibrationStatus == CalibrationStatus::Calibrated &&
+        data.unit == MeasurementUnit::Grams && std::isfinite(data.calibratedValue)) {
+        std::cout << "Wartość skalibrowana [g]: " << data.calibratedValue << std::endl;
+    } else {
+        std::cout << "Wartość skalibrowana: UNKNOWN (brak potwierdzonej jednostki/kalibracji)" << std::endl;
+    }
+    std::cout << "Status kalibracji: " << static_cast<int>(data.calibrationStatus) << std::endl;
+    std::cout << "Jednostka: " << static_cast<int>(data.unit) << std::endl;
     std::cout << "Timestamp: " << data.timestamp << " ms" << std::endl;
     std::cout << "CRC: 0x" << std::hex << static_cast<int>(data.crc) << std::dec << std::endl;
     std::cout << "Poprawność: " << (data.isValid ? "TAK" : "NIE") << std::endl;

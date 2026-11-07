@@ -2,9 +2,13 @@
 #include "core/DebugManager.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QFileDialog>
+#include <QFile>
+#include <QMetaObject>
 #include <QTextStream>
 #include <QDateTime>
+#include <cmath>
 #include <QFont>
+#include <utility>
 #include <QScrollBar>
 #include <QMessageBox>
 #include <QThread>
@@ -46,9 +50,16 @@ DebugTab::DebugTab(QWidget *parent)
     registerAsDebugReceiver();
 }
 
-DebugTab::~DebugTab() override
+DebugTab::~DebugTab()
 {
-    // Odłącz callback przy niszczeniu
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
+    }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
     core::DebugManager::instance().unregisterDebugCallback();
 }
 
@@ -225,14 +236,24 @@ void DebugTab::addDebugMessage(const QString& message, const QString& type)
 
 void DebugTab::clearTerminal()
 {
-    std::lock_guard<std::mutex> lock(m_messageMutex);
-    
-    if (m_debugTerminal) {
+    // This slot is invoked by the GUI thread. Do not hold m_messageMutex
+    // while calling addDebugMessage(): that method acquires the same
+    // non-recursive mutex and would deadlock.
+    if (!m_debugTerminal) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_messageMutex);
         m_debugTerminal->clear();
         m_messageCount = 0;
-        m_lblMessageCount->setText("Wiadomości: 0");
-        addDebugMessage("Terminal wyczyszczony", "INFO");
+        if (m_lblMessageCount) {
+            m_lblMessageCount->setText("Wiadomości: 0");
+        }
     }
+
+    // Log after releasing the mutex; addDebugMessage() acquires it itself.
+    addDebugMessage("Terminal wyczyszczony", "INFO");
 }
 
 bool DebugTab::exportLogsToFile(const QString& filename)
@@ -260,18 +281,30 @@ bool DebugTab::exportLogsToFile(const QString& filename)
 
 void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
-    if (m_serialPort) {
-        // Połącz sygnały SerialCommunication z slotami DebugTab
-        connect(m_serialPort.get(), &sensor::SerialCommunication::sensorDataReady,
-                this, &DebugTab::onSensorDataReceived, Qt::QueuedConnection);
-        
-        connect(m_serialPort.get(), &sensor::SerialCommunication::connectionStatusChanged,
-                this, &DebugTab::onConnectionStatusChanged, Qt::QueuedConnection);
-        
-        addDebugMessage("Połączenie z SerialCommunication nawiązane", "SERIAL");
+    if (m_serialPort && m_dataSubscriptionId) {
+        m_serialPort->unsubscribeDataCallback(m_dataSubscriptionId);
+        m_dataSubscriptionId = 0;
     }
+    if (m_serialPort && m_connectionSubscriptionId) {
+        m_serialPort->unsubscribeConnectionCallback(m_connectionSubscriptionId);
+        m_connectionSubscriptionId = 0;
+    }
+
+    m_serialPort = std::move(serial);
+    if (!m_serialPort) return;
+
+    m_dataSubscriptionId = m_serialPort->subscribeDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, [this, data]() {
+            onSensorDataReceived(data);
+        }, Qt::QueuedConnection);
+    });
+    m_connectionSubscriptionId = m_serialPort->subscribeConnectionCallback([this](bool connected, const std::string& message) {
+        QMetaObject::invokeMethod(this, [this, connected, message]() {
+            onConnectionStatusChanged(connected, QString::fromStdString(message));
+        }, Qt::QueuedConnection);
+    });
+
+    addDebugMessage("Połączenie z SerialCommunication nawiązane", "SERIAL");
 }
 
 bool DebugTab::isArduinoConnected() const
@@ -296,10 +329,9 @@ void DebugTab::registerAsDebugReceiver()
     auto debugCallback = [this](const QString& message, const QString& type) {
         // Wywołujemy addDebugMessage w głównym wątku GUI
         if (QThread::currentThread() != this->thread()) {
-            QMetaObject::invokeMethod(this, "addDebugMessage", 
-                                      Qt::QueuedConnection,
-                                      Q_ARG(QString, message), 
-                                      Q_ARG(QString, type));
+            QMetaObject::invokeMethod(this, [this, message, type]() {
+                addDebugMessage(message, type);
+            }, Qt::QueuedConnection);
         } else {
             addDebugMessage(message, type);
         }
@@ -319,9 +351,14 @@ void DebugTab::onSensorDataReceived(const sensor::SensorData& data)
         updateConnectionStatus(true);
         
         // Dodaj wiadomość do terminala z danymi z Arduino
-        QString arduinoMsg = QString("RAW=%1 | CALIBRATED=%.2fN | Timestamp=%2")
-            .arg(data.value)
-            .arg(data.calibratedValue)
+        const QString frameValue = data.hasRawValue
+            ? QString("RAW=%1").arg(data.value)
+            : QString("FORCE_VALUE=%1 g").arg(data.calibratedValue, 0, 'f', 2);
+        QString arduinoMsg = QString("%1 | CALIBRATED=%2 | Timestamp=%3")
+            .arg(frameValue)
+            .arg(std::isfinite(data.calibratedValue)
+                     ? QString("%1 g").arg(data.calibratedValue, 0, 'f', 2)
+                     : QStringLiteral("N/A (brak kalibracji)"))
             .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"));
         
         addDebugMessage(arduinoMsg, "ARDUINO");
@@ -338,7 +375,9 @@ void DebugTab::onConnectionStatusChanged(bool connected, const QString& message)
     m_hasArduinoConnection = connected;
     
     if (connected) {
-        m_currentPort = m_serialPort ? m_serialPort->getPortName() : "Unknown";
+        m_currentPort = m_serialPort
+            ? QString::fromStdString(m_serialPort->getPortName())
+            : QStringLiteral("Unknown");
         m_baudRate = m_serialPort ? m_serialPort->getBaudRate() : 0;
         
         m_lblPortName->setText(QString("Port: %1").arg(m_currentPort));
@@ -403,8 +442,18 @@ void DebugTab::updateConnectionStatus(bool connected)
         // Aktualizuj ostatnie dane
         if (m_lastSensorData.isValid) {
             m_lblLastDataTime->setText(QString("Ostatnie dane: %1").arg(m_lastDataTime.toString("HH:mm:ss")));
-            m_lblRawValue->setText(QString("Wartość surowa: %1").arg(m_lastSensorData.value));
-            m_lblCalibratedValue->setText(QString("Wartość skalibrowana: %.2f N").arg(m_lastSensorData.calibratedValue));
+            m_lblRawValue->setText(m_lastSensorData.hasRawValue
+                ? QString("Wartość surowa ADC: %1").arg(m_lastSensorData.value)
+                : QStringLiteral("Wartość surowa ADC: niedostępna"));
+            if (std::isfinite(m_lastSensorData.calibratedValue)) {
+                const double forceN = m_lastSensorData.calibratedValue * 9.81 / 1000.0;
+                m_lblCalibratedValue->setText(
+                    QString("Skalibrowana siła: %1 g (%2 N)")
+                        .arg(m_lastSensorData.calibratedValue, 0, 'f', 2)
+                        .arg(forceN, 0, 'f', 2));
+            } else {
+                m_lblCalibratedValue->setText("Skalibrowana siła: brak kalibracji");
+            }
         }
     } else {
         m_lblConnectionStatus->setText(tr("🔴 Rozłączony"));
