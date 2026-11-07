@@ -2,7 +2,11 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QResizeEvent>
-#include <QTime>
+#include <QThread>
+#include <QMetaObject>
+#include <QPointer>
+#include <cmath>
+#include <limits>
 
 namespace games {
 
@@ -12,7 +16,9 @@ GameEngine::GameEngine(QWidget *parent)
     , m_isPaused(false)
     , m_score(0)
     , m_gameTimer(new QTimer(this))
-    , m_lastFrameTime(0)
+    , m_gameElapsedMs(0)
+    , m_frameCount(0)
+    , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
     // Konfiguracja timera gry - 60 FPS (ok. 16ms)
@@ -38,8 +44,8 @@ GameEngine::~GameEngine()
 
 void GameEngine::start()
 {
-    if (m_isRunning && !m_isPaused) {
-        return; // Gra już trwa
+    if (m_isRunning) {
+        return;
     }
     
     // Reset stanu gry
@@ -51,7 +57,7 @@ void GameEngine::start()
     // Aktualizacja stanu
     m_isRunning = true;
     m_isPaused = false;
-    m_lastFrameTime = QTime::currentTime().msecsSinceStartOfDay();
+    m_frameClock.start();
     
     // Uruchomienie timera
     m_gameTimer->start();
@@ -100,7 +106,7 @@ void GameEngine::resume()
     }
     
     // Aktualizacja czasu ostatniej klatki
-    m_lastFrameTime = QTime::currentTime().msecsSinceStartOfDay();
+    m_frameClock.restart();
     
     // Wznowienie timera
     m_gameTimer->start();
@@ -137,6 +143,8 @@ void GameEngine::reset()
     m_isPaused = false;
     m_score = 0;
     m_sensorValue = 0.0;
+    resetGameStats();
+    m_frameClock.invalidate();
     
     // Wymuszenie odświeżenia widoku
     QWidget::update();
@@ -148,17 +156,11 @@ void GameEngine::gameLoop()
         return;
     }
     
-    // Obliczenie delta time (czas w sekundach od ostatniej klatki)
-    qint64 currentTime = QTime::currentTime().msecsSinceStartOfDay();
-    double deltaTime = (currentTime - m_lastFrameTime) / 1000.0;
-    m_lastFrameTime = currentTime;
-    
-    // Ograniczenie delta time aby uniknąć skoków przy lagach
-    if (deltaTime > 0.1) {
-        deltaTime = 0.1;
-    }
-    
-    // Aktualizacja logiki gry
+    // Zegar monotoniczny jest odporny na zmianę daty i strefy czasowej.
+    const qint64 elapsedMs = m_frameClock.isValid() ? m_frameClock.restart() : 0;
+    m_gameElapsedMs += qMax<qint64>(0, elapsedMs);
+    ++m_frameCount;
+    const double deltaTime = qBound(0.0, elapsedMs / 1000.0, 0.1);
     update(deltaTime);
     
     // Odświeżenie widoku (wywoła paintEvent)
@@ -167,11 +169,20 @@ void GameEngine::gameLoop()
 
 void GameEngine::handleSensorInput(double value)
 {
-    // Zapisanie wartości sensora
+    if (QThread::currentThread() != thread()) {
+        QPointer<GameEngine> guard(this);
+        QMetaObject::invokeMethod(this, [guard, value]() {
+            if (guard) guard->handleSensorInput(value);
+        }, Qt::QueuedConnection);
+        return;
+    }
+    if (!std::isfinite(value)) {
+        ++m_invalidInputCount;
+        return;
+    }
     m_sensorValue = value;
-    
-    // Przekazanie do specyficznej obsługi w grze
     handleInput(value);
+    QWidget::update();
 }
 
 void GameEngine::setScore(int score)
@@ -184,9 +195,26 @@ void GameEngine::setScore(int score)
 
 void GameEngine::addScore(int points)
 {
-    if (points != 0) {
-        setScore(m_score + points);
-    }
+    if (points == 0) return;
+    const qint64 total = static_cast<qint64>(m_score) + points;
+    setScore(static_cast<int>(qBound<qint64>(
+        std::numeric_limits<int>::min(), total, std::numeric_limits<int>::max())));
+}
+
+QString GameEngine::getGameStats() const
+{
+    const QString state = !m_isRunning ? QStringLiteral("stopped")
+        : (m_isPaused ? QStringLiteral("paused") : QStringLiteral("running"));
+    return QStringLiteral("game=%1; state=%2; score=%3; elapsed_ms=%4; frames=%5; invalid_inputs=%6")
+        .arg(gameName()).arg(state).arg(m_score).arg(m_gameElapsedMs)
+        .arg(m_frameCount).arg(m_invalidInputCount);
+}
+
+void GameEngine::resetGameStats()
+{
+    m_gameElapsedMs = 0;
+    m_frameCount = 0;
+    m_invalidInputCount = 0;
 }
 
 void GameEngine::paintEvent(QPaintEvent* event)
