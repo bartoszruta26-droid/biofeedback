@@ -1,4 +1,5 @@
 #include "gui/MainWindow.hpp"
+#include <QFont>
 #include "gui/GraphWidget.hpp"
 #include "tab/PatientTab.hpp"
 #include "tab/MeasurementTab.hpp"
