@@ -189,6 +189,7 @@ public:
      * @brief Podłącza silnik gry
      */
     void setGameEngine(games::GameEngine* game);
+    void setCurrentPatientContext(const QString& patientPesel, const QString& patientDataPath);
     
     /**
      * @brief Pobiera aktualny wynik treningu
@@ -300,6 +301,8 @@ private:
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
     QString m_activeGameType;
+    QString m_currentPatientPesel;
+    QString m_currentPatientDataPath;
     
     // Tabela statystyk
     QGroupBox* m_statsBox;
