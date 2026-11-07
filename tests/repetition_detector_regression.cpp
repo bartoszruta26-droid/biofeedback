@@ -86,9 +86,9 @@ int main() {
     assert(rep.durationMs == 320);
 
     std::vector<RepetitionRecord> series{
-        {0, 400, 400, 200, 40.0, 20.0, 5},
-        {500, 900, 400, 180, 50.0, 22.0, 5},
-        {1000, 1400, 400, 220, 60.0, 24.0, 5}
+        {0, 400, 400, 200, 40.0, 20.0, 5, {}},
+        {500, 900, 400, 180, 50.0, 22.0, 5, {}},
+        {1000, 1400, 400, 220, 60.0, 24.0, 5, {}}
     };
     const auto summary = summarizeSeries(series, 50.0);
     assert(summary.repetitionCount == 3);
