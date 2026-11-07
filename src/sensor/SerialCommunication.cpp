@@ -166,6 +166,7 @@ public:
     int portHandle = -1;
     bool isConnected = false;
     int baudRate = DEFAULT_BAUD_RATE;
+    std::string portName;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
     double zeroOffset = 0.0;
@@ -407,7 +408,9 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         m_impl->portHandle = fd;
 #endif
         m_impl->isConnected = true;
+        m_impl->portName = portName;
         m_impl->lastActivityTime = std::chrono::steady_clock::now();
+        if (m_impl->connectionCallback) m_impl->connectionCallback(true, std::string("Connected to ") + portName);
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
         
 #if DEBUG_CONNECTION
@@ -449,11 +452,15 @@ void SerialCommunication::disconnect() {
 #else
     if (m_impl->portHandle >= 0) close(m_impl->portHandle);
 #endif
-    m_impl->portHandle = -1; m_impl->isConnected = false;
+    m_impl->portHandle = -1;
+    m_impl->isConnected = false;
+    m_impl->portName.clear();
+    if (m_impl->connectionCallback) m_impl->connectionCallback(false, "Disconnected");
 }
 
 bool SerialCommunication::isConnected() const { return m_impl->isConnected; }
-std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? "Unknown" : ""; }
+std::string SerialCommunication::getPortName() const { return m_impl->isConnected ? m_impl->portName : ""; }
+int SerialCommunication::getBaudRate() const { return m_impl->baudRate; }
 
 ArduinoInfo SerialCommunication::identifyArduino(int timeout) {
     ArduinoInfo info;
