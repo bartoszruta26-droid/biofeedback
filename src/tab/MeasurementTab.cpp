@@ -104,7 +104,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     for (int i = 0; i <= 5; ++i) {
         int y = margin + plotHeight - (plotHeight * i / 5);
         double force = m_maxForce * i / 5;
-        QString label = QString::number(force, 'f', 0);
+        QString label = QString::number(force, 'f', m_unit == ForceUnit::Kilograms ? 2 : 0);
         painter.drawText(5, y + 3, label);
     }
     
@@ -297,7 +297,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
         painter.setPen(QPen(QColor(255, 100, 100), 2, Qt::DashLine));
         painter.drawLine(margin, targetY, margin + plotWidth, targetY);
         painter.setPen(QColor(255, 100, 100));
-        painter.drawText(margin + plotWidth - 60, targetY - 5, "Cel");
+        painter.drawText(margin + plotWidth - 60, targetY - 5, QString("Cel [%1]").arg(getUnitLabel()));
     }
     
     // Rysowanie wykresu siły
@@ -521,7 +521,7 @@ void MeasurementTab::setupUI()
     // Wybór jednostki siły
     m_unitSelector = new QComboBox(this);
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
-    m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
+    m_unitSelector->addItem("Kilogram-siła (kgf)", static_cast<int>(ForceUnit::Kilograms));
     m_unitSelector->addItem("Wartość surowa (ADC)", static_cast<int>(ForceUnit::Raw));
     m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
     m_unitSelector->setMinimumHeight(35);
@@ -1472,7 +1472,7 @@ void MeasurementTab::onSaveMeasurementJSON()
     int sessionNum = m_patientSessions.size() + 1;
     QString filename = dataDir + "/pomiar_" + timestamp + "_sesja" + QString::number(sessionNum) + ".json";
     
-    exportToJSON(filename);
+    if (!exportToJSON(filename)) return;
     
     // Dodaj do listy sesji pacjenta
     loadPatientTrends();
@@ -1599,24 +1599,23 @@ bool MeasurementTab::importFromCSV(const QString& filename)
 
 bool MeasurementTab::exportToJSON(const QString& filename)
 {
-    QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        QMessageBox::critical(this, "Błąd", "Nie można zapisać pliku: " + filename);
-        return false;
-    }
-    
     MeasurementSession session;
     session.sessionId = QUuid::createUuid().toString();
     session.patientId = m_patientId;
     session.date = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
     session.series = m_completedSeriesStats;
-    
-    QString json = serializeSessionToJSON(session);
-    QTextStream out(&file);
-    out << json;
-    file.close();
-    
-    QMessageBox::information(this, "Sukces", "Dane sesji zapisane do: " + filename);
+
+    const QByteArray payload = serializeSessionToJSON(session).toUtf8();
+    QSaveFile file(filename);
+    if (!file.open(QIODevice::WriteOnly) ||
+        file.write(payload) != payload.size() ||
+        !file.commit()) {
+        QMessageBox::critical(this, tr("Błąd zapisu"),
+                              tr("Nie można atomowo zapisać sesji: %1").arg(file.errorString()));
+        return false;
+    }
+    QFile::setPermissions(filename, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    QMessageBox::information(this, tr("Sukces"), tr("Dane sesji zapisano do: %1").arg(filename));
     return true;
 }
 
