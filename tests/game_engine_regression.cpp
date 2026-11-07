@@ -1,60 +1,92 @@
 #include "games/GameEngine.hpp"
 #include <QApplication>
-#include <QCoreApplication>
 #include <QEventLoop>
-#include <QThread>
-#include <atomic>
-#include <cassert>
+#include <QTimer>
+#include <cstdio>
+#include <cstdlib>
 #include <cmath>
+#include <limits>
 #include <thread>
+
+#define REQUIRE(condition) do { \
+    if (!(condition)) { \
+        std::fprintf(stderr, "GameEngine regression failed at %s:%d: %s\n", __FILE__, __LINE__, #condition); \
+        std::abort(); \
+    } \
+} while (false)
 
 class TestGame final : public games::GameEngine {
 public:
     using GameEngine::GameEngine;
     QString gameName() const override { return QStringLiteral("TestGame"); }
-    int updates{0};
-    double lastStep{0.0};
-    double lastInput{0.0};
+    double lastInput() const { return m_sensorValue; }
+    double lastDelta() const { return m_lastDelta; }
+    int inputCount() const { return m_inputCount; }
+    void award(int points) { addScore(points); }
 protected:
-    void initialize() override { updates = 0; }
-    void update(double dt) override { ++updates; lastStep = dt; }
+    void initialize() override { m_lastDelta = 0.0; }
+    void update(double deltaTime) override { m_lastDelta = deltaTime; }
     void render(QPainter&) override {}
-    bool handleInput(double value) override { lastInput = value; return true; }
+    bool handleInput(double) override { ++m_inputCount; return true; }
+private:
+    double m_lastDelta = 0.0;
+    int m_inputCount = 0;
 };
 
-int main(int argc, char** argv)
+static void waitForEvents(int milliseconds)
+{
+    QEventLoop loop;
+    QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
+    loop.exec();
+}
+
+int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
     TestGame game;
     game.resize(320, 240);
+
     game.start();
-    assert(game.isRunning());
-    QThread::msleep(25);
-    game.gameLoop();
-    assert(game.updates > 0);
-    assert(game.lastStep > 0.0 && game.lastStep <= (1.0 / 120.0) + 1e-9);
+    REQUIRE(game.isRunning() && !game.isPaused());
+    waitForEvents(70);
+    REQUIRE(game.getGameStats().contains(QStringLiteral("state=running")));
+    game.award(5);
+    game.start();
+    REQUIRE(game.getScore() == 5); // Repeated start preserves the active game.
 
     game.pause();
-    assert(game.isPaused());
-    const int pausedUpdates = game.updates;
-    QThread::msleep(25);
-    game.gameLoop();
-    assert(game.updates == pausedUpdates);
+    REQUIRE(game.isPaused());
+    REQUIRE(game.getGameStats().contains(QStringLiteral("state=paused")));
+    game.start(); // start() while paused resumes instead of resetting.
+    REQUIRE(game.isRunning() && !game.isPaused());
 
-    std::thread sensor([&game] { game.handleSensorInput(42.5); });
-    sensor.join();
-    QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
-    assert(std::abs(game.lastInput - 42.5) < 1e-9);
+    game.pause();
+    game.resume();
+    REQUIRE(game.isRunning() && !game.isPaused());
+    waitForEvents(40);
+    REQUIRE(game.lastDelta() > 0.0 && game.lastDelta() <= 1.0 / 120.0 + 1e-9);
 
-    game.start(); // start() while paused must resume, not reset the game.
-    assert(!game.isPaused() && game.isRunning());
-    QThread::msleep(25);
-    game.gameLoop();
-    assert(game.updates > pausedUpdates);
+    std::thread worker([&game]() { game.handleSensorInput(42.5); });
+    worker.join();
+    waitForEvents(10);
+    REQUIRE(std::abs(game.lastInput() - 42.5) < 1e-9);
+
+    const int inputsBeforeInvalid = game.inputCount();
+    game.handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    REQUIRE(game.inputCount() == inputsBeforeInvalid);
+    REQUIRE(game.getGameStats().contains(QStringLiteral("invalid_inputs=1")));
+
+    game.award(std::numeric_limits<int>::max());
+    game.award(1);
+    REQUIRE(game.getScore() == std::numeric_limits<int>::max());
+
     game.stop();
-    assert(!game.isRunning());
-    assert(game.getGameStats().contains(QStringLiteral("elapsed_ms=")));
+    REQUIRE(!game.isRunning() && !game.isPaused());
     game.resetGameStats();
-    assert(game.getScore() == 0);
+    const QString stats = game.getGameStats();
+    REQUIRE(stats.contains(QStringLiteral("elapsed_ms=0")));
+    REQUIRE(stats.contains(QStringLiteral("frames=0")));
+    REQUIRE(stats.contains(QStringLiteral("invalid_inputs=0")));
+    REQUIRE(game.getScore() == 0);
     return 0;
 }
