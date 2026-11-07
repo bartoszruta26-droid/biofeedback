@@ -262,6 +262,16 @@ void TrainingAnalyticsWidget::onHistoryEntryActivated(int row, int /*column*/) {
             record.measurement.meanForceN = repetitionObject.value("mean_force_n").toDouble();
             record.measurement.sampleCount = static_cast<std::size_t>(
                 repetitionObject.value("sample_count").toDouble());
+            const QJsonArray samples = repetitionObject.value("samples").toArray();
+            for (const QJsonValue& sampleValue : samples) {
+                if (!sampleValue.isObject()) continue;
+                const QJsonObject sampleObject = sampleValue.toObject();
+                biofeedback::training::ForceSample sample;
+                sample.timestampMs = static_cast<std::uint32_t>(
+                    sampleObject.value("timestamp_ms").toDouble());
+                sample.forceN = sampleObject.value("force_n").toDouble();
+                record.measurement.samples.push_back(sample);
+            }
             exercise.repetitions.append(record);
         }
         restored.append(exercise);
@@ -353,6 +363,14 @@ void TrainingAnalyticsWidget::saveCurrentSession() {
             repetitionEntry.insert("peak_force_n", measurement.peakForceN);
             repetitionEntry.insert("mean_force_n", measurement.meanForceN);
             repetitionEntry.insert("sample_count", static_cast<double>(measurement.sampleCount));
+            QJsonArray sampleEntries;
+            for (const auto& sample : measurement.samples) {
+                QJsonObject sampleEntry;
+                sampleEntry.insert("timestamp_ms", static_cast<double>(sample.timestampMs));
+                sampleEntry.insert("force_n", sample.forceN);
+                sampleEntries.append(sampleEntry);
+            }
+            repetitionEntry.insert("samples", sampleEntries);
             repetitionEntries.append(repetitionEntry);
         }
         exerciseEntry.insert("repetitions", repetitionEntries);
