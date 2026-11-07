@@ -1766,6 +1766,10 @@ bool MeasurementTab::exportToJSON(const QString& filename)
     session.date = QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss");
     session.series = m_completedSeriesStats;
     session.samples = m_recordedSamples;
+    session.elasticConstantNPerM = m_elasticConstantInput
+        ? m_elasticConstantInput->value() : 0.0;
+    session.patientMassKg = m_patientMassInput
+        ? m_patientMassInput->value() : 0.0;
 
     const QByteArray payload = serializeSessionToJSON(session).toUtf8();
     QSaveFile file(filename);
@@ -1799,7 +1803,15 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_patientId = session.patientId;
         m_completedSeriesStats = session.series;
         m_recordedSamples = session.samples;
-        updateBiomechanicalTable();
+        if (m_elasticConstantInput) {
+            const QSignalBlocker blocker(m_elasticConstantInput);
+            m_elasticConstantInput->setValue(session.elasticConstantNPerM);
+        }
+        if (m_patientMassInput) {
+            const QSignalBlocker blocker(m_patientMassInput);
+            m_patientMassInput->setValue(session.patientMassKg);
+        }
+        recalculateBiomechanicalResults();
         m_sessionElapsedOffsetSeconds = m_recordedSamples.isEmpty()
             ? 0.0 : m_recordedSamples.last().elapsedTimeSeconds;
         m_sessionStartTime = QDateTime::currentMSecsSinceEpoch() / 1000.0;
@@ -2034,7 +2046,9 @@ QString MeasurementTab::serializeSessionToJSON(const MeasurementSession& session
     root["sessionId"] = session.sessionId;
     root["patientId"] = session.patientId;
     root["date"] = session.date;
-    root["schemaVersion"] = 2;
+    root["schemaVersion"] = 3;
+    root["elasticConstantNPerM"] = session.elasticConstantNPerM;
+    root["patientMassKg"] = session.patientMassKg;
 
     QJsonArray samplesArray;
     for (const auto& sample : session.samples) {
@@ -2148,6 +2162,8 @@ MeasurementSession MeasurementTab::deserializeSessionFromJSON(const QString& jso
     session.sessionId = root["sessionId"].toString();
     session.patientId = root["patientId"].toString();
     session.date = root["date"].toString();
+    session.elasticConstantNPerM = root["elasticConstantNPerM"].toDouble();
+    session.patientMassKg = root["patientMassKg"].toDouble();
 
     if (includeSamples) {
         const QJsonArray samplesArray = root["samples"].toArray();
