@@ -1136,14 +1136,18 @@ void TrainingTab::loadNextSeries()
             stopTraining(true);
             emit trainingFinished(completed);
         } else {
-            if (!m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise)) return;
             m_restTimeRemaining = 120;
             m_restDurationMs = 120000;
+            if (!m_stateMachine.resting() &&
+                !m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise))
+                return;
+            if (m_stateMachine.restTarget() != biofeedback::training::RestTarget::NextExercise)
+                return;
             m_restClock.start();
             m_lblRestTimer->setText(QString("Odpoczynek przed kolejnym ćwiczeniem: %1 s")
                                     .arg(m_restTimeRemaining));
-            if (m_restTimeRemaining == 0) advanceAfterRest();
-            else if (!m_stateMachine.paused()) m_restTimer->start();
+            m_restTimer->start();
+            saveExecutionCheckpoint();
         }
         return;
     }
@@ -1296,9 +1300,13 @@ void TrainingTab::finishCurrentSeries()
         }
         m_restClock.start();
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-        if (!m_stateMachine.paused()) m_restTimer->start();
+        m_restTimer->start();
     } else {
-        advanceAfterRest();
+        // No rest: advance directly without introducing a Resting transition.
+        if (m_currentExerciseIndex != completedExerciseIndex)
+            loadNextExercise();
+        else
+            loadNextSeries();
     }
     if (!saveExecutionCheckpoint())
         addDebugMessage("Nie udało się zapisać przejścia na następną serię.", "ERROR");
