@@ -6,6 +6,9 @@ project(biofeedback VERSION 1.0.0 LANGUAGES CXX)
 # C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Register regression tests before declaring individual test targets.
+enable_testing()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Build type
@@ -56,6 +59,17 @@ target_include_directories(biofeedback_measurement PUBLIC ${CMAKE_SOURCE_DIR}/in
 add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
 target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement)
 add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
+
+# Application service boundary reuses the shared measurement engine.
+add_library(biofeedback_application_services STATIC
+    src/application/MeasurementService.cpp
+)
+target_include_directories(biofeedback_application_services PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_application_services PUBLIC biofeedback_measurement)
+
+add_executable(measurement_service_regression tests/measurement_service_regression.cpp)
+target_link_libraries(measurement_service_regression PRIVATE biofeedback_application_services)
+add_test(NAME measurement_service_regression COMMAND measurement_service_regression)
 
 # Local loopback HTTP API. Sensitive and hardware operations remain disabled
 # until authentication, authorization and measurement services are integrated.
@@ -246,8 +260,7 @@ file(COPY ${CMAKE_SOURCE_DIR}/config DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
 
-# Testing
-enable_testing()
+# Additional test definitions.
 add_subdirectory(tests OPTIONAL)
 
 # Documentation
