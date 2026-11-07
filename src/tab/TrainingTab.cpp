@@ -10,6 +10,7 @@
 #include <QColor>
 #include <QStackedWidget>
 #include <QDir>
+#include <QElapsedTimer>
 #include <cmath>
 #include <utility>
 #include "games/PongGame.hpp"
@@ -408,7 +409,7 @@ void TrainingTab::setupUI()
     m_timer->setInterval(1000);  // 1 Hz — licznik sesji zwiększa się raz na sekundę
     
     m_restTimer = new QTimer(this);
-    m_restTimer->setInterval(1000);  // 1 Hz
+    m_restTimer->setInterval(100);  // 10 Hz; remaining time is measured monotonically
     
     // Połączenia sygnałów
     connect(m_btnStartStop, &QPushButton::clicked, this, &TrainingTab::onStartStopClicked);
@@ -436,12 +437,9 @@ void TrainingTab::setupUI()
             this, &TrainingTab::onExerciseSelected);
     connect(m_timer, &QTimer::timeout, this, &TrainingTab::onTimerTick);
     connect(m_restTimer, &QTimer::timeout, this, [this]() {
-        m_restTimeRemaining--;
         updateRestDisplay();
         if (m_restTimeRemaining <= 0) {
             m_restTimer->stop();
-            m_inRestPeriod = false;
-            m_lblRestTimer->setText("");
             advanceAfterRest();
         }
     });
@@ -513,6 +511,9 @@ void TrainingTab::startTraining()
     m_isTraining = true;
     m_isPaused = false;
     m_sessionTime = 0;
+    m_activeExerciseTimeMs = 0;
+    m_lastClockUpdateMs = 0;
+    m_sessionClock.start();
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
@@ -547,6 +548,7 @@ void TrainingTab::stopTraining()
 {
     if (!m_isTraining) return;
     
+    updateSessionClocks();
     m_timer->stop();
     m_restTimer->stop();
     
@@ -582,8 +584,9 @@ void TrainingTab::pauseTraining()
 {
     if (!m_isTraining || m_isPaused) return;
     
+    updateSessionClocks();
+    if (m_inRestPeriod) updateRestDisplay();
     m_isPaused = true;
-    m_timer->stop();
     m_restTimer->stop();
     
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -600,8 +603,8 @@ void TrainingTab::resumeTraining()
     if (!m_isTraining || !m_isPaused) return;
     
     m_isPaused = false;
-    m_timer->start();
     if (m_inRestPeriod) {
+        m_restClock.restart();
         m_restTimer->start();
     }
     
@@ -930,18 +933,32 @@ void TrainingTab::onExerciseSelected(int index)
 
 void TrainingTab::onTimerTick()
 {
-    if (!m_isTraining || m_isPaused) return;
-    
-    m_sessionTime++;
-    
-    // Aktualizacja wyświetlacza czasu
-    int minutes = m_sessionTime / 60;
-    int seconds = m_sessionTime % 60;
-    m_lblTimer->setText(QString("Czas: %1:%2")
+    if (!m_isTraining) return;
+    updateSessionClocks();
+    if (m_inRestPeriod && !m_isPaused) updateRestDisplay();
+
+    const int activeSeconds = static_cast<int>(m_activeExerciseTimeMs / 1000);
+    const int activeMinutes = activeSeconds / 60;
+    const int activeRemainder = activeSeconds % 60;
+    const int minutes = m_sessionTime / 60;
+    const int seconds = m_sessionTime % 60;
+    m_lblTimer->setText(QString("Sesja: %1:%2 | Aktywnie: %3:%4")
                         .arg(minutes, 2, 10, QChar('0'))
-                        .arg(seconds, 2, 10, QChar('0')));
-    
+                        .arg(seconds, 2, 10, QChar('0'))
+                        .arg(activeMinutes, 2, 10, QChar('0'))
+                        .arg(activeRemainder, 2, 10, QChar('0')));
     updateProgressWidgets();
+}
+
+void TrainingTab::updateSessionClocks()
+{
+    if (!m_isTraining || !m_sessionClock.isValid()) return;
+    const qint64 elapsedMs = m_sessionClock.elapsed();
+    const qint64 deltaMs = qMax<qint64>(0, elapsedMs - m_lastClockUpdateMs);
+    if (!m_isPaused && !m_inRestPeriod)
+        m_activeExerciseTimeMs += deltaMs;
+    m_lastClockUpdateMs = elapsedMs;
+    m_sessionTime = static_cast<int>(elapsedMs / 1000);
 }
 
 void TrainingTab::onMeasurementSample(
@@ -1084,10 +1101,11 @@ void TrainingTab::loadNextSeries()
             m_inRestPeriod = true;
             m_restAdvancesExercise = true;
             m_restTimeRemaining = 120;
+            m_restClock.start();
             m_lblRestTimer->setText(QString("Odpoczynek przed kolejnym ćwiczeniem: %1 s")
                                     .arg(m_restTimeRemaining));
             if (m_restTimeRemaining == 0) advanceAfterRest();
-            else m_restTimer->start();
+            else if (!m_isPaused) m_restTimer->start();
         }
         return;
     }
@@ -1223,9 +1241,11 @@ void TrainingTab::finishCurrentSeries()
 
     updateProgressWidgets();
     if (m_restTimeRemaining > 0) {
+        updateSessionClocks();
         m_inRestPeriod = true;
+        m_restClock.start();
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-        m_restTimer->start();
+        if (!m_isPaused) m_restTimer->start();
     } else {
         advanceAfterRest();
     }
@@ -1234,6 +1254,10 @@ void TrainingTab::finishCurrentSeries()
 void TrainingTab::advanceAfterRest()
 {
     if (!m_isTraining || m_isPaused) return;
+    updateRestDisplay();
+    if (m_restTimeRemaining > 0) return;
+    updateSessionClocks();
+    m_restTimer->stop();
     m_inRestPeriod = false;
     m_lblRestTimer->clear();
     if (m_restAdvancesExercise) {
@@ -1268,15 +1292,26 @@ void TrainingTab::calculateExerciseStats()
 
 void TrainingTab::startRestTimer()
 {
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    m_restTimeRemaining = static_cast<int>(ex.restTime);
-    m_inRestPeriod = true;
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size())
+        return;
+    updateSessionClocks();
+    m_restTimeRemaining = qMax(0, static_cast<int>(m_exercisePlan[m_currentExerciseIndex].restTime));
+    m_inRestPeriod = m_restTimeRemaining > 0;
+    if (!m_inRestPeriod) {
+        advanceAfterRest();
+        return;
+    }
+    m_restClock.start();
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-    m_restTimer->start();
+    if (!m_isPaused) m_restTimer->start();
 }
 
 void TrainingTab::updateRestDisplay()
 {
+    if (!m_restClock.isValid()) return;
+    const qint64 remainingMs = qMax<qint64>(
+        0, static_cast<qint64>(m_restTimeRemaining) * 1000 - m_restClock.elapsed());
+    m_restTimeRemaining = static_cast<int>((remainingMs + 999) / 1000);
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
 }
 
