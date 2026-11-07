@@ -310,7 +310,6 @@ private:
     void ensureSessionClockStarted();
     void setupUI();
     void updateLiveDisplay(double force);
-    void detectRepetitions();
     void calculateRepetitionStats();
     void updateStatsTable();
     void updateSeriesProgress();
@@ -399,7 +398,6 @@ private:
     double m_repPeakForce;
     double m_repStartTime;
     double m_repPeakTime;
-    double m_contractionThreshold;
     biofeedback::training::RepetitionDetector m_repetitionDetector;
     
     // Wyniki
