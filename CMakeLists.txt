@@ -75,7 +75,7 @@ add_executable(api_client_regression
 set_target_properties(api_client_regression PROPERTIES AUTOMOC ON)
 target_include_directories(api_client_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(api_client_regression PRIVATE
-    biofeedback_api_client biofeedback_data_repository biofeedback_core Qt5::Core Qt5::Network
+    biofeedback_api_client biofeedback_data_repository biofeedback_core biofeedback_application_services Qt5::Core Qt5::Network
 )
 add_test(NAME api_client_regression COMMAND api_client_regression)
 set_tests_properties(api_client_regression PROPERTIES TIMEOUT 20)
@@ -502,6 +502,7 @@ if(Qt5_FOUND)
         biofeedback_measurement
         biofeedback_training
         biofeedback_sensor_protocol
+        biofeedback_application_services
         Qt5::Core
         Qt5::Network
         Qt5::Widgets
