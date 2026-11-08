@@ -22,6 +22,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QSet>
+#include <QHash>
 #include <QSignalBlocker>
 #include <iostream>
 #include <sstream>
@@ -413,6 +414,7 @@ void Application::setupConnections()
                 }
             });
     
+    auto patientVersions = std::make_shared<QHash<QString, int>>();
     const auto findPatientByPesel = [this](const QString& pesel, QJsonObject& found,
                                                QString* lookupError) {
         if (!m_sharedResources || pesel.isEmpty()) {
@@ -563,7 +565,7 @@ void Application::setupConnections()
 
 
     connect(m_patientTab, &tab::PatientTab::patientRecordChanged,
-            this, [this, findPatientByPesel](const QString& pesel, const QString& firstName,
+            this, [this, findPatientByPesel, patientVersions](const QString& pesel, const QString& firstName,
                          const QString& lastName, const QDate& birthDate,
                          const QString& gender, const QString& notes) {
                 if (!m_sharedResources || pesel.isEmpty()) return;
@@ -584,16 +586,25 @@ void Application::setupConnections()
                     return;
                 }
                 if (found) {
-                    QJsonObject updated;
-                    saved = m_sharedResources->update(
-                        QStringLiteral("patients"),
-                        existing.value(QStringLiteral("id")).toString(),
-                        existing.value(QStringLiteral("version")).toInt(),
-                        payload, updated, &error);
+                    const int cachedVersion = patientVersions->value(
+                        pesel, existing.value(QStringLiteral("version")).toInt());
+                    if (cachedVersion != existing.value(QStringLiteral("version")).toInt()) {
+                        error = QStringLiteral("VERSION_CONFLICT");
+                    } else {
+                        QJsonObject updated;
+                        saved = m_sharedResources->update(
+                            QStringLiteral("patients"),
+                            existing.value(QStringLiteral("id")).toString(),
+                            cachedVersion, payload, updated, &error);
+                        if (saved) patientVersions->insert(
+                            pesel, updated.value(QStringLiteral("version")).toInt());
+                    }
                 } else {
                     QJsonObject created;
                     saved = m_sharedResources->create(
                         QStringLiteral("patients"), payload, created, &error);
+                    if (saved) patientVersions->insert(
+                        pesel, created.value(QStringLiteral("version")).toInt());
                 }
                 if (!saved) {
                     if (m_logger) m_logger->error("Shared patient repository write failed: " + error.toStdString());
@@ -603,7 +614,7 @@ void Application::setupConnections()
             });
 
     connect(m_patientTab, &tab::PatientTab::patientRecordDeleted,
-            this, [this, findPatientByPesel](const QString& pesel) {
+            this, [this, findPatientByPesel, patientVersions](const QString& pesel) {
                 if (!m_sharedResources || pesel.isEmpty()) return;
                 QJsonObject existing;
                 QString error;
@@ -614,10 +625,17 @@ void Application::setupConnections()
                     return;
                 }
                 if (found) {
-                    repositoryDeleteSucceeded = m_sharedResources->remove(
-                        QStringLiteral("patients"),
-                        existing.value(QStringLiteral("id")).toString(),
-                        existing.value(QStringLiteral("version")).toInt(), &error);
+                    const int cachedVersion = patientVersions->value(
+                        pesel, existing.value(QStringLiteral("version")).toInt());
+                    if (cachedVersion != existing.value(QStringLiteral("version")).toInt()) {
+                        error = QStringLiteral("VERSION_CONFLICT");
+                    } else {
+                        repositoryDeleteSucceeded = m_sharedResources->remove(
+                            QStringLiteral("patients"),
+                            existing.value(QStringLiteral("id")).toString(),
+                            cachedVersion, &error);
+                        if (repositoryDeleteSucceeded) patientVersions->remove(pesel);
+                    }
                     if (!repositoryDeleteSucceeded && m_logger)
                         m_logger->warning("Shared patient repository delete failed: " + error.toStdString());
                 } else {
@@ -645,6 +663,7 @@ void Application::setupConnections()
         const QString pesel = patient.value(QStringLiteral("pesel")).toString();
         if (pesel.isEmpty()) continue;
         loadedPatientIds.insert(pesel);
+        patientVersions->insert(pesel, patient.value(QStringLiteral("version")).toInt());
         m_patientTab->addPatient(
             pesel,
             patient.value(QStringLiteral("firstName")).toString(),
@@ -681,6 +700,7 @@ void Application::setupConnections()
         QString migrationError;
         if (m_sharedResources->create(QStringLiteral("patients"), payload, migrated, &migrationError)) {
             loadedPatientIds.insert(pesel);
+            patientVersions->insert(pesel, migrated.value(QStringLiteral("version")).toInt());
             m_patientTab->addPatient(
                 pesel, QString::fromStdString(legacy.firstName),
                 QString::fromStdString(legacy.lastName),
