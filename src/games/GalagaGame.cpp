@@ -81,15 +81,23 @@ void GalagaGame::resizeEvent(QResizeEvent* event)
 void GalagaGame::createWave()
 {
     m_enemies.clear();
-    const int rows = qBound(2, 3 + m_wave / 2, 6);
-    const int columns = 8;
-    const double cellWidth = qMax(24.0, (width() - 48.0) / columns);
-    const double enemyWidth = qMin(28.0, cellWidth - 6.0);
+    // Dopasuj formację do małych widoków: stałe osiem kolumn i trzy
+    // wiersze powodowały nakładanie się przeciwników po zmianie rozmiaru.
+    const int desiredRows = qBound(2, 3 + m_wave / 2, 6);
+    const int maxRows = qMax(1, (height() - 60) / 34);
+    const int rows = qMin(desiredRows, maxRows);
+    const int columns = qBound(1, width() / 40, 8);
+    const double margin = qMin(24.0, qMax(4.0, width() * 0.05));
+    const double cellWidth = qMax(1.0, (width() - 2.0 * margin) / columns);
+    const double enemyWidth = qMax(6.0, qMin(28.0, cellWidth - 6.0));
+    const double enemyHeight = qMin(22.0, qMax(8.0, (height() - 60.0) / rows - 8.0));
+    const double rowSpacing = qMax(enemyHeight + 2.0,
+                                   qMin(34.0, (height() - 60.0) / rows));
     for (int row = 0; row < rows; ++row) {
         for (int column = 0; column < columns; ++column) {
             Enemy enemy;
-            enemy.rect = QRectF(24.0 + column * cellWidth + (cellWidth - enemyWidth) / 2.0,
-                                48.0 + row * 34.0, enemyWidth, 22.0);
+            enemy.rect = QRectF(margin + column * cellWidth + (cellWidth - enemyWidth) / 2.0,
+                                48.0 + row * rowSpacing, enemyWidth, enemyHeight);
             enemy.hitPoints = (m_wave >= 3 && row == 0) ? 2 : 1;
             enemy.active = true;
             m_enemies.push_back(enemy);
