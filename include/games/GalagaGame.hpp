@@ -47,7 +47,7 @@ private:
     double m_keyboardDirection;
     double m_fireCooldown;
     double m_enemyDirection;
-    double m_enemyStepTimer;
+    double m_enemyFireCooldown;
     int m_lives;
     int m_wave;
     bool m_fireHeld;
