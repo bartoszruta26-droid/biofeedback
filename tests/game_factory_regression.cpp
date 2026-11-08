@@ -168,6 +168,12 @@ int main(int argc, char **argv)
     waitForEvents(900);
     REQUIRE(archerGame->isRunning());
     REQUIRE(archerGame->getScore() >= 10); // The aimed arrow must hit the target.
+    archerGame->resize(180, 120);
+    waitForEvents(80);
+    REQUIRE(archerGame->isRunning());
+    archerGame->resize(640, 480);
+    waitForEvents(80);
+    REQUIRE(archerGame->isRunning());
     archerGame->stop();
 
     std::unique_ptr<games::GameEngine> carRace(games::createGame(QStringLiteral("car_race")));
@@ -194,7 +200,12 @@ int main(int argc, char **argv)
     scorchedGame->handleSensorInput(65.0);
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire);
-    waitForEvents(1600);
+    waitForEvents(180);
+    scorchedGame->resize(180, 120);
+    waitForEvents(80);
+    REQUIRE(scorchedGame->isRunning());
+    scorchedGame->resize(640, 480);
+    waitForEvents(1340);
     REQUIRE(scorchedGame->isRunning());
     scorchedGame->stop();
 
