@@ -95,6 +95,8 @@ for required in (
     "m_queue.push_back(PendingRecord{line, ticket, durable})",
     "m_changed.wait(lock",
     "file.write(record.line)",
+    "syncParentDirectory(m_path, error)",
+    "::fsync(directoryFd)",
     "flushDurably(file, error)",
     "::fsync(file.handle())",
 ):
