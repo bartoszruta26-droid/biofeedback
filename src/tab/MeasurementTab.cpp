@@ -449,7 +449,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
             return commitMeasurementSample(sample);
         });
     m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
-        *m_serialPort, m_measurementEngine, "desktop-hx711", "g");
+        *m_serialPort, m_measurementEngine, "desktop-hx711", m_showRawValues ? "count" : "g");
     m_measurementCallbackToken = m_measurementEngine->subscribe(
         [this](const biofeedback::measurement::MeasurementSample& sample) {
             enqueueMeasurementSample(sample);
@@ -558,21 +558,8 @@ bool MeasurementTab::commitMeasurementSample(
 {
     if (!m_journalAdmission.load(std::memory_order_acquire))
         return false;
-
-    // Raw ADC diagnostics use the direct capture path; the calibrated adapter
-    // still publishes its values for other internal consumers but does not
-    // create a second journal record.
-    if (m_showRawValues)
+    if (!sample.isValid())
         return true;
-
-    if (!sample.isValid() || sample.unit != "kg" ||
-        !std::isfinite(sample.value) || sample.value < 0.0)
-        return true;
-
-    const double forceN = sample.value *
-        biofeedback::measurement::standardGravityMetersPerSecondSquared;
-    if (!std::isfinite(forceN))
-        return false;
 
     const quint64 sequence = m_journalNextSequence.load(std::memory_order_acquire);
     if (sequence == 0 ||
@@ -594,16 +581,32 @@ bool MeasurementTab::commitMeasurementSample(
     record["timestampUnixMs"] = sample.timestampUnixMs;
     record["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
     record["elapsedTimeSeconds"] = elapsed;
-    record["value"] = forceN;
     record["rawValue"] = sample.rawValue;
     record["hasRawValue"] = true;
-    record["calibratedMassKg"] = sample.value;
-    record["hasCalibratedMass"] = true;
-    record["unit"] = "N";
     record["source"] = QString::fromStdString(sample.source);
     record["quality"] = QStringLiteral("valid");
-    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
 
+    if (m_showRawValues) {
+        if (sample.unit != "count")
+            return true;
+        record["value"] = sample.value;
+        record["calibratedMassKg"] = 0.0;
+        record["hasCalibratedMass"] = false;
+        record["unit"] = "count";
+    } else {
+        if (sample.unit != "kg" || !std::isfinite(sample.value) || sample.value < 0.0)
+            return true;
+        const double forceN = sample.value *
+            biofeedback::measurement::standardGravityMetersPerSecondSquared;
+        if (!std::isfinite(forceN))
+            return true;
+        record["value"] = forceN;
+        record["calibratedMassKg"] = sample.value;
+        record["hasCalibratedMass"] = true;
+        record["unit"] = "N";
+    }
+
+    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
     if (!m_sampleJournalWriter.appendDurably(line)) {
         m_sampleJournalFailed = true;
         m_journalAdmission.store(false, std::memory_order_release);
@@ -614,34 +617,6 @@ bool MeasurementTab::commitMeasurementSample(
     }
 
     m_journalNextSequence.store(sequence + 1, std::memory_order_release);
-    return true;
-}
-
-bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample)
-{
-    if (!m_sampleJournalWriter.isAccepting() || m_sampleJournalFailed)
-        return false;
-
-    QJsonObject record;
-    record["recordType"] = "sample";
-    record["sequence"] = static_cast<qint64>(sample.sequence);
-    record["timestampUnixMs"] = sample.timestampUnixMs;
-    record["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
-    record["elapsedTimeSeconds"] = sample.elapsedTimeSeconds;
-    record["value"] = sample.value;
-    record["rawValue"] = sample.rawValue;
-    record["hasRawValue"] = sample.hasRawValue;
-    record["calibratedMassKg"] = sample.calibratedMassKg;
-    record["hasCalibratedMass"] = sample.hasCalibratedMass;
-    record["unit"] = sample.unit;
-    record["source"] = sample.source;
-    record["quality"] = sample.quality;
-    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
-    if (!m_sampleJournalWriter.append(line)) {
-        m_sampleJournalFailed = true;
-        return false;
-    }
-    m_journalNextSequence.store(sample.sequence + 1, std::memory_order_release);
     return true;
 }
 
@@ -823,6 +798,12 @@ void MeasurementTab::setupUI()
     m_btnToggleRaw->setFont(QFont("Arial", 9));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
         m_showRawValues = checked;
+        if (m_measurementAdapter && m_serialPort && m_measurementEngine) {
+            m_measurementAdapter.reset();
+            m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
+                *m_serialPort, m_measurementEngine, "desktop-hx711",
+                checked ? "count" : "g");
+        }
         if (m_forcePlot)
             m_forcePlot->setUnit(checked ? ForceUnit::Raw : m_currentUnit);
         if (m_unitSelector) m_unitSelector->setEnabled(!checked);
@@ -1385,18 +1366,7 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
-    bool journalWriteFailed = false;
-    // Calibrated samples are committed by MeasurementEngine before any GUI
-    // subscriber is published. Raw diagnostic capture bypasses that adapter.
-    if (m_isMeasuring && m_showRawValues &&
-        !m_sampleJournalPath.isEmpty() && !m_sampleJournalFailed) {
-        if (!m_sampleJournalWriter.isAccepting() || !appendSampleJournal(recorded)) {
-            m_sampleJournalFailed = true;
-            journalWriteFailed = true;
-            if (m_lblStatus)
-                m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — pomiar zostanie zatrzymany"));
-        }
-    }
+    // The acquisition CommitHook has already durably journaled this sample.
 
     if (m_rawBox)
         m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
@@ -1436,8 +1406,6 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     updateLiveDisplay(forceValue);
 
     updateRawTableBatch();
-    if (journalWriteFailed && m_isMeasuring)
-        stopMeasurement();
 }
 
 void MeasurementTab::updateRawTableBatch(bool force)
@@ -2812,11 +2780,8 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 
     if (!m_isMeasuring) return;
 
-    // Calibrated biomechanical samples are delivered through MeasurementEngine.
-    // Raw ADC capture remains a diagnostic-only path and is never treated as force.
-    if (m_isMeasuring && m_showRawValues)
-        readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true,
-                         data.calibratedValue, data.hasCalibratedValue);
+    // Both calibrated and RAW samples are committed by MeasurementEngine before
+    // the GUI subscriber is notified; this callback only refreshes frame status.
 }
 
 void MeasurementTab::enqueueMeasurementSample(
@@ -2896,8 +2861,18 @@ void MeasurementTab::drainMeasurementSamples()
 void MeasurementTab::onMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
-    if (!m_isMeasuring || m_showRawValues) return;
-    if (!sample.isValid() || sample.unit != "kg") {
+    if (!m_isMeasuring) return;
+    if (!sample.isValid()) {
+        m_repetitionDetector.reset();
+        return;
+    }
+    if (m_showRawValues) {
+        if (sample.unit != "count") return;
+        readSingleSample(sample.value, sample.deviceTimestampMs,
+                         sample.rawValue, true, 0.0, false);
+        return;
+    }
+    if (sample.unit != "kg") {
         m_repetitionDetector.reset();
         return;
     }
