@@ -310,6 +310,12 @@ int main(int argc, char **argv)
     marioReset->resize(640, 480);
     marioReset->start();
     REQUIRE(marioReset->isRunning());
+    marioReset->resize(180, 120);
+    waitForEvents(80);
+    REQUIRE(marioReset->isRunning()); // Active player and obstacles survive a compact resize.
+    marioReset->resize(640, 480);
+    waitForEvents(80);
+    REQUIRE(marioReset->isRunning());
     marioReset->reset();
     REQUIRE(!marioReset->isRunning());
     marioReset->start();
