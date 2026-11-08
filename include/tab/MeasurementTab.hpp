@@ -491,6 +491,7 @@ private:
     bool m_measurementQueueAccepting{true};
     bool m_measurementDrainScheduled{false};
     std::size_t m_droppedMeasurementSamples{0};
+    quint64 m_totalDroppedMeasurementSamples{0};
     std::atomic<bool> m_journalAdmission{false};
     std::atomic<quint64> m_journalNextSequence{1};
 };
