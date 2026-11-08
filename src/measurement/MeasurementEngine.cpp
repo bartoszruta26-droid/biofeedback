@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <utility>
+#include <stdexcept>
 
 namespace biofeedback::measurement {
 namespace {
@@ -34,7 +35,10 @@ const char* qualityName(Quality quality) noexcept {
 }
 
 MeasurementEngine::MeasurementEngine(MeasurementEngineConfig config)
-    : m_config(config) {
+    : m_config(config), m_nextSequence(config.initialSequence) {
+    if (m_nextSequence == 0 || m_nextSequence > static_cast<std::uint64_t>(INT64_MAX)) {
+        throw std::invalid_argument("MeasurementEngine initial sequence is outside the supported range");
+    }
     if (m_config.historyCapacity == 0) m_config.historyCapacity = 1;
     if (!std::isfinite(m_config.minimumValue) ||
         !std::isfinite(m_config.maximumValue) ||
