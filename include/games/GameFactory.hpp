@@ -2,6 +2,7 @@
 #define GAMES_GAMEFACTORY_HPP
 
 #include "games/ArcherGame.hpp"
+#include "games/CarRaceGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/GalagaGame.hpp"
@@ -42,6 +43,10 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
 
     if (id == QStringLiteral("archer") || id == QStringLiteral("archer_force"))
         return new ArcherGame(parent);
+
+    if (id == QStringLiteral("car_race") || id == QStringLiteral("carrace") ||
+        id == QStringLiteral("car-race"))
+        return new CarRaceGame(parent);
 
     return nullptr;
 }
