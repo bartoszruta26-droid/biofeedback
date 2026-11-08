@@ -57,6 +57,7 @@
 - [x] Rejestracja nowych gier w GameFactory oraz udostępnienie ich w selektorach TrainingTab i OutlineTab.
 - [x] Archer, Car Race i Scorched Earth: obsługa zmiany rozmiaru aktywnego widoku; zachowanie/ponowne dopasowanie celu, przeszkód, terenu, czołgów i pocisków.
 - [x] Galaga: skalowanie statku, przeciwników i pocisków podczas zmiany rozmiaru; ograniczenie pozycji aktorów do nowego widoku.
+- [x] Galaga: czasowa ochrona po trafieniu, czyszczenie wrogich pocisków bez unieważniania iteracji oraz pojedyncza utrata życia przy zejściu formacji; fala jest odtwarzana dopiero po rzeczywistej utracie życia.
 - [x] Testy zmiany rozmiaru Galaga i Car Race z aktywnymi aktorami/przeszkodami.
 - [x] Testy regresyjne zmiany rozmiaru podczas aktywnej rozgrywki Archer i Scorched Earth; Car Race ma już test małego widoku podczas gry.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier.
