@@ -1,5 +1,6 @@
 #include "api/HttpApiServer.hpp"
 #include "application/AcquisitionService.hpp"
+#include "application/DeviceService.hpp"
 #include "application/MeasurementService.hpp"
 #include "measurement/MeasurementEngine.hpp"
 #include "core/Authentication.hpp"
@@ -17,6 +18,13 @@
 #include <iostream>
 
 namespace {
+class ConnectedTestDevice final : public biofeedback::application::DeviceAdapter {
+public:
+    bool connect(std::string&) override { connected = true; return true; }
+    void disconnect() noexcept override { connected = false; }
+    bool isConnected() const noexcept override { return connected; }
+    bool connected{true};
+};
 QByteArray transact(quint16 port, const QByteArray& request) {
     QTcpSocket socket;
     socket.connectToHost(QHostAddress::LocalHost, port);
@@ -82,6 +90,9 @@ int main(int argc, char** argv) {
     auto measurementService = std::make_shared<biofeedback::application::MeasurementService>(measurementEngine);
     auto acquisitionService = std::make_shared<biofeedback::application::AcquisitionService>(measurementService);
     server.setAcquisitionService(acquisitionService);
+    auto deviceService = std::make_shared<biofeedback::application::DeviceService>();
+    assert(deviceService->registerDevice(biofeedback::application::DeviceDescriptor{"sensor-api-1", "API test sensor", "test"}, std::make_shared<ConnectedTestDevice>()));
+    server.setDeviceService(deviceService);
     assert(server.listen(QHostAddress::LocalHost, 0));
     const quint16 port = server.serverPort();
 
@@ -171,16 +182,17 @@ int main(int argc, char** argv) {
     assert(statusCode(resourceRequest(
         "PUT", ("/api/v1/patients/" + patientId).toUtf8(), updatePayload)) == 409);
 
-    const QByteArray deletePayload = QJsonDocument(QJsonObject{
-        {"expected_version", 2}
-    }).toJson(QJsonDocument::Compact);
-    assert(statusCode(resourceRequest(
-        "DELETE", ("/api/v1/patients/" + patientId).toUtf8(), deletePayload)) == 200);
+    const QByteArray missingPatientAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
+        QJsonDocument(QJsonObject{{"id", "missing-patient-session"}, {"patient_id", "patient-does-not-exist"},
+                                  {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}}).toJson(QJsonDocument::Compact));
+    assert(statusCode(missingPatientAcquisition) == 422);
+    const QByteArray missingDeviceAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
+        QJsonDocument(QJsonObject{{"id", "missing-device-session"}, {"patient_id", patientId},
+                                  {"device_id", "sensor-does-not-exist"}, {"protocol_id", "strength"}}).toJson(QJsonDocument::Compact));
+    assert(statusCode(missingDeviceAcquisition) == 422);
     const QByteArray startAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
-        QJsonDocument(QJsonObject{
-            {"id", "api-session-1"}, {"patient_id", "patient-api-1"},
-            {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}
-        }).toJson(QJsonDocument::Compact));
+        QJsonDocument(QJsonObject{{"id", "api-session-1"}, {"patient_id", patientId},
+                                  {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}}).toJson(QJsonDocument::Compact));
     assert(statusCode(startAcquisition) == 201);
     const QByteArray activeAcquisition = resourceRequest("GET", "/api/v1/acquisition/session");
     assert(statusCode(activeAcquisition) == 200);
@@ -201,6 +213,8 @@ int main(int argc, char** argv) {
     assert(statusCode(inactiveAcquisition) == 200);
     assert(!QJsonDocument::fromJson(responseBody(inactiveAcquisition)).object()
                 .value("active").toBool());
+    const QByteArray deletePayload = QJsonDocument(QJsonObject{{"expected_version", 2}}).toJson(QJsonDocument::Compact);
+    assert(statusCode(resourceRequest("DELETE", ("/api/v1/patients/" + patientId).toUtf8(), deletePayload)) == 200);
 
     const QByteArray meResponse = transact(port, meRequest);
     assert(statusCode(meResponse) == 200);
