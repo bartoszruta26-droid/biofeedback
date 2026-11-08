@@ -62,6 +62,24 @@ add_executable(json_resource_repository_regression tests/json_resource_repositor
 target_link_libraries(json_resource_repository_regression PRIVATE biofeedback_data_repository Qt5::Core)
 add_test(NAME json_resource_repository_regression COMMAND json_resource_repository_regression)
 
+# Shared authenticated HTTP client for terminal and other native clients.
+add_library(biofeedback_api_client STATIC src/api/HttpApiClient.cpp)
+target_include_directories(biofeedback_api_client PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_api_client PUBLIC Qt5::Core Qt5::Network)
+
+add_executable(api_client_regression
+    tests/api_client_regression.cpp
+    src/api/HttpApiServer.cpp
+    include/api/HttpApiServer.hpp
+)
+set_target_properties(api_client_regression PROPERTIES AUTOMOC ON)
+target_include_directories(api_client_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(api_client_regression PRIVATE
+    biofeedback_api_client biofeedback_data_repository biofeedback_core Qt5::Core Qt5::Network
+)
+add_test(NAME api_client_regression COMMAND api_client_regression)
+set_tests_properties(api_client_regression PROPERTIES TIMEOUT 20)
+
 # Shared measurement pipeline: validation, canonical units, quality and bounded history.
 add_library(biofeedback_measurement STATIC src/measurement/MeasurementEngine.cpp)
 target_include_directories(biofeedback_measurement PUBLIC ${CMAKE_SOURCE_DIR}/include)
@@ -223,7 +241,7 @@ if(CURSES_FOUND)
     )
     set_target_properties(biofeedback_tui PROPERTIES AUTOMOC ON)
     target_include_directories(biofeedback_tui PRIVATE ${CMAKE_SOURCE_DIR}/include ${CURSES_INCLUDE_DIRS})
-    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model biofeedback_measurement biofeedback_training biofeedback_sensor_protocol biofeedback_core Qt5::Core ${CURSES_LIBRARIES})
+    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model biofeedback_measurement biofeedback_training biofeedback_sensor_protocol biofeedback_api_client biofeedback_core Qt5::Core Qt5::Network ${CURSES_LIBRARIES})
     install(TARGETS biofeedback_tui DESTINATION bin)
 else()
     message(STATUS "ncurses not found - skipping optional biofeedback_tui target")
