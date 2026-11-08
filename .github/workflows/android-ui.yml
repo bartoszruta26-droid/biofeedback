@@ -10,6 +10,7 @@ on:
       - '.github/workflows/android-ui.yml'
   pull_request:
     branches:
+      - main
       - integration/all-work
     paths:
       - 'platforms/android/**'
