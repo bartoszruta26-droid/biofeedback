@@ -7,7 +7,7 @@
 #include <cstring>
 
 namespace {
-constexpr uart_inst_t* kControlUart = uart0;
+uart_inst_t* const kControlUart = uart0;
 constexpr uint kUartTxPin = 0;
 constexpr uint kUartRxPin = 1;
 constexpr uint32_t kBaudRate = 115200;
