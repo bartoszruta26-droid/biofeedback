@@ -2,9 +2,11 @@
 #define GAMES_GALAGAGAME_HPP
 
 #include "games/GameEngine.hpp"
+#include "sensor/SerialCommunication.hpp"
 #include <QPointF>
 #include <QRectF>
 #include <QVector>
+#include <memory>
 
 class QKeyEvent;
 class QResizeEvent;
@@ -18,6 +20,9 @@ class GalagaGame final : public GameEngine
 public:
     explicit GalagaGame(QWidget *parent = nullptr);
     QString gameName() const override;
+    void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    void disconnectSerial();
+    bool isSerialConnected() const;
     int livesRemaining() const { return m_lives; }
     int currentWave() const { return m_wave; }
     int activeEnemyCount() const;
@@ -60,6 +65,7 @@ private:
     int m_lives;
     int m_wave;
     bool m_fireHeld;
+    std::shared_ptr<sensor::SerialCommunication> m_serialPort;
 };
 
 } // namespace games
