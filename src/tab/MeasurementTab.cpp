@@ -1308,6 +1308,9 @@ void MeasurementTab::stopMeasurement()
     m_measurementSessionGeneration.fetch_add(1, std::memory_order_acq_rel);
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        // Anything still queued at STOP is a presentation/analysis drop;
+        // the durable journal already contains those samples.
+        m_totalDroppedMeasurementSamples += m_measurementQueue.size();
         m_measurementQueue.clear();
         m_measurementDrainScheduled = false;
         m_droppedMeasurementSamples = 0;
