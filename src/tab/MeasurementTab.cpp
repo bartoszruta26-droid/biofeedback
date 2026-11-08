@@ -557,7 +557,7 @@ bool MeasurementTab::commitMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
     if (!m_journalAdmission.load(std::memory_order_acquire))
-        return false;
+        return !m_sampleJournalFailed.load(std::memory_order_acquire);
 
     const quint64 sequence = m_journalNextSequence.load(std::memory_order_acquire);
     if (sequence == 0 ||
@@ -2798,6 +2798,12 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 void MeasurementTab::enqueueMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
+    // The shared engine also feeds TrainingTab while this tab is idle. Do not
+    // queue idle frames for this tab's inactive graph/repetition presentation.
+    if (!m_journalAdmission.load(std::memory_order_acquire) &&
+        !m_sampleJournalFailed.load(std::memory_order_acquire))
+        return;
+
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
