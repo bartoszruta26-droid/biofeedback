@@ -1,6 +1,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include <QPainter>
 #include <QPaintEvent>
+#include <QResizeEvent>
 #include <QtMath>
 #include <QDebug>
 #include <QPen>
@@ -198,6 +199,41 @@ void FlappyBirdGame::resetBird() {
     m_birdVelocity.setX(0.0f);
     m_birdVelocity.setY(0.0f);
     m_birdRadius = m_birdBaseRadius;
+}
+
+void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        const double scaleRadius = qMin(scaleX, scaleY);
+
+        m_birdPos.setX(m_birdPos.x() * scaleX);
+        m_birdPos.setY(m_birdPos.y() * scaleY);
+        m_birdVelocity.setY(m_birdVelocity.y() * scaleY);
+        m_birdRadius = static_cast<float>(qMax(1.0, m_birdRadius * scaleRadius));
+        m_obstacleWidth = static_cast<float>(qMax(1.0, m_obstacleWidth * scaleX));
+        m_minGapHeight = static_cast<float>(qMax(0.0, m_minGapHeight * scaleY));
+        m_maxGapHeight = static_cast<float>(qMax(m_minGapHeight, m_maxGapHeight * scaleY));
+
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.xPosition = static_cast<float>(obstacle.xPosition * scaleX);
+            obstacle.gapY = static_cast<float>(obstacle.gapY * scaleY);
+            obstacle.gapHeight = static_cast<float>(obstacle.gapHeight * scaleY);
+        }
+
+        m_birdPos.setX(qBound(static_cast<double>(m_birdRadius),
+                              m_birdPos.x(),
+                              qMax(static_cast<double>(m_birdRadius),
+                                   static_cast<double>(newSize.width()) - m_birdRadius)));
+        m_birdPos.setY(qBound(static_cast<double>(m_birdRadius),
+                              m_birdPos.y(),
+                              qMax(static_cast<double>(m_birdRadius),
+                                   static_cast<double>(newSize.height()) - m_birdRadius)));
+    }
+    GameEngine::resizeEvent(event);
 }
 
 void FlappyBirdGame::spawnObstacle() {
