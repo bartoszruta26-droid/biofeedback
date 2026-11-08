@@ -62,12 +62,66 @@
     if (event.key === "Escape") sidebar.classList.remove("open");
   });
 
-  async function checkApi() {
-    if (!window.BiofeedbackApi) {
-      apiStatus.textContent = "Klient API niedostępny";
+  const authGate = document.getElementById("authGate");
+  const appShell = document.getElementById("appShell");
+  const loginForm = document.getElementById("loginForm");
+  const loginMessage = document.getElementById("loginMessage");
+  const loginButton = document.getElementById("loginButton");
+  const currentUser = document.getElementById("currentUser");
+  const api = window.BiofeedbackApi
+    ? window.BiofeedbackApi.createApiClient()
+    : null;
+
+  function showAuthenticated(user) {
+    authGate.hidden = true;
+    appShell.hidden = false;
+    currentUser.textContent = user.username + " · " + user.role;
+    loginMessage.textContent = "";
+  }
+
+  loginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!api) {
+      loginMessage.textContent = "Klient API jest niedostępny.";
       return;
     }
-    const api = window.BiofeedbackApi.createApiClient();
+    loginButton.disabled = true;
+    loginMessage.textContent = "Trwa uwierzytelnianie…";
+    try {
+      await api.login(
+        document.getElementById("loginUsername").value,
+        document.getElementById("loginPassword").value
+      );
+      const user = await api.getCurrentUser();
+      showAuthenticated(user);
+      document.getElementById("loginPassword").value = "";
+    } catch (error) {
+      loginMessage.textContent = error.message || "Logowanie nie powiodło się.";
+      document.getElementById("loginPassword").value = "";
+    } finally {
+      loginButton.disabled = false;
+    }
+  });
+
+  document.getElementById("logoutButton").addEventListener("click", async () => {
+    try {
+      if (api) await api.logout();
+    } catch (_) {
+      // Local token is cleared by the client even if the server is unreachable.
+    }
+    appShell.hidden = true;
+    authGate.hidden = false;
+    currentUser.textContent = "";
+    document.getElementById("loginPassword").value = "";
+    loginMessage.textContent = "Sesja została zakończona. Zaloguj się ponownie.";
+  });
+
+  async function checkApi() {
+    if (!api) {
+      apiStatus.textContent = "Klient API niedostępny";
+      loginMessage.textContent = "Nie można załadować klienta API.";
+      return;
+    }
     try {
       const status = await api.getStatus();
       const label = status && status.status ? String(status.status) : "API dostępne";
@@ -81,6 +135,7 @@
       apiStatus.title = error.message;
       document.getElementById("apiSummary").textContent = "API niedostępne";
       document.getElementById("apiSummaryDetail").textContent = error.message;
+      loginMessage.textContent = "Serwer API jest niedostępny.";
     }
   }
   checkApi();
