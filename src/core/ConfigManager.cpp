@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <type_traits>
+#include <cmath>
 #include <iostream>
 #include <QThread>
 #include <QFile>
