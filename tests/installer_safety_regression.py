@@ -8,6 +8,7 @@ packaged = (root / "packaging/linux/install.sh").read_text(encoding="utf-8")
 uninstaller = (root / "packaging/linux/uninstall.sh").read_text(encoding="utf-8")
 main = (root / "src/main.cpp").read_text(encoding="utf-8")
 debug = (root / "src/core/DebugManager.cpp").read_text(encoding="utf-8")
+encryption = (root / "src/data/Encryption.cpp").read_text(encoding="utf-8")
 example = (root / "config/config.json.example").read_text(encoding="utf-8")
 
 assert 'KERNEL=="ttyUSB[0-9]*"' in legacy
@@ -36,3 +37,7 @@ assert "constexpr bool DEBUG_DEBUGMANAGER = false;" in debug
 assert "m_minimumLogLevel(DebugLevel::INFO)" in debug
 assert "m_consoleOutputEnabled(false)" in debug
 print("installer_safety_regression: PASS")
+
+for flag in ("DEBUG_ENCRYPTION", "DEBUG_XOR_OPERATIONS", "DEBUG_BASE64_OPERATIONS", "DEBUG_KEY_GENERATION", "DEBUG_ERROR_HANDLING"):
+    assert f"#define {flag} 0" in encryption
+assert "bool Encryption::m_consoleOutputEnabled = false;" in encryption
