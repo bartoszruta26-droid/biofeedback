@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     const QString id = created.value(QStringLiteral("id")).toString();
     assert(!id.isEmpty());
     assert(created.value(QStringLiteral("version")).toInt() == 1);
-    assert(created.value(QStringLiteral("pesel")).toString() == QStringLiteral("90010112345"));
+    assert(created.value(QStringLiteral("pesel")).toString() == QStringLiteral("TEST-PATIENT-001"));
 
     QJsonObject validMeasurement{
         {QStringLiteral("patient_id"), id},
