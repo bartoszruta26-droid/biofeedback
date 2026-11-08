@@ -62,16 +62,16 @@ int main() {
         watchdog_update();
         while (uart_is_readable(kControlUart)) {
             const char ch = static_cast<char>(uart_getc(kControlUart));
-            if (ch == '\\r' || ch == '\\n') {
+            if (ch == '\r' || ch == '\n') {
                 if (discardingOversizedLine) {
                     writeReply("ERR,COMMAND_TOO_LONG");
                     discardingOversizedLine = false;
                     length = 0;
-                    command.fill('\\0');
+                    command.fill('\0');
                 } else if (length > 0) {
-                    command[length] = '\\0';
+                    command[length] = '\0';
                     processCommand(command.data());
-                    command.fill('\\0');
+                    command.fill('\0');
                     length = 0;
                 }
             } else if (ch >= 0x20 && ch <= 0x7e) {
@@ -79,12 +79,12 @@ int main() {
                 if (length + 1 < command.size()) {
                     command[length++] = ch;
                 } else {
-                    command.fill('\\0');
+                    command.fill('\0');
                     length = 0;
                     discardingOversizedLine = true;
                 }
             } else {
-                command.fill('\\0');
+                command.fill('\0');
                 length = 0;
                 discardingOversizedLine = true;
             }
