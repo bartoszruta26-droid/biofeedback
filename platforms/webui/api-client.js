@@ -94,7 +94,7 @@
       login: async (username, password) => {
         config.accessToken = null;
         const result = await request("/api/v1/auth/login", jsonRequest("POST", { username, password }));
-        if (!result || typeof result.access_token !== "string" || !result.access_token) {
+        if (!result || typeof result.access_token !== "string" || !/^[0-9a-fA-F]{64}$/.test(result.access_token)) {
           throw new ApiError("API login response did not contain an access token", 0, result);
         }
         config.accessToken = result.access_token;
