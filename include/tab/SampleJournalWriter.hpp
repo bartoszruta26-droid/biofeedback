@@ -52,6 +52,7 @@ private:
     static bool writeDurably(QFile& file, const QByteArray& bytes,
                              QString& error);
     static bool flushDurably(QFile& file, QString& error);
+    static bool syncParentDirectory(const QString& path, QString& error);
 
     const std::size_t m_capacity;
     mutable std::mutex m_mutex;
