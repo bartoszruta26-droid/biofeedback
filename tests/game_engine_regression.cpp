@@ -86,6 +86,16 @@ int main(int argc, char **argv)
     // than creating one queued Qt event per sensor sample.
     REQUIRE(game.inputCount() == inputsBeforeBurst + 1);
 
+    // A stopped/restarted engine must not apply an already queued old sample.
+    std::thread staleWorker([&game]() { game.handleSensorInput(12345.0); });
+    staleWorker.join();
+    game.stop();
+    game.start();
+    const int inputsAfterRestart = game.inputCount();
+    waitForEvents(20);
+    REQUIRE(game.inputCount() == inputsAfterRestart);
+    REQUIRE(std::abs(game.lastInput()) < 1e-9);
+
     const int inputsBeforeInvalid = game.inputCount();
     game.handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     REQUIRE(game.inputCount() == inputsBeforeInvalid);
