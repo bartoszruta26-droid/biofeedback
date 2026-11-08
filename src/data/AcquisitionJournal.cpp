@@ -13,7 +13,7 @@
 
 namespace biofeedback::data {
 namespace {
-constexpr qint64 MaxJournalRecordBytes = 1024 * 1024;
+constexpr qint64 MaxJournalRecordBytes = 2 * 1024 * 1024;
 QString sequenceName(quint64 sequence) {
     return QStringLiteral("%1.bfj").arg(sequence, 20, 10, QLatin1Char('0'));
 }
@@ -75,7 +75,7 @@ bool AcquisitionJournal::recover(QString* error) {
         const QString base = info.completeBaseName();
         bool sequenceOk = false;
         const quint64 sequence = base.toULongLong(&sequenceOk);
-        if (!sequenceOk || sequence == 0 || sequenceName(sequence) != info.fileName() ||
+        if (!sequenceOk || sequence == 0 || sequence > static_cast<quint64>(std::numeric_limits<qint64>::max()) || sequenceName(sequence) != info.fileName() ||
             sequence <= last) {
             setError(error, QStringLiteral("JOURNAL_SEQUENCE_INVALID"));
             return false;
@@ -116,7 +116,7 @@ bool AcquisitionJournal::append(quint64 sequence, const QJsonObject& payload, QS
     QMutexLocker lock(&m_mutex);
     if (error) error->clear();
     if (!isReady()) { setError(error, m_initializationError); return false; }
-    if (sequence == 0 || sequence != m_lastSequence + 1 ||
+    if (sequence == 0 || sequence > static_cast<quint64>(std::numeric_limits<qint64>::max()) ||\n        m_lastSequence == static_cast<quint64>(std::numeric_limits<qint64>::max()) || sequence != m_lastSequence + 1 ||
         payload.value(QStringLiteral("sequence")).toVariant().toULongLong() != sequence) {
         setError(error, QStringLiteral("JOURNAL_SEQUENCE_CONFLICT"));
         return false;
