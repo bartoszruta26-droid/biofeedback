@@ -561,14 +561,16 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 }
                 if (!m_resources->remove(collection, resourceId, expectedVersion, &repositoryError)) {
                     const bool missing = repositoryError == "RESOURCE_NOT_FOUND";
-                    const bool conflict = repositoryError == "VERSION_CONFLICT" ||
-                        repositoryError == "PATIENT_HAS_REFERENCES";
+                    const bool patientReferenced = repositoryError == "PATIENT_HAS_REFERENCES";
+                    const bool conflict = repositoryError == "VERSION_CONFLICT" || patientReferenced;
                     sendJson(socket, missing ? 404 : (conflict ? 409 : 400),
                         errorBody(missing ? "RESOURCE_NOT_FOUND" :
-                                  (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED"),
+                                  (patientReferenced ? "PATIENT_HAS_REFERENCES" :
+                                   (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED")),
                                   missing ? "Rekord nie istnieje." :
-                                  (conflict ? "Rekord został zmieniony przez innego klienta." :
-                                              "Nie można usunąć rekordu.")));
+                                  (patientReferenced ? "Pacjent ma powiązane rekordy kliniczne." :
+                                   (conflict ? "Rekord został zmieniony przez innego klienta." :
+                                               "Nie można usunąć rekordu."))));
                     return;
                 }
                 sendJson(socket, 200, R"({"ok":true})");
