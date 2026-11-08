@@ -173,6 +173,7 @@ void GameEngine::resetGameStats()
     m_accumulatedSessionMs = 0;
     m_frameCount = 0;
     m_invalidInputCount = 0;
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     if (m_isRunning && !m_isPaused) {
         m_monotonicClock.restart();
         m_lastFrameTime = 0;
@@ -198,6 +199,7 @@ void GameEngine::reset()
     m_simulationAccumulator = 0.0;
     m_frameCount = 0;
     m_invalidInputCount = 0;
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
     // Wymuszenie odświeżenia widoku
     QWidget::update();
@@ -243,6 +245,8 @@ void GameEngine::handleSensorInput(double value)
     if (!std::isfinite(value)) {
         if (QThread::currentThread() == thread())
             ++m_invalidInputCount;
+        else
+            m_pendingInvalidInputCount.fetch_add(1, std::memory_order_relaxed);
         return;
     }
 
@@ -264,6 +268,8 @@ void GameEngine::handleSensorInput(double value)
             // producer either gets included in this read or schedules another
             // dispatch, so the newest sample cannot be stranded.
             guard->m_sensorDispatchQueued.store(false, std::memory_order_release);
+            guard->m_invalidInputCount += guard->m_pendingInvalidInputCount.exchange(
+                0, std::memory_order_acq_rel);
             const double pending = guard->m_pendingSensorValue.load(std::memory_order_acquire);
             guard->handleSensorInput(pending);
         }, Qt::QueuedConnection);
