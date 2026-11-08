@@ -14,3 +14,10 @@ if "calibration_factor = known_weight / raw_value;" not in firmware or "is_calib
 if "hasCalibratedValue" not in header or "data.hasCalibratedValue = calibrationConfirmed;" not in serial:
     raise SystemExit("Host parser must preserve explicit calibration validity")
 print("HX711 calibration protocol regression passed")
+
+if "strtod(buffer + 4, &end_ptr)" not in firmware:
+    raise SystemExit("Calibration parser must consume the complete numeric field")
+if "isfinite(parsed_weight)" not in firmware or "isfinite(proposed_factor)" not in firmware:
+    raise SystemExit("Calibration parser must reject non-finite weights and factors")
+if "atof(buffer + 4)" in firmware:
+    raise SystemExit("Unsafe permissive atof calibration parser remains")
