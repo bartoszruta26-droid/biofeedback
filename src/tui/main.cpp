@@ -238,6 +238,23 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
     QString error;
     const bool saved = apiClient.createResource(
         QStringLiteral("training-sessions"), payload, created, &error);
+    QString resultWarning;
+    if (saved) {
+        const QJsonObject resultPayload{
+            {QStringLiteral("training_session_id"), created.value(QStringLiteral("id")).toString()},
+            {QStringLiteral("exercise_name"), exercise},
+            {QStringLiteral("completed_series"), completedSeries},
+            {QStringLiteral("completed_repetitions"), completedReps},
+            {QStringLiteral("target_force_n"), targetForce},
+            {QStringLiteral("repetitions"), repetitionRecords},
+            {QStringLiteral("source_client"), QStringLiteral("tui")}
+        };
+        QJsonObject storedResult;
+        if (!apiClient.createResource(QStringLiteral("training-results"),
+                                      resultPayload, storedResult, &resultWarning)) {
+            resultWarning = "Szczegoly wyniku nie zostaly zapisane: " + resultWarning;
+        }
+    }
     {
         std::lock_guard<std::mutex> lock(live.mutex);
         if (saved) {
@@ -245,6 +262,8 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
             live.sessionNeedsSave = false;
             live.trainingMessage = "Sesja zapisana w serwerze danych: " +
                 created.value(QStringLiteral("id")).toString().toStdString();
+            if (!resultWarning.isEmpty())
+                live.trainingMessage += " (" + resultWarning.toStdString() + ")";
         } else {
             live.trainingMessage = "Blad zapisu sesji w serwerze: " + error.toStdString();
         }
