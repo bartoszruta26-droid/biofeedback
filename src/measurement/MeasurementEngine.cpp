@@ -5,6 +5,7 @@
 #include <cmath>
 #include <utility>
 #include <stdexcept>
+#include <limits>
 
 namespace biofeedback::measurement {
 namespace {
@@ -36,7 +37,7 @@ const char* qualityName(Quality quality) noexcept {
 
 MeasurementEngine::MeasurementEngine(MeasurementEngineConfig config)
     : m_config(config), m_nextSequence(config.initialSequence) {
-    if (m_nextSequence == 0 || m_nextSequence > static_cast<std::uint64_t>(INT64_MAX)) {
+    if (m_nextSequence == 0 || m_nextSequence > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
         throw std::invalid_argument("MeasurementEngine initial sequence is outside the supported range");
     }
     if (m_config.historyCapacity == 0) m_config.historyCapacity = 1;
