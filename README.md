@@ -449,10 +449,13 @@ pełnych zakresów RBAC. Serwer nie udostępnia jeszcze WebSocket/SSE.
 
 WebUI ma klienta CRUD dla wszystkich kolekcji. Android ma klienta CRUD,
 a ekran Pacjenci obsługuje odczyt, dodawanie, edycję i usuwanie kart.
-TUI nie jest jeszcze klientem API. Producenci danych pomiarowych, treningowych
-i wyników gier w Desktop/TUI nie są jeszcze w pełni przepięci na wspólny zapis
-serwerowy. Serwer nasłuchuje domyślnie wyłącznie na loopback; zdalny Android
-wymaga bramy HTTPS/WSS. Nie wystawiaj prototypu HTTP bezpośrednio do sieci publicznej.
+TUI nie jest jeszcze klientem API. Desktop zapisuje sesje pomiarowe wraz z próbkami, sesje treningowe, wyniki
+ćwiczeń oraz wyniki gier do wspólnych kolekcji. TUI pobiera listę pacjentów
+i zapisuje sesje treningowe, ale nie dołącza jeszcze identyfikatora pacjenta
+ani nie archiwizuje pomiarów i gier. WebUI ma klienta CRUD, lecz jego ekrany
+nie są jeszcze pełnym panelem dokumentacji. Android obsługuje karty pacjentów;
+pozostałe ekrany nie zapisują jeszcze sesji. Serwer nasłuchuje domyślnie
+wyłącznie na loopback; zdalny Android wymaga bramy HTTPS/WSS. Nie wystawiaj prototypu HTTP bezpośrednio do sieci publicznej.
 
 Szczegółowy opis decyzji i etapów wdrożenia znajduje się w
 [docs/ARCHITECTURE_SHARED_DATA_SERVER.md](docs/ARCHITECTURE_SHARED_DATA_SERVER.md).
@@ -555,10 +558,10 @@ próbkowanej siły i progów histerezy.
 Po zakończeniu powtórzeń można analizować siłę szczytową i średnią, czas
 powtórzenia, czas do szczytu, realizację celu oraz zmienność pomiędzy
 powtórzeniami. Podsumowania serii są wykorzystywane w analizie treningowej
-i mogą być eksportowane z Desktop. TUI zapisuje sesje treningowe przez API
-do wspólnego repozytorium. Obecnie nie dołącza jeszcze identyfikatora pacjenta
-do sesji, a Desktop nie zapisuje jeszcze wszystkich wyników treningowych
-i pomiarowych przez API.
+i mogą być eksportowane z Desktop. Desktop zapisuje sesje pomiarowe z pełnym strumieniem próbek, serie i
+powtórzenia, a także sesje treningowe, wyniki ćwiczeń i wyniki gier.
+TUI zapisuje sesje treningowe przez API do wspólnego repozytorium, lecz
+nie dołącza jeszcze identyfikatora pacjenta.
 
 ### 10. Gry biofeedbackowe
 
