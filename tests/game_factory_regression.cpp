@@ -222,6 +222,20 @@ int main(int argc, char **argv)
         games::createGame(QStringLiteral("scored_earth")));
     REQUIRE(dynamic_cast<games::ScorchedEarthGame*>(legacyScoredEarth.get()) != nullptr);
 
+    // Public reset must be safe before a widget receives its final size.
+    std::unique_ptr<games::GameEngine> marioReset(games::createGame(QStringLiteral("mario")));
+    REQUIRE(marioReset != nullptr);
+    marioReset->reset();
+    REQUIRE(!marioReset->isRunning());
+    marioReset->resize(640, 480);
+    marioReset->start();
+    REQUIRE(marioReset->isRunning());
+    marioReset->reset();
+    REQUIRE(!marioReset->isRunning());
+    marioReset->start();
+    REQUIRE(marioReset->isRunning());
+    marioReset->stop();
+
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
 }
