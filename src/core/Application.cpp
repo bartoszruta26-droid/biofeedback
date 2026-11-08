@@ -20,6 +20,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QSet>
+#include <QSignalBlocker>
 #include <iostream>
 #include <sstream>
 
@@ -459,20 +460,26 @@ void Application::setupConnections()
                 if (!m_sharedResources || pesel.isEmpty()) return;
                 QJsonObject existing;
                 QString error;
+                bool repositoryDeleteSucceeded = false;
                 if (findPatientByPesel(pesel, existing)) {
-                    if (!m_sharedResources->remove(
-                            QStringLiteral("patients"),
-                            existing.value(QStringLiteral("id")).toString(),
-                            existing.value(QStringLiteral("version")).toInt(), &error) && m_logger) {
+                    repositoryDeleteSucceeded = m_sharedResources->remove(
+                        QStringLiteral("patients"),
+                        existing.value(QStringLiteral("id")).toString(),
+                        existing.value(QStringLiteral("version")).toInt(), &error);
+                    if (!repositoryDeleteSucceeded && m_logger)
                         m_logger->warning("Shared patient repository delete failed: " + error.toStdString());
-                    }
+                } else {
+                    repositoryDeleteSucceeded = true;
                 }
-                // Retire the legacy local chart after successful repository deletion.
-                const QString legacyFile = QDir(runtime::patientDirectory(pesel))
-                    .filePath(QStringLiteral("patient.json"));
-                if (QFile::exists(legacyFile)) QFile::remove(legacyFile);
+                // Retire the legacy local chart only after the canonical record is deleted.
+                if (repositoryDeleteSucceeded) {
+                    const QString legacyFile = QDir(runtime::patientDirectory(pesel))
+                        .filePath(QStringLiteral("patient.json"));
+                    if (QFile::exists(legacyFile)) QFile::remove(legacyFile);
+                }
             });
 
+    QSignalBlocker suppressPatientReloadSignals(m_patientTab);
     QSet<QString> loadedPatientIds;
     QString repositoryError;
     const QJsonArray sharedPatients = m_sharedResources
