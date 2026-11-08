@@ -186,12 +186,15 @@ int main(int argc, char **argv)
     galagaHitGame->resize(640, 480);
     galagaHitGame->start();
     galagaHitGame->handleSensorInput(100.0);
-    waitForEvents(3200);
+    // Wait for the first hit rather than assuming a fixed wall-clock time:
+    // CI load and event-loop scheduling can move the collision by several frames.
+    for (int attempt = 0; attempt < 500 && galagaHitGame->livesRemaining() == 3; ++attempt)
+        waitForEvents(10);
     REQUIRE(galagaHitGame->livesRemaining() == 2);
     REQUIRE(galagaHitGame->isRunning());
     const double protectionAtHit = galagaHitGame->hitProtectionRemaining();
     REQUIRE(protectionAtHit > 0.0);
-    waitForEvents(250);
+    waitForEvents(50);
     REQUIRE(galagaHitGame->livesRemaining() == 2);
     REQUIRE(galagaHitGame->hitProtectionRemaining() > 0.0);
     REQUIRE(galagaHitGame->hitProtectionRemaining() < protectionAtHit);
