@@ -562,15 +562,20 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 if (!m_resources->remove(collection, resourceId, expectedVersion, &repositoryError)) {
                     const bool missing = repositoryError == "RESOURCE_NOT_FOUND";
                     const bool patientReferenced = repositoryError == "PATIENT_HAS_REFERENCES";
-                    const bool conflict = repositoryError == "VERSION_CONFLICT" || patientReferenced;
+                    const bool trainingSessionReferenced =
+                        repositoryError == "TRAINING_SESSION_HAS_RESULTS";
+                    const bool referenceConflict = patientReferenced || trainingSessionReferenced;
+                    const bool conflict = repositoryError == "VERSION_CONFLICT" || referenceConflict;
                     sendJson(socket, missing ? 404 : (conflict ? 409 : 400),
                         errorBody(missing ? "RESOURCE_NOT_FOUND" :
                                   (patientReferenced ? "PATIENT_HAS_REFERENCES" :
-                                   (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED")),
+                                   (trainingSessionReferenced ? "TRAINING_SESSION_HAS_RESULTS" :
+                                    (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED"))),
                                   missing ? "Rekord nie istnieje." :
                                   (patientReferenced ? "Pacjent ma powiązane rekordy kliniczne." :
-                                   (conflict ? "Rekord został zmieniony przez innego klienta." :
-                                               "Nie można usunąć rekordu."))));
+                                   (trainingSessionReferenced ? "Sesja treningowa ma powiązane wyniki." :
+                                    (conflict ? "Rekord został zmieniony przez innego klienta." :
+                                                "Nie można usunąć rekordu."))));
                     return;
                 }
                 sendJson(socket, 200, R"({"ok":true})");
