@@ -1,4 +1,6 @@
 /*
+ * LEGACY TEXT-ONLY EXAMPLE — not compatible with the v1 binary ProtocolParser.
+ * Use hx711_advanced.ino for the currently supported CRC-framed HX711 stream.
  * Arduino Nano + HX711 - Przykładowy kod do wagi elektronicznej
  * 
  * Połączenia:
