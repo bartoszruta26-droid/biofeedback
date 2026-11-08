@@ -744,10 +744,23 @@ int main(int argc, char** argv)
         case 10:
         case 13: active = selected; break;
         case KEY_LEFT:
-            if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort > 0) --selectedPort;
+            if (active == static_cast<std::size_t>(tui::Screen::Patients) && !patientIds.isEmpty()) {
+                selectedPatientIndex = selectedPatientIndex <= 0
+                    ? patientIds.size() - 1 : selectedPatientIndex - 1;
+                std::lock_guard<std::mutex> lock(live.mutex);
+                live.selectedPatientId = patientIds.at(selectedPatientIndex);
+            } else if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort > 0) {
+                --selectedPort;
+            }
             break;
         case KEY_RIGHT:
-            if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort + 1 < ports.size()) ++selectedPort;
+            if (active == static_cast<std::size_t>(tui::Screen::Patients) && !patientIds.isEmpty()) {
+                selectedPatientIndex = (selectedPatientIndex + 1) % patientIds.size();
+                std::lock_guard<std::mutex> lock(live.mutex);
+                live.selectedPatientId = patientIds.at(selectedPatientIndex);
+            } else if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort + 1 < ports.size()) {
+                ++selectedPort;
+            }
             break;
         case 'r':
         case 'R':
@@ -810,18 +823,6 @@ int main(int argc, char** argv)
                     live.trainingMessage = "Sesja zatrzymana przez operatora.";
                     live.repetitionDetector.reset();
                 }
-            }
-            break;
-        case '[':
-        case ']':
-            if (active == static_cast<std::size_t>(tui::Screen::Patients) && !patientIds.isEmpty()) {
-                if (ch == ']')
-                    selectedPatientIndex = (selectedPatientIndex + 1) % patientIds.size();
-                else
-                    selectedPatientIndex = selectedPatientIndex <= 0
-                        ? patientIds.size() - 1 : selectedPatientIndex - 1;
-                std::lock_guard<std::mutex> lock(live.mutex);
-                live.selectedPatientId = patientIds.at(selectedPatientIndex);
             }
             break;
         case 'p':
