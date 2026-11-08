@@ -25,6 +25,7 @@
 #include "core/DebugManager.hpp"
 
 namespace biofeedback {
+namespace api { class HttpApiServer; }
 
 /**
  * @brief Application state enumeration for tracking lifecycle
@@ -297,6 +298,7 @@ private:
     std::unique_ptr<gui::MainWindow> m_mainWindow;
     std::unique_ptr<DataManager> m_dataManager;
     std::shared_ptr<data::JsonResourceRepository> m_sharedResources;
+    std::unique_ptr<api::HttpApiServer> m_localApiServer;
     std::unique_ptr<Authentication> m_authentication;
     
     // Note: DebugManager is a singleton, we don't store it as unique_ptr
