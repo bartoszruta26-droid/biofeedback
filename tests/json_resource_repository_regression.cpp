@@ -21,7 +21,7 @@ int main(int argc, char** argv) {
     QJsonObject patientPayload{
         {QStringLiteral("firstName"), QStringLiteral("Test")},
         {QStringLiteral("lastName"), QStringLiteral("Patient")},
-        {QStringLiteral("pesel"), QStringLiteral("90010112345")}
+        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-001")}
     };
     QJsonObject created;
     QString error;
@@ -49,7 +49,8 @@ int main(int argc, char** argv) {
 
     QJsonObject updatePayload{
         {QStringLiteral("firstName"), QStringLiteral("Updated")},
-        {QStringLiteral("lastName"), QStringLiteral("Patient")}
+        {QStringLiteral("lastName"), QStringLiteral("Patient")},
+        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-001")}
     };
     QJsonObject updated;
     assert(restarted.update(QStringLiteral("patients"), id, 1, updatePayload, updated, &error));
