@@ -213,7 +213,8 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             const bool allowedScheme = originUrl.scheme() == QStringLiteral("http") ||
                 originUrl.scheme() == QStringLiteral("https");
             if (!originUrl.isValid() || !localHost || !allowedScheme ||
-                originUrl.path() != QStringLiteral("/") || !originUrl.query().isEmpty() ||
+                (!originUrl.path().isEmpty() && originUrl.path() != QStringLiteral("/")) ||
+                !originUrl.userInfo().isEmpty() || !originUrl.query().isEmpty() ||
                 !originUrl.fragment().isEmpty()) {
                 sendJson(socket, 403, errorBody("ORIGIN_NOT_ALLOWED", "Dozwolone są wyłącznie lokalne źródła."));
                 return;
