@@ -379,6 +379,13 @@ bool ConfigManager::validateConfiguration() const {
                        "validateConfiguration");
             valid = false;
         }
+        if (stringValue("encryption.key_derivation", "") !=
+            "SHA-256 key normalization (32+ byte external secret)") {
+            logMessage(ConfigManagerLogLevel::ERROR,
+                       "Production profile requires the configured SHA-256 external-secret key normalization",
+                       "validateConfiguration");
+            valid = false;
+        }
     }
 
     const double baudRate = numericValue("serial.baud_rate", 0.0);
@@ -491,13 +498,31 @@ void ConfigManager::setDefaults() {
     m_config["sensor.gain"] = static_cast<int>(sensor::protocol::Hx711Gain);
     m_config["sensor.calibration_enabled"] = true;
     m_config["sensor.zero_threshold"] = 0.5;
+
+    // Device transport and fail-closed effector defaults
+    m_config["devices.pico.transport"] = std::string("serial");
+    m_config["devices.pico.baud_rate"] = sensor::protocol::DefaultControlBaudRate;
+    m_config["devices.pico.uart_tx_pin"] = static_cast<int>(sensor::protocol::PicoUartTxPin);
+    m_config["devices.pico.uart_rx_pin"] = static_cast<int>(sensor::protocol::PicoUartRxPin);
+    m_config["devices.pico.protocol"] = std::string("biofeedback-control");
+    m_config["devices.pico.protocol_version"] = sensor::protocol::ControlProtocolVersion;
+    m_config["devices.pico.actuators_enabled"] = false;
+    m_config["devices.pico.effectors.ir_pwm.enabled"] = false;
+    m_config["devices.pico.effectors.electrodes.enabled"] = false;
+    m_config["devices.pico.effectors.antenna.enabled"] = false;
+    m_config["devices.arduino_nano.transport"] = std::string("serial");
+    m_config["devices.arduino_nano.baud_rate"] = sensor::protocol::DefaultBaudRate;
+    m_config["devices.arduino_nano.hx711_data_pin"] = static_cast<int>(sensor::protocol::NanoHx711DataPin);
+    m_config["devices.arduino_nano.hx711_clock_pin"] = static_cast<int>(sensor::protocol::NanoHx711ClockPin);
+    m_config["devices.arduino_nano.protocol"] = std::string("hx711-frame-v1");
+    m_config["devices.arduino_nano.actuators_enabled"] = false;
     
     // Logging settings
     m_config["logging.level"] = std::string("INFO");
     m_config["logging.file"] = std::string("./logs/biofeedback.log");
     m_config["logging.max_size_mb"] = 10;
     m_config["logging.rotate_count"] = 5;
-    m_config["logging.console_output"] = true;
+    m_config["logging.console_output"] = false;\n    m_config["logging.diagnostics_enabled"] = false;
     
     // Games settings
     m_config["games.difficulty_default"] = std::string("medium");
