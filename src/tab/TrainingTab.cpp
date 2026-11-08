@@ -887,7 +887,7 @@ QJsonObject TrainingTab::buildSharedTrainingRecord(const QString& patientUuid) c
         {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
         {QStringLiteral("status"), completed ? QStringLiteral("completed") : QStringLiteral("interrupted")},
         {QStringLiteral("elapsed_ms"), elapsedMs},
-        {QStringLiteral("active_training_seconds"), m_trainingClock.activeSeconds()},
+        {QStringLiteral("active_training_seconds"), static_cast<double>(m_trainingClock.activeSeconds())},
         {QStringLiteral("plan"), plan},
         {QStringLiteral("exercise_results"), exerciseResults},
         {QStringLiteral("game_results"), gameRecords},
