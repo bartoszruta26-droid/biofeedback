@@ -1,4 +1,6 @@
 #include "tab/MeasurementTab.hpp"
+#include <utility>
+#include <vector>
 #include "measurement/Units.hpp"
 #include "core/RuntimePaths.hpp"
 #include "sensor/SerialCommunication.hpp"
