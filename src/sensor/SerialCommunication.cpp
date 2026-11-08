@@ -775,139 +775,135 @@ ArduinoInfo SerialCommunication::getArduinoInfo() const {
     return m_impl->arduinoInfo;
 }
 
-SensorData SerialCommunication::readData(int timeout) {
-    SensorData data;
+std::vector<SensorData> SerialCommunication::readDataBatch(int timeout) {
+    std::vector<SensorData> samples;
     if (timeout < 0) {
         m_impl->setLastError("Serial read rejected: negative timeout");
-        return data;
+        return samples;
     }
-    if (!m_impl->isConnected) return data;
-    
+    if (!m_impl->isConnected) return samples;
+
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
-    
-    // Send DATA command
-    std::string toSend = "DATA\n";
-if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
-        return data;
+    const std::string toSend = "DATA\n";
+    if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
+        return samples;
     }
     m_impl->markActivity();
-    
-    // Read response within the caller-provided total deadline.
+
     uint8_t buf[256];
-    constexpr size_t MaxResponseBytes = 4096;
+    constexpr std::size_t MaxResponseBytes = 4096;
     std::vector<uint8_t> rawData;
     rawData.reserve(512);
     const auto deadline = std::chrono::steady_clock::now() +
-                          std::chrono::milliseconds(std::max(timeout, 0));
-    bool gotBinaryData = false;
+                          std::chrono::milliseconds(timeout);
     ProtocolParser binaryParser;
 
     while (rawData.size() < MaxResponseBytes &&
            std::chrono::steady_clock::now() < deadline) {
         const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
             deadline - std::chrono::steady_clock::now());
-        const int rd = readFromPort(buf, std::min(sizeof(buf), MaxResponseBytes - rawData.size()),
-                                    static_cast<int>(std::max<int64_t>(1, remaining.count())));
+        const int rd = readFromPort(buf,
+            std::min(sizeof(buf), MaxResponseBytes - rawData.size()),
+            static_cast<int>(std::max<int64_t>(1, remaining.count())));
         if (rd < 0) break;
-        if (rd > 0) {
-            binaryParser.feed(buf, static_cast<std::size_t>(rd));
-            if (!gotBinaryData) {
-                const auto frame = binaryParser.takeFrame();
-                if (frame) {
-                    data.timestamp = frame->timestampMs;
-                    data.hasTimestamp = true;
-                    data.value = frame->rawValue;
-                    data.crc = frame->crc;
-                    data.isValid = true;
-                    gotBinaryData = true;
+        if (rd == 0) continue;
+
+        binaryParser.feed(buf, static_cast<std::size_t>(rd));
+        for (int i = 0; i < rd && rawData.size() < MaxResponseBytes; ++i) {
+            rawData.push_back(buf[i]);
+        }
+
+        // Preserve every complete CRC-valid frame in wire order.
+        while (const auto frame = binaryParser.takeFrame()) {
+            SensorData sample;
+            sample.timestamp = frame->timestampMs;
+            sample.hasTimestamp = true;
+            sample.value = frame->rawValue;
+            sample.crc = frame->crc;
+            sample.isValid = true;
+            sample.hasFrame = true;
+            samples.push_back(sample);
+        }
+
+        const std::string response(rawData.begin(), rawData.end());
+        if (response.find("[DATA_SENT]") != std::string::npos && !samples.empty()) {
+            break;
+        }
+    }
+
+    // FORCE text describes the DATA transaction, not each extra continuous frame.
+    const std::string response(rawData.begin(), rawData.end());
+    const std::size_t forcePos = response.find("FORCE:");
+    if (forcePos != std::string::npos) {
+        const std::size_t gramsEnd = response.find("g,", forcePos);
+        bool calibrationConfirmed = false;
+        const std::size_t calibrationPos = response.find("CAL:", forcePos);
+        if (calibrationPos != std::string::npos) {
+            try {
+                calibrationConfirmed = std::stoi(response.substr(calibrationPos + 4)) == 1;
+            } catch (...) {}
+        }
+        if (gramsEnd != std::string::npos) {
+            try {
+                const double grams = std::stod(
+                    response.substr(forcePos + 6, gramsEnd - forcePos - 6));
+                if (std::isfinite(grams)) {
+                    if (samples.empty()) samples.emplace_back();
+                    samples.front().calibratedValue = grams;
+                    samples.front().hasCalibratedValue = calibrationConfirmed;
+                    samples.front().isValid = true;
                 }
-            }
-            // Drain any additional complete frames from this response. A single
-            // readData() call represents one request/response transaction.
-            while (binaryParser.takeFrame()) {}
+            } catch (...) {}
+        }
 
-            for (int i = 0; i < rd && rawData.size() < MaxResponseBytes; ++i)
-                rawData.push_back(buf[i]);
-
-            // Parse the calibrated text even when a valid binary frame was
-            // already received. The firmware sends both in one DATA response.
-            std::string resp(rawData.begin(), rawData.end());
-            const size_t forcePos = resp.find("FORCE:");
-            if (forcePos != std::string::npos) {
-                const size_t gramsEnd = resp.find("g,", forcePos);
-                bool calibrationConfirmed = false;
-                const size_t calibrationPos = resp.find("CAL:", forcePos);
-                if (calibrationPos != std::string::npos) {
+        if (samples.empty()) {
+            SensorData fallback;
+            const std::size_t rawPos = response.find("RAW:", forcePos);
+            if (rawPos != std::string::npos) {
+                const std::size_t rawEnd = response.find(",", rawPos + 4);
+                if (rawEnd != std::string::npos) {
                     try {
-                        const int calibrationFlag = std::stoi(resp.substr(calibrationPos + 4));
-                        calibrationConfirmed = (calibrationFlag == 1);
+                        fallback.value = std::stoi(
+                            response.substr(rawPos + 4, rawEnd - rawPos - 4));
                     } catch (...) {}
                 }
-                if (gramsEnd != std::string::npos) {
-                    try {
-                        const double grams = std::stod(
-                            resp.substr(forcePos + 6, gramsEnd - forcePos - 6));
-                        if (std::isfinite(grams)) {
-                            data.calibratedValue = grams;
-                            data.hasCalibratedValue = calibrationConfirmed;
-                            data.isValid = true;
-                        }
-                    } catch (...) {}
-                }
-
-                const size_t rawPos = resp.find("RAW:", forcePos);
-                if (rawPos != std::string::npos) {
-                    const size_t rawEnd = resp.find(",", rawPos + 4);
-                    if (rawEnd != std::string::npos && !gotBinaryData) {
+                const std::size_t timestampPos = response.find("TS:", rawPos);
+                if (timestampPos != std::string::npos) {
+                    const std::size_t timestampEnd = response.find("ms", timestampPos);
+                    if (timestampEnd != std::string::npos) {
                         try {
-                            data.value = std::stoi(resp.substr(rawPos + 4, rawEnd - rawPos - 4));
+                            fallback.timestamp = static_cast<uint32_t>(std::stoul(
+                                response.substr(timestampPos + 3,
+                                    timestampEnd - timestampPos - 3)));
+                            fallback.hasTimestamp = true;
                         } catch (...) {}
                     }
-                    if (!gotBinaryData) {
-                        const size_t timestampPos = resp.find("TS:", rawPos);
-                        if (timestampPos != std::string::npos) {
-                            const size_t timestampEnd = resp.find("ms", timestampPos);
-                            if (timestampEnd != std::string::npos) {
-                                try {
-                                    data.timestamp = static_cast<uint32_t>(
-                                        std::stoul(resp.substr(timestampPos + 3,
-                                            timestampEnd - timestampPos - 3)));
-                                    data.hasTimestamp = true;
-                                } catch (...) {}
-                            }
-                        }
-                    }
                 }
             }
-            
-            if (resp.find("[DATA_SENT]") != std::string::npos && gotBinaryData) {
-                break;
-            }
+            fallback.hasFrame = !rawData.empty();
+            samples.push_back(fallback);
         }
+    } else if (samples.empty() && !rawData.empty()) {
+        SensorData responseOnly;
+        responseOnly.hasFrame = true;
+        samples.push_back(responseOnly);
     }
-    
-    data.hasFrame = !rawData.empty();
 
-    if (m_impl->verbose && data.isValid) {
-        std::cout << "[SerialComm] Data: TS=" << data.timestamp 
-                  << ", Value=" << data.value 
-                  << ", Calibrated=" << data.calibratedValue
-                  << ", CRC=" << (int)data.crc << std::endl;
-    } else if (m_impl->verbose && !data.isValid) {
-        std::cout << "[SerialComm] Failed to parse data. Raw bytes: ";
-        for (size_t i = 0; i < std::min(rawData.size(), size_t(20)); ++i) {
-            printf("%02X ", rawData[i]);
-        }
-        std::cout << std::endl;
+    if (m_impl->verbose && !samples.empty() && samples.front().isValid) {
+        const auto& first = samples.front();
+        std::cout << "[SerialComm] Batch: " << samples.size()
+                  << " frame(s), first TS=" << first.timestamp
+                  << ", Value=" << first.value
+                  << ", CRC=" << static_cast<int>(first.crc) << std::endl;
     }
-    
-    if (!rawData.empty()) {
-        m_impl->markActivity();
-    }
-    return data;
+    if (!rawData.empty()) m_impl->markActivity();
+    return samples;
 }
 
-bool SerialCommunication::tryReadData(SensorData& data) { data = readData(100); return data.isValid; }
+SensorData SerialCommunication::readData(int timeout) {
+    auto samples = readDataBatch(timeout);
+    return samples.empty() ? SensorData{} : samples.front();
+}
 
 void SerialCommunication::setDataCallback(DataCallback callback)
 {
@@ -1010,8 +1006,10 @@ void SerialCommunication::startAsyncReading() {
             }
             while (m_impl->asyncReading.load(std::memory_order_acquire) &&
                    m_impl->isConnected) {
-                SensorData data = readData(100);
-                if (data.hasFrame) notifyDataCallbacks(data);
+                const auto samples = readDataBatch(100);
+                for (const auto& sample : samples) {
+                    if (sample.hasFrame) notifyDataCallbacks(sample);
+                }
                 // readData() already waits on the serial response with a bounded
                 // deadline. An additional fixed sleep throttles the acquisition
                 // loop (and adds up to 12 ms to every sample) without improving
