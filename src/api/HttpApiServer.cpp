@@ -266,6 +266,20 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 sendJson(socket, 503, errorBody("SESSION_GENERATION_FAILED", "Nie można utworzyć bezpiecznej sesji."));
                 return;
             }
+            for (auto it = m_sessions.begin(); it != m_sessions.end();) {
+                if (it->expiresAtUtc <= QDateTime::currentDateTimeUtc() ||
+                    !it->authentication || !it->authentication->isLoggedIn()) {
+                    it = m_sessions.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+            if (m_sessions.size() >= 64) {
+                authentication->logout();
+                sendJson(socket, 503, errorBody("SESSION_CAPACITY_REACHED", "Limit aktywnych sesji API został osiągnięty."));
+                return;
+            }
+
             const QString token = QString::fromLatin1(
                 QByteArray(reinterpret_cast<const char*>(randomBytes), sizeof(randomBytes)).toHex());
             const QDateTime expiry = QDateTime::currentDateTimeUtc().addSecs(SessionLifetimeSeconds);
