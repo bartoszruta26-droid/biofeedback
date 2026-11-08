@@ -1,5 +1,6 @@
 #include "games/GameFactory.hpp"
 #include "games/TanGame.hpp"
+#include "games/SinGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/PongGame.hpp"
@@ -85,6 +86,34 @@ int main(int argc, char **argv)
     REQUIRE(tanGame->getDifficultyLevel() == 5);
     tanGame->setDifficultyLevel(0);
     REQUIRE(tanGame->getDifficultyLevel() == 1);
+    tanGame->resize(640, 480);
+    tanGame->start();
+    tanGame->handleSensorInput(35.0);
+    tanGame->update(std::numeric_limits<double>::max());
+    REQUIRE(tanGame->isRunning());
+    tanGame->update(std::numeric_limits<double>::quiet_NaN());
+    tanGame->update(std::numeric_limits<double>::infinity());
+    tanGame->update(-1.0);
+    tanGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    tanGame->handleSensorInput(std::numeric_limits<double>::infinity());
+    REQUIRE(tanGame->isRunning());
+    tanGame->stop();
+
+    std::unique_ptr<games::GameEngine> sinus(games::createGame(QStringLiteral("sin_game")));
+    auto* sinusGame = dynamic_cast<games::SinGame*>(sinus.get());
+    REQUIRE(sinusGame != nullptr);
+    sinusGame->resize(640, 480);
+    sinusGame->start();
+    sinusGame->handleSensorInput(35.0);
+    sinusGame->update(std::numeric_limits<double>::max());
+    REQUIRE(sinusGame->isRunning());
+    sinusGame->update(std::numeric_limits<double>::quiet_NaN());
+    sinusGame->update(std::numeric_limits<double>::infinity());
+    sinusGame->update(-1.0);
+    sinusGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    sinusGame->handleSensorInput(std::numeric_limits<double>::infinity());
+    REQUIRE(sinusGame->isRunning());
+    sinusGame->stop();
 
     std::unique_ptr<games::GameEngine> flappy(games::createGame(QStringLiteral("flappy")));
     auto* flappyGame = dynamic_cast<games::FlappyBirdGame*>(flappy.get());
