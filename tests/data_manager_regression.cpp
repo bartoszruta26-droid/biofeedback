@@ -6,15 +6,16 @@
 #include <string>
 #include <vector>
 #include <fstream>
-#include <csignal>
-#include <sys/resource.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace {
 
 const char* kExercisesFile = "/tmp/biofeedback_dm_exercises.json";
 const char* kResultsFile = "/tmp/biofeedback_dm_results.json";
 const char* kPatientFile = "/tmp/biofeedback_dm_patient.json";
-const char* kAtomicFailureFile = "/tmp/biofeedback_dm_atomic_failure.dat";
+const char* kAtomicFailureDirectory = "/tmp/biofeedback_dm_atomic_failure_dir";
+const char* kAtomicFailureFile = "/tmp/biofeedback_dm_atomic_failure_dir/target.dat";
 
 void expect(bool condition, const std::string& message) {
     if (!condition) {
@@ -152,28 +153,27 @@ int main() {
         expect(dm.importFromJson(kResultsFile) == exportPayload, "plaintext mode JSON import");
 
 
-        // Force a partial write to the temporary file. The existing destination
-        // must remain unchanged because rename is reached only after full write+fsync.
+        // Make the destination directory unwritable so QSaveFile cannot create
+        // its sibling temporary file. The existing destination must remain intact.
+        ::chmod(kAtomicFailureDirectory, 0700);
+        ::unlink(kAtomicFailureFile);
+        ::rmdir(kAtomicFailureDirectory);
+        expect(::mkdir(kAtomicFailureDirectory, 0700) == 0, "create atomic failure directory");
         {
             std::ofstream original(kAtomicFailureFile, std::ios::binary);
             original << "original-content";
         }
-        struct rlimit previousLimit{};
-        expect(::getrlimit(RLIMIT_FSIZE, &previousLimit) == 0, "getrlimit RLIMIT_FSIZE");
-        struct rlimit limited = previousLimit;
-        limited.rlim_cur = 1;
-        const auto previousHandler = std::signal(SIGXFSZ, SIG_IGN);
-        expect(::setrlimit(RLIMIT_FSIZE, &limited) == 0, "setrlimit partial-write injection");
-        const bool interruptedWrite = dm.exportToJson("payload-longer-than-one-byte", kAtomicFailureFile);
-        const int restoreResult = ::setrlimit(RLIMIT_FSIZE, &previousLimit);
-        std::signal(SIGXFSZ, previousHandler);
-        expect(restoreResult == 0, "restore RLIMIT_FSIZE");
-        expect(!interruptedWrite, "partial atomic write must fail");
+        expect(::chmod(kAtomicFailureDirectory, 0500) == 0, "make atomic destination directory read-only");
+        const bool interruptedWrite = dm.exportToJson("payload-that-cannot-be-written", kAtomicFailureFile);
+        const int restoreResult = ::chmod(kAtomicFailureDirectory, 0700);
+        expect(restoreResult == 0, "restore atomic destination directory permissions");
+        expect(!interruptedWrite, "unwritable atomic destination must fail");
         std::ifstream preserved(kAtomicFailureFile, std::ios::binary);
         std::string preservedContent((std::istreambuf_iterator<char>(preserved)), std::istreambuf_iterator<char>());
-        expect(preservedContent == "original-content", "previous destination must survive partial write");
+        expect(preservedContent == "original-content", "previous destination must survive failed atomic write");
 
         std::remove(kAtomicFailureFile);
+        ::rmdir(kAtomicFailureDirectory);
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
         std::remove(kPatientFile);
@@ -181,6 +181,8 @@ int main() {
         return 0;
     } catch (const std::exception& ex) {
         std::remove(kAtomicFailureFile);
+        ::chmod(kAtomicFailureDirectory, 0700);
+        ::rmdir(kAtomicFailureDirectory);
         std::remove(kExercisesFile);
         std::remove(kResultsFile);
         std::remove(kPatientFile);
