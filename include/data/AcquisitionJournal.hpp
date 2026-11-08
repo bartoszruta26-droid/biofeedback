@@ -31,6 +31,7 @@ public:
 
 private:
     bool recover(QString* error);
+    bool flushLocked(QString* error);
     QString batchPath(quint64 firstSequence, quint64 lastSequence) const;
     static void setError(QString* error, const QString& value);
 
