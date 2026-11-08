@@ -56,13 +56,13 @@ Implement behind the same repository interface as the file backend. Use migratio
 
 ### Configuration
 
-The server selects one backend at startup, for example:
-- `storage.patient_backend = "files"`
-- `storage.patient_backend = "mariadb"`
+The backend is selected in `config/config.json`:
+- `storage.patient_backend: "files"` selects local patient files (current default).
+- `storage.patient_backend: "mariadb"` selects the intended MariaDB backend.
 
-The file backend requires a configured data directory and encryption key source. The MariaDB backend requires host, port, database, username and secret supplied through a protected secret mechanism. Never commit credentials. A failed backend initialization must fail closed; do not silently fall back to plaintext files or another database.
+MariaDB connection settings are grouped under `storage.mariadb`: `host`, `port`, `database`, `username`, `password_env`, `tls` and `connect_timeout_seconds`. The password itself must be supplied through the named environment variable (default: `BIOFEEDBACK_MARIADB_PASSWORD`), never stored in JSON or committed. The configuration manager validates the backend name and required MariaDB connection metadata.
 
-The first implementation milestone should retain the existing encrypted file persistence and formalize it behind a repository interface. MariaDB is added as a second adapter after repository contracts and migration tests are stable.
+**Implementation status:** the file backend is currently wired into the Desktop application. The MariaDB repository adapter and driver integration are not implemented yet. If `mariadb` is selected today, Desktop startup fails explicitly and does not fall back to files. This prevents accidental split-brain storage. The next storage milestone is the repository contract and MariaDB adapter, followed by shared server integration.
 
 ## 4. API contract
 
