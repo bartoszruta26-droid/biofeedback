@@ -4,6 +4,7 @@
 #include <QPainter>
 #include <QFont>
 #include <algorithm>
+#include <utility>
 #include <cmath>
 
 namespace games {
