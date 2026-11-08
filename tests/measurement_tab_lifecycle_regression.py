@@ -182,31 +182,46 @@ if "removeFirst()" in add_sample_body or "for (double sample : m_forces)" in add
     raise SystemExit("ForcePlotWidget must not shift or rescan the full visible trace per sample")
 
 
-# The ordered training stream must never be truncated merely because the GUI
-# is temporarily behind. A full bounded queue applies producer backpressure;
-# teardown releases a blocked producer before waiting for subscriber callbacks.
+# Durable acquisition commits precede publication to the lossy GUI queue.
+engine_source = Path("src/measurement/MeasurementEngine.cpp").read_text(encoding="utf-8")
 for required in (
-    "#include <condition_variable>",
-    "std::condition_variable m_measurementQueueSpaceAvailable",
+    "m_measurementEngine->setCommitHook",
+    "m_journalAdmission.store(true",
+    "m_journalAdmission.store(false",
+    "m_sampleJournalWriter.appendDurably(line)",
+    "m_journalNextSequence.store(sequence + 1",
+):
+    if required not in source:
+        raise SystemExit(f"Missing durable acquisition commit invariant: {required}")
+commit_start = engine_source.index("if (m_commitHook)")
+history_start = engine_source.index("m_history.push_back(sample)", commit_start)
+if commit_start > history_start:
+    raise SystemExit("MeasurementEngine must durably commit before adding to history")
+if engine_source.index("m_commitHook(sample)") > history_start:
+    raise SystemExit("MeasurementEngine must invoke the commit hook before publication")
+
+# The bounded GUI queue may drop derived/presentation frames, but it must never
+# block the serial acquisition callback after the durable commit has succeeded.
+for required in (
     "bool m_measurementQueueAccepting{true}",
-    "m_measurementQueueSpaceAvailable.wait(lock",
-    "m_measurementQueue.size() < 4096",
-    "m_measurementQueueSpaceAvailable.notify_all()",
+    "MaximumQueuedSamples = 4096",
+    "if (m_measurementQueue.size() >= MaximumQueuedSamples)",
+    "++m_droppedMeasurementSamples",
     "m_measurementQueueAccepting = false",
 ):
     if required not in source and required not in header:
-        raise SystemExit(f"Missing lossless sample backpressure invariant: {required}")
+        raise SystemExit(f"Missing lossy GUI queue invariant: {required}")
 enqueue_start = source.index("void MeasurementTab::enqueueMeasurementSample(")
 enqueue_end = source.index("void MeasurementTab::drainMeasurementSamples(", enqueue_start)
 enqueue_body = source[enqueue_start:enqueue_end]
-if "m_droppedMeasurementSamples += m_measurementQueue.size() + 1" in enqueue_body:
-    raise SystemExit("A full training queue must apply backpressure, not discard acquired samples")
-if "if (m_measurementQueue.size() >= MaximumQueuedSamples)" in enqueue_body:
-    raise SystemExit("Queue-capacity handling must wait for space instead of entering a drop branch")
+if "m_measurementQueueSpaceAvailable.wait" in enqueue_body:
+    raise SystemExit("GUI presentation backlog must not block durable acquisition")
+if "m_measurementQueue.push_back(sample)" not in enqueue_body:
+    raise SystemExit("GUI queue must retain ordered samples while capacity is available")
 destructor_start = source.index("MeasurementTab::~MeasurementTab()")
 destructor_end = source.index("void MeasurementTab::ensureCurrentSeriesInitialized", destructor_start)
 destructor_body = source[destructor_start:destructor_end]
-if destructor_body.index("m_measurementQueueAccepting = false") > destructor_body.index("m_measurementEngine->unsubscribe"):
-    raise SystemExit("Teardown must release blocked acquisition callbacks before unsubscribe")
+if destructor_body.index("m_measurementEngine->setCommitHook({})") > destructor_body.index("closeSampleJournal()"):
+    raise SystemExit("Teardown must disable and synchronize commit hook before closing journal")
 
 print("Measurement, training and game realtime dispatch regression passed")
