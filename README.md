@@ -649,9 +649,11 @@ Aby przechowywać dane pacjentów w plikach na dysku, ustaw:
 }
 ```
 
-Wartość `"files"` jest ustawieniem domyślnym. Lokalizacja danych wynika z
-ustawienia `data.base_path` (w przykładowej konfiguracji: `./data/patients`).
-Wybór backendu plikowego nie wymaga konfiguracji MariaDB ani hasła do bazy.
+Wartość `"files"` jest ustawieniem domyślnym. Wspólne repozytorium jest
+zapisywane w katalogu `QStandardPaths::AppDataLocation/shared-data`.
+`data.base_path` pozostaje ścieżką starszego magazynu wykorzystywanego
+podczas migracji i zachowania zgodności wstecznej. Wybór backendu plikowego
+nie wymaga konfiguracji MariaDB ani hasła do bazy.
 
 ### MariaDB — konfiguracja docelowa, adapter jeszcze niedostępny
 
