@@ -238,11 +238,19 @@ void GameEngine::gameLoop()
 
 void GameEngine::handleSensorInput(double value)
 {
+    // Validate before publishing into the cross-thread mailbox. Otherwise a
+    // trailing NaN/Inf can overwrite a valid sample before the GUI consumes it.
+    if (!std::isfinite(value)) {
+        if (QThread::currentThread() == thread())
+            ++m_invalidInputCount;
+        return;
+    }
+
     // Sensor callbacks may originate on the serial worker thread. QWidget and
     // every derived game state must only be touched on the GUI thread.
     if (QThread::currentThread() != thread()) {
         // Sensor streams can be much faster than the GUI event loop. Keep only
-        // the newest sample and schedule at most one pending GUI-thread callback.
+        // the newest valid sample and schedule at most one pending callback.
         m_pendingSensorValue.store(value, std::memory_order_relaxed);
         if (m_sensorDispatchQueued.exchange(true, std::memory_order_acq_rel))
             return;
@@ -262,10 +270,6 @@ void GameEngine::handleSensorInput(double value)
 
         if (!queued)
             m_sensorDispatchQueued.store(false, std::memory_order_release);
-        return;
-    }
-    if (!std::isfinite(value)) {
-        ++m_invalidInputCount;
         return;
     }
     m_sensorValue = value;
