@@ -767,12 +767,13 @@ int main(int argc, char** argv)
                         live.currentSeries.clear();
                         live.sessionRepetitions.clear();
                         live.measurementSamples = QJsonArray();
+                        live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+                        if (live.selectedPatientId.isEmpty() && !patientIds.isEmpty())
+                            live.selectedPatientId = patientIds.first();
                         live.lastSeries = {};
                         live.trainingResting = false;
                         live.restRemaining = 0;
                         live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-                        if (live.selectedPatientId.isEmpty() && !patientIds.isEmpty())
-                            live.selectedPatientId = patientIds.first();
                         live.sessionNeedsSave = false;
                         live.sessionSaved = false;
                         live.sessionSaveAttempted = false;
