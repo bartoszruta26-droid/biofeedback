@@ -74,10 +74,17 @@ int main(int argc, char **argv)
     REQUIRE(game.isPaused());
     game.resume();
 
-    std::thread worker([&game]() { game.handleSensorInput(42.5); });
+    const int inputsBeforeBurst = game.inputCount();
+    std::thread worker([&game]() {
+        for (int sample = 0; sample < 1000; ++sample)
+            game.handleSensorInput(static_cast<double>(sample));
+    });
     worker.join();
     waitForEvents(10);
-    REQUIRE(std::abs(game.lastInput() - 42.5) < 1e-9);
+    REQUIRE(std::abs(game.lastInput() - 999.0) < 1e-9);
+    // A burst produced before the GUI loop drains must be coalesced rather
+    // than creating one queued Qt event per sensor sample.
+    REQUIRE(game.inputCount() == inputsBeforeBurst + 1);
 
     const int inputsBeforeInvalid = game.inputCount();
     game.handleSensorInput(std::numeric_limits<double>::quiet_NaN());
