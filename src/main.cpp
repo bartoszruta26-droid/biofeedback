@@ -279,15 +279,10 @@ int main(int argc, char* argv[]) {
         }
 
         const bool encryptionEnabled = app.getConfigManager().getBool("encryption.enabled", false);
-        const QByteArray keyBytes = qgetenv("BIOFEEDBACK_ENCRYPTION_KEY");
-        const QString encryptionKey = QString::fromUtf8(keyBytes);
-        auto sharedResources = std::make_shared<biofeedback::data::JsonResourceRepository>(
-            QDir(biofeedback::runtime::appDataDirectory()).filePath(QStringLiteral("shared-data")),
-            encryptionKey, encryptionEnabled);
-        if (!sharedResources->isReady()) {
-            std::cerr << "[MAIN] Shared resource storage is unavailable: "
-                      << sharedResources->initializationError().toStdString()
-                      << ". Resource API will fail closed." << std::endl;
+        const QString encryptionKey = QString::fromUtf8(qgetenv("BIOFEEDBACK_ENCRYPTION_KEY"));
+        const auto sharedResources = app.getSharedResources();
+        if (!sharedResources || !sharedResources->isReady()) {
+            std::cerr << "[MAIN] Shared resource storage is unavailable; resource API will fail closed." << std::endl;
         }
 
         const QString usersPath = biofeedback::runtime::ensureUserConfigFile(QStringLiteral("users.json"));
