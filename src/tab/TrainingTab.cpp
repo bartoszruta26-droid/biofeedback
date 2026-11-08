@@ -22,6 +22,7 @@
 #include "games/SinGame.hpp"
 #include "games/TanGame.hpp"
 #include "games/ArkanoidGame.hpp"
+#include "games/GalagaGame.hpp"
 #include "games/GameFactory.hpp"
 
 namespace tab {
@@ -740,6 +741,8 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
         if (auto* game = dynamic_cast<games::TanGame*>(m_currentGame))
             game->setSerialConnection(m_serialPort);
         if (auto* game = dynamic_cast<games::ArkanoidGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::GalagaGame*>(m_currentGame))
             game->setSerialConnection(m_serialPort);
     }
 }
