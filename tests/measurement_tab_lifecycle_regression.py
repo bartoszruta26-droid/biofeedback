@@ -35,6 +35,8 @@ for required in (
     "bool MeasurementTab::openSampleJournal()",
     "SampleJournalWriter m_sampleJournalWriter",
     "m_sampleJournalWriter.appendDurably(line)",
+    "m_totalDroppedMeasurementSamples",
+    "dziennik trwały zachowuje pełny pomiar",
     "m_sampleJournalWriter.finish()",
     "m_sampleJournalWriter.isAccepting()",
     "recoverSampleJournals(dataDir)",
