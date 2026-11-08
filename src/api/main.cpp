@@ -5,6 +5,7 @@
 #include "application/MeasurementService.hpp"
 #include "application/DeviceService.hpp"
 #include "measurement/MeasurementEngine.hpp"
+#include "sensor/AcquisitionSerialDeviceAdapter.hpp"
 
 #include <QCoreApplication>
 #include <QCommandLineParser>
@@ -83,7 +84,41 @@ int main(int argc, char* argv[]) {
     auto measurementService = std::make_shared<biofeedback::application::MeasurementService>(measurementEngine);
     auto acquisitionService = std::make_shared<biofeedback::application::AcquisitionService>(measurementService);
     server.setAcquisitionService(acquisitionService);
-    server.setDeviceService(std::make_shared<biofeedback::application::DeviceService>());
+    auto deviceService = std::make_shared<biofeedback::application::DeviceService>();
+
+    // Explicit opt-in prevents the API from guessing which serial device is a
+    // clinical sensor. Configure BIOFEEDBACK_SERIAL_PORT to register one Nano.
+    const QByteArray serialPort = qgetenv("BIOFEEDBACK_SERIAL_PORT").trimmed();
+    if (!serialPort.isEmpty()) {
+        bool baudOk = false;
+        const int baudRate = qgetenv("BIOFEEDBACK_SERIAL_BAUD").isEmpty()
+            ? sensor::protocol::DefaultBaudRate
+            : qgetenv("BIOFEEDBACK_SERIAL_BAUD").toInt(&baudOk);
+        sensor::SerialConfig serialConfig;
+        serialConfig.portName = serialPort.toStdString();
+        serialConfig.baudRate = qgetenv("BIOFEEDBACK_SERIAL_BAUD").isEmpty()
+            ? sensor::protocol::DefaultBaudRate : (baudOk ? baudRate : -1);
+
+        const QByteArray configuredId = qgetenv("BIOFEEDBACK_DEVICE_ID").trimmed();
+        const std::string deviceId = configuredId.isEmpty()
+            ? std::string("arduino-nano-hx711-1") : configuredId.toStdString();
+        auto serialAdapter = std::make_shared<sensor::AcquisitionSerialDeviceAdapter>(
+            acquisitionService, deviceId, serialConfig, "hx711", "g");
+        if (deviceService->registerDevice(
+                {deviceId, "Arduino Nano HX711", "usb-serial",
+                 biofeedback::application::DeviceState::Disconnected, {}},
+                serialAdapter)) {
+            if (!deviceService->connectDevice(deviceId)) {
+                QTextStream(stderr) << "Configured serial device could not connect: "
+                                    << QString::fromStdString(deviceId) << "\\n";
+            }
+        } else {
+            QTextStream(stderr) << "Configured serial device could not be registered.\\n";
+        }
+    } else {
+        QTextStream(stdout) << "No BIOFEEDBACK_SERIAL_PORT configured; hardware acquisition remains disabled.\\n";
+    }
+    server.setDeviceService(deviceService);
 
     if (!server.listen(QHostAddress::LocalHost, static_cast<quint16>(portValue))) {
         QTextStream(stderr) << "Cannot listen on loopback TCP port " << portValue << ".\n";
