@@ -273,6 +273,10 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Mario", "mario");
     m_gameTypeCombo->addItem("Sinusoidalna", "sin");
     m_gameTypeCombo->addItem("Tangensoidalna", "tan");
+    m_gameTypeCombo->addItem("Galaga", "galaga");
+    m_gameTypeCombo->addItem("Archer", "archer");
+    m_gameTypeCombo->addItem("Scorched Earth", "scorched_earth");
+    m_gameTypeCombo->addItem("Car Race", "car_race");
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_gameTypeCombo);
