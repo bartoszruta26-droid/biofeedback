@@ -187,6 +187,29 @@ bool JsonResourceRepository::remove(const QString& collection, const QString& id
         setError(error, QStringLiteral("VERSION_CONFLICT"));
         return false;
     }
+    if (collection == QStringLiteral("training-sessions")) {
+        const QDir directory(collectionPath(QStringLiteral("training-results")));
+        if (directory.exists()) {
+            const QFileInfoList files = directory.entryInfoList(
+                QStringList{QStringLiteral("*.json")}, QDir::Files | QDir::Readable, QDir::Name);
+            for (const QFileInfo& fileInfo : files) {
+                const QString dependentId = fileInfo.completeBaseName();
+                if (!validId(dependentId)) continue;
+                QJsonObject dependent;
+                QString readError;
+                if (!readRecord(QStringLiteral("training-results"), dependentId,
+                                dependent, &readError)) {
+                    setError(error, readError);
+                    return false;
+                }
+                if (dependent.value(QStringLiteral("training_session_id")).toString().compare(
+                        id, Qt::CaseInsensitive) == 0) {
+                    setError(error, QStringLiteral("TRAINING_SESSION_HAS_RESULTS"));
+                    return false;
+                }
+            }
+        }
+    }
     if (collection == QStringLiteral("patients")) {
         for (const QString& dependentCollection : {
                  QStringLiteral("measurements"), QStringLiteral("training-sessions"),
