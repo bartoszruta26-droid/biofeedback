@@ -226,8 +226,9 @@ int main(int argc, char **argv)
     waitForEvents(80);
     REQUIRE(scorchedGame->isRunning());
     scorchedGame->resize(640, 480);
-    waitForEvents(1340);
+    waitForEvents(2600); // Allow the aimed shell to resolve against the enemy tank and the AI reply to begin.
     REQUIRE(scorchedGame->isRunning());
+    REQUIRE(scorchedGame->enemyHealth() < 100); // A real tank hit must apply damage.
     REQUIRE(scorchedGame->playerHealth() > 0);
     REQUIRE(scorchedGame->currentRound() == 1);
     scorchedGame->stop();
