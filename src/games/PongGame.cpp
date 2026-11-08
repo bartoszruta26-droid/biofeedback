@@ -195,11 +195,14 @@ void PongGame::checkCollisions() {
         m_ballPos.setY(qMax(static_cast<qreal>(m_ballRadius), qMin(static_cast<qreal>(m_ballPos.y()), static_cast<qreal>(height() - m_ballRadius))));
     }
     
-    // Kolizja z lewą paletką (gracz)
-    if (m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
-        m_ballPos.x() - m_ballRadius >= m_leftPaddle.left() &&
-        m_ballPos.y() >= m_leftPaddle.top() &&
-        m_ballPos.y() <= m_leftPaddle.bottom()) {
+    // Kolizja z lewą paletką (gracz). Uwzględnij cały obrys piłki,
+    // a nie wyłącznie jej środek; kierunek ruchu zapobiega ponownemu
+    // naliczaniu kontaktu po odbiciu.
+    if (m_ballVel.x() < 0.0 &&
+        m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
+        m_ballPos.x() + m_ballRadius >= m_leftPaddle.left() &&
+        m_ballPos.y() + m_ballRadius >= m_leftPaddle.top() &&
+        m_ballPos.y() - m_ballRadius <= m_leftPaddle.bottom()) {
         
         // Odbicie piłki z lekkim przyspieszeniem
         // Zachowaj ograniczoną prędkość całkowitą i wyznacz oba składniki
@@ -215,11 +218,12 @@ void PongGame::checkCollisions() {
         m_ballPos.setX(m_leftPaddle.right() + m_ballRadius);
     }
     
-    // Kolizja z prawą paletką (AI)
-    if (m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
-        m_ballPos.x() + m_ballRadius <= m_rightPaddle.right() &&
-        m_ballPos.y() >= m_rightPaddle.top() &&
-        m_ballPos.y() <= m_rightPaddle.bottom()) {
+    // Analogiczna kolizja dla paletki AI.
+    if (m_ballVel.x() > 0.0 &&
+        m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
+        m_ballPos.x() - m_ballRadius <= m_rightPaddle.right() &&
+        m_ballPos.y() + m_ballRadius >= m_rightPaddle.top() &&
+        m_ballPos.y() - m_ballRadius <= m_rightPaddle.bottom()) {
         
         const float hitPos = (m_ballPos.y() - m_rightPaddle.top()) / m_paddleHeight;
         const float angle = (hitPos - 0.5f) * 1.5f;
