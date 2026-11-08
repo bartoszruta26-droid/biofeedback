@@ -52,6 +52,9 @@ int main() {
     assert(acquisition.ingest("hx711-1", input, sample));
     assert(sample.isValid());
 
+    assert(!acquisition.stopSession("wrong-session", error));
+    assert(error == "ACTIVE_SESSION_NOT_FOUND");
+
     // stopSession must wait for an ingest already admitted to the pipeline.
     std::mutex callbackMutex;
     std::condition_variable callbackCondition;
