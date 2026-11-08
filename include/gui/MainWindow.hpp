@@ -240,6 +240,7 @@ private:
     void loadGame(const QString& gameId);
     void onGameFinished(int score);
     void onSensorDataForGame(double value);
+    void enqueueGameSensorInput(double value);
 
     // Widgety główne
     GraphWidget* m_graphWidget;
@@ -309,6 +310,9 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
     sensor::SerialCommunication::CallbackToken m_serialDataCallbackToken = 0;
+    std::mutex m_gameInputQueueMutex;
+    double m_latestGameSensorInput{0.0};
+    bool m_gameInputDrainScheduled{false};
 };
 
 } // namespace gui
