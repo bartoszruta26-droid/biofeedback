@@ -2,6 +2,7 @@
 #include "games/TanGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
+#include "games/PongGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -82,6 +83,18 @@ int main(int argc, char **argv)
     const float defaultSpeed = flappyGame->getGameSpeed();
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
+
+    std::unique_ptr<games::GameEngine> pong(games::createGame(QStringLiteral("pong")));
+    auto* pongGame = dynamic_cast<games::PongGame*>(pong.get());
+    REQUIRE(pongGame != nullptr);
+    pongGame->resize(640, 480);
+    pongGame->start();
+    pongGame->update(std::numeric_limits<double>::max());
+    REQUIRE(pongGame->isRunning()); // Huge finite deltas are bounded before substep conversion.
+    pongGame->update(std::numeric_limits<double>::quiet_NaN());
+    pongGame->update(std::numeric_limits<double>::infinity());
+    REQUIRE(pongGame->isRunning()); // Invalid deltas are ignored.
+    pongGame->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;

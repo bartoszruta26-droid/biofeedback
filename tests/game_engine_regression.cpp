@@ -66,6 +66,14 @@ int main(int argc, char **argv)
     waitForEvents(40);
     REQUIRE(game.lastDelta() > 0.0 && game.lastDelta() <= 1.0 / 120.0 + 1e-9);
 
+    // A paused session must not continue advancing the fixed-step simulation.
+    game.pause();
+    const double pausedDelta = game.lastDelta();
+    waitForEvents(40);
+    REQUIRE(std::abs(game.lastDelta() - pausedDelta) < 1e-12);
+    REQUIRE(game.isPaused());
+    game.resume();
+
     std::thread worker([&game]() { game.handleSensorInput(42.5); });
     worker.join();
     waitForEvents(10);

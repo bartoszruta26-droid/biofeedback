@@ -251,17 +251,22 @@ void PongGame::checkCollisions() {
 }
 
 void PongGame::update(double deltaTime) {
-    if (!isRunning()) return;
-    
-    // Aktualizacja pozycji piłki
-    m_ballPos.setX(m_ballPos.x() + m_ballVel.x() * deltaTime);
-    m_ballPos.setY(m_ballPos.y() + m_ballVel.y() * deltaTime);
-    
-    // Aktualizacja AI
-    updateAIPaddle(deltaTime);
-    
-    // Sprawdzenie kolizji
-    checkCollisions();
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0) return;
+
+    // Match GameEngine's stall policy before converting the step count to int.
+    // The normal GameEngine path already supplies fixed 1/120 s steps; this
+    // subdivision is a defensive guard for direct callers with larger deltas.
+    deltaTime = qMin(deltaTime, 0.1);
+    constexpr double maxPhysicsStep = 1.0 / 120.0;
+    const int steps = qMax(1, static_cast<int>(std::ceil(deltaTime / maxPhysicsStep)));
+    const double stepTime = deltaTime / steps;
+
+    for (int step = 0; step < steps && isRunning(); ++step) {
+        m_ballPos.setX(m_ballPos.x() + m_ballVel.x() * stepTime);
+        m_ballPos.setY(m_ballPos.y() + m_ballVel.y() * stepTime);
+        updateAIPaddle(stepTime);
+        checkCollisions();
+    }
 }
 
 void PongGame::render(QPainter &painter) {
