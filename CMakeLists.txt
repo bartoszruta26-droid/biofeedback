@@ -168,7 +168,7 @@ add_executable(biofeedback_api
 )
 set_target_properties(biofeedback_api PROPERTIES AUTOMOC ON)
 target_include_directories(biofeedback_api PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core biofeedback_data_repository)
+target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core biofeedback_data_repository biofeedback_application_services)
 
 # HTTP API authentication and bearer-session lifecycle regression.
 add_executable(api_auth_regression
