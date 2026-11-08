@@ -31,6 +31,13 @@ int main(int argc, char** argv) {
     assert(created.value(QStringLiteral("version")).toInt() == 1);
     assert(created.value(QStringLiteral("pesel")).toString() == QStringLiteral("90010112345"));
 
+    QJsonObject orphanMeasurement{{QStringLiteral("patient_id"),
+        QStringLiteral("00000000-0000-4000-8000-000000000001")}};
+    QJsonObject rejectedMeasurement;
+    assert(!repository.create(QStringLiteral("measurements"), orphanMeasurement,
+                              rejectedMeasurement, &error));
+    assert(error == QStringLiteral("PATIENT_NOT_FOUND"));
+
     const QString recordPath = QDir(root).filePath(
         QStringLiteral("patients/") + id + QStringLiteral(".json"));
     QFile encryptedFile(recordPath);
