@@ -120,6 +120,9 @@ int main(int argc, char** argv) {
         QByteArray::number(badBody.size()) +
         "\r\nConnection: close\r\n\r\n" + badBody;
     assert(statusCode(transact(port, badRequest)) == 401);
+    for (int attempt = 0; attempt < 4; ++attempt)
+        assert(statusCode(transact(port, badRequest)) == 401);
+    assert(statusCode(transact(port, badRequest)) == 429);
 
     const QByteArray statusResponse = transact(
         port, "GET /api/v1/status HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
