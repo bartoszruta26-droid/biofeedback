@@ -3,6 +3,7 @@
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/PongGame.hpp"
+#include "games/GalagaGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -37,7 +38,8 @@ int main(int argc, char **argv)
         QStringLiteral("pong"),
         QStringLiteral("arkanoid"),
         QStringLiteral("flappy_bird"),
-        QStringLiteral("mario")
+        QStringLiteral("mario"),
+        QStringLiteral("galaga")
     };
 
     for (const QString& id : ids) {
@@ -95,6 +97,16 @@ int main(int argc, char **argv)
     pongGame->update(std::numeric_limits<double>::infinity());
     REQUIRE(pongGame->isRunning()); // Invalid deltas are ignored.
     pongGame->stop();
+
+    std::unique_ptr<games::GameEngine> galaga(games::createGame(QStringLiteral("galaga")));
+    auto* galagaGame = dynamic_cast<games::GalagaGame*>(galaga.get());
+    REQUIRE(galagaGame != nullptr);
+    galagaGame->resize(640, 480);
+    galagaGame->start();
+    galagaGame->handleSensorInput(75.0);
+    waitForEvents(80);
+    REQUIRE(galagaGame->isRunning());
+    galagaGame->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
