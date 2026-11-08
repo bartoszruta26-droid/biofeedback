@@ -341,11 +341,11 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         // Walidacja baud rate
         if (baudRate <= 0 || baudRate > 921600) {
             core::DebugManager::instance().sendDebugMessage(
-                QString("Invalid baud rate %1. Using default %2.").arg(baudRate).arg(DEFAULT_BAUD_RATE),
+                QString("Invalid baud rate %1. Using default %2.").arg(baudRate).arg(protocol::DefaultBaudRate),
                 core::DebugLevel::WARNING,
                 "SerialCommunication::openPort"
             );
-            baudRate = DEFAULT_BAUD_RATE;
+            baudRate = protocol::DefaultBaudRate;
         }
 
 #if DEBUG_CONNECTION
@@ -753,7 +753,7 @@ bool SerialCommunication::autoConnect(int maxAttempts) {
     while (maxAttempts <= 0 || attempt < maxAttempts) {
         for (const auto& p : scanAvailablePorts()) {
             std::cout << "[SerialComm] Trying " << p << std::endl;
-            if (connect(p, DEFAULT_BAUD_RATE)) {
+            if (connect(p, protocol::DefaultBaudRate)) {
                 std::this_thread::sleep_for(std::chrono::seconds(1));
                 if (identifyArduino(2000).isConnected) {
                     std::cout << "[SerialComm] Found Arduino on " << p << std::endl;
