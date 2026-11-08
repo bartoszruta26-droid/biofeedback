@@ -1,7 +1,7 @@
 {
     "serial": {
         "port": "/dev/ttyUSB0",
-        "baud_rate": 9600,
+        "baud_rate": 115200,
         "timeout_ms": 1000,
         "retry_count": 3
     },
@@ -12,10 +12,10 @@
         "max_backups": 7
     },
     "encryption": {
-        "enabled": true,
-        "algorithm": "AES-256-CBC",
-        "key_derivation": "PBKDF2",
-        "iterations": 100000
+        "enabled": false,
+        "algorithm": "AES-256-GCM",
+        "key_derivation": "PBKDF2-HMAC-SHA256",
+        "iterations": 600000
     },
     "ui": {
         "theme": "default",
@@ -31,12 +31,28 @@
         "calibration_enabled": true,
         "zero_threshold": 0.5
     },
+    "devices": {
+        "pico": {
+            "transport": "serial",
+            "baud_rate": 115200,
+            "protocol": "biofeedback-control",
+            "protocol_version": 1,
+            "actuators_enabled": false
+        },
+        "arduino_nano": {
+            "transport": "serial",
+            "baud_rate": 115200,
+            "protocol": "hx711-frame-v1",
+            "actuators_enabled": false
+        }
+    },
     "logging": {
         "level": "INFO",
         "file": "./logs/biofeedback.log",
         "max_size_mb": 10,
         "rotate_count": 5,
-        "console_output": true
+        "console_output": false,
+        "diagnostics_enabled": false
     },
     "games": {
         "difficulty_default": "medium",
@@ -44,7 +60,7 @@
         "session_duration_minutes": 15
     },
     "medical": {
-        "require_authentication": false,
+        "require_authentication": true,
         "audit_log_enabled": true,
         "data_retention_days": 2555,
         "export_format": "JSON"
