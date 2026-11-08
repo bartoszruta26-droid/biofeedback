@@ -9,6 +9,8 @@
 #include <QRandomGenerator>
 #include <memory>
 
+class QResizeEvent;
+
 namespace games {
 
 /**
@@ -41,6 +43,7 @@ public:
 
 protected:
     void initialize() override;
+    void resizeEvent(QResizeEvent* event) override;
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;

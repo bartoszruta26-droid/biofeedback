@@ -195,54 +195,57 @@ void PongGame::checkCollisions() {
         m_ballPos.setY(qMax(static_cast<qreal>(m_ballRadius), qMin(static_cast<qreal>(m_ballPos.y()), static_cast<qreal>(height() - m_ballRadius))));
     }
     
-    // Kolizja z lewą paletką (gracz)
-    if (m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
-        m_ballPos.x() - m_ballRadius >= m_leftPaddle.left() &&
-        m_ballPos.y() >= m_leftPaddle.top() &&
-        m_ballPos.y() <= m_leftPaddle.bottom()) {
+    // Kolizja z lewą paletką (gracz). Uwzględnij cały obrys piłki,
+    // a nie wyłącznie jej środek; kierunek ruchu zapobiega ponownemu
+    // naliczaniu kontaktu po odbiciu.
+    if (m_ballVel.x() < 0.0 &&
+        m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
+        m_ballPos.x() + m_ballRadius >= m_leftPaddle.left() &&
+        m_ballPos.y() + m_ballRadius >= m_leftPaddle.top() &&
+        m_ballPos.y() - m_ballRadius <= m_leftPaddle.bottom()) {
         
         // Odbicie piłki z lekkim przyspieszeniem
-        m_ballVel.setX(-m_ballVel.x() * 1.05f);
-        
-        // Zmiana kąta odbicia w zależności od miejsca uderzenia w paletce
-        float hitPos = (m_ballPos.y() - m_leftPaddle.top()) / m_paddleHeight;
-        float angle = (hitPos - 0.5f) * 1.5f; // Kąt od -0.75 do 0.75
-        
-        float speed = std::sqrt(m_ballVel.x() * m_ballVel.x() + m_ballVel.y() * m_ballVel.y());
-        speed = qMin(speed, m_ballSpeed * 2.0f); // Ograniczenie maksymalnej prędkości
-        
-        m_ballVel.setX(std::abs(m_ballVel.x())); // W prawo
-        m_ballVel.setY(angle * speed);
+        // Zachowaj ograniczoną prędkość całkowitą i wyznacz oba składniki
+        // wektora z jednego kąta odbicia (bez niekontrolowanego przyspieszania).
+        const double hitPos = qBound(0.0,
+            (m_ballPos.y() - m_leftPaddle.top()) /
+                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
+        const float angle = (hitPos - 0.5f) * 1.5f;
+        const double speed = qMin(
+            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
+            static_cast<double>(m_ballSpeed) * 2.0);
+        m_ballVel.setX(std::cos(angle) * speed); // W prawo
+        m_ballVel.setY(std::sin(angle) * speed);
         
         m_ballPos.setX(m_leftPaddle.right() + m_ballRadius);
     }
     
-    // Kolizja z prawą paletką (AI)
-    if (m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
-        m_ballPos.x() + m_ballRadius <= m_rightPaddle.right() &&
-        m_ballPos.y() >= m_rightPaddle.top() &&
-        m_ballPos.y() <= m_rightPaddle.bottom()) {
+    // Analogiczna kolizja dla paletki AI.
+    if (m_ballVel.x() > 0.0 &&
+        m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
+        m_ballPos.x() - m_ballRadius <= m_rightPaddle.right() &&
+        m_ballPos.y() + m_ballRadius >= m_rightPaddle.top() &&
+        m_ballPos.y() - m_ballRadius <= m_rightPaddle.bottom()) {
         
-        m_ballVel.setX(-m_ballVel.x() * 1.05f);
-        
-        float hitPos = (m_ballPos.y() - m_rightPaddle.top()) / m_paddleHeight;
-        float angle = (hitPos - 0.5f) * 1.5f;
-        
-        float speed = std::sqrt(m_ballVel.x() * m_ballVel.x() + m_ballVel.y() * m_ballVel.y());
-        speed = qMin(speed, m_ballSpeed * 2.0f);
-        
-        m_ballVel.setX(-std::abs(m_ballVel.x())); // W lewo
-        m_ballVel.setY(angle * speed);
+        const double hitPos = qBound(0.0,
+            (m_ballPos.y() - m_rightPaddle.top()) /
+                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
+        const float angle = (hitPos - 0.5f) * 1.5f;
+        const double speed = qMin(
+            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
+            static_cast<double>(m_ballSpeed) * 2.0);
+        m_ballVel.setX(-std::cos(angle) * speed); // W lewo
+        m_ballVel.setY(std::sin(angle) * speed);
         
         m_ballPos.setX(m_rightPaddle.left() - m_ballRadius);
     }
     
     // Punktacja - piłka poza ekranem
-    if (m_ballPos.x() < 0) {
+    if (m_ballPos.x() + m_ballRadius < 0) {
         // Punkt dla AI
         m_aiScore++;
         resetBall();
-    } else if (m_ballPos.x() > width()) {
+    } else if (m_ballPos.x() - m_ballRadius > width()) {
         // Punkt dla gracza
         m_playerScore++;
         addScore(10); // 10 punktów za każde trafienie

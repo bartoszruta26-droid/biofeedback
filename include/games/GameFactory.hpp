@@ -1,8 +1,12 @@
 #ifndef GAMES_GAMEFACTORY_HPP
 #define GAMES_GAMEFACTORY_HPP
 
+#include "games/ArcherGame.hpp"
+#include "games/CarRaceGame.hpp"
+#include "games/ScorchedEarthGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
+#include "games/GalagaGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/PongGame.hpp"
 #include "games/SinGame.hpp"
@@ -34,6 +38,21 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
 
     if (id == QStringLiteral("mario") || id == QStringLiteral("mario_run"))
         return new MarioGame(parent);
+
+    if (id == QStringLiteral("galaga") || id == QStringLiteral("galaga_force"))
+        return new GalagaGame(parent);
+
+    if (id == QStringLiteral("archer") || id == QStringLiteral("archer_force"))
+        return new ArcherGame(parent);
+
+    if (id == QStringLiteral("car_race") || id == QStringLiteral("carrace") ||
+        id == QStringLiteral("car-race"))
+        return new CarRaceGame(parent);
+
+    if (id == QStringLiteral("scorched_earth") || id == QStringLiteral("scored_earth") ||
+        id == QStringLiteral("scorched-earth") ||
+        id == QStringLiteral("scorchedearth"))
+        return new ScorchedEarthGame(parent);
 
     return nullptr;
 }

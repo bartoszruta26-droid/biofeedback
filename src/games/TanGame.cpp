@@ -75,7 +75,12 @@ bool TanGame::isSerialConnected() const
 
 bool TanGame::handleInput(double value)
 {
+    if (!std::isfinite(value) || !std::isfinite(MAX_FORCE) || MAX_FORCE <= 0.0)
+        return false;
+
     const double normalized = value / MAX_FORCE;
+    if (!std::isfinite(normalized))
+        return false;
     m_currentForce = qBound(MIN_FORCE, normalized, 1.0);
     return true;
 }
@@ -95,8 +100,10 @@ void TanGame::calculateTargetY(double x)
 
 void TanGame::update(double deltaTime)
 {
-    if (!isRunning() || width() <= 0 || height() <= 0)
+    if (!isRunning() || width() <= 0 || height() <= 0 ||
+        !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+    deltaTime = qMin(deltaTime, 0.1);
 
     // Faza jest w radianach; prędkość przesuwania [px/s] przeliczamy
     // przez częstotliwość przestrzenną [rad/px].

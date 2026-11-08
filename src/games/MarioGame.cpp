@@ -1,6 +1,7 @@
 #include "games/MarioGame.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QPaintEvent>
+#include <QResizeEvent>
 #include <cmath>
 
 namespace games {
@@ -19,8 +20,8 @@ MarioGame::MarioGame(QWidget *parent)
     // Inicjalizacja chmurek dekoracyjnych
     for (int i = 0; i < 5; ++i) {
         Cloud cloud;
-        cloud.pos.setX(QRandomGenerator::global()->bounded(width()));
-        cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+        cloud.pos.setX(QRandomGenerator::global()->bounded(qMax(1, width())));
+        cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         cloud.speed = 20.0 + QRandomGenerator::global()->bounded(30);
         cloud.size = 20 + QRandomGenerator::global()->bounded(30);
         m_clouds.append(cloud);
@@ -46,12 +47,58 @@ void MarioGame::initialize()
     m_clouds.clear();
     for (int i = 0; i < 5; ++i) {
         Cloud cloud;
-        cloud.pos.setX(QRandomGenerator::global()->bounded(width()));
-        cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+        cloud.pos.setX(QRandomGenerator::global()->bounded(qMax(1, width())));
+        cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         cloud.speed = 20.0 + QRandomGenerator::global()->bounded(30);
         cloud.size = 20 + QRandomGenerator::global()->bounded(30);
         m_clouds.append(cloud);
     }
+}
+
+void MarioGame::resizeEvent(QResizeEvent* event)
+{
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        const double scaleDecor = qMin(scaleX, scaleY);
+
+        m_player.body = QRectF(m_player.body.x() * scaleX,
+                               m_player.body.y() * scaleY,
+                               m_player.body.width() * scaleX,
+                               m_player.body.height() * scaleY);
+        m_player.velocityY *= scaleY;
+
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.rect = QRectF(obstacle.rect.x() * scaleX,
+                                   obstacle.rect.y() * scaleY,
+                                   obstacle.rect.width() * scaleX,
+                                   obstacle.rect.height() * scaleY);
+        }
+
+        for (Cloud& cloud : m_clouds) {
+            cloud.pos.setX(cloud.pos.x() * scaleX);
+            cloud.pos.setY(cloud.pos.y() * scaleY);
+            cloud.size = qMax(1, static_cast<int>(std::lround(cloud.size * scaleDecor)));
+        }
+
+        const double groundY = newSize.height() * GROUND_Y_RATIO;
+        const double maxPlayerY = qMax(0.0, static_cast<double>(newSize.height()) -
+                                             m_player.body.height());
+        m_player.body.moveTop(qBound(0.0, m_player.body.top(), maxPlayerY));
+        if (m_player.isOnGround && m_obstacles.isEmpty())
+            m_player.body.moveBottom(groundY);
+        for (Cloud& cloud : m_clouds) {
+            cloud.pos.setX(qBound(-static_cast<double>(cloud.size),
+                                  cloud.pos.x(),
+                                  static_cast<double>(newSize.width() + cloud.size)));
+            cloud.pos.setY(qBound(0.0, cloud.pos.y(),
+                                  static_cast<double>(newSize.height() / 3)));
+        }
+    }
+    GameEngine::resizeEvent(event);
 }
 
 void MarioGame::initPlayer()
@@ -88,6 +135,12 @@ void MarioGame::increaseDifficulty()
 
 void MarioGame::update(double deltaTime)
 {
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+
+    // Ogranicz bezpośrednie wywołania, tak jak w GameEngine.
+    deltaTime = qMin(deltaTime, 0.1);
+
     // Aktualizacja gracza
     updatePlayer(deltaTime);
     if (!isRunning()) return;
@@ -102,7 +155,7 @@ void MarioGame::update(double deltaTime)
         cloud.pos.setX(cloud.pos.x() - cloud.speed * deltaTime);
         if (cloud.pos.x() + cloud.size < 0) {
             cloud.pos.setX(width() + cloud.size);
-            cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+            cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         }
     }
     

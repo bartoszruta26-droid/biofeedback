@@ -8,6 +8,8 @@
 #include <vector>
 #include <memory>
 
+class QResizeEvent;
+
 namespace games {
 
 /**
@@ -116,6 +118,9 @@ private slots:
      */
     void onConnectionStatusChanged(bool connected, const std::string& message);
 
+protected:
+    void resizeEvent(QResizeEvent* event) override;
+
 private:
     // Struktura reprezentująca przeszkodę (gałęzie drzewa)
     struct Obstacle {
@@ -133,6 +138,9 @@ private:
     const float m_obstacleBaseWidth = 60.0f;
     const double m_minForce = 0.0;
     const double m_maxForce = 100.0; ///< Zakres siły w jednostkach umownych
+
+    // Ostatni znany rozmiar logicznego widoku (działa także dla ukrytych widgetów).
+    QSize m_lastKnownSize;
 
     // Stan gry - Ptak
     QPointF m_birdPos;            ///< Pozycja ptaka
@@ -167,6 +175,7 @@ private:
     int m_obstaclesPassed;
     
     // Pomocnicze
+    void adaptToSize(const QSize& oldSize, const QSize& newSize);
     void resetBird();
     void spawnObstacle();
     void normalizeForceValue(double rawValue);

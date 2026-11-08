@@ -1,6 +1,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include <QPainter>
 #include <QPaintEvent>
+#include <QResizeEvent>
 #include <QtMath>
 #include <QDebug>
 #include <QPen>
@@ -50,6 +51,9 @@ void FlappyBirdGame::initialize() {
     m_wasFlapping = false;
     m_obstaclesPassed = 0;
     
+    // Zachowaj rozmiar logiczny także wtedy, gdy widget jest jeszcze ukryty.
+    m_lastKnownSize = QSize(width(), height());
+
     // Inicjalizacja ptaka
     resetBird();
     
@@ -200,6 +204,66 @@ void FlappyBirdGame::resetBird() {
     m_birdRadius = m_birdBaseRadius;
 }
 
+void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
+    if (newSize.width() <= 0 || newSize.height() <= 0)
+        return;
+
+    if (oldSize.width() > 0 && oldSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        const double scaleRadius = qMin(scaleX, scaleY);
+
+        m_birdPos.setX(m_birdPos.x() * scaleX);
+        m_birdPos.setY(m_birdPos.y() * scaleY);
+        m_birdVelocity.setY(m_birdVelocity.y() * scaleY);
+        m_birdRadius = static_cast<float>(qMax(1.0, m_birdRadius * scaleRadius));
+        m_obstacleWidth = static_cast<float>(qMax(1.0, m_obstacleWidth * scaleX));
+
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.xPosition = static_cast<float>(obstacle.xPosition * scaleX);
+            obstacle.gapY = static_cast<float>(obstacle.gapY * scaleY);
+            obstacle.gapHeight = static_cast<float>(obstacle.gapHeight * scaleY);
+        }
+    } else {
+        // A hidden widget may not receive resizeEvent until it is shown.
+        // If no previous logical dimensions exist, restore the start layout.
+        m_birdPos = QPointF(newSize.width() / 4.0, newSize.height() / 2.0);
+        m_birdRadius = m_birdBaseRadius;
+    }
+
+    m_birdRadius = static_cast<float>(qMin(
+        static_cast<double>(m_birdRadius),
+        qMin(newSize.width(), newSize.height()) / 2.0));
+    const double radius = m_birdRadius;
+    m_birdPos.setX(qBound(radius, m_birdPos.x(),
+                          static_cast<double>(newSize.width()) - radius));
+    m_birdPos.setY(qBound(radius, m_birdPos.y(),
+                          static_cast<double>(newSize.height()) - radius));
+
+    const double safeGapHeight = qMax(
+        0.0, static_cast<double>(newSize.height()) - 2.0 * radius);
+    for (Obstacle& obstacle : m_obstacles) {
+        obstacle.gapHeight = static_cast<float>(
+            qBound(0.0, static_cast<double>(obstacle.gapHeight), safeGapHeight));
+        const double minGapCenter = radius + obstacle.gapHeight / 2.0;
+        const double maxGapCenter = static_cast<double>(newSize.height()) -
+                                    radius - obstacle.gapHeight / 2.0;
+        obstacle.gapY = static_cast<float>(
+            qBound(minGapCenter, static_cast<double>(obstacle.gapY), maxGapCenter));
+        obstacle.xPosition = static_cast<float>(qBound(
+            -static_cast<double>(m_obstacleWidth),
+            static_cast<double>(obstacle.xPosition),
+            static_cast<double>(newSize.width())));
+    }
+}
+
+void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
+    const QSize newSize = event->size();
+    adaptToSize(m_lastKnownSize, newSize);
+    m_lastKnownSize = newSize;
+    GameEngine::resizeEvent(event);
+}
+
 void FlappyBirdGame::spawnObstacle() {
     Obstacle obs;
     obs.xPosition = static_cast<float>(width());
@@ -301,8 +365,18 @@ void FlappyBirdGame::checkCollisions() {
 }
 
 void FlappyBirdGame::update(double deltaTime) {
-    if (!isRunning()) return;
-    
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+    const QSize currentSize(width(), height());
+    if (currentSize != m_lastKnownSize) {
+        adaptToSize(m_lastKnownSize, currentSize);
+        m_lastKnownSize = currentSize;
+    }
+
+
+    // Ochrona wywołań bezpośrednich: nie wykonuj nieograniczonego skoku czasu.
+    deltaTime = qMin(deltaTime, 0.1);
+
     // Aktualizacja ptaka
     updateBird(deltaTime);
     if (!isRunning()) return;

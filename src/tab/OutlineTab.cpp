@@ -416,6 +416,8 @@ bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline)
         exercise.imagePath = exerciseObj["imagePath"].toString();
         exercise.videoPath = exerciseObj["videoPath"].toString();
         exercise.gameId = exerciseObj["gameId"].toString();
+        if (exercise.gameId == QStringLiteral("scored_earth"))
+            exercise.gameId = QStringLiteral("scorched_earth");
         exercise.durationSeconds = exerciseObj["durationSeconds"].toInt(0);
         exercise.targetRepetitions = exerciseObj["targetRepetitions"].toInt(0);
         exercise.difficulty = exerciseObj["difficulty"].toString("medium");
@@ -489,7 +491,7 @@ void OutlineTab::populateGameCombo()
     m_gameCombo->addItem(tr("Mario"), "mario");
     m_gameCombo->addItem(tr("Galaga"), "galaga");
     m_gameCombo->addItem(tr("Archer"), "archer");
-    m_gameCombo->addItem(tr("Scored Earth"), "scored_earth");
+    m_gameCombo->addItem(tr("Scorched Earth"), "scorched_earth");
     m_gameCombo->addItem(tr("Car Race"), "car_race");
 
     // Nie pokazuj jako dostępnych gier, których implementacje nie są jeszcze

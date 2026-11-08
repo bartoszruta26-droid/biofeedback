@@ -55,8 +55,8 @@ void GameEngine::start()
     // Reset stanu gry
     reset();
     
-    // Inicjalizacja specyficzna dla gry
-    initialize();
+    // reset() initializes the derived game state after clearing the base state.
+    // Keep initialization in one place to avoid running it twice on start().
     
     // Aktualizacja stanu
     m_isRunning = true;
@@ -77,6 +77,14 @@ void GameEngine::stop()
     if (!m_isRunning) {
         return; // Gra nie jest aktywna
     }
+
+    // Invalidate callbacks already queued for this session before clearing
+    // the mailbox. The GUI lambda checks this generation before consuming it.
+    m_sensorDispatchGeneration.fetch_add(1, std::memory_order_acq_rel);
+    m_sensorDispatchQueued.store(false, std::memory_order_release);
+    m_pendingSensorValue.store(0.0, std::memory_order_relaxed);
+    m_pendingSensorValueAvailable.store(false, std::memory_order_relaxed);
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
     // Zatrzymanie timera
     m_gameTimer->stop();
@@ -168,6 +176,7 @@ void GameEngine::resetGameStats()
     m_accumulatedSessionMs = 0;
     m_frameCount = 0;
     m_invalidInputCount = 0;
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     if (m_isRunning && !m_isPaused) {
         m_monotonicClock.restart();
         m_lastFrameTime = 0;
@@ -179,6 +188,13 @@ void GameEngine::resetGameStats()
 
 void GameEngine::reset()
 {
+    // Invalidate queued sensor callbacks from any previous game instance.
+    m_sensorDispatchGeneration.fetch_add(1, std::memory_order_acq_rel);
+    m_sensorDispatchQueued.store(false, std::memory_order_release);
+    m_pendingSensorValue.store(0.0, std::memory_order_relaxed);
+    m_pendingSensorValueAvailable.store(false, std::memory_order_relaxed);
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
+
     // Zatrzymanie gry
     m_gameTimer->stop();
     
@@ -193,7 +209,12 @@ void GameEngine::reset()
     m_simulationAccumulator = 0.0;
     m_frameCount = 0;
     m_invalidInputCount = 0;
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
+    // Rebuild the derived game's state as part of the public reset contract.
+    // start() delegates here too, so each new session is initialized exactly once.
+    initialize();
+
     // Wymuszenie odświeżenia widoku
     QWidget::update();
 }
@@ -233,18 +254,72 @@ void GameEngine::gameLoop()
 
 void GameEngine::handleSensorInput(double value)
 {
+    // Validate before publishing into the cross-thread mailbox. Otherwise a
+    // trailing NaN/Inf can overwrite a valid sample before the GUI consumes it.
+    if (!std::isfinite(value)) {
+        if (QThread::currentThread() == thread()) {
+            ++m_invalidInputCount;
+        } else {
+            m_pendingInvalidInputCount.fetch_add(1, std::memory_order_relaxed);
+            const quint64 generation =
+                m_sensorDispatchGeneration.load(std::memory_order_acquire);
+            if (!m_sensorDispatchQueued.exchange(true, std::memory_order_acq_rel)) {
+                QPointer<GameEngine> guard(this);
+                const bool queued = QMetaObject::invokeMethod(this, [guard, generation] {
+                    if (!guard ||
+                        guard->m_sensorDispatchGeneration.load(std::memory_order_acquire) != generation)
+                        return;
+                    guard->m_sensorDispatchQueued.store(false, std::memory_order_release);
+                    guard->m_invalidInputCount += guard->m_pendingInvalidInputCount.exchange(
+                        0, std::memory_order_acq_rel);
+                    if (guard->m_pendingSensorValueAvailable.exchange(
+                            false, std::memory_order_acq_rel)) {
+                        const double pending = guard->m_pendingSensorValue.load(
+                            std::memory_order_acquire);
+                        guard->handleSensorInput(pending);
+                    }
+                }, Qt::QueuedConnection);
+                if (!queued)
+                    m_sensorDispatchQueued.store(false, std::memory_order_release);
+            }
+        }
+        return;
+    }
+
     // Sensor callbacks may originate on the serial worker thread. QWidget and
     // every derived game state must only be touched on the GUI thread.
     if (QThread::currentThread() != thread()) {
+        // Sensor streams can be much faster than the GUI event loop. Keep only
+        // the newest valid sample and schedule at most one pending callback.
+        m_pendingSensorValue.store(value, std::memory_order_relaxed);
+        m_pendingSensorValueAvailable.store(true, std::memory_order_release);
+        const quint64 generation =
+            m_sensorDispatchGeneration.load(std::memory_order_acquire);
+        if (m_sensorDispatchQueued.exchange(true, std::memory_order_acq_rel))
+            return;
+
         QPointer<GameEngine> guard(this);
-        QMetaObject::invokeMethod(this, [guard, value] {
-            if (guard)
-                guard->handleSensorInput(value);
+        const bool queued = QMetaObject::invokeMethod(this, [guard, generation] {
+            if (!guard)
+                return;
+            if (guard->m_sensorDispatchGeneration.load(std::memory_order_acquire) != generation)
+                return;
+
+            // Clear the flag before reading the latest value. A concurrent
+            // producer either gets included in this read or schedules another
+            // dispatch, so the newest sample cannot be stranded.
+            guard->m_sensorDispatchQueued.store(false, std::memory_order_release);
+            guard->m_invalidInputCount += guard->m_pendingInvalidInputCount.exchange(
+                0, std::memory_order_acq_rel);
+            if (guard->m_pendingSensorValueAvailable.exchange(
+                    false, std::memory_order_acq_rel)) {
+                const double pending = guard->m_pendingSensorValue.load(std::memory_order_acquire);
+                guard->handleSensorInput(pending);
+            }
         }, Qt::QueuedConnection);
-        return;
-    }
-    if (!std::isfinite(value)) {
-        ++m_invalidInputCount;
+
+        if (!queued)
+            m_sensorDispatchQueued.store(false, std::memory_order_release);
         return;
     }
     m_sensorValue = value;

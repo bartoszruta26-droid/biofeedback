@@ -41,6 +41,7 @@ private:
         int row{0};
     };
 
+    void updatePhysicsStep(double deltaTime);
     void buildLevel();
     void resetBall();
     void advanceLevel();

@@ -149,6 +149,22 @@ void ArkanoidGame::advanceLevel()
 
 void ArkanoidGame::update(double deltaTime)
 {
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0 ||
+        width() <= 0 || height() <= 0)
+        return;
+
+    // Match the engine's bounded catch-up policy for defensive direct calls.
+    // At most twelve 1/120 s physics steps are executed per update.
+    deltaTime = qMin(deltaTime, 0.1);
+    constexpr double maxPhysicsStep = 1.0 / 120.0;
+    const int steps = qBound(1, static_cast<int>(std::ceil(deltaTime / maxPhysicsStep)), 12);
+    const double stepTime = deltaTime / static_cast<double>(steps);
+    for (int step = 0; step < steps && isRunning(); ++step)
+        updatePhysicsStep(stepTime);
+}
+
+void ArkanoidGame::updatePhysicsStep(double deltaTime)
+{
     if (!isRunning() || width() <= 0 || height() <= 0)
         return;
 
@@ -184,12 +200,11 @@ void ArkanoidGame::update(double deltaTime)
         return;
     }
 
-    const QRectF ballBounds(m_ballPosition.x() - m_ballRadius,
-                            m_ballPosition.y() - m_ballRadius,
-                            2.0 * m_ballRadius, 2.0 * m_ballRadius);
     if (m_ballVelocity.y() > 0.0 &&
         previousPosition.y() + m_ballRadius <= m_paddle.top() &&
-        ballBounds.intersects(m_paddle)) {
+        QRectF(m_ballPosition.x() - m_ballRadius,
+               m_ballPosition.y() - m_ballRadius,
+               2.0 * m_ballRadius, 2.0 * m_ballRadius).intersects(m_paddle)) {
         const double halfWidth = qMax(1.0, m_paddle.width() / 2.0);
         const double hitOffset = qBound(-1.0,
             (m_ballPosition.x() - m_paddle.center().x()) / halfWidth, 1.0);
@@ -200,6 +215,9 @@ void ArkanoidGame::update(double deltaTime)
         m_ballPosition.setY(m_paddle.top() - m_ballRadius - 0.5);
     }
 
+    const QRectF ballBounds(m_ballPosition.x() - m_ballRadius,
+                            m_ballPosition.y() - m_ballRadius,
+                            2.0 * m_ballRadius, 2.0 * m_ballRadius);
     for (Brick& brick : m_bricks) {
         if (!brick.active || !ballBounds.intersects(brick.rect))
             continue;

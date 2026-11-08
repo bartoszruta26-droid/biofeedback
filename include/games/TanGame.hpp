@@ -20,13 +20,15 @@ public:
     void setDifficultyLevel(int level);
     int getDifficultyLevel() const;
 
+    // Public for parity with SinGame and deterministic regression coverage.
+    void update(double deltaTime) override;
+
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
     void disconnectSerial();
     bool isSerialConnected() const;
 
 protected:
     void initialize() override;
-    void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
 
