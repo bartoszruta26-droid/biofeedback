@@ -558,8 +558,6 @@ bool MeasurementTab::commitMeasurementSample(
 {
     if (!m_journalAdmission.load(std::memory_order_acquire))
         return false;
-    if (!sample.isValid())
-        return true;
 
     const quint64 sequence = m_journalNextSequence.load(std::memory_order_acquire);
     if (sequence == 0 ||
@@ -575,43 +573,55 @@ bool MeasurementTab::commitMeasurementSample(
     const double elapsed = m_sessionElapsedTimer.isValid()
         ? m_sessionElapsedOffsetSeconds + m_sessionElapsedTimer.elapsed() / 1000.0
         : m_sessionElapsedOffsetSeconds;
+    const bool rawMode = m_showRawValues;
+    bool calibratedMassAvailable = false;
+    double archivedValue = 0.0;
+    double calibratedMassKg = 0.0;
+    QString quality = QString::fromLatin1(
+        biofeedback::measurement::qualityName(sample.quality));
+
+    if (sample.isValid()) {
+        if (rawMode) {
+            if (sample.unit == "count" && std::isfinite(sample.value))
+                archivedValue = sample.value;
+            else
+                quality = QStringLiteral("invalid_unit");
+        } else if (sample.unit == "kg" && std::isfinite(sample.value)) {
+            const double forceN = sample.value *
+                biofeedback::measurement::standardGravityMetersPerSecondSquared;
+            if (std::isfinite(forceN)) {
+                archivedValue = forceN;
+                calibratedMassKg = sample.value;
+                calibratedMassAvailable = true;
+            } else {
+                quality = QStringLiteral("non_finite_value");
+            }
+        } else {
+            quality = QStringLiteral("invalid_unit");
+        }
+    }
+
     QJsonObject record;
     record["recordType"] = "sample";
     record["sequence"] = static_cast<qint64>(sequence);
     record["timestampUnixMs"] = sample.timestampUnixMs;
     record["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
     record["elapsedTimeSeconds"] = elapsed;
+    record["value"] = archivedValue;
     record["rawValue"] = sample.rawValue;
     record["hasRawValue"] = true;
+    record["calibratedMassKg"] = calibratedMassKg;
+    record["hasCalibratedMass"] = calibratedMassAvailable;
+    record["unit"] = rawMode ? "count" : "N";
     record["source"] = QString::fromStdString(sample.source);
-    record["quality"] = QStringLiteral("valid");
-
-    if (m_showRawValues) {
-        if (sample.unit != "count")
-            return true;
-        record["value"] = sample.value;
-        record["calibratedMassKg"] = 0.0;
-        record["hasCalibratedMass"] = false;
-        record["unit"] = "count";
-    } else {
-        if (sample.unit != "kg" || !std::isfinite(sample.value) || sample.value < 0.0)
-            return true;
-        const double forceN = sample.value *
-            biofeedback::measurement::standardGravityMetersPerSecondSquared;
-        if (!std::isfinite(forceN))
-            return true;
-        record["value"] = forceN;
-        record["calibratedMassKg"] = sample.value;
-        record["hasCalibratedMass"] = true;
-        record["unit"] = "N";
-    }
+    record["quality"] = quality;
 
     const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
     if (!m_sampleJournalWriter.appendDurably(line)) {
         m_sampleJournalFailed = true;
         m_journalAdmission.store(false, std::memory_order_release);
         QMetaObject::invokeMethod(this, [this] {
-            if (m_isMeasuring) stopMeasurement();
+            if (m_isMeasuring && m_sampleJournalFailed) stopMeasurement();
         }, Qt::QueuedConnection);
         return false;
     }
