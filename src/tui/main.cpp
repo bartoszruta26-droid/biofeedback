@@ -163,6 +163,7 @@ struct LiveData {
     bool sessionSaved = false;
     bool sessionSaveAttempted = false;
     QString sessionStartedAt;
+    QString measurementStartedAt;
     QString selectedPatientId;
     QJsonArray measurementSamples;
     std::uint64_t validSampleCount = 0;
@@ -191,9 +192,10 @@ void saveMeasurementSession(LiveData& live, biofeedback::api::HttpApiClient& api
         std::lock_guard<std::mutex> lock(live.mutex);
         if (live.measurementSamples.isEmpty()) return;
         samples = live.measurementSamples;
-        startedAt = live.sessionStartedAt;
+        startedAt = live.measurementStartedAt;
         patientId = live.selectedPatientId;
         live.measurementSamples = QJsonArray();
+        live.measurementStartedAt.clear();
     }
     const QJsonObject payload{
         {QStringLiteral("started_at"), startedAt.isEmpty()
@@ -745,12 +747,22 @@ int main(int argc, char** argv)
         case 'C':
             if (active == static_cast<std::size_t>(tui::Screen::Devices) &&
                 !serial.isConnected() && selectedPort < ports.size()) {
-                if (serial.connect(ports[selectedPort], sensor::protocol::DefaultBaudRate)) serial.startAsyncReading();
+                if (serial.connect(ports[selectedPort], sensor::protocol::DefaultBaudRate)) {
+                    {
+                        std::lock_guard<std::mutex> lock(live.mutex);
+                        if (live.measurementSamples.isEmpty())
+                            live.measurementStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+                    }
+                    serial.startAsyncReading();
+                }
             }
             break;
         case 'd':
         case 'D':
-            if (active == static_cast<std::size_t>(tui::Screen::Devices) && serial.isConnected()) serial.disconnect();
+            if (active == static_cast<std::size_t>(tui::Screen::Devices) && serial.isConnected()) {
+                serial.disconnect();
+                saveMeasurementSession(live, *apiClient);
+            }
             break;
         case 's':
         case 'S':
@@ -766,7 +778,6 @@ int main(int argc, char** argv)
                         live.completedReps = 0;
                         live.currentSeries.clear();
                         live.sessionRepetitions.clear();
-                        live.measurementSamples = QJsonArray();
                         live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
                         if (live.selectedPatientId.isEmpty() && !patientIds.isEmpty())
                             live.selectedPatientId = patientIds.first();
@@ -897,7 +908,6 @@ int main(int argc, char** argv)
                 }
             }
         }
-        saveMeasurementSession(live, *apiClient);
         saveTrainingSession(live, *apiClient);
     }
 
@@ -909,10 +919,10 @@ int main(int argc, char** argv)
             live.sessionNeedsSave = !live.sessionRepetitions.empty();
         }
     }
+    serial.disconnect();
     saveMeasurementSession(live, *apiClient);
     saveTrainingSession(live, *apiClient);
     endwin();
-    serial.disconnect();
     measurementEngine->unsubscribe(measurementToken);
     apiClient->logout();
     return EXIT_SUCCESS;
