@@ -102,6 +102,31 @@ int main(int argc, char** argv) {
     assert(activeSession.value(QStringLiteral("active")).toBool());
     assert(activeSession.value(QStringLiteral("id")).toString() == acquisitionId);
     assert(activeSession.value(QStringLiteral("device_id")).toString() == QStringLiteral("test-device"));
+
+    // The replay cursor is exercised against actual accepted samples, not only
+    // an empty history response.
+    biofeedback::measurement::MeasurementInput sampleInput;
+    sampleInput.deviceTimestampMs = 1234;
+    sampleInput.hasTimestamp = true;
+    sampleInput.rawValue = 321;
+    sampleInput.value = 321.0;
+    sampleInput.sensorValid = true;
+    sampleInput.unit = "g";
+    sampleInput.source = "api-client-regression";
+    biofeedback::measurement::MeasurementSample acceptedSample;
+    assert(measurementService->ingest(sampleInput, acceptedSample));
+
+    assert(client.listAcquisitionSamples(acquisitionSamples, &error, 0));
+    assert(acquisitionSamples.size() == 1);
+    const QJsonObject firstSample = acquisitionSamples.first().toObject();
+    assert(firstSample.value(QStringLiteral("sequence")).toVariant().toULongLong() ==
+           acceptedSample.sequence);
+    assert(firstSample.value(QStringLiteral("raw_value")).toInt() == 321);
+    assert(firstSample.value(QStringLiteral("quality")).toString() == QStringLiteral("valid"));
+
+    assert(client.listAcquisitionSamples(acquisitionSamples, &error, acceptedSample.sequence));
+    assert(acquisitionSamples.isEmpty());
+
     assert(client.stopAcquisitionSession(acquisitionId, &error));
     assert(client.getAcquisitionSession(activeSession, &error));
     assert(!activeSession.value(QStringLiteral("active")).toBool());
