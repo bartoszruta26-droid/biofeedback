@@ -1,0 +1,50 @@
+name: runtime-safety-policy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'biofeedback_installer.sh'
+      - 'src/main.cpp'
+      - 'src/core/DebugManager.cpp'
+      - 'config/config.json'
+      - 'include/sensor/**'
+      - 'src/sensor/**'
+      - 'hx711_advanced.ino'
+      - 'hx711_arduino_nano.ino'
+      - 'tests/serial_configuration_regression.py'
+      - 'tests/installer_safety_regression.py'
+      - '.github/workflows/runtime-safety-policy.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'biofeedback_installer.sh'
+      - 'src/main.cpp'
+      - 'src/core/DebugManager.cpp'
+      - 'config/config.json'
+      - 'include/sensor/**'
+      - 'src/sensor/**'
+      - 'hx711_advanced.ino'
+      - 'hx711_arduino_nano.ino'
+      - 'tests/serial_configuration_regression.py'
+      - 'tests/installer_safety_regression.py'
+      - '.github/workflows/runtime-safety-policy.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: bash -n biofeedback_installer.sh
+      - name: Serial configuration consistency
+        run: python3 tests/serial_configuration_regression.py
+      - name: Installer and diagnostics safety
+        run: python3 tests/installer_safety_regression.py
+      - name: WebUI API client regression
+        run: |
+          node --check platforms/webui/api-client.js
+          node --test platforms/webui/api-client.test.js
