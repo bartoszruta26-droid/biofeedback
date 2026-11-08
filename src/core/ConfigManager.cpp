@@ -499,23 +499,18 @@ void ConfigManager::setDefaults() {
     m_config["sensor.calibration_enabled"] = true;
     m_config["sensor.zero_threshold"] = 0.5;
 
-    // Device transport and fail-closed effector defaults
+    // Device transport defaults for measurement hardware
     m_config["devices.pico.transport"] = std::string("serial");
     m_config["devices.pico.baud_rate"] = sensor::protocol::DefaultControlBaudRate;
     m_config["devices.pico.uart_tx_pin"] = static_cast<int>(sensor::protocol::PicoUartTxPin);
     m_config["devices.pico.uart_rx_pin"] = static_cast<int>(sensor::protocol::PicoUartRxPin);
     m_config["devices.pico.protocol"] = std::string("biofeedback-control");
     m_config["devices.pico.protocol_version"] = static_cast<int>(sensor::protocol::ControlProtocolVersion);
-    m_config["devices.pico.actuators_enabled"] = false;
-    m_config["devices.pico.effectors.ir_pwm.enabled"] = false;
-    m_config["devices.pico.effectors.electrodes.enabled"] = false;
-    m_config["devices.pico.effectors.antenna.enabled"] = false;
     m_config["devices.arduino_nano.transport"] = std::string("serial");
     m_config["devices.arduino_nano.baud_rate"] = sensor::protocol::DefaultBaudRate;
     m_config["devices.arduino_nano.hx711_data_pin"] = static_cast<int>(sensor::protocol::NanoHx711DataPin);
     m_config["devices.arduino_nano.hx711_clock_pin"] = static_cast<int>(sensor::protocol::NanoHx711ClockPin);
     m_config["devices.arduino_nano.protocol"] = std::string("hx711-frame-v1");
-    m_config["devices.arduino_nano.actuators_enabled"] = false;
     
     // Logging settings
     m_config["logging.level"] = std::string("INFO");
