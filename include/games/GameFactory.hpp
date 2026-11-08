@@ -3,6 +3,7 @@
 
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
+#include "games/GalagaGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/PongGame.hpp"
 #include "games/SinGame.hpp"
@@ -34,6 +35,9 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
 
     if (id == QStringLiteral("mario") || id == QStringLiteral("mario_run"))
         return new MarioGame(parent);
+
+    if (id == QStringLiteral("galaga") || id == QStringLiteral("galaga_force"))
+        return new GalagaGame(parent);
 
     return nullptr;
 }
