@@ -6,6 +6,7 @@
 #include "core/DebugManager.hpp"
 #include "core/RuntimePaths.hpp"
 #include "core/Authentication.hpp"
+#include "api/HttpApiClient.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -13,6 +14,9 @@
 #include <QFile>
 #include <QFileDevice>
 #include <QTextStream>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QUrl>
 
 #include <ncurses.h>
 
@@ -35,7 +39,7 @@ namespace {
 constexpr int kMinimumColumns = 72;
 constexpr int kMinimumRows = 20;
 
-std::unique_ptr<biofeedback::Authentication> authenticateTuiUser() {
+std::unique_ptr<biofeedback::api::HttpApiClient> authenticateTuiUser() {
     const QString usersPath = biofeedback::runtime::ensureUserConfigFile(QStringLiteral("users.json"));
     if (usersPath.isEmpty()) {
         std::cerr << "Nie można przygotować magazynu kont.\n";
@@ -43,6 +47,22 @@ std::unique_ptr<biofeedback::Authentication> authenticateTuiUser() {
     }
 
     auto authentication = std::make_unique<biofeedback::Authentication>(usersPath.toStdString());
+    const QString configPath = biofeedback::runtime::ensureUserConfigFile(QStringLiteral("config.json"));
+    QFile configFile(configPath);
+    bool encryptionEnabled = false;
+    const QString encryptionKey = QString::fromUtf8(qgetenv("BIOFEEDBACK_ENCRYPTION_KEY"));
+    if (!configPath.isEmpty() && configFile.open(QIODevice::ReadOnly)) {
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(configFile.readAll(), &parseError);
+        if (parseError.error == QJsonParseError::NoError && document.isObject())
+            encryptionEnabled = document.object().value(QStringLiteral("encryption"))
+                .toObject().value(QStringLiteral("enabled")).toBool(false);
+    }
+    if (encryptionEnabled && encryptionKey.toUtf8().size() < 32) {
+        std::cerr << "Szyfrowanie kont jest włączone, ale brakuje BIOFEEDBACK_ENCRYPTION_KEY.\n";
+        return {};
+    }
+    authentication->setFileEncryption(encryptionEnabled, encryptionKey.toStdString());
     if (!authentication->loadUsers()) {
         std::cerr << "Nie można odczytać magazynu kont.\n";
         return {};
@@ -82,14 +102,36 @@ std::unique_ptr<biofeedback::Authentication> authenticateTuiUser() {
     std::memset(input, 0, std::strlen(input));
 
     const bool loggedIn = authentication->login(username, password);
-    std::fill(password.begin(), password.end(), '\0');
     if (!loggedIn || authentication->requiresPasswordChange()) {
+        std::fill(password.begin(), password.end(), '\0');
         authentication->logout();
         std::cerr << "Logowanie nie powiodło się lub wymagane jest ustawienie nowego hasła.\n";
         return {};
     }
-    std::cout << "Zalogowano. Rola: " << authentication->getCurrentUserRole() << "\n";
-    return authentication;
+
+    QString apiUrl = QString::fromUtf8(qgetenv("BIOFEEDBACK_API_URL")).trimmed();
+    if (apiUrl.isEmpty()) apiUrl = QStringLiteral("http://127.0.0.1:8765");
+    std::unique_ptr<biofeedback::api::HttpApiClient> apiClient;
+    try {
+        apiClient = std::make_unique<biofeedback::api::HttpApiClient>(QUrl(apiUrl));
+    } catch (const std::exception& error) {
+        std::fill(password.begin(), password.end(), '\0');
+        authentication->logout();
+        std::cerr << "Niepoprawny adres serwera API: " << error.what() << "\n";
+        return {};
+    }
+    QString apiError;
+    const bool apiLogin = apiClient->login(
+        QString::fromStdString(username), QString::fromStdString(password), &apiError);
+    std::fill(password.begin(), password.end(), '\0');
+    authentication->logout();
+    if (!apiLogin) {
+        std::cerr << "Nie można zalogować do wspólnego serwera danych: "
+                  << apiError.toStdString() << "\n";
+        return {};
+    }
+    std::cout << "Zalogowano do wspólnego serwera danych.\n";
+    return apiClient;
 }
 
 struct LiveData {
