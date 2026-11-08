@@ -166,8 +166,11 @@ long readHX711Raw() {
     digitalWrite(HX711_SCK_PIN, LOW);
     delayMicroseconds(1);
     
-    // Convert from 24-bit to 32-bit signed
-    count ^= 0x800000;  // Flip MSB to get signed value
+    // Sign-extend the 24-bit two's-complement sample to 32 bits.
+    // Flipping the sign bit would produce an unsigned offset-binary value.
+    if (count & 0x800000L) {
+        count |= ~0xFFFFFFL;
+    }
     
     return count;
 }
