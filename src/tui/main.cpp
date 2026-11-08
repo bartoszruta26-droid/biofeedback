@@ -780,8 +780,7 @@ int main(int argc, char** argv)
                         live.currentSeries.clear();
                         live.sessionRepetitions.clear();
                         live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-                        if (live.selectedPatientId.isEmpty() && !patientIds.isEmpty())
-                            live.selectedPatientId = patientIds.first();
+                        live.selectedPatientId.clear();
                         live.lastSeries = {};
                         live.trainingResting = false;
                         live.restRemaining = 0;
