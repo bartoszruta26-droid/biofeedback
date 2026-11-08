@@ -21,7 +21,7 @@ if "if (m_isMeasuring)" not in manual or "AKTYWNY POMIAR ZAPISUJE PRÓBKI AUTOMA
 # journals raw ADC value and device timestamp before any GUI subscriber runs.
 if 'checked ? "count" : "g"' not in source:
     raise SystemExit("RAW diagnostic mode must switch the adapter to count units")
-if 'record["unit"] = "count"' not in source or 'record["rawValue"] = sample.rawValue' not in source:
+if 'record["unit"] = rawMode ? "count" : "N"' not in source or 'record["rawValue"] = sample.rawValue' not in source:
     raise SystemExit("RAW diagnostic capture must durably archive ADC value and source timestamp")
 handler_start = source.index("void MeasurementTab::onMeasurementSample")
 handler_end = source.index("// MeasurementTab - Konwersja jednostek", handler_start)
