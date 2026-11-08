@@ -35,6 +35,57 @@ class ApiClient(baseUrl: String) {
     fun currentUser(): JSONObject =
         request("GET", "/api/v1/auth/me", null, authenticated = true)
 
+    private val resourceCollections = setOf(
+        "patients", "measurements", "training-sessions",
+        "training-results", "game-sessions", "game-results"
+    )
+
+    private fun resourcePath(collection: String, id: String? = null): String {
+        require(collection in resourceCollections) { "Unsupported resource collection." }
+        val base = "/api/v1/$collection"
+        return if (id == null) base else
+            base + "/" + java.net.URLEncoder.encode(id, "UTF-8").replace("+", "%20")
+    }
+
+    fun listResources(collection: String): JSONObject =
+        request("GET", resourcePath(collection), null, authenticated = true)
+
+    fun getResource(collection: String, id: String): JSONObject =
+        request("GET", resourcePath(collection, id), null, authenticated = true)
+
+    fun createResource(collection: String, record: JSONObject): JSONObject =
+        request("POST", resourcePath(collection), record, authenticated = true)
+
+    fun updateResource(collection: String, id: String, expectedVersion: Int, record: JSONObject): JSONObject {
+        val payload = JSONObject()
+            .put("expected_version", expectedVersion)
+            .put("record", record)
+        return request("PUT", resourcePath(collection, id), payload, authenticated = true)
+    }
+
+    fun deleteResource(collection: String, id: String, expectedVersion: Int): JSONObject {
+        val payload = JSONObject().put("expected_version", expectedVersion)
+        return request("DELETE", resourcePath(collection, id), payload, authenticated = true)
+    }
+
+    fun getPatients(): JSONObject = listResources("patients")
+    fun createPatient(record: JSONObject): JSONObject = createResource("patients", record)
+    fun updatePatient(id: String, version: Int, record: JSONObject): JSONObject =
+        updateResource("patients", id, version, record)
+    fun deletePatient(id: String, version: Int): JSONObject =
+        deleteResource("patients", id, version)
+
+    fun getMeasurementSessions(): JSONObject = listResources("measurements")
+    fun createMeasurementSession(record: JSONObject): JSONObject = createResource("measurements", record)
+    fun getTrainingSessions(): JSONObject = listResources("training-sessions")
+    fun createTrainingSession(record: JSONObject): JSONObject = createResource("training-sessions", record)
+    fun getTrainingResults(): JSONObject = listResources("training-results")
+    fun createTrainingResult(record: JSONObject): JSONObject = createResource("training-results", record)
+    fun getGameSessions(): JSONObject = listResources("game-sessions")
+    fun createGameSession(record: JSONObject): JSONObject = createResource("game-sessions", record)
+    fun getGameResults(): JSONObject = listResources("game-results")
+    fun createGameResult(record: JSONObject): JSONObject = createResource("game-results", record)
+
     @Synchronized
     fun logout() {
         try {
