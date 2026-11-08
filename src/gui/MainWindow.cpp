@@ -89,9 +89,7 @@ MainWindow::MainWindow(QWidget *parent)
         if (!std::isfinite(forceNewtons) || forceNewtons < 0.0) return;
         constexpr double gameReferenceForceN = 50.0;
         const double normalizedGameInput = qBound(0.0, forceNewtons / gameReferenceForceN * 100.0, 100.0);
-        QMetaObject::invokeMethod(this, [this, normalizedGameInput]() {
-            forwardSensorToGame(normalizedGameInput);
-        }, Qt::QueuedConnection);
+        enqueueGameSensorInput(normalizedGameInput);
     });
 
     setupUI();
@@ -846,6 +844,34 @@ void MainWindow::stopGame()
     game->deleteLater();
     m_gameStack->hide();
     qDebug() << "Game stopped";
+}
+
+void MainWindow::enqueueGameSensorInput(double value)
+{
+    bool scheduleDrain = false;
+    {
+        std::lock_guard<std::mutex> lock(m_gameInputQueueMutex);
+        m_latestGameSensorInput = value;
+        if (!m_gameInputDrainScheduled) {
+            m_gameInputDrainScheduled = true;
+            scheduleDrain = true;
+        }
+    }
+    if (!scheduleDrain) return;
+
+    const bool queued = QMetaObject::invokeMethod(this, [this]() {
+        double latestValue = 0.0;
+        {
+            std::lock_guard<std::mutex> lock(m_gameInputQueueMutex);
+            latestValue = m_latestGameSensorInput;
+            m_gameInputDrainScheduled = false;
+        }
+        forwardSensorToGame(latestValue);
+    }, Qt::QueuedConnection);
+    if (!queued) {
+        std::lock_guard<std::mutex> lock(m_gameInputQueueMutex);
+        m_gameInputDrainScheduled = false;
+    }
 }
 
 void MainWindow::forwardSensorToGame(double value)
