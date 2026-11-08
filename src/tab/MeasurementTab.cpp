@@ -1152,8 +1152,12 @@ void MeasurementTab::stopMeasurement()
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     m_lblStatus->setText("Status: ZATRZYMANO");
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
-    if (!journalFlushed)
-        m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku"));
+    if (!journalFlushed) {
+        const QString journalError = m_sampleJournalWriter.errorString();
+        m_lblStatus->setText(journalError.isEmpty()
+            ? tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku")
+            : tr("Status: BŁĄD ZAPISU DZIENNIKA — %1").arg(journalError));
+    }
     
     std::cout << "[DEBUG] stopMeasurement: emit measurementStopped" << std::endl;
     emit measurementStopped();
