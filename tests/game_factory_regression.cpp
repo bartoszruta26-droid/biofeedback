@@ -67,6 +67,11 @@ int main(int argc, char **argv)
     arkanoidGame->setDifficultyLevel(0);
     REQUIRE(arkanoidGame->getDifficultyLevel() == 1);
     arkanoidGame->start();
+    arkanoidGame->update(std::numeric_limits<double>::max());
+    REQUIRE(arkanoidGame->isRunning()); // Direct callers cannot trigger unbounded catch-up.
+    arkanoidGame->update(std::numeric_limits<double>::quiet_NaN());
+    arkanoidGame->update(std::numeric_limits<double>::infinity());
+    REQUIRE(arkanoidGame->isRunning()); // Invalid deltas are ignored.
     waitForEvents(1800);
     REQUIRE(arkanoidGame->getScore() > 0); // Ball must hit at least one brick.
     arkanoidGame->stop();
