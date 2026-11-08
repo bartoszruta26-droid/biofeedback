@@ -15,7 +15,7 @@
 namespace biofeedback::api {
 namespace {
 constexpr int MaxHeaderBytes = 16 * 1024;
-constexpr int MaxBodyBytes = 16 * 1024;
+constexpr int MaxBodyBytes = 1024 * 1024;
 constexpr int SessionLifetimeSeconds = 1800;
 
 QByteArray reasonPhrase(int status) {
@@ -68,7 +68,15 @@ bool isTokenCharacter(char c) {
 }
 
 HttpApiServer::HttpApiServer(const QString& usersFilePath, QObject* parent)
-    : QObject(parent), m_usersFilePath(usersFilePath) {
+    : HttpApiServer(usersFilePath,
+                    std::shared_ptr<biofeedback::data::JsonResourceRepository>(),
+                    parent) {}
+
+HttpApiServer::HttpApiServer(
+    const QString& usersFilePath,
+    std::shared_ptr<biofeedback::data::JsonResourceRepository> resources,
+    QObject* parent)
+    : QObject(parent), m_usersFilePath(usersFilePath), m_resources(std::move(resources)) {
     connect(&m_server, &QTcpServer::newConnection, this, [this]() {
         while (m_server.hasPendingConnections()) {
             QTcpSocket* socket = m_server.nextPendingConnection();
@@ -409,6 +417,138 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             return;
         }
 
+        // Shared, versioned resource API. Until full role scopes are implemented,
+        // mutations and reads are restricted to administrator accounts.
+        const QString decodedPath = QUrl::fromEncoded(path).path();
+        const QStringList pathParts = decodedPath.split('/', Qt::SkipEmptyParts);
+        if (pathParts.size() >= 3 && pathParts.at(0) == QStringLiteral("api") &&
+            pathParts.at(1) == QStringLiteral("v1") &&
+            biofeedback::data::JsonResourceRepository::isSupportedCollection(pathParts.at(2))) {
+            if (!sessionValid) {
+                if (sessionIt != m_sessions.end()) m_sessions.erase(sessionIt);
+                sendJson(socket, 401, errorBody("AUTHENTICATION_REQUIRED", "Wymagane jest zalogowanie."));
+                return;
+            }
+            if (sessionIt->authentication->getCurrentUserRole() != "administrator") {
+                sendJson(socket, 403, errorBody("RESOURCE_FORBIDDEN", "Brak uprawnień do repozytorium danych."));
+                return;
+            }
+            if (!m_resources || !m_resources->isReady()) {
+                sendJson(socket, 503, errorBody("RESOURCE_STORE_UNAVAILABLE",
+                    m_resources ? "Magazyn danych nie jest gotowy." : "Repozytorium danych nie zostało skonfigurowane."));
+                return;
+            }
+
+            const QString collection = pathParts.at(2);
+            const bool collectionRoute = pathParts.size() == 3;
+            const bool itemRoute = pathParts.size() == 4;
+            if (!collectionRoute && !itemRoute) {
+                sendJson(socket, 404, errorBody("NOT_FOUND", "Nieznana ścieżka zasobu."));
+                return;
+            }
+
+            QString repositoryError;
+            if (collectionRoute && method == "GET") {
+                const QJsonArray items = m_resources->list(collection, &repositoryError);
+                if (!repositoryError.isEmpty()) {
+                    sendJson(socket, 503, errorBody("RESOURCE_LIST_FAILED", "Nie można odczytać kolekcji."));
+                    return;
+                }
+                sendJson(socket, 200, QJsonDocument(QJsonObject{
+                    {"items", items}, {"count", items.size()}
+                }).toJson(QJsonDocument::Compact));
+                return;
+            }
+
+            if (collectionRoute && method == "POST") {
+                QJsonParseError parseError;
+                const QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
+                if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+                    sendJson(socket, 400, errorBody("INVALID_JSON", "Treść musi być obiektem JSON."));
+                    return;
+                }
+                QJsonObject created;
+                if (!m_resources->create(collection, document.object(), created, &repositoryError)) {
+                    const bool invalid = repositoryError == "EMPTY_RESOURCE" ||
+                        repositoryError == "RESOURCE_TOO_LARGE" ||
+                        repositoryError == "UNSUPPORTED_COLLECTION";
+                    sendJson(socket, invalid ? 400 : 503,
+                        errorBody(invalid ? "INVALID_RESOURCE" : "RESOURCE_CREATE_FAILED",
+                                  "Nie można utworzyć rekordu."));
+                    return;
+                }
+                sendJson(socket, 201, QJsonDocument(created).toJson(QJsonDocument::Compact));
+                return;
+            }
+
+            const QString resourceId = itemRoute ? pathParts.at(3) : QString();
+            if (itemRoute && method == "GET") {
+                QJsonObject record;
+                if (!m_resources->get(collection, resourceId, record, &repositoryError)) {
+                    const bool missing = repositoryError == "RESOURCE_NOT_FOUND";
+                    sendJson(socket, missing ? 404 : 400,
+                        errorBody(missing ? "RESOURCE_NOT_FOUND" : "INVALID_RESOURCE_ID",
+                                  missing ? "Rekord nie istnieje." : "Niepoprawny identyfikator rekordu."));
+                    return;
+                }
+                sendJson(socket, 200, QJsonDocument(record).toJson(QJsonDocument::Compact));
+                return;
+            }
+
+            if (itemRoute && (method == "PUT" || method == "DELETE")) {
+                QJsonParseError parseError;
+                const QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
+                if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+                    sendJson(socket, 400, errorBody("INVALID_JSON", "Treść musi być obiektem JSON."));
+                    return;
+                }
+                const QJsonObject requestObject = document.object();
+                const int expectedVersion = requestObject.value(QStringLiteral("expected_version")).toInt(0);
+                if (expectedVersion < 1) {
+                    sendJson(socket, 400, errorBody("EXPECTED_VERSION_REQUIRED", "Wymagane jest expected_version."));
+                    return;
+                }
+                if (method == "PUT") {
+                    if (!requestObject.value(QStringLiteral("record")).isObject()) {
+                        sendJson(socket, 400, errorBody("RECORD_REQUIRED", "Wymagany jest obiekt record."));
+                        return;
+                    }
+                    QJsonObject updated;
+                    if (!m_resources->update(collection, resourceId, expectedVersion,
+                                             requestObject.value(QStringLiteral("record")).toObject(),
+                                             updated, &repositoryError)) {
+                        const bool missing = repositoryError == "RESOURCE_NOT_FOUND";
+                        const bool conflict = repositoryError == "VERSION_CONFLICT";
+                        sendJson(socket, missing ? 404 : (conflict ? 409 : 400),
+                            errorBody(missing ? "RESOURCE_NOT_FOUND" :
+                                      (conflict ? "VERSION_CONFLICT" : "RESOURCE_UPDATE_FAILED"),
+                                      missing ? "Rekord nie istnieje." :
+                                      (conflict ? "Rekord został zmieniony przez innego klienta." :
+                                                  "Nie można zaktualizować rekordu.")));
+                        return;
+                    }
+                    sendJson(socket, 200, QJsonDocument(updated).toJson(QJsonDocument::Compact));
+                    return;
+                }
+                if (!m_resources->remove(collection, resourceId, expectedVersion, &repositoryError)) {
+                    const bool missing = repositoryError == "RESOURCE_NOT_FOUND";
+                    const bool conflict = repositoryError == "VERSION_CONFLICT";
+                    sendJson(socket, missing ? 404 : (conflict ? 409 : 400),
+                        errorBody(missing ? "RESOURCE_NOT_FOUND" :
+                                  (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED"),
+                                  missing ? "Rekord nie istnieje." :
+                                  (conflict ? "Rekord został zmieniony przez innego klienta." :
+                                              "Nie można usunąć rekordu.")));
+                    return;
+                }
+                sendJson(socket, 200, R"({"ok":true})");
+                return;
+            }
+
+            sendJson(socket, 405, errorBody("METHOD_NOT_ALLOWED", "Metoda nie jest obsługiwana dla tego zasobu."));
+            return;
+        }
+
         if (method == "POST") {
             sendJson(socket, 503, errorBody("CAPABILITY_NOT_AVAILABLE", "Ta operacja API nie jest jeszcze wdrożona."));
             return;
@@ -438,7 +578,7 @@ void HttpApiServer::sendJson(QTcpSocket* socket, int status, const QByteArray& b
     const QByteArray corsOrigin = socket->property("corsOrigin").toByteArray();
     if (!corsOrigin.isEmpty()) {
         response += "Access-Control-Allow-Origin: " + corsOrigin + "\r\n";
-        response += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
+        response += "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS\r\n";
         response += "Access-Control-Allow-Headers: Authorization, Content-Type\r\n";
         response += "Access-Control-Max-Age: 600\r\n";
         response += "Vary: Origin\r\n";
