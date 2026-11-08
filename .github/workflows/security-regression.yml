@@ -30,12 +30,16 @@ jobs:
               "INVALID_TRAINING_SESSION_REFERENCE",
               "TRAINING_SESSION_NOT_FOUND",
               "PATIENT_TRAINING_SESSION_MISMATCH",
+              "PATIENT_HAS_REFERENCES",
+              "TRAINING_SESSION_HAS_RESULTS",
           ]
           for token in required:
               if token not in source:
                   raise SystemExit(f"Missing repository validation: {token}")
           if "PATIENT_NOT_FOUND" not in test:
               raise SystemExit("Missing regression for orphan clinical records")
+          if "TRAINING_SESSION_HAS_RESULTS" not in test:
+              raise SystemExit("Missing regression for referenced training session deletion")
           print("Shared record relationship guards present")
           PY
       - name: Check installer, udev and production security defaults
