@@ -17,8 +17,11 @@
   }
 
   function createApiClient(options) {
+    const apiBaseMeta = root.document && root.document.querySelector
+      ? root.document.querySelector('meta[name="biofeedback-api-base"]')
+      : null;
     const config = Object.assign({
-      baseUrl: "",
+      baseUrl: apiBaseMeta ? apiBaseMeta.content : "",
       fetchImpl: root.fetch ? root.fetch.bind(root) : null,
       WebSocketImpl: root.WebSocket || null,
       requestTimeoutMs: 8000,
