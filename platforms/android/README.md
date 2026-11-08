@@ -13,9 +13,16 @@ Z katalogu platforms/android uruchom:
 
     gradle :app:assembleDebug
 
-## Zakres wersji 0.1
+## Zakres bieżącej wersji
 Aplikacja zawiera responsywną nawigację dolną i widoki Pulpit, Pomiary,
-Pacjenci, Trening oraz Urządzenia. Status jest jawnie oznaczony jako podgląd.
-Nie ma jeszcze komunikacji z API, Bluetooth, USB ani portem szeregowym.
-Kolejnym etapem będzie wspólny klient API/WebSocket współdzielący kontrakt
-z WebUI i korzystający z backendu MeasurementEngine.
+Pacjenci, Trening oraz Urządzenia. Klient API obsługuje logowanie Bearer
+oraz CRUD sześciu kolekcji serwera: pacjentów, pomiarów, sesji i wyników
+treningowych oraz sesji i wyników gier. Ekran Pacjenci umożliwia pobranie listy,
+dodawanie, edycję i usuwanie kart przez wspólne API.
+
+Ekrany Pomiary, Trening i Urządzenia pozostają podglądowe: aplikacja nie
+odbiera jeszcze strumienia pomiarowego i nie tworzy sesji treningowych
+ani wyników gier z rzeczywistych danych. Komunikacja bezpośrednia Bluetooth,
+USB i port szeregowy nie jest zaimplementowana. Serwer wymaga HTTPS dla
+połączeń zdalnych; aplikacja Android nie łączy się z jego lokalnym HTTP
+bezpośrednio. Użyj bramy TLS/reverse proxy.
