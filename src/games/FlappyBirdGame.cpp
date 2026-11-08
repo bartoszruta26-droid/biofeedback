@@ -224,14 +224,34 @@ void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
             obstacle.gapHeight = static_cast<float>(obstacle.gapHeight * scaleY);
         }
 
-        m_birdPos.setX(qBound(static_cast<double>(m_birdRadius),
-                              m_birdPos.x(),
-                              qMax(static_cast<double>(m_birdRadius),
-                                   static_cast<double>(newSize.width()) - m_birdRadius)));
-        m_birdPos.setY(qBound(static_cast<double>(m_birdRadius),
-                              m_birdPos.y(),
-                              qMax(static_cast<double>(m_birdRadius),
-                                   static_cast<double>(newSize.height()) - m_birdRadius)));
+        // Zachowaj pełny obrys ptaka w bardzo wąskim lub niskim widoku.
+        m_birdRadius = static_cast<float>(qMin(
+            static_cast<double>(m_birdRadius),
+            qMin(newSize.width(), newSize.height()) / 2.0));
+        const double radius = m_birdRadius;
+        m_birdPos.setX(qBound(radius, m_birdPos.x(),
+                              static_cast<double>(newSize.width()) - radius));
+        m_birdPos.setY(qBound(radius, m_birdPos.y(),
+                              static_cast<double>(newSize.height()) - radius));
+
+        // Po zmianie proporcji luka istniejącej przeszkody również musi
+        // pozostać w granicach nowego obszaru gry.
+        const double safeGapHeight = qMax(
+            0.0, static_cast<double>(newSize.height()) - 2.0 * radius);
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.gapHeight = static_cast<float>(
+                qBound(0.0, static_cast<double>(obstacle.gapHeight), safeGapHeight));
+            const double minGapCenter = radius + obstacle.gapHeight / 2.0;
+            const double maxGapCenter = static_cast<double>(newSize.height()) -
+                                        radius - obstacle.gapHeight / 2.0;
+            obstacle.gapY = static_cast<float>(
+                qBound(minGapCenter, static_cast<double>(obstacle.gapY), maxGapCenter));
+        }
+        m_minGapHeight = static_cast<float>(qMin(
+            static_cast<double>(m_minGapHeight), safeGapHeight));
+        m_maxGapHeight = static_cast<float>(qBound(
+            static_cast<double>(m_minGapHeight),
+            static_cast<double>(m_maxGapHeight), safeGapHeight));
     }
     GameEngine::resizeEvent(event);
 }
