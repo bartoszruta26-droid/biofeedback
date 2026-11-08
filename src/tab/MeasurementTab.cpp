@@ -567,7 +567,7 @@ bool MeasurementTab::commitMeasurementSample(
         m_sampleJournalFailed = true;
         m_journalAdmission.store(false, std::memory_order_release);
         QMetaObject::invokeMethod(this, [this] {
-            if (m_isMeasuring) stopMeasurement();
+            if (m_isMeasuring && m_sampleJournalFailed) stopMeasurement();
         }, Qt::QueuedConnection);
         return false;
     }
