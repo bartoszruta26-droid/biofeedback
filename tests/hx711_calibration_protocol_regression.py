@@ -9,7 +9,7 @@ if "bool is_calibrated = false;" not in firmware:
     raise SystemExit("Firmware must fail closed after boot until calibrated")
 if 'Serial.print(F("ms,CAL:"));' not in firmware or "is_calibrated ? 1 : 0" not in firmware:
     raise SystemExit("Firmware FORCE record must expose explicit CAL status")
-if "calibration_factor = known_weight / raw_value;" not in firmware or "is_calibrated = true;" not in firmware:
+if "const float proposed_factor = known_weight / static_cast<float>(raw_value);" not in firmware or "calibration_factor = proposed_factor;" not in firmware or "is_calibrated = true;" not in firmware:
     raise SystemExit("CAL command must set calibration factor and active flag")
 if "hasCalibratedValue" not in header or "data.hasCalibratedValue = calibrationConfirmed;" not in serial:
     raise SystemExit("Host parser must preserve explicit calibration validity")
