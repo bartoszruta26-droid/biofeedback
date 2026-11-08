@@ -575,7 +575,7 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                                   (patientReferenced ? "Pacjent ma powiązane rekordy kliniczne." :
                                    (trainingSessionReferenced ? "Sesja treningowa ma powiązane wyniki." :
                                     (conflict ? "Rekord został zmieniony przez innego klienta." :
-                                                "Nie można usunąć rekordu."))));
+                                                "Nie można usunąć rekordu.")))));
                     return;
                 }
                 sendJson(socket, 200, R"({"ok":true})");
