@@ -63,9 +63,9 @@ The training screen supports configuration before starting:
 - repetitions per series: comma and period;
 - rest duration: semicolon decreases and apostrophe increases by 5 seconds (0–600 seconds).
 
-After each completed series, the TUI pauses repetition detection during the configured rest interval. The rest countdown is suspended while the session is paused. Completed repetitions are retained in memory and appended to the local CSV session history when the operator stops the session, exits the application, or completes the plan. The file is stored under the user's Biofeedback XDG application data directory with owner-only permissions.
+After each completed series, the TUI pauses repetition detection during the configured rest interval. The rest countdown is suspended while the session is paused. Completed repetitions are retained in memory and submitted as one `training-sessions` resource to the authenticated shared API when the operator stops the session, exits the application, or completes the plan. The record includes exercise, target, series/repetition metadata, force statistics and per-repetition sample counts. A failed API submission is shown in the training status; TUI does not silently fall back to a separate local history file.
 
-The Diagnostics screen reports valid and rejected sample counts, the last sample-quality classification, the last repetition's peak and mean force, duration and time-to-peak, and the history-file path. TUI session history is local and unencrypted; it does not include a patient identifier. It is not a substitute for the encrypted patient record workflow.
+The Patients screen reads the shared `patients` collection through the API and displays the records returned by the server. The Diagnostics screen reports valid and rejected sample counts, the last sample-quality classification, and the last repetition's peak and mean force, duration and time-to-peak. The TUI currently does not select a patient and therefore does not yet attach a `patient_id` to a training session. Patient-to-session association and full training-result history are next integration steps.
 
 ## HX711 calibration requirement
 
