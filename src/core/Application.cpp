@@ -412,11 +412,18 @@ void Application::setupConnections()
                 }
             });
     
-    const auto findPatientByPesel = [this](const QString& pesel, QJsonObject& found) {
-        if (!m_sharedResources || pesel.isEmpty()) return false;
+    const auto findPatientByPesel = [this](const QString& pesel, QJsonObject& found,
+                                               QString* lookupError) {
+        if (!m_sharedResources || pesel.isEmpty()) {
+            if (lookupError) *lookupError = QStringLiteral("PATIENT_REPOSITORY_UNAVAILABLE");
+            return false;
+        }
         QString error;
         const QJsonArray records = m_sharedResources->list(QStringLiteral("patients"), &error);
-        if (!error.isEmpty()) return false;
+        if (!error.isEmpty()) {
+            if (lookupError) *lookupError = error;
+            return false;
+        }
         for (const QJsonValue& value : records) {
             if (!value.isObject()) continue;
             const QJsonObject record = value.toObject();
@@ -451,7 +458,12 @@ void Application::setupConnections()
                 QJsonObject existing;
                 QString error;
                 bool saved = false;
-                if (findPatientByPesel(pesel, existing)) {
+                const bool found = findPatientByPesel(pesel, existing, &error);
+                if (!error.isEmpty()) {
+                    if (m_logger) m_logger->error("Shared patient lookup failed: " + error.toStdString());
+                    return;
+                }
+                if (found) {
                     QJsonObject updated;
                     saved = m_sharedResources->update(
                         QStringLiteral("patients"),
@@ -476,7 +488,12 @@ void Application::setupConnections()
                 QJsonObject existing;
                 QString error;
                 bool repositoryDeleteSucceeded = false;
-                if (findPatientByPesel(pesel, existing)) {
+                const bool found = findPatientByPesel(pesel, existing, &error);
+                if (!error.isEmpty()) {
+                    if (m_logger) m_logger->warning("Shared patient lookup failed; legacy chart retained.");
+                    return;
+                }
+                if (found) {
                     repositoryDeleteSucceeded = m_sharedResources->remove(
                         QStringLiteral("patients"),
                         existing.value(QStringLiteral("id")).toString(),
