@@ -265,7 +265,7 @@ option_install_dependencies() {
         
         # Create udev rule for Arduino
         echo -e "${CYAN}Creating udev rule for Arduino...${NC}"
-        echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", MODE="0666"' | sudo tee /etc/udev/rules.d/50-arduino.rules > /dev/null 2>&1
+        echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", GROUP="dialout", MODE="0660"' | sudo tee /etc/udev/rules.d/50-arduino.rules > /dev/null 2>&1
         
         # Reload udev rules
         sudo udevadm control --reload-rules 2>/dev/null || true
@@ -1989,32 +1989,35 @@ option_8_factory() {
         echo "  - Brak logów do czyszczenia"
     fi
     
-    # Krok 6: Usunięcie danych pomiarowych użytkownika
-    print_info "[Krok 6/7] Usuwanie danych pomiarowych..."
+    # Krok 6: Dane pacjentów są zachowywane domyślnie.
+    print_info "[Krok 6/7] Ochrona danych pomiarowych..."
     local data_removed=0
-    
-    if [ -d "data" ]; then
-        local data_count=$(find data -type f 2>/dev/null | wc -l)
-        if [ $data_count -gt 0 ]; then
-            rm -rf data/*
-            echo "  - Usunięto $data_count plików z data/"
-            data_removed=1
+    local purge_patient_data="NIE"
+    read -r -p "Aby trwale usunąć wyłącznie $REPO_DIR/data/patients, wpisz USUŃ DANE POMIAROWE: " purge_patient_data
+
+    if [[ "$purge_patient_data" == "USUŃ DANE POMIAROWE" ]]; then
+        local patient_data_dir="$REPO_DIR/data/patients"
+        if [ -L "$patient_data_dir" ]; then
+            print_warning "Odmowa usunięcia: katalog danych jest dowiązaniem symbolicznym."
+        elif [ -d "$patient_data_dir" ]; then
+            local resolved_data_dir
+            local resolved_data_root
+            resolved_data_dir=$(realpath -e -- "$patient_data_dir") || resolved_data_dir=""
+            resolved_data_root=$(realpath -e -- "$REPO_DIR/data") || resolved_data_root=""
+            if [[ -n "$resolved_data_dir" && -n "$resolved_data_root" && "$resolved_data_dir" == "$resolved_data_root/patients" ]]; then
+                find "$resolved_data_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+                echo "  - Usunięto zawartość katalogu danych pacjentów."
+                data_removed=1
+            else
+                print_warning "Odmowa usunięcia: ścieżka danych nie przeszła kontroli kanonicznej."
+            fi
+        else
+            echo "  - Katalog danych pacjentów nie istnieje."
         fi
+    else
+        echo "  - Dane pacjentów zachowano."
     fi
-    
-    if [ -d "$REPO_DIR/data" ]; then
-        local repo_data_count=$(find "$REPO_DIR/data" -type f 2>/dev/null | wc -l)
-        if [ $repo_data_count -gt 0 ]; then
-            rm -rf "$REPO_DIR/data"/*
-            echo "  - Usunięto $repo_data_count plików z $REPO_DIR/data/"
-            data_removed=1
-        fi
-    fi
-    
-    if [ $data_removed -eq 0 ]; then
-        echo "  - Brak danych pomiarowych do usunięcia"
-    fi
-    
+
     # Krok 7: Reset repozytorium Git do czystego stanu
     print_info "[Krok 7/7] Przywracanie repozytorium do czystego stanu..."
     if [ -d "$REPO_DIR/.git" ]; then
