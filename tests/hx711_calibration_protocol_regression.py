@@ -29,10 +29,13 @@ required_firmware = [
     "return LONG_MIN;",
     "return INT32_MIN;  // Preserve timeout separately from a valid zero sample",
     "if (raw != LONG_MIN)",
+    "if (count & 0x800000L)",
+    "count |= ~0xFFFFFFL;",
 ]
 for token in required_firmware:
     assert token in firmware, f"missing Nano firmware invariant: {token}"
 assert "atof(buffer + 4)" not in firmware
+assert "count ^= 0x800000" not in firmware, "HX711 samples must be sign-extended, not offset-flipped"
 assert "*end_ptr == '\\t'" in firmware, "calibration parser must use a single escaped tab character"
 assert "*end_ptr == '\\0'" in firmware, "calibration parser must use a single escaped NUL terminator"
 
