@@ -13,4 +13,14 @@ inline constexpr uint8_t FrameTrailerFirst = 0xAA;
 inline constexpr uint8_t FrameTrailerSecond = 0x55;
 inline constexpr uint32_t DefaultSampleRateHz = 80;
 inline constexpr uint8_t Hx711Gain = 128;
+
+// Versioned ASCII control envelope used by the Pico command processor.
+// Measurement frames remain binary and are parsed by ProtocolParser.
+inline constexpr int ControlProtocolVersion = 1;
+inline constexpr std::size_t MaxControlCommandBytes = 63;
+inline constexpr int DefaultControlBaudRate = DefaultBaudRate;
+inline constexpr char ControlPing[] = "PING";
+inline constexpr char ControlStatus[] = "STATUS";
+inline constexpr char ControlSafe[] = "SAFE";
+inline constexpr char ActuatorLockedReply[] = "ERR,ACTUATORS_LOCKED";
 } // namespace sensor::protocol
