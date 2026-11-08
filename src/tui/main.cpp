@@ -162,6 +162,7 @@ struct LiveData {
     bool sessionSaved = false;
     bool sessionSaveAttempted = false;
     QString sessionStartedAt;
+    QString selectedPatientId;
     std::uint64_t validSampleCount = 0;
     std::uint64_t invalidSampleCount = 0;
     QString lastSampleQuality = "brak probki";
@@ -225,6 +226,8 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
         {QStringLiteral("started_at"), startedAt},
         {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
         {QStringLiteral("exercise_name"), exercise},
+        {QStringLiteral("patient_id"), live.selectedPatientId},
+
         {QStringLiteral("target_force_n"), targetForce},
         {QStringLiteral("target_series_count"), targetSeries},
         {QStringLiteral("target_reps_per_series"), targetReps},
@@ -242,6 +245,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
     if (saved) {
         const QJsonObject resultPayload{
             {QStringLiteral("training_session_id"), created.value(QStringLiteral("id")).toString()},
+            {QStringLiteral("patient_id"), live.selectedPatientId},
             {QStringLiteral("exercise_name"), exercise},
             {QStringLiteral("completed_series"), completedSeries},
             {QStringLiteral("completed_repetitions"), completedReps},
@@ -568,6 +572,7 @@ int main(int argc, char** argv)
     if (!apiClient) return EXIT_FAILURE;
 
     std::vector<std::string> patientSummaries;
+    QStringList patientIds;
     QJsonArray sharedPatients;
     QString patientLoadError;
     if (apiClient->listResources(QStringLiteral("patients"), sharedPatients, &patientLoadError)) {
@@ -576,7 +581,9 @@ int main(int argc, char** argv)
             const QJsonObject patient = value.toObject();
             const QString label = patient.value(QStringLiteral("firstName")).toString() +
                 QStringLiteral(" ") + patient.value(QStringLiteral("lastName")).toString();
-            patientSummaries.push_back(label.toStdString());
+            const QString id = patient.value(QStringLiteral("id")).toString();
+            patientSummaries.push_back((label + QStringLiteral(" [") + id + QStringLiteral("]")).toStdString());
+            patientIds.push_back(id);
         }
     } else {
         patientSummaries.push_back("Blad odczytu repozytorium: " + patientLoadError.toStdString());
@@ -720,6 +727,8 @@ int main(int argc, char** argv)
                         live.trainingResting = false;
                         live.restRemaining = 0;
                         live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+                        if (live.selectedPatientId.isEmpty() && !patientIds.isEmpty())
+                            live.selectedPatientId = patientIds.first();
                         live.sessionNeedsSave = false;
                         live.sessionSaved = false;
                         live.sessionSaveAttempted = false;
