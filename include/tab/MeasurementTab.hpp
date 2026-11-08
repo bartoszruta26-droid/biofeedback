@@ -448,7 +448,7 @@ private:
     SampleJournalWriter m_sampleJournalWriter;
     QString m_sampleJournalPath;
     QString m_activeSessionId;
-    bool m_sampleJournalFailed{false};
+    std::atomic<bool> m_sampleJournalFailed{false};
     
     // Bufor bieżącego powtórzenia
     QVector<double> m_currentRepForces;
