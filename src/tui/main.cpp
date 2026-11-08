@@ -247,7 +247,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
     if (saved) {
         const QJsonObject resultPayload{
             {QStringLiteral("training_session_id"), created.value(QStringLiteral("id")).toString()},
-            {QStringLiteral("patient_id"), live.selectedPatientId},
+            {QStringLiteral("patient_id"), patientId},
             {QStringLiteral("exercise_name"), exercise},
             {QStringLiteral("completed_series"), completedSeries},
             {QStringLiteral("completed_repetitions"), completedReps},
