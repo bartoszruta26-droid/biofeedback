@@ -1,0 +1,45 @@
+name: arduino-nano-firmware
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'hx711_advanced.ino'
+      - 'hx711_arduino_nano.ino'
+      - 'tests/hx711_calibration_protocol_regression.py'
+      - '.github/workflows/arduino-nano.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'hx711_advanced.ino'
+      - 'hx711_arduino_nano.ino'
+      - 'tests/hx711_calibration_protocol_regression.py'
+      - '.github/workflows/arduino-nano.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  nano-firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install Nano core and HX711 library
+        run: |
+          arduino-cli core update-index
+          arduino-cli core install arduino:avr
+          arduino-cli lib install HX711
+      - name: Check calibration input policy
+        run: python3 tests/hx711_calibration_protocol_regression.py
+      - name: Compile supported CRC-framed firmware
+        run: |
+          mkdir -p build/arduino/advanced
+          cp hx711_advanced.ino build/arduino/advanced/advanced.ino
+          arduino-cli compile --warnings all --fqbn arduino:avr:nano:cpu=atmega328old build/arduino/advanced
+      - name: Compile legacy text-only example
+        run: |
+          mkdir -p build/arduino/legacy
+          cp hx711_arduino_nano.ino build/arduino/legacy/legacy.ino
+          arduino-cli compile --warnings all --fqbn arduino:avr:nano:cpu=atmega328old build/arduino/legacy
