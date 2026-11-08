@@ -444,6 +444,10 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
+    m_measurementEngine->setCommitHook(
+        [this](const biofeedback::measurement::MeasurementSample& sample) {
+            return commitMeasurementSample(sample);
+        });
     m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
         *m_serialPort, m_measurementEngine, "desktop-hx711", "g");
     m_measurementCallbackToken = m_measurementEngine->subscribe(
@@ -465,13 +469,16 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
-    // Wake a serial-reader callback if it is applying bounded-queue
-    // backpressure. Stop admission before waiting for in-flight subscribers.
+    // Reject new acquisitions and wait for any in-flight durable commit
+    // before closing the journal worker.
+    m_journalAdmission.store(false, std::memory_order_release);
+    if (m_measurementEngine)
+        m_measurementEngine->setCommitHook({});
+
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         m_measurementQueueAccepting = false;
     }
-    m_measurementQueueSpaceAvailable.notify_all();
 
     if (m_measurementEngine && m_measurementCallbackToken) {
         m_measurementEngine->unsubscribe(m_measurementCallbackToken);
@@ -507,7 +514,9 @@ bool MeasurementTab::openSampleJournal()
         // Preserve the failed segment for recovery and begin a fresh journal.
         m_sampleJournalPath.clear();
         m_activeSessionId.clear();
-        m_sampleJournalFailed = false;
+    m_journalNextSequence.store(1, std::memory_order_release);
+    m_journalAdmission.store(false, std::memory_order_release);
+    m_sampleJournalFailed = false;
     }
     if (m_sampleJournalPath.isEmpty()) {
         const QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
@@ -523,7 +532,7 @@ bool MeasurementTab::openSampleJournal()
         QJsonObject header;
         header["recordType"] = "header";
         header["schemaVersion"] = 1;
-        header["firstSequence"] = static_cast<qint64>(m_recordedSamples.size()) + 1;
+        header["firstSequence"] = static_cast<qint64>(m_journalNextSequence.load(std::memory_order_acquire));
         header["sessionId"] = m_activeSessionId;
         header["patientId"] = m_patientId;
         header["date"] = QDateTime::currentDateTime().toString(Qt::ISODateWithMs);
@@ -542,6 +551,70 @@ bool MeasurementTab::openSampleJournal()
         return false;
     }
     m_sampleJournalFailed = false;
+    return true;
+}
+
+bool MeasurementTab::commitMeasurementSample(
+    const biofeedback::measurement::MeasurementSample& sample)
+{
+    if (!m_journalAdmission.load(std::memory_order_acquire))
+        return false;
+
+    // Raw ADC diagnostics use the direct capture path; the calibrated adapter
+    // still publishes its values for other internal consumers but does not
+    // create a second journal record.
+    if (m_showRawValues)
+        return true;
+
+    if (!sample.isValid() || sample.unit != "kg" ||
+        !std::isfinite(sample.value) || sample.value < 0.0)
+        return true;
+
+    const double forceN = sample.value *
+        biofeedback::measurement::standardGravityMetersPerSecondSquared;
+    if (!std::isfinite(forceN))
+        return false;
+
+    const quint64 sequence = m_journalNextSequence.load(std::memory_order_acquire);
+    if (sequence == 0 ||
+        sequence > static_cast<quint64>(std::numeric_limits<qint64>::max())) {
+        m_sampleJournalFailed = true;
+        m_journalAdmission.store(false, std::memory_order_release);
+        QMetaObject::invokeMethod(this, [this] {
+            if (m_isMeasuring) stopMeasurement();
+        }, Qt::QueuedConnection);
+        return false;
+    }
+
+    const double elapsed = m_sessionElapsedTimer.isValid()
+        ? m_sessionElapsedOffsetSeconds + m_sessionElapsedTimer.elapsed() / 1000.0
+        : m_sessionElapsedOffsetSeconds;
+    QJsonObject record;
+    record["recordType"] = "sample";
+    record["sequence"] = static_cast<qint64>(sequence);
+    record["timestampUnixMs"] = sample.timestampUnixMs;
+    record["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
+    record["elapsedTimeSeconds"] = elapsed;
+    record["value"] = forceN;
+    record["rawValue"] = sample.rawValue;
+    record["hasRawValue"] = true;
+    record["calibratedMassKg"] = sample.value;
+    record["hasCalibratedMass"] = true;
+    record["unit"] = "N";
+    record["source"] = QString::fromStdString(sample.source);
+    record["quality"] = QStringLiteral("valid");
+    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
+
+    if (!m_sampleJournalWriter.appendDurably(line)) {
+        m_sampleJournalFailed = true;
+        m_journalAdmission.store(false, std::memory_order_release);
+        QMetaObject::invokeMethod(this, [this] {
+            if (m_isMeasuring) stopMeasurement();
+        }, Qt::QueuedConnection);
+        return false;
+    }
+
+    m_journalNextSequence.store(sequence + 1, std::memory_order_release);
     return true;
 }
 
@@ -569,6 +642,7 @@ bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample
         m_sampleJournalFailed = true;
         return false;
     }
+    m_journalNextSequence.store(sample.sequence + 1, std::memory_order_release);
     return true;
 }
 
@@ -1092,6 +1166,7 @@ void MeasurementTab::startMeasurement()
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
+    m_journalAdmission.store(true, std::memory_order_release);
     
     std::cout << "[DEBUG] startMeasurement: Locking Raw/Calibrated button" << std::endl;
     
@@ -1123,6 +1198,15 @@ void MeasurementTab::stopMeasurement()
         return;
     }
     
+    m_journalAdmission.store(false, std::memory_order_release);
+    // setCommitHook takes the engine mutex, forming a barrier behind any
+    // in-flight commit before the writer is drained and closed.
+    if (m_measurementEngine) {
+        m_measurementEngine->setCommitHook(
+            [this](const biofeedback::measurement::MeasurementSample& sample) {
+                return commitMeasurementSample(sample);
+            });
+    }
     m_isMeasuring = false;
     updateRawTableBatch(true);
     const bool journalFlushed = flushSampleJournal();
@@ -1301,8 +1385,10 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
     bool journalWriteFailed = false;
-    if (m_isMeasuring && !m_sampleJournalPath.isEmpty() && !m_sampleJournalFailed) {
-        // A worker-side disk error may close admission between two samples.
+    // Calibrated samples are committed by MeasurementEngine before any GUI
+    // subscriber is published. Raw diagnostic capture bypasses that adapter.
+    if (m_isMeasuring && m_showRawValues &&
+        !m_sampleJournalPath.isEmpty() && !m_sampleJournalFailed) {
         if (!m_sampleJournalWriter.isAccepting() || !appendSampleJournal(recorded)) {
             m_sampleJournalFailed = true;
             journalWriteFailed = true;
@@ -2186,6 +2272,8 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_sampleJournalFailed = false;
         m_completedSeriesStats = session.series;
         m_recordedSamples = session.samples;
+        m_journalNextSequence.store(static_cast<quint64>(m_recordedSamples.size()) + 1,
+                                    std::memory_order_release);
         if (m_elasticConstantInput) {
             const QSignalBlocker blocker(m_elasticConstantInput);
             m_elasticConstantInput->setValue(session.elasticConstantNPerM);
@@ -2735,15 +2823,15 @@ void MeasurementTab::enqueueMeasurementSample(
 {
     bool scheduleDrain = false;
     {
-        std::unique_lock<std::mutex> lock(m_measurementQueueMutex);
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         constexpr std::size_t MaximumQueuedSamples = 4096;
-        // Training/repetition detection consumes an ordered full-rate stream.
-        // Apply backpressure to the serial reader instead of discarding a
-        // backlog that would corrupt repetition boundaries and sample counts.
-        m_measurementQueueSpaceAvailable.wait(lock, [this]() {
-            return !m_measurementQueueAccepting || m_measurementQueue.size() < 4096;
-        });
         if (!m_measurementQueueAccepting) return;
+        // This queue serves only GUI presentation and derived repetition
+        // analysis. The durable journal has already committed this sample.
+        if (m_measurementQueue.size() >= MaximumQueuedSamples) {
+            ++m_droppedMeasurementSamples;
+            return;
+        }
         m_measurementQueue.push_back(sample);
         if (!m_measurementDrainScheduled) {
             m_measurementDrainScheduled = true;
@@ -2778,7 +2866,6 @@ void MeasurementTab::drainMeasurementSamples()
             batch.push_back(std::move(m_measurementQueue.front()));
             m_measurementQueue.pop_front();
         }
-        if (count != 0) m_measurementQueueSpaceAvailable.notify_all();
         if (m_measurementQueue.empty()) {
             m_measurementDrainScheduled = false;
         } else {
