@@ -47,7 +47,9 @@
 - [x] Ograniczenie liczby oczekujących zdarzeń wejścia czujnika przez scalanie próbek do najnowszej wartości.
 - [x] Regresja dla serii 1000 próbek wysłanych z wątku roboczego.
 - [ ] Audyt i poprawki mechaniki istniejących gier (w pierwszej kolejności Arkanoid, Pong, Flappy Bird i Mario).
-- [x] Zabezpieczenia wejściowego deltaTime w Arkanoidzie, Flappy Bird i Mario; normalizacja wektora odbicia piłki w Pongu.
+- [x] Zabezpieczenia wejściowego deltaTime w Arkanoidzie, Flappy Bird, Mario, Sinus Force Trainer i Tan Force Trainer; normalizacja wektora odbicia piłki w Pongu.
+- [x] Sinus/Tan Force Trainer: odrzucanie NaN/Inf w próbkach siły, kontrola dodatniego i skończonego kroku czasu oraz ograniczenie pojedynczej aktualizacji do 100 ms.
+- [x] Testy regresyjne wejścia i deltaTime dla Sinus/Tan: bardzo duża delta, NaN, Inf, wartości ujemne oraz uszkodzone próbki czujnika.
 - [x] Pierwsza grywalna implementacja Galaga: statek, sterowanie czujnikiem/klawiaturą, pociski obu stron, kolizje, życia, fale i punktacja. Pozostaje rozszerzyć testy scenariuszowe i zbalansować rozgrywkę.
 - [x] Pierwsza grywalna implementacja Archer: regulacja kąta z czujnika/klawiatury, strzały balistyczne, ruchomy cel i punktacja. Pozostaje rozszerzyć testy scenariuszowe i dopracować rozgrywkę.
 - [x] Pierwsza grywalna implementacja Scorched Earth: artyleria turowa, kąt i siła strzału, grawitacja, wiatr, deformacja terenu, zdrowie czołgów i przeciwnik AI. Pozostaje rozszerzyć testy scenariuszowe, dopracować AI i zbalansować fizykę.
