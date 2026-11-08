@@ -40,7 +40,7 @@
       "uart_tx_pin": 0,
       "uart_rx_pin": 1,
       "protocol": "biofeedback-control",
-      "protocol_version": 1,
+      "protocol_version": 1
     },
     "arduino_nano": {
       "transport": "serial",
