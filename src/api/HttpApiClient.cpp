@@ -273,10 +273,12 @@ bool HttpApiClient::stopAcquisitionSession(const QString& sessionId, QString* er
                    &body, true, response, error);
 }
 
-bool HttpApiClient::listAcquisitionSamples(QJsonArray& samples, QString* error) {
+bool HttpApiClient::listAcquisitionSamples(QJsonArray& samples, QString* error,
+                                               quint64 afterSequence) {
     QJsonObject response;
-    if (!request("GET", QStringLiteral("/api/v1/acquisition/samples"),
-                 nullptr, true, response, error))
+    const QString path = QStringLiteral("/api/v1/acquisition/samples?after_sequence=%1")
+        .arg(QString::number(afterSequence));
+    if (!request("GET", path, nullptr, true, response, error))
         return false;
     if (!response.value(QStringLiteral("items")).isArray()) {
         setError(error, QStringLiteral("INVALID_ACQUISITION_SAMPLES_RESPONSE"));
