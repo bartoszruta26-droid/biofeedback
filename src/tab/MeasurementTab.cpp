@@ -1362,7 +1362,7 @@ void MeasurementTab::stopMeasurement()
         m_lblStatus->setText(journalError.isEmpty()
             ? tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku")
             : tr("Status: BŁĄD ZAPISU DZIENNIKA — %1").arg(journalError));
-    } else if (!journalRestored && !m_sampleJournalFailed) {
+    } else if (!journalRestored) {
         m_lblStatus->setText(tr("Status: dziennik zapisany, ale odtworzenie sesji wymaga kontroli"));
     } else {
         quint64 totalDropped = 0;
