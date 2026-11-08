@@ -27,6 +27,7 @@
 
 #include <avr/wdt.h>  // Hardware Watchdog Timer
 #include <util/crc16.h> // CRC utilities
+#include <math.h>
 
 // Pin definitions
 #define HX711_DT_PIN  2   // Data pin
@@ -306,15 +307,26 @@ void processSerialCommand() {
                     resetWatchdog();
                 }
                 else if (strncmp(upper_buffer, "CAL:", 4) == 0) {
-                    // Calibration command: CAL:<known_weight_in_grams>
-                    float known_weight = atof(buffer + 4);
-                    if (known_weight > 0) {
-                        int32_t raw_value = current_weight - tare_offset;
+                    // Calibration command: CAL:<known_weight_in_grams>.
+                    // Parse the entire numeric field and reject NaN/Inf/trailing text.
+                    char *end_ptr = nullptr;
+                    const double parsed_weight = strtod(buffer + 4, &end_ptr);
+                    while (end_ptr && (*end_ptr == ' ' || *end_ptr == '\\t')) ++end_ptr;
+                    const float known_weight = static_cast<float>(parsed_weight);
+                    if (end_ptr != buffer + 4 && end_ptr && *end_ptr == '\\0' &&
+                        isfinite(parsed_weight) && parsed_weight > 0.0 &&
+                        isfinite(known_weight) && known_weight > 0.0f) {
+                        const int32_t raw_value = current_weight - tare_offset;
                         if (raw_value != 0) {
-                            calibration_factor = known_weight / raw_value;
-                            is_calibrated = true;
-                            Serial.print(F("Calibrated! Factor:"));
-                            Serial.println(calibration_factor, 6);
+                            const float proposed_factor = known_weight / static_cast<float>(raw_value);
+                            if (isfinite(proposed_factor) && proposed_factor != 0.0f) {
+                                calibration_factor = proposed_factor;
+                                is_calibrated = true;
+                                Serial.print(F("Calibrated! Factor:"));
+                                Serial.println(calibration_factor, 6);
+                            } else {
+                                Serial.println(F("Error: invalid calibration factor"));
+                            }
                         } else {
                             Serial.println(F("Error: zero reading"));
                         }
