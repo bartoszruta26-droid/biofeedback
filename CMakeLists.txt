@@ -209,6 +209,7 @@ if(Qt5_FOUND)
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
+        src/games/GalagaGame.cpp
         src/formulas.cpp
     )
 
@@ -241,6 +242,7 @@ if(Qt5_FOUND)
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
+        include/games/GalagaGame.hpp
         include/formulas.hpp
     )
 
@@ -271,6 +273,7 @@ if(Qt5_FOUND)
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
         src/games/MarioGame.cpp
+        src/games/GalagaGame.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
         include/games/GameEngine.hpp
@@ -280,6 +283,7 @@ if(Qt5_FOUND)
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
+        include/games/GalagaGame.hpp
         include/sensor/SerialCommunication.hpp
         include/core/DebugManager.hpp
     )
