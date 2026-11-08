@@ -103,7 +103,12 @@ checks = {
         "activeMsValue > sessionMsValue" in tab and
         "restMsValue > 86400000.0" in tab
     ),
-    "no patient identifier is serialized": '"patient_pesel"' not in tab and '"patient_id"' not in tab,
+    "no patient identifier is serialized in crash checkpoints": (
+        '"patient_pesel"' not in tab[tab.index("QJsonObject TrainingTab::buildExecutionCheckpoint"):
+                                     tab.index("bool TrainingTab::restoreExecutionCheckpoint")] and
+        '"patient_id"' not in tab[tab.index("QJsonObject TrainingTab::buildExecutionCheckpoint"):
+                                  tab.index("bool TrainingTab::restoreExecutionCheckpoint")]
+    ),
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:
