@@ -734,6 +734,11 @@ bool MeasurementTab::restoreSampleJournalIntoSession()
         if (m_forcePlot)
             m_forcePlot->addSample(sample.value, sample.elapsedTimeSeconds);
     }
+    constexpr int liveBufferCapacity = 10000;
+    if (m_rawForceBuffer.size() > liveBufferCapacity)
+        m_rawForceBuffer.remove(0, m_rawForceBuffer.size() - liveBufferCapacity);
+    if (m_timeBuffer.size() > liveBufferCapacity)
+        m_timeBuffer.remove(0, m_timeBuffer.size() - liveBufferCapacity);
 
     if (m_rawTable) m_rawTable->setRowCount(0);
     m_rawTableLastSequence = 0;
