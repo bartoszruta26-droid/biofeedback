@@ -8,7 +8,21 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-shell">
+  <section class="auth-gate" id="authGate" aria-labelledby="authTitle">
+    <form class="auth-card" id="loginForm">
+      <p class="eyebrow">BIOFEEDBACK · DOSTĘP</p>
+      <h1 id="authTitle">Zaloguj się</h1>
+      <p class="muted">Użyj konta skonfigurowanego w aplikacji Biofeedback.</p>
+      <label for="loginUsername">Użytkownik</label>
+      <input id="loginUsername" name="username" autocomplete="username" required maxlength="128">
+      <label for="loginPassword">Hasło</label>
+      <input id="loginPassword" name="password" type="password" autocomplete="current-password" required maxlength="1024">
+      <button class="primary-button" id="loginButton" type="submit">Zaloguj</button>
+      <p class="auth-message" id="loginMessage" role="alert" aria-live="polite"></p>
+      <p class="auth-footnote">Sesja jest przechowywana w pamięci przeglądarki i wymaga ponownego logowania po odświeżeniu strony.</p>
+    </form>
+  </section>
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar" id="sidebar">
       <a class="brand" href="#" aria-label="Biofeedback — pulpit">
         <span class="brand-mark">B</span>
@@ -35,6 +49,8 @@
         <div class="breadcrumbs"><span>Biofeedback</span><b>/</b><strong id="breadcrumb">Pulpit</strong></div>
         <div class="top-actions">
           <span class="environment"><i></i> ŚRODOWISKO ROZWOJOWE</span>
+          <span class="current-user" id="currentUser"></span>
+          <button class="secondary-button logout-button" id="logoutButton" type="button">Wyloguj</button>
           <button class="icon-button" id="themeToggle" aria-label="Zmień motyw">◐</button>
         </div>
       </header>
