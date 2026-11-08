@@ -2,6 +2,7 @@
 #define TAB_SAMPLEJOURNALWRITER_HPP
 
 #include <QByteArray>
+#include <QFile>
 #include <QString>
 
 #include <condition_variable>
@@ -39,9 +40,9 @@ public:
 
 private:
     void run();
-    static bool writeDurably(class QFile& file, const QByteArray& bytes,
+    static bool writeDurably(QFile& file, const QByteArray& bytes,
                              QString& error);
-    static bool flushDurably(class QFile& file, QString& error);
+    static bool flushDurably(QFile& file, QString& error);
 
     const std::size_t m_capacity;
     mutable std::mutex m_mutex;
