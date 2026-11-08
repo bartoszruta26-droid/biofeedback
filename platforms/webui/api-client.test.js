@@ -108,7 +108,7 @@ test("login stores bearer token in memory and protected calls attach it", async 
   assert.equal(calls[3].init.headers.Authorization, undefined);
 });
 
-test("login rejects a successful response without an access token", async () => {
+test("login rejects malformed bearer tokens", async () => {\n  const api = createApiClient({ fetchImpl: async () => response(200, { access_token: "g".repeat(64) }) });\n  await assert.rejects(api.login("operator", "example-password"), (error) =>\n    error instanceof ApiError && error.message === "API login response did not contain an access token");\n});\n\ntest("login rejects a successful response without an access token", async () => {
   const api = createApiClient({ fetchImpl: async () => response(200, { ok: true }) });
   await assert.rejects(api.login("operator", "example-password"), (error) =>
     error instanceof ApiError && error.message === "API login response did not contain an access token");
