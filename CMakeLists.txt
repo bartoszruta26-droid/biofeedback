@@ -362,6 +362,10 @@ if(Qt5_FOUND)
         include/games/SinGame.hpp
         include/games/TanGame.hpp
         include/games/ArkanoidGame.hpp
+        include/games/GalagaGame.hpp
+        include/games/ArcherGame.hpp
+        include/games/CarRaceGame.hpp
+        include/games/ScorchedEarthGame.hpp
         include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
