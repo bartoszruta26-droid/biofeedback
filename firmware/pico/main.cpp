@@ -1,0 +1,78 @@
+#include "pico/stdlib.h"
+#include "hardware/uart.h"
+#include "hardware/watchdog.h"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+
+namespace {
+constexpr uart_inst_t* kControlUart = uart0;
+constexpr uint kUartTxPin = 0;
+constexpr uint kUartRxPin = 1;
+constexpr uint32_t kBaudRate = 115200;
+constexpr uint32_t kWatchdogTimeoutMs = 2000;
+constexpr std::size_t kCommandCapacity = 64;
+// Fail-closed foundation: no GPIO is configured as an actuator output.
+void writeReply(const char* message) {
+    uart_puts(kControlUart, message);
+    uart_puts(kControlUart, "\r\n");
+}
+void processCommand(const char* command) {
+    if (std::strcmp(command, "PING") == 0) {
+        writeReply("OK,PONG,FW=0.1.0");
+    } else if (std::strcmp(command, "STATUS") == 0) {
+        writeReply("OK,STATUS,SAFE=1,ACTUATORS=LOCKED");
+    } else if (std::strcmp(command, "SAFE") == 0) {
+        writeReply("OK,SAFE,ACTUATORS=LOCKED");
+    } else if (std::strncmp(command, "ACTUATOR,", 9) == 0 ||
+               std::strncmp(command, "EFFECTOR,", 9) == 0) {
+        writeReply("ERR,ACTUATORS_LOCKED");
+    } else {
+        writeReply("ERR,UNKNOWN_COMMAND");
+    }
+}
+void configureControlUart() {
+    uart_init(kControlUart, kBaudRate);
+    gpio_set_function(kUartTxPin, GPIO_FUNC_UART);
+    gpio_set_function(kUartRxPin, GPIO_FUNC_UART);
+    uart_set_format(kControlUart, 8, 1, UART_PARITY_NONE);
+    uart_set_fifo_enabled(kControlUart, true);
+}
+}
+int main() {
+    stdio_init_all();
+    configureControlUart();
+    watchdog_enable(kWatchdogTimeoutMs, true);
+    writeReply("BIOFEEDBACK_PICO,FW=0.1.0,SAFE=1");
+    std::array<char, kCommandCapacity> command{};
+    std::size_t length = 0;
+    while (true) {
+        watchdog_update();
+        while (uart_is_readable(kControlUart)) {
+            const char ch = static_cast<char>(uart_getc(kControlUart));
+            if (ch == '\r' || ch == '\n') {
+                if (length > 0) {
+                    command[length] = '\0';
+                    processCommand(command.data());
+                    command.fill('\0');
+                    length = 0;
+                }
+            } else if (ch >= 0x20 && ch <= 0x7e) {
+                if (length + 1 < command.size()) {
+                    command[length++] = ch;
+                } else {
+                    command.fill('\0');
+                    length = 0;
+                    writeReply("ERR,COMMAND_TOO_LONG");
+                }
+            } else {
+                command.fill('\0');
+                length = 0;
+                writeReply("ERR,INVALID_BYTE");
+            }
+        }
+        tight_loop_contents();
+    }
+}
