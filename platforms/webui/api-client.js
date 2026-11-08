@@ -69,6 +69,37 @@
       return { method, headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(body || {}) };
     }
 
+    const resourceCollections = new Set([
+      "patients", "measurements", "training-sessions", "training-results",
+      "game-sessions", "game-results"
+    ]);
+    function resourcePath(collection, id) {
+      if (!resourceCollections.has(collection)) throw new ApiError("Unsupported resource collection", 400);
+      const base = "/api/v1/" + collection;
+      return id === undefined || id === null
+        ? base
+        : base + "/" + encodeURIComponent(String(id));
+    }
+    function listResources(collection) {
+      return request(resourcePath(collection));
+    }
+    function getResource(collection, id) {
+      return request(resourcePath(collection, id));
+    }
+    function createResource(collection, record) {
+      return request(resourcePath(collection), jsonRequest("POST", record));
+    }
+    function updateResource(collection, id, expectedVersion, record) {
+      return request(resourcePath(collection, id), jsonRequest("PUT", {
+        expected_version: expectedVersion, record
+      }));
+    }
+    function deleteResource(collection, id, expectedVersion) {
+      return request(resourcePath(collection, id), jsonRequest("DELETE", {
+        expected_version: expectedVersion
+      }));
+    }
+
     function subscribe(path, onMessage, onState) {
       if (!config.WebSocketImpl) {
         const error = new ApiError("WebSocket is unavailable", 0);
@@ -109,10 +140,26 @@
       getDevices: () => request("/api/v1/devices"),
       connectDevice: (id) => request("/api/v1/devices/" + encodeURIComponent(id) + "/connect", jsonRequest("POST")),
       disconnectDevice: (id) => request("/api/v1/devices/" + encodeURIComponent(id) + "/disconnect", jsonRequest("POST")),
-      getSessions: () => request("/api/v1/measurements/sessions"),
-      createSession: (data) => request("/api/v1/measurements/sessions", jsonRequest("POST", data)),
-      getPatients: () => request("/api/v1/patients"),
-      getPatient: (id) => request("/api/v1/patients/" + encodeURIComponent(id)),
+      listResources,
+      getResource,
+      createResource,
+      updateResource,
+      deleteResource,
+      getSessions: () => listResources("measurements"),
+      createSession: (data) => createResource("measurements", data),
+      getPatients: () => listResources("patients"),
+      getPatient: (id) => getResource("patients", id),
+      createPatient: (record) => createResource("patients", record),
+      updatePatient: (id, version, record) => updateResource("patients", id, version, record),
+      deletePatient: (id, version) => deleteResource("patients", id, version),
+      getTrainingSessions: () => listResources("training-sessions"),
+      createTrainingSession: (record) => createResource("training-sessions", record),
+      getTrainingResults: () => listResources("training-results"),
+      createTrainingResult: (record) => createResource("training-results", record),
+      getGameSessions: () => listResources("game-sessions"),
+      createGameSession: (record) => createResource("game-sessions", record),
+      getGameResults: () => listResources("game-results"),
+      createGameResult: (record) => createResource("game-results", record),
       subscribeMeasurements: (onMessage, onState) => subscribe("/ws/measurements", onMessage, onState),
       subscribeEvents: (onMessage, onState) => subscribe("/ws/events", onMessage, onState)
     });
