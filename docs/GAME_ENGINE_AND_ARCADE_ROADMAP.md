@@ -87,6 +87,9 @@
 - [x] Flappy Bird: po zmianie rozmiaru ograniczono promień ptaka i geometrię luk istniejących przeszkód do nowego widoku, także dla małych i wąskich okien. Commit: `1a6da0998e24e6886971e241a25b2e4d2cca0370`; oczekuje na kompilację i testy.
 - [ ] Statyczny przegląd poprawek Pong i Flappy Bird zakończony; zachowanie kolizji i resize wymaga potwierdzenia testami po wznowieniu walidacji.
 - [x] Arkanoid: prostokąt kolizji piłki jest wyznaczany po ewentualnym odbiciu od paletki, a więc dalsza detekcja klocków korzysta z aktualnej pozycji piłki, nie z nieaktualnego obrysu sprzed korekty. Commit: `2aa83f96acffccf6f48028f951a7e96021edd536`; oczekuje na kompilację i testy.
+- [x] Galaga: generowanie formacji przeciwników uwzględnia szerokość i wysokość widoku; w małych oknach liczba kolumn/wierszy i rozmiar aktorów są ograniczane, aby nowa fala nie nakładała się ani nie wychodziła poza ekran. Commit: `218a66fd1419988583b138a8ac82ae7ca0da51cb`; oczekuje na kompilację i testy.
+- [ ] Galaga: bezpośrednia regresja dwóch trafień w jednym oknie ochronnym nadal wymaga scenariusza testowego bez dodawania sztucznego publicznego interfejsu do zadawania obrażeń.
+- [ ] Scorched Earth: przejście rundy po zniszczeniu czołgu i leczenie gracza wymagają dalszego testu scenariuszowego; nie dodawać produkcyjnych metod wyłącznie na potrzeby testów.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
