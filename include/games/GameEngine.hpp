@@ -211,8 +211,10 @@ protected:
     std::atomic<quint64> m_pendingInvalidInputCount{0};
 
     // Coalesce high-rate worker-thread sensor callbacks into one GUI dispatch.
+    // The generation invalidates callbacks queued before stop/reset.
     std::atomic<double> m_pendingSensorValue{0.0};
     std::atomic_bool m_sensorDispatchQueued{false};
+    std::atomic<quint64> m_sensorDispatchGeneration{0};
 
     // Wartość wejściowa z sensora
     double m_sensorValue;
