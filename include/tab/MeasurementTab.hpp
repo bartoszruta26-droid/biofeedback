@@ -353,6 +353,7 @@ private:
     void ensureSessionClockStarted();
     void setupUI();
     void updateLiveDisplay(double force);
+    void updateRawTableBatch(bool force = false);
     void calculateRepetitionStats();
     void updateStatsTable();
     void updateBiomechanicalTable();
@@ -440,6 +441,8 @@ private:
     QVector<double> m_rawForceBuffer;
     QVector<double> m_timeBuffer;
     QVector<RecordedMeasurementSample> m_recordedSamples;
+    quint64 m_rawTableLastSequence{0};
+    qint64 m_lastRawTableRefreshMs{-100};
     QFile m_sampleJournal;
     QString m_sampleJournalPath;
     quint32 m_sampleJournalPendingWrites{0};
