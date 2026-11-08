@@ -137,11 +137,11 @@ Nie wystawiać surowego serwera HTTP poza loopback.
 wybranie `storage.patient_backend=mariadb` powoduje fail-closed.
 Desktop zapisuje do repozytorium sesje pomiarowe z próbkami, sesje treningowe,
 wyniki ćwiczeń i wyniki gier. TUI loguje się przez API, odczytuje pacjentów
-i zapisuje sesje treningowe, ale nie wiąże ich jeszcze z pacjentem oraz nie
-archiwizuje pomiarów i gier. WebUI ma klienta CRUD, lecz jego ekrany nie są
-jeszcze pełnym panelem pracy na tych zasobach. Android obsługuje CRUD kart
-pacjentów; pozostałe ekrany pozostają podglądowe. WebSocket/SSE i strumień
-próbek czasu rzeczywistego pozostają do wdrożenia. Nie należy
+i zapisuje sesje oraz wyniki treningowe, ale nie wiąże ich jeszcze z pacjentem
+oraz nie archiwizuje pomiarów i gier. WebUI obsługuje CRUD kart pacjentów
+i odczyt archiwów pomiarów, treningów oraz gier. Android obsługuje CRUD kart
+pacjentów i odczyt tych samych archiwów. WebSocket/SSE i strumień próbek
+czasu rzeczywistego pozostają do wdrożenia. Nie należy
 traktować tego API jako gotowego systemu dokumentacji klinicznej.
 
 Uruchomienie:
