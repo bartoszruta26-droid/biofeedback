@@ -763,7 +763,12 @@ Minimalny serwer statusu HTTP (Qt Network) można zbudować i uruchomić:
     cmake --build build --target biofeedback_api
     ./build/biofeedback_api --port 8765
 
-Usługa nasłuchuje wyłącznie na `127.0.0.1` i udostępnia `/healthz` oraz
-`/api/v1/status`. Sterowanie sprzętem, dane pacjentów i strumień pomiarowy
-pozostają wyłączone do czasu wdrożenia uwierzytelniania, autoryzacji oraz
-wspólnych usług domenowych. Nie wystawiaj tego prototypu na sieć publiczną.
+Usługa nasłuchuje wyłącznie na `127.0.0.1`. Oprócz health/status i
+uwierzytelniania udostępnia CRUD kolekcji pacjentów, pomiarów, sesji i wyników
+treningowych oraz sesji i wyników gier. Dostęp do zasobów jest obecnie
+ograniczony do konta administratora. Gdy `encryption.enabled=true`, ustaw
+`BIOFEEDBACK_ENCRYPTION_KEY` przed uruchomieniem serwera; bez klucza zasoby
+pozostaną niedostępne. Desktop uruchamia ten sam serwer automatycznie we
+własnym procesie. TUI łączy się domyślnie z `http://127.0.0.1:8765`; można
+zmienić adres przez `BIOFEEDBACK_API_URL`. Android wymaga HTTPS i bramy TLS.
+Nie wystawiaj surowego prototypu HTTP na sieć publiczną.
