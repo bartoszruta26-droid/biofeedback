@@ -42,7 +42,7 @@ for required in (
     "Never carry samples or a live journal across patient boundaries",
     "if (hasActivePatientData)\n        resetSession();",
     "if (m_patientId == id) return;",
-    'header["firstSequence"] = static_cast<qint64>(m_recordedSamples.size()) + 1',
+    'header["firstSequence"] = static_cast<qint64>(m_journalNextSequence.load(std::memory_order_acquire))',
     'expectedSequence = object["firstSequence"].toVariant().toULongLong()',
     "Prefer a finalized JSON session over its still-present journal",
     "if (file.atEnd()) break;",
@@ -91,9 +91,9 @@ writer_source = Path("src/tab/SampleJournalWriter.cpp").read_text(encoding="utf-
 for required in (
     "std::thread(&SampleJournalWriter::run, this)",
     "m_queue.size() >= m_capacity",
-    "m_queue.push_back(line)",
+    "m_queue.push_back(PendingRecord{line, ticket, durable})",
     "m_changed.wait(lock",
-    "file.write(line)",
+    "file.write(record.line)",
     "flushDurably(file, error)",
     "::fsync(file.handle())",
 ):
