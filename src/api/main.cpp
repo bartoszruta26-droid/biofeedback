@@ -90,30 +90,36 @@ int main(int argc, char* argv[]) {
     // clinical sensor. Configure BIOFEEDBACK_SERIAL_PORT to register one Nano.
     const QByteArray serialPort = qgetenv("BIOFEEDBACK_SERIAL_PORT").trimmed();
     if (!serialPort.isEmpty()) {
-        bool baudOk = false;
-        const int baudRate = qgetenv("BIOFEEDBACK_SERIAL_BAUD").isEmpty()
-            ? sensor::protocol::DefaultBaudRate
-            : qgetenv("BIOFEEDBACK_SERIAL_BAUD").toInt(&baudOk);
-        sensor::SerialConfig serialConfig;
-        serialConfig.portName = serialPort.toStdString();
-        serialConfig.baudRate = qgetenv("BIOFEEDBACK_SERIAL_BAUD").isEmpty()
-            ? sensor::protocol::DefaultBaudRate : (baudOk ? baudRate : -1);
-
-        const QByteArray configuredId = qgetenv("BIOFEEDBACK_DEVICE_ID").trimmed();
-        const std::string deviceId = configuredId.isEmpty()
-            ? std::string("arduino-nano-hx711-1") : configuredId.toStdString();
-        auto serialAdapter = std::make_shared<sensor::AcquisitionSerialDeviceAdapter>(
-            acquisitionService, deviceId, serialConfig, "hx711", "g");
-        if (deviceService->registerDevice(
-                {deviceId, "Arduino Nano HX711", "usb-serial",
-                 biofeedback::application::DeviceState::Disconnected, {}},
-                serialAdapter)) {
-            if (!deviceService->connectDevice(deviceId)) {
-                QTextStream(stderr) << "Configured serial device could not connect: "
-                                    << QString::fromStdString(deviceId) << "\\n";
-            }
+        const QByteArray baudText = qgetenv("BIOFEEDBACK_SERIAL_BAUD").trimmed();
+        bool baudOk = baudText.isEmpty();
+        int baudRate = sensor::protocol::DefaultBaudRate;
+        if (!baudText.isEmpty()) {
+            baudRate = baudText.toInt(&baudOk);
+            baudOk = baudOk && baudRate > 0 && baudRate <= 921600;
+        }
+        if (!baudOk) {
+            QTextStream(stderr) << "Invalid BIOFEEDBACK_SERIAL_BAUD; expected 1..921600. Hardware acquisition disabled.\\n";
         } else {
-            QTextStream(stderr) << "Configured serial device could not be registered.\\n";
+            sensor::SerialConfig serialConfig;
+            serialConfig.portName = serialPort.toStdString();
+            serialConfig.baudRate = baudRate;
+
+            const QByteArray configuredId = qgetenv("BIOFEEDBACK_DEVICE_ID").trimmed();
+            const std::string deviceId = configuredId.isEmpty()
+                ? std::string("arduino-nano-hx711-1") : configuredId.toStdString();
+            auto serialAdapter = std::make_shared<sensor::AcquisitionSerialDeviceAdapter>(
+                acquisitionService, deviceId, serialConfig, "hx711", "g");
+            if (deviceService->registerDevice(
+                    {deviceId, "Arduino Nano HX711", "usb-serial",
+                     biofeedback::application::DeviceState::Disconnected, {}},
+                    serialAdapter)) {
+                if (!deviceService->connectDevice(deviceId)) {
+                    QTextStream(stderr) << "Configured serial device could not connect: "
+                                        << QString::fromStdString(deviceId) << "\\n";
+                }
+            } else {
+                QTextStream(stderr) << "Configured serial device could not be registered.\\n";
+            }
         }
     } else {
         QTextStream(stdout) << "No BIOFEEDBACK_SERIAL_PORT configured; hardware acquisition remains disabled.\\n";
