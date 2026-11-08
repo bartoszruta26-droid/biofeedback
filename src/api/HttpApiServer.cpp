@@ -16,7 +16,7 @@
 namespace biofeedback::api {
 namespace {
 constexpr int MaxHeaderBytes = 16 * 1024;
-constexpr int MaxBodyBytes = 1024 * 1024;
+constexpr int MaxBodyBytes = 16 * 1024 * 1024;
 constexpr int SessionLifetimeSeconds = 1800;
 
 QByteArray reasonPhrase(int status) {
