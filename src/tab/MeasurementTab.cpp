@@ -644,6 +644,102 @@ void MeasurementTab::closeSampleJournal()
         m_sampleJournalFailed = true;
 }
 
+bool MeasurementTab::restoreSampleJournalIntoSession()
+{
+    if (m_sampleJournalPath.isEmpty()) return false;
+
+    QFile file(m_sampleJournalPath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return false;
+
+    QVector<RecordedMeasurementSample> journalSamples;
+    bool headerSeen = false;
+    quint64 expectedSequence = 1;
+    quint64 firstSequence = 1;
+    while (!file.atEnd()) {
+        const QByteArray line = file.readLine();
+        if (line.trimmed().isEmpty()) continue;
+
+        QJsonParseError parseError;
+        const QJsonDocument document = QJsonDocument::fromJson(line, &parseError);
+        if (parseError.error != QJsonParseError::NoError || !document.isObject())
+            return false;
+
+        const QJsonObject object = document.object();
+        const QString recordType = object.value("recordType").toString();
+        if (!headerSeen) {
+            if (recordType != "header" || object.value("schemaVersion").toInt() != 1)
+                return false;
+            if (object.value("patientId").toString() != m_patientId ||
+                (!m_activeSessionId.isEmpty() &&
+                 object.value("sessionId").toString() != m_activeSessionId))
+                return false;
+            firstSequence = object.value("firstSequence").toVariant().toULongLong();
+            if (firstSequence == 0) return false;
+            expectedSequence = firstSequence;
+            headerSeen = true;
+            continue;
+        }
+
+        if (recordType != "sample") return false;
+        const quint64 sequence = object.value("sequence").toVariant().toULongLong();
+        const double elapsed = object.value("elapsedTimeSeconds").toDouble(-1.0);
+        const double value = object.value("value").toDouble(
+            std::numeric_limits<double>::quiet_NaN());
+        if (sequence != expectedSequence || !std::isfinite(elapsed) ||
+            elapsed < 0.0 || !std::isfinite(value))
+            return false;
+
+        RecordedMeasurementSample sample;
+        sample.sequence = sequence;
+        sample.timestampUnixMs = object.value("timestampUnixMs").toVariant().toLongLong();
+        sample.deviceTimestampMs = static_cast<quint32>(
+            object.value("deviceTimestampMs").toVariant().toULongLong());
+        sample.elapsedTimeSeconds = elapsed;
+        sample.value = value;
+        sample.rawValue = object.value("rawValue").toInt();
+        sample.hasRawValue = object.value("hasRawValue").toBool();
+        sample.calibratedMassKg = object.value("calibratedMassKg").toDouble();
+        sample.hasCalibratedMass = object.value("hasCalibratedMass").toBool();
+        sample.unit = object.value("unit").toString();
+        sample.source = object.value("source").toString();
+        sample.quality = object.value("quality").toString();
+        journalSamples.append(sample);
+        ++expectedSequence;
+    }
+    file.close();
+    if (!headerSeen) return false;
+
+    const quint64 prefixCount = firstSequence - 1;
+    if (prefixCount > static_cast<quint64>(m_recordedSamples.size()))
+        return false;
+
+    QVector<RecordedMeasurementSample> completeSamples =
+        m_recordedSamples.mid(0, static_cast<int>(prefixCount));
+    for (const auto& sample : journalSamples)
+        completeSamples.append(sample);
+    m_recordedSamples = std::move(completeSamples);
+
+    m_rawForceBuffer.clear();
+    m_timeBuffer.clear();
+    if (m_forcePlot) m_forcePlot->clearData();
+    for (const auto& sample : journalSamples) {
+        if (sample.quality != "valid" || !std::isfinite(sample.value))
+            continue;
+        m_rawForceBuffer.append(sample.value);
+        m_timeBuffer.append(sample.elapsedTimeSeconds);
+        if (m_forcePlot)
+            m_forcePlot->addSample(sample.value, sample.elapsedTimeSeconds);
+    }
+
+    if (m_rawTable) m_rawTable->setRowCount(0);
+    m_rawTableLastSequence = 0;
+    if (m_rawBox)
+        m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)")
+                               .arg(m_recordedSamples.size()));
+    updateRawTableBatch(true);
+    return true;
+}
+
 bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
 {
     QDir dir(dataDir);
@@ -1217,9 +1313,13 @@ void MeasurementTab::stopMeasurement()
     if (m_measurementEngine)
         m_measurementEngine->setCommitHook({});
     m_isMeasuring = false;
-    updateRawTableBatch(true);
     const bool journalFlushed = flushSampleJournal();
     closeSampleJournal();
+    const bool journalRestored = journalFlushed && !m_sampleJournalFailed &&
+                                 restoreSampleJournalIntoSession();
+    if (!journalRestored && journalFlushed && !m_sampleJournalFailed && m_lblStatus)
+        m_lblStatus->setText(tr("Status: dziennik zapisany, ale odtworzenie sesji wymaga kontroli"));
+    updateRawTableBatch(true);
     
     // An unfinished contraction is discarded; it must not be stored as a
     // completed repetition with an artificial end boundary.
