@@ -7,7 +7,7 @@
  * 
  * FEATURES:
  * - JSON serialization/deserialization with proper escaping
- * - Mandatory AES-256-GCM encryption for patient-linked data
+ * - Optional AES-256-GCM encryption for patient-linked data (required by production configuration)
  * - File existence checking and safe deletion
  * - Directory listing capabilities
  * - Import/export functionality
@@ -42,6 +42,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <cstring>
+#include <limits>
 #include <QByteArray>
 #include <QDir>
 #include <QFile>
@@ -51,7 +52,6 @@
 #include <iomanip>
 #include <ctime>
 #include <thread>
-#include <cerrno>
 
 
 // ============================================================================
