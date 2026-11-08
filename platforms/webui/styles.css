@@ -42,3 +42,18 @@
 .auth-footnote { margin: 4px 0 0; color: var(--muted, #718096); font-size: 11px; line-height: 1.5; }
 .current-user { color: var(--muted, #718096); font-size: 12px; }
 .logout-button { min-height: 34px; padding: 6px 10px; }
+
+
+.resource-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.resource-form label{display:grid;gap:6px;color:var(--muted);font-size:11px;font-weight:650}
+.resource-form input,.resource-form textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font:inherit}
+.resource-form textarea{resize:vertical;grid-column:1/-1}
+.resource-form button{justify-self:start}
+.resource-list{display:grid;gap:10px;margin-top:12px}
+.resource-card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.resource-card h3{margin:0 0 4px;font-size:13px;color:var(--text)}
+.resource-card p{margin:0;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
+.resource-actions{display:flex;gap:8px;flex-shrink:0}
+.resource-actions button{border:1px solid var(--line);border-radius:7px;padding:7px 10px;background:var(--panel);color:var(--text);font-size:11px;cursor:pointer}
+.resource-actions button.danger{color:#b42318}
+@media(max-width:700px){.resource-form{grid-template-columns:1fr}.resource-card{align-items:flex-start;flex-direction:column}.resource-actions{width:100%}}
