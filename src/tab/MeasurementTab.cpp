@@ -2396,6 +2396,12 @@ bool MeasurementTab::exportToJSON(const QString& filename)
 
 bool MeasurementTab::importFromJSON(const QString& filename)
 {
+    if (m_isMeasuring) {
+        QMessageBox::warning(this, tr("Pomiar w toku"),
+                             tr("Zatrzymaj pomiar przed wczytaniem innej sesji."));
+        return false;
+    }
+
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
         QMessageBox::critical(this, "Błąd", "Nie można otworzyć pliku: " + filename);
