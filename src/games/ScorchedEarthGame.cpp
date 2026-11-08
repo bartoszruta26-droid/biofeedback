@@ -187,17 +187,19 @@ void ScorchedEarthGame::update(double deltaTime)
         const double frameStart = 0.0;
         Q_UNUSED(frameStart);
         const QPointF oldPosition = projectile.position;
+        const QPointF oldVelocity = projectile.velocity;
         projectile.velocity.ry() += m_gravity * deltaTime;
         projectile.velocity.rx() += m_wind * 0.08 * deltaTime;
         const QPointF displacement = projectile.velocity * deltaTime;
         const int samples = qBound(1, static_cast<int>(std::ceil(
             std::hypot(displacement.x(), displacement.y()) / maxSegmentLength)), 256);
-        QPointF previous = oldPosition;
         bool impacted = false;
 
         for (int sample = 1; sample <= samples; ++sample) {
-            const QPointF current = oldPosition + displacement *
-                (static_cast<double>(sample) / samples);
+            const double fraction = static_cast<double>(sample) / samples;
+            const QPointF current = oldPosition + oldVelocity * (deltaTime * fraction) +
+                QPointF(0.5 * m_wind * 0.08 * deltaTime * deltaTime * fraction * fraction,
+                        0.5 * m_gravity * deltaTime * deltaTime * fraction * fraction);
             const bool outside = current.x() < 0.0 || current.x() > width() ||
                 current.y() > height() || current.y() < -height();
             const bool hitTerrain = !outside &&
@@ -226,12 +228,10 @@ void ScorchedEarthGame::update(double deltaTime)
                 impacted = true;
                 break;
             }
-            previous = current;
         }
 
         if (!impacted)
             projectile.position = oldPosition + displacement;
-        Q_UNUSED(previous);
     }
 
     m_projectiles.erase(std::remove_if(m_projectiles.begin(), m_projectiles.end(),
