@@ -32,7 +32,8 @@ public:
                                  const QString& deviceId, const QString& protocolId,
                                  QString* error = nullptr);
     bool stopAcquisitionSession(const QString& sessionId, QString* error = nullptr);
-    bool listAcquisitionSamples(QJsonArray& samples, QString* error = nullptr);
+    bool listAcquisitionSamples(QJsonArray& samples, QString* error = nullptr,
+                                 quint64 afterSequence = 0);
 
 private:
     bool request(const QByteArray& method, const QString& path, const QJsonObject* body,
