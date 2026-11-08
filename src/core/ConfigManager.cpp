@@ -607,7 +607,7 @@ std::string ConfigManager::getSerialPort() const {
 }
 
 bool ConfigManager::isEncryptionEnabled() const {
-    return getBool("encryption.enabled", true);
+    return getBool("encryption.enabled", false);
 }
 
 void ConfigManager::setMinimumLogLevel(ConfigManagerLogLevel level) {
