@@ -64,7 +64,7 @@
 - [x] Car Race: test scenariuszowy potwierdza utratę życia po kolizji z pierwszą przeszkodą na deterministycznie wybranym pasie oraz odtworzenie trzech żyć i pustej listy przeszkód przez reset; klasa udostępnia wyłącznie do odczytu liczbę pozostałych żyć i przeszkód na potrzeby diagnostyki/testów.
 - [x] Galaga: testuje początkową liczbę żyć, pierwszą falę (24 przeciwników), zachowanie gry po aktywnej rozgrywce i odtworzenie stanu początkowego przez reset.
 - [x] Archer: test potwierdza trafienie i wzrost prędkości celu (narastanie trudności), a osobny scenariusz pudła sprawdza usunięcie nieaktywnej strzały bez naliczenia punktów.
-- [x] Scorched Earth: test potwierdza stan początkowy zdrowia/rundy, istnienie terenu, rzeczywiste trafienie pociskiem i zmniejszenie zdrowia czołgu przeciwnika, ciągłość sesji oraz odtworzenie zdrowia i rundy przez reset. Bezpośrednie testy przejścia rundy po zniszczeniu czołgu i regeneracji pozostają do dopisania.
+- [ ] Scorched Earth: test stanu początkowego i resetu jest obecny; scenariusz trafienia czołgu wymaga ponownej walidacji CI. Poprzedni przebieg wykazał, że tor 38,5° mijał rozszerzony obszar kolizji, a zmiana rozmiaru w trakcie lotu zmieniała warunki fizyki. Test skorygowano do 40° i przeniesiono zmianę rozmiaru za rozstrzygnięcie strzału. Bezpośrednie testy przejścia rundy po zniszczeniu czołgu i regeneracji pozostają do dopisania.
 - [x] Testy regresyjne zmiany rozmiaru podczas aktywnej rozgrywki Archer i Scorched Earth; Car Race ma już test małego widoku podczas gry.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier.
 
