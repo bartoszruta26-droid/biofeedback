@@ -43,7 +43,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build regression targets
-        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api measurement_engine_regression measurement_training_pipeline_regression training_session_clock_regression session_state_machine_regression repetition_detector_regression force_units_regression serial_pty_regression training_history_restart_regression training_tab_process_restart_regression game_engine_regression game_factory_regression config_manager_regression calibration_profile_regression protocol_parser_regression biomechanical_parameter_availability_regression
+        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api measurement_engine_regression measurement_service_regression measurement_training_pipeline_regression training_session_clock_regression session_state_machine_regression repetition_detector_regression force_units_regression serial_pty_regression training_history_restart_regression training_tab_process_restart_regression game_engine_regression game_factory_regression config_manager_regression calibration_profile_regression protocol_parser_regression biomechanical_parameter_availability_regression
       - name: Smoke-test local HTTP API
         run: |
           ./build/biofeedback_api --port 18765 > /tmp/biofeedback-api.log 2>&1 &
@@ -65,17 +65,17 @@ jobs:
 
           cases = [
               ("duplicate content length",
-               b"GET /healthz HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\ncontent-length: 0\r\n\r\n"),
+               b"GET /healthz HTTP/1.1\\r\\nHost: localhost\\r\\nContent-Length: 0\\r\\ncontent-length: 0\\r\\n\\r\\n"),
               ("transfer encoding",
-               b"POST /api/v1/test HTTP/1.1\r\nHost: localhost\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n"),
+               b"POST /api/v1/test HTTP/1.1\\r\\nHost: localhost\\r\\nTransfer-Encoding: chunked\\r\\n\\r\\n0\\r\\n\\r\\n"),
               ("malformed header",
-               b"GET /healthz HTTP/1.1\r\nHost localhost\r\n\r\n"),
+               b"GET /healthz HTTP/1.1\\r\\nHost localhost\\r\\n\\r\\n"),
           ]
           for label, request in cases:
               with socket.create_connection(("127.0.0.1", 18765), timeout=3) as client:
                   client.sendall(request)
                   response = client.recv(4096)
-              status = response.split(b"\r\n", 1)[0]
+              status = response.split(b"\\r\\n", 1)[0]
               if b" 400 " not in status:
                   raise SystemExit(f"{label}: expected HTTP 400, got {status!r}")
           print("HTTP parser rejection cases passed")
