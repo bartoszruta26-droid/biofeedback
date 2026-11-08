@@ -28,6 +28,7 @@
 #include <avr/wdt.h>  // Hardware Watchdog Timer
 #include <util/crc16.h> // CRC utilities
 #include <math.h>
+#include <limits.h>
 
 // Pin definitions
 #define HX711_DT_PIN  2   // Data pin (canonical Nano pin map)
@@ -139,7 +140,7 @@ long readHX711Raw() {
     unsigned long timeout = millis() + 100;  // 100ms timeout
     while (digitalRead(HX711_DT_PIN) == HIGH) {
         if (millis() > timeout) {
-            return 0;  // Timeout
+            return LONG_MIN;  // Explicit timeout sentinel; zero is a valid signed sample
         }
         feedWatchdog();
     }
@@ -176,10 +177,10 @@ int32_t readHX711Averaged(int samples) {
     long reading = readHX711Raw();
     feedWatchdog();
     
-    if (reading != 0) {
-        return reading;
+    if (reading == LONG_MIN) {
+        return INT32_MIN;  // Preserve timeout separately from a valid zero sample
     }
-    return 0;
+    return static_cast<int32_t>(reading);
 }
 
 // ============================================================
@@ -363,8 +364,8 @@ void threadHX711() {
         if (digitalRead(HX711_DT_PIN) == LOW) {
             // Read single sample at 80Hz
             long raw = readHX711Raw();
-            if (raw != 0) {
-                current_weight = raw;
+            if (raw != LONG_MIN) {
+                current_weight = static_cast<int32_t>(raw);
             }
         }
     }
@@ -427,7 +428,15 @@ void setup() {
     }
     
     // Set initial tare offset
-    tare_offset = readHX711Averaged(HX711_SAMPLES);
+    const int32_t initial_reading = readHX711Averaged(HX711_SAMPLES);
+    if (initial_reading == INT32_MIN) {
+        current_weight = 0;
+        tare_offset = 0;
+        Serial.println(F("ERR,HX711_NOT_READY"));
+    } else {
+        current_weight = initial_reading;
+        tare_offset = initial_reading;
+    }
     
     Serial.println(F("System Ready!"));
     Serial.println(F("Send 'ID' for device info, 'TARE' to zero"));
