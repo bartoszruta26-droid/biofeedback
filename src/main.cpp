@@ -21,6 +21,7 @@
  */
 
 #include "core/Application.hpp"
+#include "api/HttpApiServer.hpp"
 #include <iostream>
 #include <csignal>
 #include <exception>
@@ -267,6 +268,13 @@ int main(int argc, char* argv[]) {
         // Create application with RAII semantics
         biofeedback::Application app(argc, argv);
         g_app = &app;
+
+        // Host the authenticated local API for local clients. The server binds
+        // only to loopback; remote access requires a separate TLS gateway.
+        biofeedback::api::HttpApiServer localApiServer;
+        if (!localApiServer.listen(QHostAddress::LocalHost, 8765)) {
+            std::cerr << "[MAIN] Loopback API unavailable on 127.0.0.1:8765; desktop mode continues." << std::endl;
+        }
         
 #if DEBUG_VERBOSE
         std::cout << "[DEBUG] Application instance created at address: " << &app << std::endl;
