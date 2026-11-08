@@ -116,9 +116,13 @@ void SinGame::onConnectionStatusChanged(bool connected, const std::string& messa
 }
 
 void SinGame::normalizeForceValue(double rawValue) {
-    // Normalizacja siły do zakresu 0.0 - 1.0
-    // Zakładamy, że rawValue jest w zakresie 0-m_maxForce (np. 0-100)
-    double normalizedForce = rawValue / m_maxForce;
+    // Odrzuć uszkodzoną próbkę, zachowując ostatnią poprawną wartość.
+    if (!std::isfinite(rawValue) || !std::isfinite(m_maxForce) || m_maxForce <= 0.0)
+        return;
+
+    const double normalizedForce = rawValue / m_maxForce;
+    if (!std::isfinite(normalizedForce))
+        return;
     m_currentForce = qBound(0.0, normalizedForce, 1.0);
 }
 
@@ -140,7 +144,10 @@ void SinGame::calculateTargetY(double x) {
 }
 
 void SinGame::update(double deltaTime) {
-    if (!isRunning()) return;
+    if (!isRunning() || width() <= 0 || height() <= 0 ||
+        !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+    deltaTime = qMin(deltaTime, 0.1);
 
     // Aktualizacja fazy sinusa (ruch wykresu w lewo)
     // Przelicz prędkość przesuwania w pikselach/s na zmianę fazy.
