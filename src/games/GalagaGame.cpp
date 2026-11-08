@@ -28,6 +28,12 @@ QString GalagaGame::gameName() const
     return QStringLiteral("Galaga Force Trainer");
 }
 
+int GalagaGame::activeEnemyCount() const
+{
+    return static_cast<int>(std::count_if(m_enemies.cbegin(), m_enemies.cend(),
+        [](const Enemy& enemy) { return enemy.active; }));
+}
+
 void GalagaGame::initialize()
 {
     m_force = 0.5;
