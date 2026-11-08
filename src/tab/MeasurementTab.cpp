@@ -1321,8 +1321,6 @@ void MeasurementTab::stopMeasurement()
     closeSampleJournal();
     const bool journalRestored = journalFlushed && !m_sampleJournalFailed &&
                                  restoreSampleJournalIntoSession();
-    if (!journalRestored && journalFlushed && !m_sampleJournalFailed && m_lblStatus)
-        m_lblStatus->setText(tr("Status: dziennik zapisany, ale odtworzenie sesji wymaga kontroli"));
     updateRawTableBatch(true);
     
     // An unfinished contraction is discarded; it must not be stored as a
@@ -1354,6 +1352,8 @@ void MeasurementTab::stopMeasurement()
         m_lblStatus->setText(journalError.isEmpty()
             ? tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku")
             : tr("Status: BŁĄD ZAPISU DZIENNIKA — %1").arg(journalError));
+    } else if (!journalRestored && !m_sampleJournalFailed) {
+        m_lblStatus->setText(tr("Status: dziennik zapisany, ale odtworzenie sesji wymaga kontroli"));
     } else {
         quint64 totalDropped = 0;
         {
