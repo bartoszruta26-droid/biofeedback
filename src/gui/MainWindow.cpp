@@ -428,10 +428,17 @@ void MainWindow::showSettingsDialog()
 
 void MainWindow::createGameArea()
 {
-    m_gameStack = new QStackedWidget(this);
+    // The game host must be managed by the central layout so that it receives
+    // valid geometry when a training game is shown.
+    m_gameStack = new QStackedWidget(m_centralWidget);
+    m_gameStack->setMinimumHeight(320);
+    m_gameStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    if (auto* layout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout())) {
+        layout->addWidget(m_gameStack, 1);
+    }
     
     // Placeholder when no game is active
-    QWidget* placeholder = new QWidget();
+    QWidget* placeholder = new QWidget(m_gameStack);
     QVBoxLayout* placeholderLayout = new QVBoxLayout(placeholder);
     QLabel* placeholderLabel = new QLabel(tr("Gra zostanie uruchomiona po rozpoczęciu sesji treningowej"));
     placeholderLabel->setAlignment(Qt::AlignCenter);
