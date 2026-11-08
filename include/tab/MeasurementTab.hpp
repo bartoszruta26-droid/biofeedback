@@ -23,6 +23,7 @@
 #include <memory>
 #include <deque>
 #include <mutex>
+#include <utility>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFile>
@@ -85,8 +86,12 @@ protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
-    QVector<double> m_forces;
-    QVector<double> m_times;
+    // O(1) amortized append/expiry for the live trace. Monotonic candidate
+    // queues keep the visible-window extrema without rescanning every sample.
+    std::deque<double> m_forces;
+    std::deque<double> m_times;
+    std::deque<std::pair<double, double>> m_maxCandidates;
+    std::deque<std::pair<double, double>> m_minCandidates;
     double m_targetForce;
     double m_maxTimeWindow;
     double m_maxForce;
