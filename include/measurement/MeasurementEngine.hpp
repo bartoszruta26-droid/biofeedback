@@ -58,9 +58,15 @@ class MeasurementEngine final {
 public:
     using SampleCallback = std::function<void(const MeasurementSample&)>;
     using CallbackToken = std::uint64_t;
+    // A commit hook must durably accept a sample before it enters history or
+    // reaches subscribers. It runs under the engine mutex and must not re-enter
+    // this engine. Returning false (or throwing) rejects the sample.
+    using CommitHook = std::function<bool(const MeasurementSample&)>;
 
     explicit MeasurementEngine(MeasurementEngineConfig config = {});
     MeasurementSample ingest(const MeasurementInput& input);
+    bool ingest(const MeasurementInput& input, MeasurementSample& output);
+    void setCommitHook(CommitHook hook);
     CallbackToken subscribe(SampleCallback callback);
     void unsubscribe(CallbackToken token);
     std::vector<MeasurementSample> history() const;
@@ -83,6 +89,7 @@ private:
         std::size_t inFlight{0};
     };
     std::map<CallbackToken, std::shared_ptr<CallbackEntry>> m_callbacks;
+    CommitHook m_commitHook;
     std::uint64_t m_nextSequence{1};
     CallbackToken m_nextToken{1};
 };
