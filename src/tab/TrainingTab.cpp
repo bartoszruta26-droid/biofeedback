@@ -1,4 +1,6 @@
 #include "tab/TrainingTab.hpp"
+#include <algorithm>
+#include <vector>
 #include "tab/TrainingAnalyticsWidget.hpp"
 #include "measurement/Units.hpp"
 #include <QFileDialog>
