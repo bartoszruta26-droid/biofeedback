@@ -37,10 +37,10 @@ int main() {
     assert(services.devices().device("sensor-02", current));
     assert(current.state == DeviceState::Error && current.lastError == "synthetic failure");
     auto& measurements = services.measurements();
-    measurement::MeasurementInput input;
+    biofeedback::measurement::MeasurementInput input;
     input.hasTimestamp = true; input.deviceTimestampMs = 0; input.rawValue = 42;
     input.value = 4.2; input.sensorValid = true; input.unit = "N"; input.source = "sensor-01";
-    measurement::MeasurementSample sample;
+    biofeedback::measurement::MeasurementSample sample;
     assert(!measurements.ingest(input, sample));
     measurements.start();
     assert(measurements.ingest(input, sample) && sample.isValid() && sample.sequence == 1);
