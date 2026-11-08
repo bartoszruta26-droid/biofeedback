@@ -90,6 +90,11 @@ HttpApiServer::HttpApiServer(
     });
 }
 
+void HttpApiServer::setAcquisitionService(
+    std::shared_ptr<biofeedback::application::AcquisitionService> acquisition) {
+    m_acquisition = std::move(acquisition);
+}
+
 bool HttpApiServer::listen(const QHostAddress& address, quint16 port) {
     return m_server.listen(address, port);
 }
@@ -269,9 +274,11 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             capabilities.append(QStringLiteral("health"));
             capabilities.append(QStringLiteral("status"));
             capabilities.append(QStringLiteral("authentication"));
+            if (m_acquisition) capabilities.append(QStringLiteral("acquisition_session_control"));
             QJsonArray limitations;
             limitations.append(QStringLiteral("device_control"));
             limitations.append(QStringLiteral("measurement_stream"));
+            if (!m_acquisition) limitations.append(QStringLiteral("acquisition_service_unavailable"));
             limitations.append(QStringLiteral("role_scoped_authorization"));
             limitations.append(QStringLiteral("websocket_events"));
             limitations.append(QStringLiteral("mariadb_adapter"));
@@ -436,6 +443,109 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             sessionIt->authentication->logout();
             m_sessions.erase(sessionIt);
             sendJson(socket, 200, R"({"ok":true})");
+            return;
+        }
+
+        // Central acquisition session control. Only administrators may start/stop
+        // acquisition until patient-scoped authorization is implemented.
+        if (path == "/api/v1/acquisition/session" ||
+            path == "/api/v1/acquisition/samples") {
+            if (!sessionValid) {
+                if (sessionIt != m_sessions.end()) m_sessions.erase(sessionIt);
+                sendJson(socket, 401, errorBody("AUTHENTICATION_REQUIRED", "Wymagane jest zalogowanie."));
+                return;
+            }
+            if (sessionIt->authentication->getCurrentUserRole() != "administrator") {
+                sendJson(socket, 403, errorBody("ACQUISITION_FORBIDDEN", "Brak uprawnień do sterowania akwizycją."));
+                return;
+            }
+            if (!m_acquisition) {
+                sendJson(socket, 503, errorBody("ACQUISITION_UNAVAILABLE", "Usługa akwizycji nie jest skonfigurowana."));
+                return;
+            }
+            if (path == "/api/v1/acquisition/samples") {
+                if (method != "GET") {
+                    sendJson(socket, 405, errorBody("METHOD_NOT_ALLOWED", "Dozwolony jest wyłącznie GET."));
+                    return;
+                }
+                QJsonArray samples;
+                const auto history = m_acquisition->measurementService()->history();
+                for (const auto& sample : history) {
+                    samples.append(QJsonObject{
+                        {"sequence", static_cast<qint64>(sample.sequence)},
+                        {"timestamp_unix_ms", sample.timestampUnixMs},
+                        {"device_timestamp_ms", static_cast<qint64>(sample.deviceTimestampMs)},
+                        {"raw_value", sample.rawValue},
+                        {"value", sample.value},
+                        {"unit", QString::fromStdString(sample.unit)},
+                        {"source", QString::fromStdString(sample.source)},
+                        {"quality", QString::fromLatin1(biofeedback::measurement::qualityName(sample.quality))}
+                    });
+                }
+                sendJson(socket, 200, QJsonDocument(QJsonObject{
+                    {"items", samples}, {"count", samples.size()},
+                    {"retention", QStringLiteral("bounded_in_memory")}
+                }).toJson(QJsonDocument::Compact));
+                return;
+            }
+            if (method == "GET") {
+                biofeedback::application::AcquisitionSession active;
+                if (!m_acquisition->activeSession(active)) {
+                    sendJson(socket, 200, R"({"active":false})");
+                    return;
+                }
+                sendJson(socket, 200, QJsonDocument(QJsonObject{
+                    {"active", true},
+                    {"id", QString::fromStdString(active.id)},
+                    {"patient_id", QString::fromStdString(active.patientId)},
+                    {"device_id", QString::fromStdString(active.deviceId)},
+                    {"protocol_id", QString::fromStdString(active.protocolId)}
+                }).toJson(QJsonDocument::Compact));
+                return;
+            }
+            if (method == "POST") {
+                QJsonParseError parseError;
+                const QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
+                if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+                    sendJson(socket, 400, errorBody("INVALID_JSON", "Treść musi być obiektem JSON."));
+                    return;
+                }
+                const QJsonObject request = document.object();
+                biofeedback::application::AcquisitionSession requested;
+                requested.id = request.value(QStringLiteral("id")).toString().toStdString();
+                requested.patientId = request.value(QStringLiteral("patient_id")).toString().toStdString();
+                requested.deviceId = request.value(QStringLiteral("device_id")).toString().toStdString();
+                requested.protocolId = request.value(QStringLiteral("protocol_id")).toString().toStdString();
+                std::string acquisitionError;
+                if (!m_acquisition->startSession(std::move(requested), acquisitionError)) {
+                    const bool conflict = acquisitionError == "ACQUISITION_ALREADY_ACTIVE";
+                    sendJson(socket, conflict ? 409 : 400,
+                        errorBody(conflict ? "ACQUISITION_ALREADY_ACTIVE" : "INVALID_SESSION",
+                                  conflict ? "Inna sesja akwizycji jest już aktywna." :
+                                             "Wymagane są id, patient_id i device_id."));
+                    return;
+                }
+                sendJson(socket, 201, R"({"active":true})");
+                return;
+            }
+            if (method == "DELETE") {
+                QJsonParseError parseError;
+                const QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
+                if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+                    sendJson(socket, 400, errorBody("INVALID_JSON", "Treść musi być obiektem JSON."));
+                    return;
+                }
+                const std::string id = document.object().value(QStringLiteral("id")).toString().toStdString();
+                std::string acquisitionError;
+                if (!m_acquisition->stopSession(id, acquisitionError)) {
+                    sendJson(socket, 409, errorBody("ACTIVE_SESSION_NOT_FOUND",
+                        "Aktywna sesja nie istnieje lub identyfikator jest niezgodny."));
+                    return;
+                }
+                sendJson(socket, 200, R"({"active":false})");
+                return;
+            }
+            sendJson(socket, 405, errorBody("METHOD_NOT_ALLOWED", "Nieobsługiwana metoda sterowania sesją."));
             return;
         }
 
