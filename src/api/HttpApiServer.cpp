@@ -260,6 +260,7 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             limitations.append(QStringLiteral("device_control"));
             limitations.append(QStringLiteral("patient_repository"));
             limitations.append(QStringLiteral("measurement_stream"));
+            limitations.append(QStringLiteral("resource_authorization"));
             const QJsonObject status{
                 {"status", QStringLiteral("ready")},
                 {"version", QStringLiteral("0.2.0")},
