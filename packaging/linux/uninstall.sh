@@ -52,8 +52,12 @@ case "$DESKTOP_FILE" in
 esac
 
 if [[ "${BIOFEEDBACK_REMOVE_DATA:-0}" == "1" ]]; then
-  if [[ ! -d "$DATA_DIR" || -L "$DATA_DIR" ]]; then
-    printf 'Dane nie zostały usunięte: katalog danych nie istnieje lub jest dowiązaniem.\n' >&2
+  if [[ -L "$DATA_DIR" ]]; then
+    printf 'Dane nie zostały usunięte: katalog danych jest dowiązaniem symbolicznym.\n' >&2
+    exit 1
+  fi
+  if [[ ! -d "$DATA_DIR" ]]; then
+    printf 'Dane nie zostały usunięte: katalog danych nie istnieje.\n' >&2
     exit 1
   fi
   canonical_data="$(cd -- "$DATA_DIR" && pwd -P)"
