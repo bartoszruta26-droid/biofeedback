@@ -7,7 +7,10 @@ Przeglądarka nie implementuje parsera czujnika, kalibracji ani logiki sesji.
 
 | Metoda | Ścieżka | Cel |
 |---|---|---|
-| GET | /api/v1/status | Status usługi, wersja, tryb i gotowość |
+| GET | /api/v1/status | Publiczny status usługi, wersja i gotowość |
+| POST | /api/v1/auth/login | Logowanie; zwraca losowy token Bearer |
+| GET | /api/v1/auth/me | Tożsamość i rola aktywnej sesji |
+| POST | /api/v1/auth/logout | Unieważnienie tokenu bieżącej sesji |
 | GET | /api/v1/devices | Lista urządzeń i stan adapterów |
 | POST | /api/v1/devices/{id}/connect | Żądanie połączenia |
 | POST | /api/v1/devices/{id}/disconnect | Żądanie rozłączenia |
@@ -78,6 +81,11 @@ np. `{"code":"DEVICE_BUSY","message":"Urządzenie jest zajęte"}`.
 
 ## Bezpieczeństwo i integralność
 
+- Logowanie API korzysta z tego samego magazynu kont i weryfikacji haseł co aplikacja Qt.
+- Token Bearer ma 256 bitów losowości, jest przechowywany wyłącznie w pamięci serwera i wygasa po 30 minutach.
+- WebUI przechowuje token wyłącznie w pamięci klienta; nie zapisuje go w localStorage ani w adresie URL.
+- Endpoint /api/v1/status i /healthz są publiczne i nie zwracają danych pacjentów.
+- Endpointy danych, sesji i sterowania urządzeniami pozostają wyłączone do czasu wdrożenia kontroli ról i integracji usług.
 - API musi egzekwować uwierzytelnianie i autoryzację po stronie serwera.
 - Dane pacjentów są dostępne wyłącznie zgodnie z rolą i zakresem uprawnień.
 - Nie wolno umieszczać danych osobowych ani sekretów w adresach URL i logach.
@@ -90,14 +98,20 @@ np. `{"code":"DEVICE_BUSY","message":"Urządzenie jest zajęte"}`.
 ## Stan implementacji
 
 Klient JavaScript jest zaimplementowany w `api-client.js` i pokryty testami
-Node.js. W repozytorium znajduje się także `biofeedback_api`, lokalny serwer
-Qt Network udostępniający `GET /healthz` oraz `GET /api/v1/status`.
-Domyślnie nasłuchuje wyłącznie na `127.0.0.1:8765`.
+Node.js. Serwer `biofeedback_api` udostępnia `GET /healthz`,
+`GET /api/v1/status`, `POST /api/v1/auth/login`,
+`GET /api/v1/auth/me` oraz `POST /api/v1/auth/logout`.
+Sesje są przechowywane w pamięci procesu i wygasają po 30 minutach.
+Domyślnie serwer nasłuchuje wyłącznie na `127.0.0.1:8765`.
 
-Pozostałe endpointy (urządzenia, pacjenci, sesje) i kanały WebSocket są
-zarezerwowane w kontrakcie, ale nie są jeszcze wdrożone. Serwer zwraca
-jawny błąd dla nieobsługiwanych operacji. Nie należy wystawiać go poza
-interfejs lokalny ani traktować jako gotowego interfejsu klinicznego.
+Endpointy urządzeń, pacjentów i sesji oraz kanały WebSocket są nadal
+zarezerwowane, lecz niewdrożone. Samo zwrócenie roli przez endpoint
+tożsamości nie oznacza jeszcze kompletnej autoryzacji zasobów. Desktop GUI
+używa lokalnego okna logowania; integracja jego sesji z API, a także
+integracja TUI i Androida z tokenem API, pozostają kolejnymi etapami.
+Nie wystawiać serwera poza loopback bez HTTPS, kontroli pochodzenia,
+ochrony CSRF/CORS i pełnej autoryzacji ról. Nie traktować go jako gotowego
+interfejsu klinicznego.
 
 Uruchomienie:
 
