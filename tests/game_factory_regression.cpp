@@ -191,6 +191,20 @@ int main(int argc, char **argv)
     REQUIRE(archerGame->isRunning());
     archerGame->stop();
 
+    // A deliberately low aim must miss cleanly and retire the arrow.
+    std::unique_ptr<games::GameEngine> archerMiss(games::createGame(QStringLiteral("archer")));
+    auto* archerMissGame = dynamic_cast<games::ArcherGame*>(archerMiss.get());
+    REQUIRE(archerMissGame != nullptr);
+    archerMissGame->resize(640, 480);
+    archerMissGame->start();
+    archerMissGame->handleSensorInput(0.0);
+    QKeyEvent archerMissFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(archerMissGame, &archerMissFire);
+    waitForEvents(1200);
+    REQUIRE(archerMissGame->getScore() == 0);
+    REQUIRE(archerMissGame->activeArrowCount() == 0);
+    archerMissGame->stop();
+
     std::unique_ptr<games::GameEngine> carRace(games::createGame(QStringLiteral("car_race")));
     auto* carRaceGame = dynamic_cast<games::CarRaceGame*>(carRace.get());
     REQUIRE(carRaceGame != nullptr);
@@ -208,6 +222,9 @@ int main(int argc, char **argv)
     waitForEvents(120);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->stop();
+    carRaceGame->reset();
+    REQUIRE(carRaceGame->livesRemaining() == 3);
+    REQUIRE(carRaceGame->obstacleCount() == 0);
 
     std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
     auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
