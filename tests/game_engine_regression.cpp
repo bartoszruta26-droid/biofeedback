@@ -76,6 +76,7 @@ int main(int argc, char **argv)
 
     const int inputsBeforeBurst = game.inputCount();
     std::thread worker([&game]() {
+        game.handleSensorInput(std::numeric_limits<double>::quiet_NaN());
         for (int sample = 0; sample < 1000; ++sample)
             game.handleSensorInput(static_cast<double>(sample));
     });
@@ -85,6 +86,7 @@ int main(int argc, char **argv)
     // A burst produced before the GUI loop drains must be coalesced rather
     // than creating one queued Qt event per sensor sample.
     REQUIRE(game.inputCount() == inputsBeforeBurst + 1);
+    REQUIRE(game.getGameStats().contains(QStringLiteral("invalid_inputs=1")));
 
     // A stopped/restarted engine must not apply an already queued old sample.
     std::thread staleWorker([&game]() { game.handleSensorInput(12345.0); });
