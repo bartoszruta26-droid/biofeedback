@@ -5,6 +5,7 @@
 #include <QTimer>
 #include <QElapsedTimer>
 #include <QString>
+#include <atomic>
 #include "core/DebugManager.hpp"
 
 namespace games {
@@ -207,6 +208,10 @@ protected:
     
     quint64 m_frameCount;
     quint64 m_invalidInputCount;
+
+    // Coalesce high-rate worker-thread sensor callbacks into one GUI dispatch.
+    std::atomic<double> m_pendingSensorValue{0.0};
+    std::atomic_bool m_sensorDispatchQueued{false};
 
     // Wartość wejściowa z sensora
     double m_sensorValue;
