@@ -23,6 +23,10 @@ Przeglądarka nie implementuje parsera czujnika, kalibracji ani logiki sesji.
 Dozwolone kolekcje: `patients`, `measurements`, `training-sessions`,
 `training-results`, `game-sessions`, `game-results`.
 
+Rekord pacjenta wymaga niepustych pól `firstName`, `lastName` i `pesel`
+(identyfikatorze pacjenta; do 32 znaków). Serwer odrzuca duplikat tego
+identyfikatora. Ścieżka rekordu nadal używa losowego UUID, nigdy PESEL.
+
 Aktualizacja wymaga treści `{"expected_version": 1, "record": {...}}`.
 Usunięcie wymaga `{"expected_version": 1}`. Serwer zwraca `409 VERSION_CONFLICT`,
 gdy klient próbuje zmienić wersję, która nie jest już aktualna.
