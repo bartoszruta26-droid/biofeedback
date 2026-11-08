@@ -80,3 +80,32 @@ test("measurement WebSocket uses secure transport on HTTPS origins", () => {
   assert.equal(socketUrl, "wss://biofeedback.example/ws/measurements");
   subscription.close();
 });
+
+test("login stores bearer token in memory and protected calls attach it", async () => {
+  const calls = [];
+  const api = createApiClient({
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      if (url === "/api/v1/auth/login") return response(200, { access_token: "a".repeat(64), token_type: "Bearer" });
+      if (url === "/api/v1/auth/me") return response(200, { username: "operator", role: "clinician" });
+      if (url === "/api/v1/auth/logout") return response(200, { ok: true });
+      return response(404, { message: "not found" });
+    }
+  });
+
+  await api.login("operator", "example-password");
+  assert.equal(calls[0].init.headers.Authorization, undefined);
+  assert.equal(calls[0].init.method, "POST");
+  assert.deepEqual(await api.getCurrentUser(), { username: "operator", role: "clinician" });
+  assert.equal(calls[1].init.headers.Authorization, "Bearer " + "a".repeat(64));
+  await api.logout();
+  assert.equal(calls[2].init.headers.Authorization, "Bearer " + "a".repeat(64));
+  await assert.rejects(api.getCurrentUser(), (error) => error instanceof ApiError && error.status === 404);
+  assert.equal(calls[3].init.headers.Authorization, undefined);
+});
+
+test("login rejects a successful response without an access token", async () => {
+  const api = createApiClient({ fetchImpl: async () => response(200, { ok: true }) });
+  await assert.rejects(api.login("operator", "example-password"), (error) =>
+    error instanceof ApiError && error.message === "API login response did not contain an access token");
+});
