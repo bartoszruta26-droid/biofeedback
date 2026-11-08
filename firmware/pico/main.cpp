@@ -9,8 +9,8 @@
 
 namespace {
 uart_inst_t* const kControlUart = uart0;
-constexpr uint kUartTxPin = 0;
-constexpr uint kUartRxPin = 1;
+constexpr uint kUartTxPin = sensor::protocol::PicoUartTxPin;
+constexpr uint kUartRxPin = sensor::protocol::PicoUartRxPin;
 constexpr uint32_t kBaudRate = sensor::protocol::DefaultControlBaudRate;
 constexpr uint32_t kWatchdogTimeoutMs = 2000;
 constexpr std::size_t kCommandCapacity = sensor::protocol::MaxControlCommandBytes + 1;
