@@ -495,6 +495,11 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                         repositoryError == "RESOURCE_TOO_LARGE" ||
                         repositoryError == "INVALID_PATIENT_RECORD" ||
                         repositoryError == "DUPLICATE_PATIENT_REFERENCE" ||
+                        repositoryError == "INVALID_PATIENT_REFERENCE" ||
+                        repositoryError == "PATIENT_NOT_FOUND" ||
+                        repositoryError == "INVALID_TRAINING_SESSION_REFERENCE" ||
+                        repositoryError == "TRAINING_SESSION_NOT_FOUND" ||
+                        repositoryError == "PATIENT_TRAINING_SESSION_MISMATCH" ||
                         repositoryError == "UNSUPPORTED_COLLECTION";
                     sendJson(socket, invalid ? 400 : 503,
                         errorBody(invalid ? "INVALID_RESOURCE" : "RESOURCE_CREATE_FAILED",
