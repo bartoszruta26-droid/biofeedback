@@ -68,10 +68,12 @@
 - [x] Archer: test potwierdza trafienie i wzrost prędkości celu (narastanie trudności), a osobny scenariusz pudła sprawdza usunięcie nieaktywnej strzały bez naliczenia punktów.
 - [x] Scorched Earth: test stanu początkowego, resetu i rzeczywistego trafienia czołgu; CI dla `98595bd8a3dd55ad0a4f2a267bac49f403cf044a` zakończyło się powodzeniem. Poprzedni przebieg wykazał, że tor 38,5° mijał rozszerzony obszar kolizji, a zmiana rozmiaru w trakcie lotu zmieniała warunki fizyki. Test skorygowano do 40° i przeniesiono zmianę rozmiaru za rozstrzygnięcie strzału. Bezpośrednie testy przejścia rundy po zniszczeniu czołgu i regeneracji pozostają do dopisania.
 - [x] Testy regresyjne zmiany rozmiaru podczas aktywnej rozgrywki Archer i Scorched Earth; Car Race ma już test małego widoku podczas gry.
-- [ ] Galaga: deterministyczny test utraty życia od pocisku wroga, ochrony po trafieniu i blokady wielokrotnej utraty życia w oknie ochronnym.
+- [x] Galaga: dodano scenariusz deterministycznego trafienia pociskiem wroga z pozycji prawego skraju sensora; test oczekuje utraty dokładnie jednego życia i dalszego działania gry. Zmiana oczekuje na CI.
+- [ ] Galaga: osobny test ochrony po trafieniu i blokady wielokrotnej utraty życia w oknie ochronnym.
 - [ ] Scorched Earth: bezpośrednie testy przejścia rundy po zniszczeniu czołgu, przywrócenia zdrowia przeciwnika i leczenia gracza.
 - [ ] Dalszy audyt mechaniki istniejących gier (Arkanoid, Pong, Flappy Bird i Mario), w tym kolizji i zachowania przy zmianie rozmiaru.
 - [x] CI dla commitu `98595bd8a3dd55ad0a4f2a267bac49f403cf044a`: 6/6 workflow zakończonych powodzeniem (Linux desktop GUI build, security regression i cztery polityki serial).
+- [ ] Nowy scenariusz Galaga dodany w `1749b9d329052622a986a6028aa6f2722b23b58c`; bez uruchamiania kompilacji/testów na polecenie użytkownika.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
