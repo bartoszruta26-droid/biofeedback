@@ -18,6 +18,9 @@ class GalagaGame final : public GameEngine
 public:
     explicit GalagaGame(QWidget *parent = nullptr);
     QString gameName() const override;
+    int livesRemaining() const { return m_lives; }
+    int currentWave() const { return m_wave; }
+    int activeEnemyCount() const;
 
 protected:
     void initialize() override;
