@@ -121,6 +121,15 @@ add_executable(data_manager_regression tests/data_manager_regression.cpp)
 target_link_libraries(data_manager_regression PRIVATE biofeedback_core)
 add_test(NAME data_manager_regression COMMAND data_manager_regression)
 
+# ConfigManager load/validate/save regression (Qt Core only).
+add_executable(config_manager_regression
+    tests/config_manager_regression.cpp
+    src/core/ConfigManager.cpp
+)
+target_include_directories(config_manager_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(config_manager_regression PRIVATE Qt5::Core nlohmann_json::nlohmann_json)
+add_test(NAME config_manager_regression COMMAND config_manager_regression)
+
 # Shared terminal-interface model is independent of ncurses and is always testable.
 add_library(biofeedback_tui_model STATIC src/tui/TuiModel.cpp)
 target_include_directories(biofeedback_tui_model PUBLIC ${CMAKE_SOURCE_DIR}/include)
