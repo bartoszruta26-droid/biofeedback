@@ -15,7 +15,7 @@ constexpr uint32_t kBaudRate = sensor::protocol::DefaultControlBaudRate;
 constexpr uint32_t kWatchdogTimeoutMs = 2000;
 constexpr std::size_t kCommandCapacity = sensor::protocol::MaxControlCommandBytes + 1;
 
-// Fail-closed firmware boundary. No effector GPIO or PWM peripheral is enabled.
+// Measurement-device control channel; therapeutic output control is outside this firmware.
 void writeReply(const char* message) {
     uart_puts(kControlUart, message);
     uart_puts(kControlUart, "\r\n");
@@ -25,15 +25,9 @@ void processCommand(const char* command) {
     if (std::strcmp(command, sensor::protocol::ControlPing) == 0) {
         writeReply("OK,PONG,FW=0.2.0,PROTO=1");
     } else if (std::strcmp(command, sensor::protocol::ControlStatus) == 0) {
-        writeReply("OK,STATUS,SAFE=1,ACTUATORS=LOCKED,PROTO=1");
+        writeReply("OK,STATUS,READY=1,PROTO=1");
     } else if (std::strcmp(command, sensor::protocol::ControlSafe) == 0) {
-        writeReply("OK,SAFE,ACTUATORS=LOCKED");
-    } else if (std::strncmp(command, "ACTUATOR,", 9) == 0 ||
-               std::strncmp(command, "EFFECTOR,", 9) == 0 ||
-               std::strncmp(command, "IR,", 3) == 0 ||
-               std::strncmp(command, "ELECTRODE,", 10) == 0 ||
-               std::strncmp(command, "ANTENNA,", 8) == 0) {
-        writeReply(sensor::protocol::ActuatorLockedReply);
+        writeReply("OK,SAFE");
     } else {
         writeReply("ERR,UNKNOWN_COMMAND");
     }
