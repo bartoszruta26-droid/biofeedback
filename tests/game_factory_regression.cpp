@@ -147,6 +147,9 @@ int main(int argc, char **argv)
     REQUIRE(galagaGame != nullptr);
     galagaGame->resize(640, 480);
     galagaGame->start();
+    REQUIRE(galagaGame->livesRemaining() == 3);
+    REQUIRE(galagaGame->currentWave() == 1);
+    REQUIRE(galagaGame->activeEnemyCount() == 24);
     galagaGame->handleSensorInput(50.0);
     QKeyEvent galagaFireDown(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QKeyEvent galagaFireUp(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
@@ -161,7 +164,12 @@ int main(int argc, char **argv)
     galagaGame->resize(640, 480);
     waitForEvents(80);
     REQUIRE(galagaGame->isRunning());
+    REQUIRE(galagaGame->livesRemaining() > 0);
     galagaGame->stop();
+    galagaGame->reset();
+    REQUIRE(galagaGame->livesRemaining() == 3);
+    REQUIRE(galagaGame->currentWave() == 1);
+    REQUIRE(galagaGame->activeEnemyCount() == 24);
 
     std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
     auto* archerGame = dynamic_cast<games::ArcherGame*>(archer.get());
@@ -174,6 +182,7 @@ int main(int argc, char **argv)
     waitForEvents(900);
     REQUIRE(archerGame->isRunning());
     REQUIRE(archerGame->getScore() >= 10); // The aimed arrow must hit the target.
+    REQUIRE(archerGame->targetSpeed() > 55.0); // Successful hits increase target difficulty.
     archerGame->resize(180, 120);
     waitForEvents(80);
     REQUIRE(archerGame->isRunning());
@@ -205,6 +214,10 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame != nullptr);
     scorchedGame->resize(640, 480);
     scorchedGame->start();
+    REQUIRE(scorchedGame->playerHealth() == 100);
+    REQUIRE(scorchedGame->enemyHealth() == 100);
+    REQUIRE(scorchedGame->currentRound() == 1);
+    REQUIRE(scorchedGame->terrainPointCount() > 1);
     scorchedGame->handleSensorInput(65.0);
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire);
@@ -215,7 +228,13 @@ int main(int argc, char **argv)
     scorchedGame->resize(640, 480);
     waitForEvents(1340);
     REQUIRE(scorchedGame->isRunning());
+    REQUIRE(scorchedGame->playerHealth() > 0);
+    REQUIRE(scorchedGame->currentRound() == 1);
     scorchedGame->stop();
+    scorchedGame->reset();
+    REQUIRE(scorchedGame->playerHealth() == 100);
+    REQUIRE(scorchedGame->enemyHealth() == 100);
+    REQUIRE(scorchedGame->currentRound() == 1);
 
     std::unique_ptr<games::GameEngine> legacyScoredEarth(
         games::createGame(QStringLiteral("scored_earth")));
