@@ -16,6 +16,7 @@
  */
 
 #include "sensor/SerialCommunication.hpp"
+#include "sensor/ProtocolParser.hpp"
 #include "core/DebugManager.hpp"
 #include <chrono>
 #include <cmath>
@@ -799,6 +800,7 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
     const auto deadline = std::chrono::steady_clock::now() +
                           std::chrono::milliseconds(std::max(timeout, 0));
     bool gotBinaryData = false;
+    ProtocolParser binaryParser;
 
     while (rawData.size() < MaxResponseBytes &&
            std::chrono::steady_clock::now() < deadline) {
@@ -808,53 +810,25 @@ if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())
                                     static_cast<int>(std::max<int64_t>(1, remaining.count())));
         if (rd < 0) break;
         if (rd > 0) {
-            for (int i = 0; i < rd; ++i) {
-                if (rawData.size() >= MaxResponseBytes) break;
-                rawData.push_back(buf[i]);
-                
-                // Check for binary packet structure (9 bytes: 4 timestamp + 4 value + 1 CRC)
-                // followed by end markers 0xAA 0x55
-                if (!gotBinaryData && rawData.size() >= 11) {
-                    // Look for end marker pattern
-                    if (rawData[rawData.size()-2] == 0xAA && rawData[rawData.size()-1] == 0x55) {
-                        // Extract binary packet (9 bytes before end markers)
-                        if (rawData.size() >= 11) {
-                            size_t packetStart = rawData.size() - 11;
-                            
-                            // Safety check - ensure we have enough data
-                            if (packetStart + 9 <= rawData.size()) {
-                                // Copy data to local buffer to avoid vector reallocation issues
-                                uint8_t packet[9];
-                                for (size_t j = 0; j < 9; ++j) {
-                                    packet[j] = rawData[packetStart + j];
-                                }
-                                
-                                // Parse binary packet: timestamp(4) + value(4) + crc(1)
-                                uint32_t timestamp;
-                                int32_t value;
-                                uint8_t crc;
-                                
-                                std::memcpy(&timestamp, packet, 4);
-                                std::memcpy(&value, packet + 4, 4);
-                                crc = packet[8];
-                                
-                                // Verify CRC
-                                if (verifyCRC8(packet, 9)) {
-                                    data.timestamp = timestamp;
-                                    data.hasTimestamp = true;
-                                    data.value = value;
-                                    data.crc = crc;
-                                    data.isValid = true;
-                                    gotBinaryData = true;
-                                }
-                            }
-                        }
-                        // Do not break here: the same read chunk can contain
-                        // the calibrated FORCE text that follows the binary frame.
-                    }
+            binaryParser.feed(buf, static_cast<std::size_t>(rd));
+            if (!gotBinaryData) {
+                const auto frame = binaryParser.takeFrame();
+                if (frame) {
+                    data.timestamp = frame->timestampMs;
+                    data.hasTimestamp = true;
+                    data.value = frame->rawValue;
+                    data.crc = frame->crc;
+                    data.isValid = true;
+                    gotBinaryData = true;
                 }
             }
-            
+            // Drain any additional complete frames from this response. A single
+            // readData() call represents one request/response transaction.
+            while (binaryParser.takeFrame()) {}
+
+            for (int i = 0; i < rd && rawData.size() < MaxResponseBytes; ++i)
+                rawData.push_back(buf[i]);
+
             // Parse the calibrated text even when a valid binary frame was
             // already received. The firmware sends both in one DATA response.
             std::string resp(rawData.begin(), rawData.end());
