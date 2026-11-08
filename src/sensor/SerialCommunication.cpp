@@ -56,7 +56,6 @@ constexpr int MAX_CONNECTION_RETRIES = 3;
 /// Delay between connection retries in milliseconds
 constexpr int CONNECTION_RETRY_DELAY_MS = 500;
 
-#define DEFAULT_BAUD_RATE 115200
 #define WATCHDOG_DEFAULT_TIMEOUT_MS 5000
 
 #ifdef _WIN32
@@ -171,7 +170,7 @@ public:
     std::atomic<bool> isConnected{false};
     // Protect connection metadata snapshots independently from serial I/O.
     mutable std::mutex stateMutex;
-    int baudRate = DEFAULT_BAUD_RATE;
+    int baudRate = protocol::DefaultBaudRate;
     std::string portName;
     int watchdogTimeoutMs = WATCHDOG_DEFAULT_TIMEOUT_MS;
     std::chrono::steady_clock::time_point lastActivityTime;
