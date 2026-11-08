@@ -522,7 +522,8 @@ void ConfigManager::setDefaults() {
     m_config["logging.file"] = std::string("./logs/biofeedback.log");
     m_config["logging.max_size_mb"] = 10;
     m_config["logging.rotate_count"] = 5;
-    m_config["logging.console_output"] = false;\n    m_config["logging.diagnostics_enabled"] = false;
+    m_config["logging.console_output"] = false;
+    m_config["logging.diagnostics_enabled"] = false;
     
     // Games settings
     m_config["games.difficulty_default"] = std::string("medium");
