@@ -157,6 +157,6 @@ test("shared resource CRUD methods use versioned collection routes", async () =>
 
 test("resource client rejects unsupported collection names", async () => {
   const api = createApiClient({ fetchImpl: async () => response(200, {}) });
-  await assert.rejects(api.listResources("../users"), (error) =>
+  assert.throws(() => api.listResources("../users"), (error) =>
     error instanceof ApiError && error.status === 400);
 });
