@@ -429,8 +429,15 @@ void MainWindow::showSettingsDialog()
 
 void MainWindow::createGameArea()
 {
-    m_gameStack = new QStackedWidget(this);
-    
+    // The game host must participate in the central layout. A bare child of
+    // QMainWindow has no reliable geometry and can remain too short for games.
+    m_gameStack = new QStackedWidget(m_centralWidget);
+    m_gameStack->setMinimumHeight(320);
+    m_gameStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    if (auto* layout = qobject_cast<QVBoxLayout*>(m_centralWidget->layout())) {
+        layout->addWidget(m_gameStack, 1);
+    }
+
     // Placeholder when no game is active
     QWidget* placeholder = new QWidget();
     QVBoxLayout* placeholderLayout = new QVBoxLayout(placeholder);
