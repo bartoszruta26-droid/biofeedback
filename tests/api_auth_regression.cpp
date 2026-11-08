@@ -124,6 +124,24 @@ int main(int argc, char** argv) {
         assert(statusCode(transact(port, badRequest)) == 401);
     assert(statusCode(transact(port, badRequest)) == 429);
 
+    const QByteArray localOriginResponse = transact(
+        port, "GET /healthz HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost:5173\r\nConnection: close\r\n\r\n");
+    assert(statusCode(localOriginResponse) == 200);
+    assert(localOriginResponse.contains("Access-Control-Allow-Origin: http://localhost:5173"));
+
+    const QByteArray preflightResponse = transact(
+        port, "OPTIONS /api/v1/auth/login HTTP/1.1\r\nHost: localhost\r\n"
+              "Origin: http://127.0.0.1:8080\r\n"
+              "Access-Control-Request-Method: POST\r\n"
+              "Access-Control-Request-Headers: authorization,content-type\r\n"
+              "Connection: close\r\n\r\n");
+    assert(statusCode(preflightResponse) == 200);
+    assert(preflightResponse.contains("Access-Control-Allow-Headers: Authorization, Content-Type"));
+
+    const QByteArray externalOriginResponse = transact(
+        port, "GET /healthz HTTP/1.1\r\nHost: localhost\r\nOrigin: https://evil.example\r\nConnection: close\r\n\r\n");
+    assert(statusCode(externalOriginResponse) == 403);
+
     const QByteArray statusResponse = transact(
         port, "GET /api/v1/status HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     assert(statusCode(statusResponse) == 200);
