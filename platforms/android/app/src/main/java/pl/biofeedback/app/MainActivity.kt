@@ -363,8 +363,8 @@ private fun PatientsModule(client: ApiClient?) {
     }
 
     fun savePatient() {
-        if (client == null || firstName.isBlank() || lastName.isBlank()) {
-            errorMessage = "Podaj imię i nazwisko pacjenta oraz sprawdź połączenie API."
+        if (client == null || firstName.isBlank() || lastName.isBlank() || patientReference.isBlank()) {
+            errorMessage = "Podaj imię, nazwisko i identyfikator pacjenta oraz sprawdź połączenie API."
             return
         }
         val payload = org.json.JSONObject()
