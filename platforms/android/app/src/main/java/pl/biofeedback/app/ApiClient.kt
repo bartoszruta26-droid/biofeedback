@@ -75,12 +75,6 @@ class ApiClient(baseUrl: String) {
     fun getTrainingResult(id: String): JSONObject = getResource("training-results", id)
     fun getGameSession(id: String): JSONObject = getResource("game-sessions", id)
     fun getGameResult(id: String): JSONObject = getResource("game-results", id)
-    fun getPatient(id: String): JSONObject = getResource("patients", id)
-    fun getMeasurement(id: String): JSONObject = getResource("measurements", id)
-    fun getTrainingSession(id: String): JSONObject = getResource("training-sessions", id)
-    fun getTrainingResult(id: String): JSONObject = getResource("training-results", id)
-    fun getGameSession(id: String): JSONObject = getResource("game-sessions", id)
-    fun getGameResult(id: String): JSONObject = getResource("game-results", id)
     fun createPatient(record: JSONObject): JSONObject = createResource("patients", record)
     fun updatePatient(id: String, version: Int, record: JSONObject): JSONObject =
         updateResource("patients", id, version, record)
