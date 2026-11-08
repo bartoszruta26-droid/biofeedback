@@ -83,6 +83,7 @@ void GameEngine::stop()
     m_sensorDispatchGeneration.fetch_add(1, std::memory_order_acq_rel);
     m_sensorDispatchQueued.store(false, std::memory_order_release);
     m_pendingSensorValue.store(0.0, std::memory_order_relaxed);
+    m_pendingSensorValueAvailable.store(false, std::memory_order_relaxed);
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
     // Zatrzymanie timera
@@ -251,10 +252,32 @@ void GameEngine::handleSensorInput(double value)
     // Validate before publishing into the cross-thread mailbox. Otherwise a
     // trailing NaN/Inf can overwrite a valid sample before the GUI consumes it.
     if (!std::isfinite(value)) {
-        if (QThread::currentThread() == thread())
+        if (QThread::currentThread() == thread()) {
             ++m_invalidInputCount;
-        else
+        } else {
             m_pendingInvalidInputCount.fetch_add(1, std::memory_order_relaxed);
+            const quint64 generation =
+                m_sensorDispatchGeneration.load(std::memory_order_acquire);
+            if (!m_sensorDispatchQueued.exchange(true, std::memory_order_acq_rel)) {
+                QPointer<GameEngine> guard(this);
+                const bool queued = QMetaObject::invokeMethod(this, [guard, generation] {
+                    if (!guard ||
+                        guard->m_sensorDispatchGeneration.load(std::memory_order_acquire) != generation)
+                        return;
+                    guard->m_sensorDispatchQueued.store(false, std::memory_order_release);
+                    guard->m_invalidInputCount += guard->m_pendingInvalidInputCount.exchange(
+                        0, std::memory_order_acq_rel);
+                    if (guard->m_pendingSensorValueAvailable.exchange(
+                            false, std::memory_order_acq_rel)) {
+                        const double pending = guard->m_pendingSensorValue.load(
+                            std::memory_order_acquire);
+                        guard->handleSensorInput(pending);
+                    }
+                }, Qt::QueuedConnection);
+                if (!queued)
+                    m_sensorDispatchQueued.store(false, std::memory_order_release);
+            }
+        }
         return;
     }
 
@@ -264,6 +287,7 @@ void GameEngine::handleSensorInput(double value)
         // Sensor streams can be much faster than the GUI event loop. Keep only
         // the newest valid sample and schedule at most one pending callback.
         m_pendingSensorValue.store(value, std::memory_order_relaxed);
+        m_pendingSensorValueAvailable.store(true, std::memory_order_release);
         const quint64 generation =
             m_sensorDispatchGeneration.load(std::memory_order_acquire);
         if (m_sensorDispatchQueued.exchange(true, std::memory_order_acq_rel))
@@ -282,8 +306,11 @@ void GameEngine::handleSensorInput(double value)
             guard->m_sensorDispatchQueued.store(false, std::memory_order_release);
             guard->m_invalidInputCount += guard->m_pendingInvalidInputCount.exchange(
                 0, std::memory_order_acq_rel);
-            const double pending = guard->m_pendingSensorValue.load(std::memory_order_acquire);
-            guard->handleSensorInput(pending);
+            if (guard->m_pendingSensorValueAvailable.exchange(
+                    false, std::memory_order_acq_rel)) {
+                const double pending = guard->m_pendingSensorValue.load(std::memory_order_acquire);
+                guard->handleSensorInput(pending);
+            }
         }, Qt::QueuedConnection);
 
         if (!queued)
