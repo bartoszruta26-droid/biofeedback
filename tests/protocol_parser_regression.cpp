@@ -52,5 +52,12 @@ int main() {
     parsed=parser.takeFrame(); assert(parsed && parsed->timestampMs==42);
     parsed=parser.takeFrame(); assert(parsed && parsed->timestampMs==43 && parsed->rawValue==-1);
 
+    parser.reset();
+    assert(!parser.takeFrame());
+    assert(parser.crcErrorCount() == 0);
+    assert(parser.discardedByteCount() == 0);
+    parser.feed(nullptr, 0);
+    assert(!parser.takeFrame());
+
     std::cout << "protocol_parser_regression: PASS\n";
 }
