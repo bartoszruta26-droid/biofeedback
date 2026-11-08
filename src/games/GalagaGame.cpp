@@ -1,5 +1,6 @@
 #include "games/GalagaGame.hpp"
 #include <QKeyEvent>
+#include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
 #include <algorithm>
@@ -39,6 +40,34 @@ void GalagaGame::initialize()
     m_projectiles.clear();
     m_player = QRectF(width() * 0.5 - 18.0, height() - 58.0, 36.0, 24.0);
     createWave();
+}
+
+void GalagaGame::resizeEvent(QResizeEvent* event)
+{
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        auto scaleRect = [scaleX, scaleY](QRectF& rect) {
+            rect = QRectF(rect.x() * scaleX, rect.y() * scaleY,
+                          rect.width() * scaleX, rect.height() * scaleY);
+        };
+        scaleRect(m_player);
+        for (Enemy& enemy : m_enemies) {
+            scaleRect(enemy.rect);
+            enemy.rect.moveLeft(qBound(8.0, enemy.rect.left(),
+                qMax(8.0, static_cast<double>(newSize.width()) - 8.0 - enemy.rect.width())));
+        }
+        for (Projectile& projectile : m_projectiles)
+            scaleRect(projectile.rect);
+        m_player.moveLeft(qBound(8.0, m_player.left(),
+            qMax(8.0, static_cast<double>(newSize.width()) - 8.0 - m_player.width())));
+        m_player.moveTop(qBound(8.0, m_player.top(),
+            qMax(8.0, static_cast<double>(newSize.height()) - 8.0 - m_player.height())));
+    }
+    GameEngine::resizeEvent(event);
 }
 
 void GalagaGame::createWave()
