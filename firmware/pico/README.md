@@ -1,31 +1,23 @@
-# Biofeedback — Raspberry Pi Pico firmware foundation
+# Biofeedback — Raspberry Pi Pico firmware
 
-This is a fail-closed firmware foundation, not a release-ready actuator controller. CI builds this target against the pinned Raspberry Pi Pico SDK 2.1.1.
+Firmware provides the Raspberry Pi Pico serial communication foundation for the Biofeedback measurement system.
 
 ## Implemented
-- UART0 control channel: GP0 TX / GP1 RX, 115200 baud, 8N1.
-- Hardware watchdog: 2 seconds, serviced by the main control loop.
-- Bounded command parser (63 printable characters).
-- PING, STATUS and SAFE commands.
-- All ACTUATOR and EFFECTOR commands are rejected.
-- No GPIO is configured as an actuator output.
+
+- UART0 communication on GP0 TX / GP1 RX, 115200 baud, 8N1.
+- Hardware watchdog with a 2-second timeout.
+- Bounded printable-ASCII command parser.
+- PING, STATUS and SAFE diagnostic commands.
+- Explicit rejection of unknown commands.
+- No therapeutic-output control interface.
 
 ## Build
-Set PICO_SDK_PATH to a checked-out Raspberry Pi Pico SDK.
+
+Set `PICO_SDK_PATH` to a checked-out Raspberry Pi Pico SDK.
 
     cmake -S firmware/pico -B build/pico
     cmake --build build/pico --parallel
 
-## Required before enabling any effector
-Do not enable outputs by changing firmware flags alone. A reviewed hardware design and implementation must supply:
-1. Exact board revision and GPIO pin map, including boot/debug pin conflicts.
-2. Driver topology and galvanic/isolation boundaries.
-3. Measured load impedance and operating envelope for every output.
-4. Independent hardware current, voltage and temperature limits and interlocks.
-5. Hardware emergency stop and de-energized state on reset, watchdog, brownout, cable disconnect and host loss.
-6. Output readback or independent fault detection where applicable.
-7. Bench verification with non-patient dummy loads and recorded measurements.
-8. Command authentication or physically isolated control link, plus replay/sequence protection before remote actuation.
+## Measurement integration
 
-IR PWM, electrodes and antenna are intentionally not implemented or enabled.
-No clinical or therapeutic output may be connected based on this scaffold.
+The Pico firmware target is currently a communication foundation. Sensor acquisition, calibration and measurement-frame production must be implemented against the actual selected sensor hardware and the shared measurement protocol. Do not treat the diagnostic command channel as a measurement stream or as evidence that a sensor is calibrated.
