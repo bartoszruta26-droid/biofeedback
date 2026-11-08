@@ -31,6 +31,34 @@ int main(int argc, char** argv) {
     assert(created.value(QStringLiteral("version")).toInt() == 1);
     assert(created.value(QStringLiteral("pesel")).toString() == QStringLiteral("90010112345"));
 
+    QJsonObject validMeasurement{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("sample_count"), 1},
+        {QStringLiteral("source_client"), QStringLiteral("contract-test")}
+    };
+    QJsonObject measurement;
+    assert(repository.create(QStringLiteral("measurements"), validMeasurement, measurement, &error));
+    assert(measurement.value(QStringLiteral("patient_id")).toString() == id);
+
+    QJsonObject trainingSessionPayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("exercise_name"), QStringLiteral("Contract test")}
+    };
+    QJsonObject trainingSession;
+    assert(repository.create(QStringLiteral("training-sessions"), trainingSessionPayload,
+                             trainingSession, &error));
+    const QString trainingSessionId = trainingSession.value(QStringLiteral("id")).toString();
+
+    QJsonObject validResult{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("training_session_id"), trainingSessionId},
+        {QStringLiteral("completed_repetitions"), 1}
+    };
+    QJsonObject storedResult;
+    assert(repository.create(QStringLiteral("training-results"), validResult, storedResult, &error));
+    assert(storedResult.value(QStringLiteral("training_session_id")).toString() == trainingSessionId);
+
+
     QJsonObject orphanMeasurement{{QStringLiteral("patient_id"),
         QStringLiteral("00000000-0000-4000-8000-000000000001")}};
     QJsonObject rejectedMeasurement;
