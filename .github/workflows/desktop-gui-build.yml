@@ -100,11 +100,11 @@ jobs:
           EOF
           TEST_HOME="$PWD/build/package-test-home"
           mkdir -p "$TEST_HOME"
-          HOME="$TEST_HOME" USER="$(id -un)" BIOFEEDBACK_INSTALL_DIR="$TEST_HOME/opt/biofeedback" dist/biofeedback-linux/install.sh
-          test -x "$TEST_HOME/opt/biofeedback/run.sh"
+          HOME="$TEST_HOME" USER="$(id -un)" BIOFEEDBACK_INSTALL_DIR="$TEST_HOME/.local/opt/biofeedback" dist/biofeedback-linux/install.sh
+          test -x "$TEST_HOME/.local/opt/biofeedback/run.sh"
           grep -q 'Name=Biofeedback' "$TEST_HOME/.local/share/applications/biofeedback.desktop"
-          HOME="$TEST_HOME" BIOFEEDBACK_INSTALL_DIR="$TEST_HOME/opt/biofeedback" "$TEST_HOME/opt/biofeedback/uninstall.sh"
-          test ! -e "$TEST_HOME/opt/biofeedback"
+          HOME="$TEST_HOME" BIOFEEDBACK_INSTALL_DIR="$TEST_HOME/.local/opt/biofeedback" "$TEST_HOME/.local/opt/biofeedback/uninstall.sh"
+          test ! -e "$TEST_HOME/.local/opt/biofeedback"
           test ! -e "$TEST_HOME/.local/share/applications/biofeedback.desktop"
           tar -czf dist/biofeedback-linux-x86_64-ubuntu22.04.tar.gz -C dist biofeedback-linux
       - name: Upload Debian package artifact
