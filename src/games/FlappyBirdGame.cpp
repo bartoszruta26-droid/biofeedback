@@ -204,13 +204,11 @@ void FlappyBirdGame::resetBird() {
     m_birdRadius = m_birdBaseRadius;
 }
 
-void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
-    QSize oldSize = m_lastKnownSize;
-    const QSize newSize = event->size();
-    if (oldSize.width() <= 0 || oldSize.height() <= 0)
-        oldSize = event->oldSize();
-    if (oldSize.width() > 0 && oldSize.height() > 0 &&
-        newSize.width() > 0 && newSize.height() > 0) {
+void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
+    if (newSize.width() <= 0 || newSize.height() <= 0)
+        return;
+
+    if (oldSize.width() > 0 && oldSize.height() > 0) {
         const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
         const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
         const double scaleRadius = qMin(scaleX, scaleY);
@@ -220,49 +218,48 @@ void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
         m_birdVelocity.setY(m_birdVelocity.y() * scaleY);
         m_birdRadius = static_cast<float>(qMax(1.0, m_birdRadius * scaleRadius));
         m_obstacleWidth = static_cast<float>(qMax(1.0, m_obstacleWidth * scaleX));
+
         for (Obstacle& obstacle : m_obstacles) {
             obstacle.xPosition = static_cast<float>(obstacle.xPosition * scaleX);
             obstacle.gapY = static_cast<float>(obstacle.gapY * scaleY);
             obstacle.gapHeight = static_cast<float>(obstacle.gapHeight * scaleY);
         }
-
-        // Zachowaj pełny obrys ptaka w bardzo wąskim lub niskim widoku.
-        m_birdRadius = static_cast<float>(qMin(
-            static_cast<double>(m_birdRadius),
-            qMin(newSize.width(), newSize.height()) / 2.0));
-        const double radius = m_birdRadius;
-        m_birdPos.setX(qBound(radius, m_birdPos.x(),
-                              static_cast<double>(newSize.width()) - radius));
-        m_birdPos.setY(qBound(radius, m_birdPos.y(),
-                              static_cast<double>(newSize.height()) - radius));
-
-        // Po zmianie proporcji luka istniejącej przeszkody również musi
-        // pozostać w granicach nowego obszaru gry.
-        const double safeGapHeight = qMax(
-            0.0, static_cast<double>(newSize.height()) - 2.0 * radius);
-        for (Obstacle& obstacle : m_obstacles) {
-            obstacle.gapHeight = static_cast<float>(
-                qBound(0.0, static_cast<double>(obstacle.gapHeight), safeGapHeight));
-            const double minGapCenter = radius + obstacle.gapHeight / 2.0;
-            const double maxGapCenter = static_cast<double>(newSize.height()) -
-                                        radius - obstacle.gapHeight / 2.0;
-            obstacle.gapY = static_cast<float>(
-                qBound(minGapCenter, static_cast<double>(obstacle.gapY), maxGapCenter));
-        }
-        // Keep difficulty settings independent of transient widget size.
-        // spawnObstacle() clamps generated gaps to the currently available height.
-    } else if (newSize.width() > 0 && newSize.height() > 0) {
-        // Qt may report an invalid oldSize for a hidden widget's first resize.
-        // In that case preserve the game's intended starting proportions.
+    } else {
+        // A hidden widget may not receive resizeEvent until it is shown.
+        // If no previous logical dimensions exist, restore the start layout.
         m_birdPos = QPointF(newSize.width() / 4.0, newSize.height() / 2.0);
-        m_birdRadius = static_cast<float>(qMin(
-            static_cast<double>(m_birdBaseRadius),
-            qMin(newSize.width(), newSize.height()) / 2.0));
-        m_birdPos.setX(qBound(static_cast<double>(m_birdRadius), m_birdPos.x(),
-                              static_cast<double>(newSize.width()) - m_birdRadius));
-        m_birdPos.setY(qBound(static_cast<double>(m_birdRadius), m_birdPos.y(),
-                              static_cast<double>(newSize.height()) - m_birdRadius));
+        m_birdRadius = m_birdBaseRadius;
     }
+
+    m_birdRadius = static_cast<float>(qMin(
+        static_cast<double>(m_birdRadius),
+        qMin(newSize.width(), newSize.height()) / 2.0));
+    const double radius = m_birdRadius;
+    m_birdPos.setX(qBound(radius, m_birdPos.x(),
+                          static_cast<double>(newSize.width()) - radius));
+    m_birdPos.setY(qBound(radius, m_birdPos.y(),
+                          static_cast<double>(newSize.height()) - radius));
+
+    const double safeGapHeight = qMax(
+        0.0, static_cast<double>(newSize.height()) - 2.0 * radius);
+    for (Obstacle& obstacle : m_obstacles) {
+        obstacle.gapHeight = static_cast<float>(
+            qBound(0.0, static_cast<double>(obstacle.gapHeight), safeGapHeight));
+        const double minGapCenter = radius + obstacle.gapHeight / 2.0;
+        const double maxGapCenter = static_cast<double>(newSize.height()) -
+                                    radius - obstacle.gapHeight / 2.0;
+        obstacle.gapY = static_cast<float>(
+            qBound(minGapCenter, static_cast<double>(obstacle.gapY), maxGapCenter));
+        obstacle.xPosition = static_cast<float>(qBound(
+            -static_cast<double>(m_obstacleWidth),
+            static_cast<double>(obstacle.xPosition),
+            static_cast<double>(newSize.width())));
+    }
+}
+
+void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
+    const QSize newSize = event->size();
+    adaptToSize(m_lastKnownSize, newSize);
     m_lastKnownSize = newSize;
     GameEngine::resizeEvent(event);
 }
@@ -370,6 +367,12 @@ void FlappyBirdGame::checkCollisions() {
 void FlappyBirdGame::update(double deltaTime) {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+    const QSize currentSize(width(), height());
+    if (currentSize != m_lastKnownSize) {
+        adaptToSize(m_lastKnownSize, currentSize);
+        m_lastKnownSize = currentSize;
+    }
+
 
     // Ochrona wywołań bezpośrednich: nie wykonuj nieograniczonego skoku czasu.
     deltaTime = qMin(deltaTime, 0.1);
