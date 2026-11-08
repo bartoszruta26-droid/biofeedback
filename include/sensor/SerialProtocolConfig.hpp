@@ -26,5 +26,4 @@ inline constexpr uint8_t NanoHx711ClockPin = 3;
 inline constexpr char ControlPing[] = "PING";
 inline constexpr char ControlStatus[] = "STATUS";
 inline constexpr char ControlSafe[] = "SAFE";
-inline constexpr char ActuatorLockedReply[] = "ERR,ACTUATORS_LOCKED";
 } // namespace sensor::protocol
