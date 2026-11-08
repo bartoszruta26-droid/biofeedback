@@ -10,6 +10,7 @@
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
+#include <QKeyEvent>
 #include <QStringList>
 #include <cstdio>
 #include <cstdlib>
@@ -117,9 +118,14 @@ int main(int argc, char **argv)
     REQUIRE(galagaGame != nullptr);
     galagaGame->resize(640, 480);
     galagaGame->start();
-    galagaGame->handleSensorInput(75.0);
-    waitForEvents(80);
+    galagaGame->handleSensorInput(50.0);
+    QKeyEvent galagaFireDown(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QKeyEvent galagaFireUp(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(galagaGame, &galagaFireDown);
+    QApplication::sendEvent(galagaGame, &galagaFireUp);
+    waitForEvents(900);
     REQUIRE(galagaGame->isRunning());
+    REQUIRE(galagaGame->getScore() > 0); // A player shot must hit an enemy.
     galagaGame->stop();
 
     std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
@@ -127,9 +133,12 @@ int main(int argc, char **argv)
     REQUIRE(archerGame != nullptr);
     archerGame->resize(640, 480);
     archerGame->start();
-    archerGame->handleSensorInput(80.0);
-    waitForEvents(80);
+    archerGame->handleSensorInput(85.0);
+    QKeyEvent archerFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(archerGame, &archerFire);
+    waitForEvents(900);
     REQUIRE(archerGame->isRunning());
+    REQUIRE(archerGame->getScore() >= 0);
     archerGame->stop();
 
     std::unique_ptr<games::GameEngine> carRace(games::createGame(QStringLiteral("car_race")));
@@ -138,6 +147,12 @@ int main(int argc, char **argv)
     carRaceGame->resize(640, 480);
     carRaceGame->start();
     carRaceGame->handleSensorInput(95.0);
+    QKeyEvent carLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+    QApplication::sendEvent(carRaceGame, &carLeft);
+    waitForEvents(120);
+    REQUIRE(carRaceGame->isRunning());
+    carRaceGame->resize(180, 120);
+    carRaceGame->handleSensorInput(50.0);
     waitForEvents(120);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->stop();
@@ -148,7 +163,9 @@ int main(int argc, char **argv)
     scorchedGame->resize(640, 480);
     scorchedGame->start();
     scorchedGame->handleSensorInput(65.0);
-    waitForEvents(100);
+    QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(scorchedGame, &artilleryFire);
+    waitForEvents(1600);
     REQUIRE(scorchedGame->isRunning());
     scorchedGame->stop();
 
