@@ -183,6 +183,12 @@ int main(int argc, char **argv)
     waitForEvents(3200);
     REQUIRE(galagaHitGame->livesRemaining() == 2);
     REQUIRE(galagaHitGame->isRunning());
+    const double protectionAtHit = galagaHitGame->hitProtectionRemaining();
+    REQUIRE(protectionAtHit > 0.0);
+    waitForEvents(250);
+    REQUIRE(galagaHitGame->livesRemaining() == 2);
+    REQUIRE(galagaHitGame->hitProtectionRemaining() > 0.0);
+    REQUIRE(galagaHitGame->hitProtectionRemaining() < protectionAtHit);
     galagaHitGame->stop();
 
     std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
