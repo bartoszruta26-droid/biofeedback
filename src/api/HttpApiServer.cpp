@@ -26,6 +26,8 @@ QByteArray reasonPhrase(int status) {
     case 400: return "Bad Request";
     case 401: return "Unauthorized";
     case 403: return "Forbidden";
+    case 409: return "Conflict";
+    case 422: return "Unprocessable Entity";
     case 429: return "Too Many Requests";
     case 404: return "Not Found";
     case 405: return "Method Not Allowed";
