@@ -73,9 +73,6 @@ void PongGame::setDifficultyLevel(int level) {
     m_aiSpeed = 150.0f + (m_difficultyLevel * 80.0f);
     m_ballSpeed = 250.0f + (m_difficultyLevel * 70.0f);
     
-    m_playerScore = 0;
-    m_aiScore = 0;
-    setScore(0);
 }
 
 int PongGame::getDifficultyLevel() const {
