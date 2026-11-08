@@ -561,7 +561,8 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 }
                 if (!m_resources->remove(collection, resourceId, expectedVersion, &repositoryError)) {
                     const bool missing = repositoryError == "RESOURCE_NOT_FOUND";
-                    const bool conflict = repositoryError == "VERSION_CONFLICT";
+                    const bool conflict = repositoryError == "VERSION_CONFLICT" ||
+                        repositoryError == "PATIENT_HAS_REFERENCES";
                     sendJson(socket, missing ? 404 : (conflict ? 409 : 400),
                         errorBody(missing ? "RESOURCE_NOT_FOUND" :
                                   (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED"),
