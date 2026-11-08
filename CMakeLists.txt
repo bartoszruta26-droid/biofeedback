@@ -235,6 +235,7 @@ if(Qt5_FOUND)
     # Source files
     set(SOURCES
         src/main.cpp
+        src/api/HttpApiServer.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
         src/core/DebugManager.cpp
@@ -271,6 +272,7 @@ if(Qt5_FOUND)
     # Header files
     set(HEADERS
         include/core/Application.hpp
+        include/api/HttpApiServer.hpp
         include/core/Logger.hpp
         include/core/DebugManager.hpp
         include/core/ConfigManager.hpp
@@ -460,6 +462,7 @@ if(Qt5_FOUND)
         biofeedback_training
         biofeedback_sensor_protocol
         Qt5::Core
+        Qt5::Network
         Qt5::Widgets
         Qt5::Charts
         ${LIBSERIALPORT_LIBRARIES}
