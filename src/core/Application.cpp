@@ -14,6 +14,7 @@
 #include "tab/PatientTab.hpp"
 #include "tab/MeasurementTab.hpp"
 #include "tab/OutlineTab.hpp"
+#include "tab/TrainingTab.hpp"
 #include <QTabWidget>
 #include <QMessageBox>
 #include <QTimer>
@@ -389,6 +390,89 @@ void Application::setupConnections()
                 }
             });
     
+    if (m_mainWindow && m_mainWindow->trainingTab()) {
+        tab::TrainingTab* trainingTab = m_mainWindow->trainingTab();
+        connect(trainingTab, &tab::TrainingTab::trainingStopped,
+                this, [this, trainingTab, findPatientByPesel]() {
+                    if (!m_sharedResources || !trainingTab) return;
+                    const QString patientPesel = trainingTab->currentPatientPesel();
+                    if (patientPesel.isEmpty()) {
+                        if (m_logger) m_logger->warning("Training session was not archived: no patient selected.");
+                        return;
+                    }
+                    QJsonObject patient;
+                    QString lookupError;
+                    const bool patientFound = findPatientByPesel(patientPesel, patient, &lookupError);
+                    if (!lookupError.isEmpty() || !patientFound) {
+                        if (m_logger) m_logger->warning("Training session was not archived: patient lookup failed.");
+                        return;
+                    }
+
+                    const QString patientUuid = patient.value(QStringLiteral("id")).toString();
+                    const QJsonObject payload = trainingTab->buildSharedTrainingRecord(patientUuid);
+                    if (payload.isEmpty()) return;
+
+                    QJsonObject createdSession;
+                    QString error;
+                    if (!m_sharedResources->create(QStringLiteral("training-sessions"),
+                                                   payload, createdSession, &error)) {
+                        if (m_logger) m_logger->error("Shared training session write failed: " + error.toStdString());
+                        trainingTab->addDebugMessage("Nie udało się zapisać sesji treningowej w serwerze danych.", "ERROR");
+                        return;
+                    }
+                    const QString trainingSessionId = createdSession.value(QStringLiteral("id")).toString();
+
+                    const QJsonArray exerciseResults = payload.value(QStringLiteral("exercise_results")).toArray();
+                    for (const QJsonValue& value : exerciseResults) {
+                        if (!value.isObject()) continue;
+                        QJsonObject result = value.toObject();
+                        result.insert(QStringLiteral("training_session_id"), trainingSessionId);
+                        result.insert(QStringLiteral("patient_id"), patientUuid);
+                        QJsonObject storedResult;
+                        QString resultError;
+                        if (!m_sharedResources->create(QStringLiteral("training-results"),
+                                                        result, storedResult, &resultError) && m_logger) {
+                            m_logger->warning("Training result detail write failed: " + resultError.toStdString());
+                        }
+                    }
+
+                    const QJsonArray gameResults = payload.value(QStringLiteral("game_results")).toArray();
+                    for (const QJsonValue& value : gameResults) {
+                        if (!value.isObject()) continue;
+                        const QJsonObject game = value.toObject();
+                        const QString gameId = game.value(QStringLiteral("game_id")).toString();
+                        const int score = game.value(QStringLiteral("score")).toInt();
+                        QJsonObject gameSession;
+                        const QJsonObject gameSessionPayload{
+                            {QStringLiteral("game_id"), gameId},
+                            {QStringLiteral("patient_id"), patientUuid},
+                            {QStringLiteral("training_session_id"), trainingSessionId},
+                            {QStringLiteral("exercise_index"), game.value(QStringLiteral("exercise_index"))},
+                            {QStringLiteral("score"), score},
+                            {QStringLiteral("status"), QStringLiteral("completed")}
+                        };
+                        QString gameError;
+                        if (!m_sharedResources->create(QStringLiteral("game-sessions"),
+                                                        gameSessionPayload, gameSession, &gameError)) {
+                            if (m_logger) m_logger->warning("Game session write failed: " + gameError.toStdString());
+                        }
+                        const QJsonObject gameResultPayload{
+                            {QStringLiteral("game_id"), gameId},
+                            {QStringLiteral("patient_id"), patientUuid},
+                            {QStringLiteral("training_session_id"), trainingSessionId},
+                            {QStringLiteral("game_session_id"), gameSession.value(QStringLiteral("id"))},
+                            {QStringLiteral("score"), score},
+                            {QStringLiteral("exercise_name"), game.value(QStringLiteral("exercise_name"))}
+                        };
+                        QJsonObject storedGameResult;
+                        if (!m_sharedResources->create(QStringLiteral("game-results"),
+                                                        gameResultPayload, storedGameResult, &gameError) && m_logger) {
+                            m_logger->warning("Game result write failed: " + gameError.toStdString());
+                        }
+                    }
+                });
+    }
+
     connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
             m_mainWindow.get(), [this]() {
                 try {
