@@ -52,6 +52,7 @@
 - [x] Pierwsza grywalna implementacja Archer: regulacja kąta z czujnika/klawiatury, strzały balistyczne, ruchomy cel i punktacja. Pozostaje rozszerzyć testy scenariuszowe i dopracować rozgrywkę.
 - [x] Pierwsza grywalna implementacja Scorched Earth: artyleria turowa, kąt i siła strzału, grawitacja, wiatr, deformacja terenu, zdrowie czołgów i przeciwnik AI. Pozostaje rozszerzyć testy scenariuszowe, dopracować AI i zbalansować fizykę.
 - [x] Pierwsza grywalna implementacja Car Race: trzy pasy, sterowanie czujnikiem/klawiaturą, przeszkody, kolizje, życia, dystans, wynik i rosnąca prędkość. Pozostaje rozszerzyć testy scenariuszowe i dopracować rozgrywkę.
+- [x] Rejestracja nowych gier w GameFactory oraz udostępnienie ich w selektorach TrainingTab i OutlineTab.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
