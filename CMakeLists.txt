@@ -8,6 +8,8 @@ find_package(Threads REQUIRED)
 # C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+enable_testing()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Build type
@@ -107,6 +109,18 @@ target_include_directories(biomechanical_parameter_availability_regression PRIVA
 add_test(NAME biomechanical_parameter_availability_regression
     COMMAND biomechanical_parameter_availability_regression)
 
+
+# Application-facing lifecycle boundary for the shared measurement pipeline.
+add_library(biofeedback_application_services STATIC
+    src/application/MeasurementService.cpp
+)
+target_include_directories(biofeedback_application_services PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_application_services PUBLIC biofeedback_measurement)
+
+add_executable(measurement_service_regression tests/measurement_service_regression.cpp)
+target_link_libraries(measurement_service_regression PRIVATE biofeedback_application_services)
+add_test(NAME measurement_service_regression COMMAND measurement_service_regression)
+
 # Local loopback HTTP API. Sensitive and hardware operations remain disabled
 # until authentication, authorization and measurement services are integrated.
 add_executable(biofeedback_api
@@ -120,7 +134,6 @@ target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network)
 install(TARGETS biofeedback_api DESTINATION bin)
 
 # Regression targets that can be built without Qt.
-enable_testing()
 add_executable(encryption_regression tests/encryption_regression.cpp)
 target_link_libraries(encryption_regression PRIVATE biofeedback_core)
 add_test(NAME encryption_regression COMMAND encryption_regression)
