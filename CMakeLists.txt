@@ -53,7 +53,7 @@ target_link_libraries(biofeedback_core
         Qt5::Core
 )
 
-# Encrypted append-only acquisition journal (one atomically committed record per sample).
+# Encrypted acquisition journal: atomically committed batches of up to 256 samples.
 add_library(biofeedback_acquisition_journal STATIC src/data/AcquisitionJournal.cpp)
 target_include_directories(biofeedback_acquisition_journal PUBLIC ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(biofeedback_acquisition_journal PUBLIC biofeedback_core Qt5::Core)
