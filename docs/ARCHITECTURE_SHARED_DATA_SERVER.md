@@ -133,12 +133,12 @@ niezaimplementowany.
 - API ma CRUD kolekcji, sesje Bearer, kontrolę wersji i tymczasową blokadę
   dostępu do roli administratora. Pełne RBAC, audyt operacji i WebSocket/SSE
   pozostają do wdrożenia.
-- WebUI ma klienta CRUD dla wszystkich kolekcji. Android ma klienta CRUD,
-  a ekran Pacjenci obsługuje podstawowe operacje na kartach; pozostałe ekrany
-  Androida nie zapisują jeszcze pomiarów i treningów.
-- TUI loguje się przez API, odczytuje listę pacjentów i zapisuje sesje treningowe.
-  Nie dołącza jeszcze identyfikatora pacjenta do treningu ani nie zapisuje
-  pomiarów i wyników gier.
+- WebUI obsługuje CRUD kart pacjentów oraz odczyt archiwów pomiarów,
+  treningów i gier. Android obsługuje CRUD kart pacjentów i odczyt tych samych
+  archiwów; nie prowadzi jeszcze akwizycji ani tworzenia sesji z czujnika.
+- TUI loguje się przez API, odczytuje listę pacjentów i zapisuje sesje oraz
+  wyniki treningowe. Nie dołącza jeszcze identyfikatora pacjenta do treningu
+  ani nie archiwizuje pomiarów i wyników gier.
 - MariaDB pozostaje niewdrożona; wybranie jej jako backendu pacjentów nie
   powoduje fallbacku do plików.
 
