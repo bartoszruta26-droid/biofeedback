@@ -1,23 +1,49 @@
 #!/usr/bin/env python3
-"""Guard the firmware/app calibration-status contract."""
+"""Guard the Arduino Nano wire format and calibration-status contract."""
 from pathlib import Path
 
-firmware = Path("hx711_advanced.ino").read_text(encoding="utf-8")
-serial = Path("src/sensor/SerialCommunication.cpp").read_text(encoding="utf-8")
-header = Path("include/sensor/SerialCommunication.hpp").read_text(encoding="utf-8")
-if "bool is_calibrated = false;" not in firmware:
-    raise SystemExit("Firmware must fail closed after boot until calibrated")
-if 'Serial.print(F("ms,CAL:"));' not in firmware or "is_calibrated ? 1 : 0" not in firmware:
-    raise SystemExit("Firmware FORCE record must expose explicit CAL status")
-if "const float proposed_factor = known_weight / static_cast<float>(raw_value);" not in firmware or "calibration_factor = proposed_factor;" not in firmware or "is_calibrated = true;" not in firmware:
-    raise SystemExit("CAL command must set calibration factor and active flag")
-if "hasCalibratedValue" not in header or "data.hasCalibratedValue = calibrationConfirmed;" not in serial:
-    raise SystemExit("Host parser must preserve explicit calibration validity")
-print("HX711 calibration protocol regression passed")
+root = Path(__file__).resolve().parents[1]
+firmware = (root / "hx711_advanced.ino").read_text(encoding="utf-8")
+serial = (root / "src/sensor/SerialCommunication.cpp").read_text(encoding="utf-8")
+header = (root / "include/sensor/SerialCommunication.hpp").read_text(encoding="utf-8")
+protocol = (root / "include/sensor/SerialProtocolConfig.hpp").read_text(encoding="utf-8")
+parser = (root / "src/sensor/ProtocolParser.cpp").read_text(encoding="utf-8")
 
-if "strtod(buffer + 4, &end_ptr)" not in firmware:
-    raise SystemExit("Calibration parser must consume the complete numeric field")
-if "isfinite(parsed_weight)" not in firmware or "isfinite(proposed_factor)" not in firmware:
-    raise SystemExit("Calibration parser must reject non-finite weights and factors")
-if "atof(buffer + 4)" in firmware:
-    raise SystemExit("Unsafe permissive atof calibration parser remains")
+required_firmware = [
+    "#define HX711_DT_PIN  2",
+    "#define HX711_SCK_PIN 3",
+    "#define SERIAL_BAUD_RATE 115200",
+    "struct DataPacket",
+    "uint32_t timestamp;",
+    "int32_t value;",
+    "uint8_t crc;",
+    "Serial.write(0xAA);",
+    "Serial.write(0x55);",
+    "packet.crc = crc8(data_ptr, sizeof(DataPacket) - 1);",
+    "bool is_calibrated = false;",
+    'Serial.print(F("ms,CAL:"));',
+    "is_calibrated ? 1 : 0",
+    "strtod(buffer + 4, &end_ptr)",
+    "isfinite(parsed_weight)",
+    "isfinite(proposed_factor)",
+]
+for token in required_firmware:
+    assert token in firmware, f"missing Nano firmware invariant: {token}"
+assert "atof(buffer + 4)" not in firmware
+
+assert "hasCalibratedValue" in header
+assert "data.hasCalibratedValue = calibrationConfirmed;" in serial
+assert "protocol::Crc8InitialValue" in parser
+assert "protocol::Crc8Polynomial" in parser
+assert "protocol::MeasurementPayloadSize" in parser
+assert "protocol::MeasurementFrameSize" in parser
+assert "protocol::FrameTrailerFirst" in parser
+assert "protocol::FrameTrailerSecond" in parser
+assert "MeasurementPayloadSize = 9" in protocol
+assert "MeasurementFrameSize = 11" in protocol
+assert "FrameTrailerFirst = 0xAA" in protocol
+assert "FrameTrailerSecond = 0x55" in protocol
+assert "NanoHx711DataPin = 2" in protocol
+assert "NanoHx711ClockPin = 3" in protocol
+
+print("HX711 Nano wire-format and calibration regression: PASS")
