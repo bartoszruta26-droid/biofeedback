@@ -3,6 +3,7 @@
 #include "data/JsonResourceRepository.hpp"
 #include "application/AcquisitionService.hpp"
 #include "application/MeasurementService.hpp"
+#include "application/DeviceService.hpp"
 #include "measurement/MeasurementEngine.hpp"
 
 #include <QCoreApplication>
@@ -82,6 +83,7 @@ int main(int argc, char* argv[]) {
     auto measurementService = std::make_shared<biofeedback::application::MeasurementService>(measurementEngine);
     auto acquisitionService = std::make_shared<biofeedback::application::AcquisitionService>(measurementService);
     server.setAcquisitionService(acquisitionService);
+    server.setDeviceService(std::make_shared<biofeedback::application::DeviceService>());
 
     if (!server.listen(QHostAddress::LocalHost, static_cast<quint16>(portValue))) {
         QTextStream(stderr) << "Cannot listen on loopback TCP port " << portValue << ".\n";
