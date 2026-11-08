@@ -103,7 +103,10 @@ bool HttpApiClient::request(const QByteArray& method, const QString& path,
         setError(error, QStringLiteral("API_TIMEOUT"));
         return false;
     }
-    if (status == 401 && authenticated) m_accessToken.clear();
+    if (status == 401 && authenticated) {
+        m_accessToken.fill(QChar(0));
+        m_accessToken.clear();
+    }
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(responseBytes, &parseError);
     if (parseError.error != QJsonParseError::NoError ||
@@ -127,6 +130,7 @@ bool HttpApiClient::request(const QByteArray& method, const QString& path,
 }
 
 bool HttpApiClient::login(const QString& username, const QString& password, QString* error) {
+    m_accessToken.fill(QChar(0));
     m_accessToken.clear();
     QJsonObject response;
     const QJsonObject credentials{
@@ -155,6 +159,7 @@ void HttpApiClient::logout() {
     if (!m_accessToken.isEmpty()) {
         QJsonObject ignored;
         request("POST", QStringLiteral("/api/v1/auth/logout"), nullptr, true, ignored, nullptr);
+        m_accessToken.fill(QChar(0));
         m_accessToken.clear();
     }
 }
