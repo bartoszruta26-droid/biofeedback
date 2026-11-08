@@ -361,7 +361,6 @@ private:
     void updateBiomechanicalTable();
     void recalculateBiomechanicalResults();
     bool openSampleJournal();
-    bool appendSampleJournal(const RecordedMeasurementSample& sample);
     bool flushSampleJournal();
     void closeSampleJournal();
     bool recoverSampleJournals(const QString& dataDir);
