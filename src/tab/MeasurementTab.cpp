@@ -1148,6 +1148,11 @@ void MeasurementTab::startMeasurement()
     }
 
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        m_droppedMeasurementSamples = 0;
+        m_totalDroppedMeasurementSamples = 0;
+    }
     ensureCurrentSeriesInitialized();
     m_inContraction = false;
     m_repetitionDetector.reset();
@@ -1259,6 +1264,8 @@ void MeasurementTab::resetSession()
     m_journalNextSequence.store(1, std::memory_order_release);
     m_journalAdmission.store(false, std::memory_order_release);
     m_sampleJournalFailed = false;
+    m_totalDroppedMeasurementSamples = 0;
+    m_droppedMeasurementSamples = 0;
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
@@ -2804,6 +2811,12 @@ void MeasurementTab::enqueueMeasurementSample(
         !m_sampleJournalFailed.load(std::memory_order_acquire))
         return;
 
+    // The shared engine also feeds TrainingTab while this tab is idle. Do not
+    // queue idle frames for this tab's inactive graph/repetition presentation.
+    if (!m_journalAdmission.load(std::memory_order_acquire) &&
+        !m_sampleJournalFailed.load(std::memory_order_acquire))
+        return;
+
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
@@ -2813,6 +2826,7 @@ void MeasurementTab::enqueueMeasurementSample(
         // analysis. The durable journal has already committed this sample.
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
             ++m_droppedMeasurementSamples;
+            ++m_totalDroppedMeasurementSamples;
             return;
         }
         m_measurementQueue.push_back(sample);
@@ -2828,6 +2842,7 @@ void MeasurementTab::enqueueMeasurementSample(
         if (!queued) {
             std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
             m_droppedMeasurementSamples += m_measurementQueue.size();
+            m_totalDroppedMeasurementSamples += m_measurementQueue.size();
             m_measurementQueue.clear();
             m_measurementDrainScheduled = false;
         }
@@ -2839,10 +2854,12 @@ void MeasurementTab::drainMeasurementSamples()
     constexpr std::size_t MaximumBatch = 128;
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
+    quint64 totalDropped = 0;
     bool scheduleAgain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         dropped = std::exchange(m_droppedMeasurementSamples, 0);
+        totalDropped = m_totalDroppedMeasurementSamples;
         const std::size_t count = std::min(MaximumBatch, m_measurementQueue.size());
         batch.reserve(count);
         for (std::size_t i = 0; i < count; ++i) {
@@ -2857,8 +2874,12 @@ void MeasurementTab::drainMeasurementSamples()
     }
     if (dropped != 0) {
         m_repetitionDetector.reset();
-        addDebugMessage(QString("Przepełnienie kolejki pomiarowej: pominięto %1 próbek; detektor powtórzeń zresetowany.")
-                            .arg(static_cast<qulonglong>(dropped)), "WARNING");
+        addDebugMessage(QString("Przepełnienie kolejki pomiarowej: pominięto %1 próbek (łącznie %2); detektor powtórzeń zresetowany. Dziennik trwały zachowuje pełny strumień.")
+                            .arg(static_cast<qulonglong>(dropped))
+                            .arg(static_cast<qulonglong>(totalDropped)), "WARNING");
+        if (m_lblStatus)
+            m_lblStatus->setText(tr("Status: pominięto %1 klatek GUI; dziennik trwały zachowuje pełny pomiar")
+                                     .arg(static_cast<qulonglong>(totalDropped)));
     }
     for (const auto& sample : batch)
         onMeasurementSample(sample);
