@@ -14,6 +14,7 @@
 #include "core/Logger.hpp"
 #include "core/Authentication.hpp"
 #include "data/DataManager.hpp"
+#include "data/JsonResourceRepository.hpp"
 #include "gui/MainWindow.hpp"
 #include "gui/LoginDialog.hpp"
 #include "tab/PatientTab.hpp"
@@ -154,6 +155,7 @@ public:
      * @throws std::runtime_error if data manager is not initialized
      */
     DataManager& getDataManager();
+    std::shared_ptr<data::JsonResourceRepository> getSharedResources() const;
     
     /**
      * @brief Get the main window
@@ -294,6 +296,7 @@ private:
     std::unique_ptr<Logger> m_logger;
     std::unique_ptr<gui::MainWindow> m_mainWindow;
     std::unique_ptr<DataManager> m_dataManager;
+    std::shared_ptr<data::JsonResourceRepository> m_sharedResources;
     std::unique_ptr<Authentication> m_authentication;
     
     // Note: DebugManager is a singleton, we don't store it as unique_ptr
