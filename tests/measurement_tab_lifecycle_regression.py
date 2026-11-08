@@ -84,6 +84,33 @@ for required in (
 if 'addDebugMessage(QString("HX711: RAW=' in source:
     raise SystemExit("Per-sample debug logging must not run in the acquisition hot path")
 
+# The raw-data table is a presentation surface, not an acquisition sink.
+# Batch its widget mutations to at most 10 Hz and flush the visible tail at stop;
+# the full recorded sample stream remains independent of this lossy UI view.
+sample_start = source.index("void MeasurementTab::readSingleSample(")
+sample_end = source.index("void MeasurementTab::updateRawTableBatch(", sample_start)
+sample_body = source[sample_start:sample_end]
+if "m_rawTable->insertRow" in sample_body or "m_rawTable->scrollToBottom" in sample_body:
+    raise SystemExit("Per-sample raw table widget mutations remain in readSingleSample")
+batch_start = source.index("void MeasurementTab::updateRawTableBatch(")
+batch_end = source.index("void MeasurementTab::updateLiveDisplay(", batch_start)
+batch_body = source[batch_start:batch_end]
+for required in (
+    "elapsedMs - m_lastRawTableRefreshMs < 100",
+    "m_rawTable->setUpdatesEnabled(false)",
+    "m_rawTable->setUpdatesEnabled(true)",
+    "m_rawTableLastSequence = totalSamples",
+    "m_rawTable->scrollToBottom()",
+    "while (m_rawTable->rowCount() > 100)",
+):
+    if required not in batch_body:
+        raise SystemExit(f"Missing batched raw-table invariant: {required}")
+if "updateRawTableBatch(true);" not in source:
+    raise SystemExit("Stopping a measurement must flush pending raw-table presentation samples")
+if "quint64 m_rawTableLastSequence{0};" not in header:
+    raise SystemExit("Raw-table presentation sequence must be tracked independently")
+
+
 
 # Sensor-to-game control is a state input, so the GUI mailbox must coalesce
 # stale values instead of replaying a long FIFO backlog.
