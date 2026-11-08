@@ -505,7 +505,7 @@ void ConfigManager::setDefaults() {
     m_config["devices.pico.uart_tx_pin"] = static_cast<int>(sensor::protocol::PicoUartTxPin);
     m_config["devices.pico.uart_rx_pin"] = static_cast<int>(sensor::protocol::PicoUartRxPin);
     m_config["devices.pico.protocol"] = std::string("biofeedback-control");
-    m_config["devices.pico.protocol_version"] = sensor::protocol::ControlProtocolVersion;
+    m_config["devices.pico.protocol_version"] = static_cast<int>(sensor::protocol::ControlProtocolVersion);
     m_config["devices.pico.actuators_enabled"] = false;
     m_config["devices.pico.effectors.ir_pwm.enabled"] = false;
     m_config["devices.pico.effectors.electrodes.enabled"] = false;
