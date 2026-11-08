@@ -159,16 +159,35 @@ add_executable(device_service_regression tests/device_service_regression.cpp)
 target_link_libraries(device_service_regression PRIVATE biofeedback_application_services)
 add_test(NAME device_service_regression COMMAND device_service_regression)
 
-# Local loopback HTTP API. Sensitive and hardware operations remain disabled
-# until authentication, authorization and measurement services are integrated.
+# Server-owned serial adapter: physical samples must pass the active acquisition session.
+add_executable(acquisition_serial_adapter_regression
+    tests/acquisition_serial_adapter_regression.cpp
+    src/sensor/AcquisitionSerialDeviceAdapter.cpp
+    src/sensor/SerialCommunication.cpp
+    src/core/DebugManager.cpp
+    include/core/DebugManager.hpp
+)
+set_target_properties(acquisition_serial_adapter_regression PROPERTIES AUTOMOC ON)
+target_include_directories(acquisition_serial_adapter_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(acquisition_serial_adapter_regression PRIVATE
+    biofeedback_application_services biofeedback_sensor_protocol Qt5::Core Threads::Threads)
+add_test(NAME acquisition_serial_adapter_regression COMMAND acquisition_serial_adapter_regression)
+set_tests_properties(acquisition_serial_adapter_regression PROPERTIES TIMEOUT 20)
+
+# Local loopback HTTP API. Hardware acquisition is opt-in and requires an explicitly
+# configured, connected serial adapter plus an authorized active patient session.
 add_executable(biofeedback_api
     src/api/main.cpp
     src/api/HttpApiServer.cpp
+    src/sensor/AcquisitionSerialDeviceAdapter.cpp
+    src/sensor/SerialCommunication.cpp
+    src/core/DebugManager.cpp
+    include/core/DebugManager.hpp
     include/api/HttpApiServer.hpp
 )
 set_target_properties(biofeedback_api PROPERTIES AUTOMOC ON)
 target_include_directories(biofeedback_api PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core biofeedback_data_repository biofeedback_application_services)
+target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core biofeedback_data_repository biofeedback_application_services biofeedback_sensor_protocol Threads::Threads)
 
 # HTTP API authentication and bearer-session lifecycle regression.
 add_executable(api_auth_regression
