@@ -11,6 +11,7 @@
 #include <QUuid>
 
 #include <limits>
+#include <utility>
 
 namespace biofeedback::data {
 namespace {
