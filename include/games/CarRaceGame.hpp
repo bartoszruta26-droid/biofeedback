@@ -17,6 +17,8 @@ class CarRaceGame final : public GameEngine
 public:
     explicit CarRaceGame(QWidget *parent = nullptr);
     QString gameName() const override;
+    int livesRemaining() const { return m_lives; }
+    int obstacleCount() const { return m_obstacles.size(); }
 
 protected:
     void initialize() override;
