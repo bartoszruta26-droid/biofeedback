@@ -114,4 +114,25 @@ for label, content in (("MeasurementTab", source), ("TrainingTab", training_sour
     if content.count("m_measurementDrainScheduled = false;") < 2:
         raise SystemExit(f"{label}: failed scheduling must release the drain flag")
 
+
+# ForcePlotWidget must keep the visible-window trace in O(1)-amortized append
+# and expiry time; per-sample full-window scans and QVector front shifts add lag.
+plot_header = header
+plot_source = source
+for required in (
+    "std::deque<double> m_forces",
+    "std::deque<double> m_times",
+    "std::deque<std::pair<double, double>> m_maxCandidates",
+    "std::deque<std::pair<double, double>> m_minCandidates",
+    "m_maxCandidates.emplace_back(time, force)",
+    "m_minCandidates.emplace_back(time, force)",
+):
+    if required not in plot_header and required not in plot_source:
+        raise SystemExit(f"Missing constant-time live plot invariant: {required}")
+add_sample_start = plot_source.index("void ForcePlotWidget::addSample")
+add_sample_end = plot_source.index("void ForcePlotWidget::clearData", add_sample_start)
+add_sample_body = plot_source[add_sample_start:add_sample_end]
+if "removeFirst()" in add_sample_body or "for (double sample : m_forces)" in add_sample_body:
+    raise SystemExit("ForcePlotWidget must not shift or rescan the full visible trace per sample")
+
 print("Measurement, training and game realtime dispatch regression passed")
