@@ -572,6 +572,15 @@ file(COPY ${CMAKE_SOURCE_DIR}/resources DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY ${CMAKE_SOURCE_DIR}/data DESTINATION ${CMAKE_BINARY_DIR})
 
 # Testing
+# Static regression for bounded, low-latency Qt sensor dispatch paths.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME measurement_tab_lifecycle_regression
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/measurement_tab_lifecycle_regression.py)
+    set_tests_properties(measurement_tab_lifecycle_regression PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
+
 enable_testing()
 if(TARGET game_engine_regression)
     add_test(NAME game_engine_regression COMMAND game_engine_regression)
