@@ -62,6 +62,15 @@ add_executable(acquisition_journal_regression tests/acquisition_journal_regressi
 target_link_libraries(acquisition_journal_regression PRIVATE biofeedback_acquisition_journal Qt5::Core)
 add_test(NAME acquisition_journal_regression COMMAND acquisition_journal_regression)
 
+# Bounded asynchronous JSONL writer used by the desktop measurement tab.
+add_executable(sample_journal_writer_regression
+    tests/sample_journal_writer_regression.cpp
+    src/tab/SampleJournalWriter.cpp
+)
+target_include_directories(sample_journal_writer_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(sample_journal_writer_regression PRIVATE Qt5::Core Threads::Threads)
+add_test(NAME sample_journal_writer_regression COMMAND sample_journal_writer_regression)
+
 # Shared encrypted JSON resource repository for patients, measurements, training and games.
 add_library(biofeedback_data_repository STATIC src/data/JsonResourceRepository.cpp)
 target_include_directories(biofeedback_data_repository PUBLIC ${CMAKE_SOURCE_DIR}/include)
