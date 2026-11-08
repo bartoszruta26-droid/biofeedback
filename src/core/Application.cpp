@@ -445,13 +445,13 @@ void Application::setupConnections()
                 }
                 QJsonObject patient;
                 QString lookupError;
-                if (!findPatientByPesel(patientPesel, patient, &lookupError)) {
-                    if (m_logger) m_logger->warning(
-                        "Measurement session was not archived: patient lookup failed or patient is missing.");
-                    return;
-                }
+                const bool patientFound = findPatientByPesel(patientPesel, patient, &lookupError);
                 if (!lookupError.isEmpty()) {
                     if (m_logger) m_logger->warning("Measurement patient lookup failed.");
+                    return;
+                }
+                if (!patientFound) {
+                    if (m_logger) m_logger->warning("Measurement session was not archived: patient is missing.");
                     return;
                 }
                 const QJsonObject payload = m_measurementTab->buildSharedSessionRecord(
