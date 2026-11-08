@@ -438,13 +438,20 @@ Docelowe rodziny endpointów obejmują `/api/v1/patients`,
 `/api/v1/training-results`, `/api/v1/game-sessions`,
 `/api/v1/game-results` oraz kanał zdarzeń WebSocket lub SSE.
 
-**Stan obecny:** działający prototyp HTTP udostępnia `GET /healthz`,
-`GET /api/v1/status`, logowanie `POST /api/v1/auth/login`,
-`GET /api/v1/auth/me` i wylogowanie `POST /api/v1/auth/logout`.
-Nie udostępnia jeszcze CRUD pacjentów, trwałego API pomiarów/treningów/gier
-ani serwerowego WebSocket. Domyślnie nasłuchuje na loopback; nie wystawiaj
-prototypu bezpośrednio do sieci publicznej. Pełna autoryzacja zasobów i wspólne
-usługi domenowe są wymagane przed wdrożeniem wieloklientowym.
+**Stan obecny:** serwer udostępnia health/status, logowanie i wylogowanie
+oraz CRUD sześciu kolekcji: pacjenci, pomiary, sesje treningowe, wyniki treningów,
+sesje gier i wyniki gier. Aktualizacja i usunięcie wymagają numeru wersji rekordu;
+konflikt zwracany jest jako HTTP 409. Desktop uruchamia API loopback po
+inicjalizacji i współdzieli z nim tę samą instancję repozytorium. Endpointy
+danych są obecnie ograniczone do roli `administrator` do czasu wdrożenia
+pełnych zakresów RBAC. Serwer nie udostępnia jeszcze WebSocket/SSE.
+
+WebUI ma klienta CRUD dla wszystkich kolekcji. Android ma klienta CRUD,
+a ekran Pacjenci obsługuje odczyt, dodawanie, edycję i usuwanie kart.
+TUI nie jest jeszcze klientem API. Producenci danych pomiarowych, treningowych
+i wyników gier w Desktop/TUI nie są jeszcze w pełni przepięci na wspólny zapis
+serwerowy. Serwer nasłuchuje domyślnie wyłącznie na loopback; zdalny Android
+wymaga bramy HTTPS/WSS. Nie wystawiaj prototypu HTTP bezpośrednio do sieci publicznej.
 
 Szczegółowy opis decyzji i etapów wdrożenia znajduje się w
 [docs/ARCHITECTURE_SHARED_DATA_SERVER.md](docs/ARCHITECTURE_SHARED_DATA_SERVER.md).
@@ -583,25 +590,27 @@ Wyniki gier nie są jeszcze zapisywane we wspólnym repozytorium serwera.
 
 ### 11. Dane pacjentów i prywatność
 
-W bieżącej aplikacji Desktop pacjenci są obsługiwani przez lokalny magazyn
-plikowy oparty na `DataManager`. Konfiguracja `data.base_path` określa katalog
-danych. Nazwy katalogów rekordów są wyprowadzane z identyfikatora skrótem,
-zamiast używać bezpośrednio danych identyfikacyjnych w ścieżce. Zapis plikowy
-korzysta z atomowego zapisu Qt `QSaveFile`.
+Desktop i serwer API korzystają ze wspólnego `JsonResourceRepository`
+w katalogu danych aplikacji `shared-data`. Karty pacjentów mają identyfikatory
+UUID, metadane wersji i znaczniki czasu; nazwy plików nie ujawniają PESEL.
+Zapis jest atomowy przez Qt `QSaveFile`, a katalogi i pliki otrzymują
+uprawnienia tylko dla właściciela. Pierwsze uruchomienie migruje stare pliki
+pacjentów do repozytorium; źródła migracji pozostają zachowane do czasu
+usunięcia karty przez operatora.
 
-Szyfrowanie danych w `DataManager` jest dostępne, ale w profilu deweloperskim
-może być wyłączone. Przed użyciem z rzeczywistymi danymi pacjentów należy
-wdrożyć i zweryfikować profil produkcyjny z szyfrowaniem oraz kluczem
-`BIOFEEDBACK_ENCRYPTION_KEY`. Nie należy przechowywać klucza w repozytorium.
-Uprawnienia do katalogu danych i kopii zapasowych powinny być ograniczone
-do konta usługi/operatora.
+Gdy `encryption.enabled=true`, rekordy repozytorium są szyfrowane AES-256-GCM
+kluczem `BIOFEEDBACK_ENCRYPTION_KEY`. W profilu deweloperskim szyfrowanie może
+pozostawać wyłączone; przed użyciem rzeczywistych danych pacjentów wymagane
+jest włączenie szyfrowania, bezpieczne przechowanie klucza i sprawdzenie kopii
+zapasowych. Brak klucza przy włączonym szyfrowaniu powoduje fail-closed.
+Nie należy przechowywać klucza w repozytorium.
 
-Wybór `storage.patient_backend` dotyczy backendu kart pacjentów. Obecnie
-`files` jest obsługiwany; `mariadb` jest skonfigurowane i walidowane, lecz
-adapter MariaDB nie jest jeszcze dostępny. Pomiary, treningi i gry nie mają
-jeszcze kompletnego wspólnego, trwałego repozytorium API. Nie zakładaj więc,
-że dane lokalne TUI, Desktop i przyszłe rekordy serwera są już automatycznie
-synchronizowane.
+Wybór `storage.patient_backend` nadal dotyczy backendu kart pacjentów.
+`files` jest obsługiwany; adapter MariaDB nie jest jeszcze dostępny.
+Kolekcje pomiarów, treningów i gier mają wspólny serwerowy CRUD, lecz integracja
+producentów tych danych i klienta TUI pozostaje w toku. Nie należy zakładać
+pełnej synchronizacji wszystkich pięciu interfejsów, dopóki te etapy nie
+zostaną ukończone i potwierdzone testami integracyjnymi.
 
 ## Configuration
 
