@@ -160,7 +160,7 @@ bool AcquisitionJournal::append(quint64 sequence, const QJsonObject& payload, QS
     m_pendingBytes += payloadBytes;
     m_lastSequence = sequence;
     if (m_pending.size() >= MaxBatchSamples || m_pendingBytes >= MaxBatchPlainBytes) {
-        if (!flush(error)) {
+        if (!flushLocked(error)) {
             m_pending.removeLast();
             m_pendingBytes -= payloadBytes;
             m_lastSequence = sequence - 1;
@@ -172,6 +172,10 @@ bool AcquisitionJournal::append(quint64 sequence, const QJsonObject& payload, QS
 
 bool AcquisitionJournal::flush(QString* error) {
     QMutexLocker lock(&m_mutex);
+    return flushLocked(error);
+}
+
+bool AcquisitionJournal::flushLocked(QString* error) {
     if (error) error->clear();
     if (!isReady()) { setError(error, m_initializationError); return false; }
     if (m_pending.isEmpty()) return true;
