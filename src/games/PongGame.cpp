@@ -207,7 +207,8 @@ void PongGame::checkCollisions() {
         // Odbicie piłki z lekkim przyspieszeniem
         // Zachowaj ograniczoną prędkość całkowitą i wyznacz oba składniki
         // wektora z jednego kąta odbicia (bez niekontrolowanego przyspieszania).
-        const float hitPos = (m_ballPos.y() - m_leftPaddle.top()) / m_paddleHeight;
+        const float hitPos = qBound(0.0f,
+            (m_ballPos.y() - m_leftPaddle.top()) / qMax(1.0f, m_paddleHeight), 1.0f);
         const float angle = (hitPos - 0.5f) * 1.5f;
         const double speed = qMin(
             std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
@@ -225,7 +226,8 @@ void PongGame::checkCollisions() {
         m_ballPos.y() + m_ballRadius >= m_rightPaddle.top() &&
         m_ballPos.y() - m_ballRadius <= m_rightPaddle.bottom()) {
         
-        const float hitPos = (m_ballPos.y() - m_rightPaddle.top()) / m_paddleHeight;
+        const float hitPos = qBound(0.0f,
+            (m_ballPos.y() - m_rightPaddle.top()) / qMax(1.0f, m_paddleHeight), 1.0f);
         const float angle = (hitPos - 0.5f) * 1.5f;
         const double speed = qMin(
             std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
@@ -237,11 +239,11 @@ void PongGame::checkCollisions() {
     }
     
     // Punktacja - piłka poza ekranem
-    if (m_ballPos.x() < 0) {
+    if (m_ballPos.x() + m_ballRadius < 0) {
         // Punkt dla AI
         m_aiScore++;
         resetBall();
-    } else if (m_ballPos.x() > width()) {
+    } else if (m_ballPos.x() - m_ballRadius > width()) {
         // Punkt dla gracza
         m_playerScore++;
         addScore(10); // 10 punktów za każde trafienie
