@@ -155,6 +155,12 @@ int main(int argc, char **argv)
     QApplication::sendEvent(galagaGame, &galagaFireUp);
     REQUIRE(galagaGame->isRunning());
     REQUIRE(galagaGame->getScore() > 0); // A player shot must hit an enemy.
+    galagaGame->resize(180, 120);
+    waitForEvents(80);
+    REQUIRE(galagaGame->isRunning());
+    galagaGame->resize(640, 480);
+    waitForEvents(80);
+    REQUIRE(galagaGame->isRunning());
     galagaGame->stop();
 
     std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
@@ -184,10 +190,13 @@ int main(int argc, char **argv)
     carRaceGame->handleSensorInput(95.0);
     QKeyEvent carLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
     QApplication::sendEvent(carRaceGame, &carLeft);
-    waitForEvents(120);
+    waitForEvents(1400); // Allow the first obstacle to spawn before resizing.
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->resize(180, 120);
     carRaceGame->handleSensorInput(50.0);
+    waitForEvents(120);
+    REQUIRE(carRaceGame->isRunning());
+    carRaceGame->resize(640, 480);
     waitForEvents(120);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->stop();
