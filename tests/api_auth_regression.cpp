@@ -124,7 +124,7 @@ int main(int argc, char** argv) {
     const QByteArray patientPayload = QJsonDocument(QJsonObject{
         {"firstName", QStringLiteral("API")},
         {"lastName", QStringLiteral("Patient")},
-        {"patient_reference", QStringLiteral("test-patient-001")}
+        {"pesel", QStringLiteral("TEST-PATIENT-001")}
     }).toJson(QJsonDocument::Compact);
     const QByteArray createPatient = resourceRequest("POST", "/api/v1/patients", patientPayload);
     assert(statusCode(createPatient) == 201);
@@ -142,13 +142,14 @@ int main(int argc, char** argv) {
         "GET", ("/api/v1/patients/" + patientId).toUtf8());
     assert(statusCode(getPatient) == 200);
     assert(QJsonDocument::fromJson(responseBody(getPatient)).object()
-               .value("patient_reference").toString() == "test-patient-001");
+               .value("pesel").toString() == "TEST-PATIENT-001");
 
     const QByteArray updatePayload = QJsonDocument(QJsonObject{
         {"expected_version", 1},
         {"record", QJsonObject{
             {"firstName", QStringLiteral("Changed")},
-            {"lastName", QStringLiteral("Patient")}
+            {"lastName", QStringLiteral("Patient")},
+            {"pesel", QStringLiteral("TEST-PATIENT-001")}
         }}
     }).toJson(QJsonDocument::Compact);
     const QByteArray updatePatient = resourceRequest(
