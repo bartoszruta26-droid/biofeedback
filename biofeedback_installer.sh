@@ -1997,14 +1997,16 @@ option_8_factory() {
 
     if [[ "$purge_patient_data" == "USUŃ DANE POMIAROWE" ]]; then
         local patient_data_dir="$REPO_DIR/data/patients"
-        if [ -L "$patient_data_dir" ]; then
-            print_warning "Odmowa usunięcia: katalog danych jest dowiązaniem symbolicznym."
+        if [ -L "$REPO_DIR" ] || [ -L "$REPO_DIR/data" ] || [ -L "$patient_data_dir" ]; then
+            print_warning "Odmowa usunięcia: ścieżka repozytorium lub danych jest dowiązaniem symbolicznym."
         elif [ -d "$patient_data_dir" ]; then
+            local resolved_repo_root
             local resolved_data_dir
             local resolved_data_root
+            resolved_repo_root=$(realpath -e -- "$REPO_DIR") || resolved_repo_root=""
             resolved_data_dir=$(realpath -e -- "$patient_data_dir") || resolved_data_dir=""
             resolved_data_root=$(realpath -e -- "$REPO_DIR/data") || resolved_data_root=""
-            if [[ -n "$resolved_data_dir" && -n "$resolved_data_root" && "$resolved_data_dir" == "$resolved_data_root/patients" ]]; then
+            if [[ -n "$resolved_repo_root" && -n "$resolved_data_dir" && -n "$resolved_data_root" && "$resolved_data_root" == "$resolved_repo_root/data" && "$resolved_data_dir" == "$resolved_repo_root/data/patients" ]]; then
                 find "$resolved_data_dir" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
                 echo "  - Usunięto zawartość katalogu danych pacjentów."
                 data_removed=1
