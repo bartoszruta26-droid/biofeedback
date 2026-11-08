@@ -640,6 +640,7 @@ void Application::setupConnections()
                         m_logger->warning("Shared patient repository delete failed: " + error.toStdString());
                 } else {
                     repositoryDeleteSucceeded = true;
+                    patientVersions->remove(pesel);
                 }
                 // Retire the legacy local chart only after the canonical record is deleted.
                 if (repositoryDeleteSucceeded) {
