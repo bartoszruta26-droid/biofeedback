@@ -249,10 +249,6 @@ if(Qt5_FOUND)
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
-        include/games/GalagaGame.hpp
-        include/games/ArcherGame.hpp
-        include/games/CarRaceGame.hpp
-        include/games/ScorchedEarthGame.hpp
         include/formulas.hpp
     )
 
