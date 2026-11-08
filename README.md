@@ -770,9 +770,9 @@ Please read CONTRIBUTING.md for details on our code of conduct and the process f
 This software is for research and development purposes. For medical use, proper certification and regulatory approval are required.
 
 
-## Lokalny serwer API
+## Wspólny serwer danych API
 
-Minimalny serwer statusu HTTP (Qt Network) można zbudować i uruchomić:
+Samodzielny serwer HTTP (Qt Network) można zbudować i uruchomić:
 
     cmake -S . -B build
     cmake --build build --target biofeedback_api
