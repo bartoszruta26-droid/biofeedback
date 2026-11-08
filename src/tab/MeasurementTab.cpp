@@ -604,7 +604,7 @@ bool MeasurementTab::commitMeasurementSample(
     QJsonObject record;
     record["recordType"] = "sample";
     record["sequence"] = static_cast<qint64>(sequence);
-    record["timestampUnixMs"] = sample.timestampUnixMs;
+    record["timestampUnixMs"] = static_cast<qint64>(sample.timestampUnixMs);
     record["deviceTimestampMs"] = static_cast<qint64>(sample.deviceTimestampMs);
     record["elapsedTimeSeconds"] = elapsed;
     record["value"] = archivedValue;
