@@ -29,7 +29,7 @@ assert '"baud_rate": 115200' in example
 assert '"algorithm": "AES-256-GCM"' in example
 assert '"key_derivation": "SHA-256 key normalization (32+ byte external secret)"' in example
 assert '"require_authentication": true' in example
-assert '"actuators_enabled": false' in example
+assert "ir_pwm" not in example and "electrodes" not in example and "antenna" not in example
 assert "constexpr bool DEBUG_VERBOSE = false;" in main
 assert "constexpr bool DEBUG_EXCEPTION_TRACE = false;" in main
 assert "constexpr bool DEBUG_SIGNALS = false;" in main
