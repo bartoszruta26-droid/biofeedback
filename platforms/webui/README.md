@@ -12,19 +12,20 @@ Z katalogu głównego repozytorium:
 
 Następnie otwórz http://localhost:8080.
 
-## Klient API
+## Klient API i widoki danych
 
 `api-client.js` udostępnia `window.BiofeedbackApi.createApiClient()`:
-- status i lista urządzeń,
-- połączenie i rozłączenie urządzenia,
-- sesje pomiarowe i repozytorium pacjentów,
-- subskrypcje WebSocket dla pomiarów i zdarzeń,
+- logowanie Bearer i wylogowanie;
+- CRUD pacjentów, pomiarów, sesji/wyników treningowych oraz sesji/wyników gier;
+- kontrolę wersji rekordów przy aktualizacji i usuwaniu;
 - ujednolicone błędy HTTP, sieci i niepoprawnej odpowiedzi.
 
-Klient domyślnie używa tego samego pochodzenia (same-origin). Interfejs
-wykonuje kontrolne żądanie `GET /api/v1/status`; brak serwera jest jawnie
-pokazywany jako stan niedostępności. Nie ma trybu zastępczego z fikcyjnymi
-danymi. Polecenia urządzeń nie są wysyłane automatycznie.
+Po zalogowaniu strony Pacjenci, Pomiary i Trening pobierają dane z tych samych
+kolekcji API. Karty pacjentów można dodawać, edytować i usuwać; pozostałe strony
+wyświetlają archiwum pomiarów, treningów i gier. Klient domyślnie używa tego
+samego pochodzenia (same-origin). Brak serwera i brak uprawnień są jawnie
+pokazywane. Nie ma trybu zastępczego z fikcyjnymi danymi. WebSocket i
+strumieniowanie pomiarów czasu rzeczywistego nie są jeszcze dostępne.
 
 ## Ważne ograniczenie wersji 0.2
 
