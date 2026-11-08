@@ -208,6 +208,7 @@ protected:
     
     quint64 m_frameCount;
     quint64 m_invalidInputCount;
+    std::atomic<quint64> m_pendingInvalidInputCount{0};
 
     // Coalesce high-rate worker-thread sensor callbacks into one GUI dispatch.
     std::atomic<double> m_pendingSensorValue{0.0};
