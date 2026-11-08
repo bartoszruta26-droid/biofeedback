@@ -1297,11 +1297,14 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
     bool journalWriteFailed = false;
-    if (m_sampleJournalWriter.isAccepting() && !appendSampleJournal(recorded)) {
-        m_sampleJournalFailed = true;
-        journalWriteFailed = true;
-        if (m_lblStatus)
-            m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — pomiar zostanie zatrzymany"));
+    if (m_isMeasuring && !m_sampleJournalPath.isEmpty() && !m_sampleJournalFailed) {
+        // A worker-side disk error may close admission between two samples.
+        if (!m_sampleJournalWriter.isAccepting() || !appendSampleJournal(recorded)) {
+            m_sampleJournalFailed = true;
+            journalWriteFailed = true;
+            if (m_lblStatus)
+                m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — pomiar zostanie zatrzymany"));
+        }
     }
 
     if (m_rawBox)
@@ -2176,7 +2179,6 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_patientId = session.patientId;
         m_sampleJournalPath.clear();
         m_activeSessionId.clear();
-        m_sampleJournalPendingWrites = 0;
         m_sampleJournalFailed = false;
         m_completedSeriesStats = session.series;
         m_recordedSamples = session.samples;
