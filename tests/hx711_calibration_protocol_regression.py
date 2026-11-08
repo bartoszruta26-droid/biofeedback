@@ -26,10 +26,15 @@ required_firmware = [
     "strtod(buffer + 4, &end_ptr)",
     "isfinite(parsed_weight)",
     "isfinite(proposed_factor)",
+    "return LONG_MIN;",
+    "return INT32_MIN;  // Preserve timeout separately from a valid zero sample",
+    "if (raw != LONG_MIN)",
 ]
 for token in required_firmware:
     assert token in firmware, f"missing Nano firmware invariant: {token}"
 assert "atof(buffer + 4)" not in firmware
+assert r"*end_ptr == '\\t'" in firmware, "calibration parser must use a single escaped tab character"
+assert r"*end_ptr == '\\0'" in firmware, "calibration parser must use a single escaped NUL terminator"
 
 assert "hasCalibratedValue" in header
 assert "data.hasCalibratedValue = calibrationConfirmed;" in serial
