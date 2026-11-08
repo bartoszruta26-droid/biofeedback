@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - integration/all-work
+      - main
     paths:
       - 'platforms/android/**'
       - '.github/workflows/android-ui.yml'
