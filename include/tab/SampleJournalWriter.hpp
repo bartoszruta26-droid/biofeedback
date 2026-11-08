@@ -11,6 +11,8 @@
 #include <thread>
 #include <utility>
 
+class QFile;
+
 namespace tab {
 
 /**
@@ -40,7 +42,7 @@ public:
 
 private:
     void run(QString path, QByteArray headerLine);
-    bool flushFile();
+    bool flushFile(QFile& file);
 
     mutable std::mutex m_mutex;
     std::condition_variable m_workAvailable;
