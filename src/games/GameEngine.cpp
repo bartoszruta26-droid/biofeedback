@@ -192,6 +192,7 @@ void GameEngine::reset()
     m_sensorDispatchGeneration.fetch_add(1, std::memory_order_acq_rel);
     m_sensorDispatchQueued.store(false, std::memory_order_release);
     m_pendingSensorValue.store(0.0, std::memory_order_relaxed);
+    m_pendingSensorValueAvailable.store(false, std::memory_order_relaxed);
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
 
     // Zatrzymanie gry
