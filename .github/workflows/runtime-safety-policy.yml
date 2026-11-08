@@ -8,6 +8,8 @@ on:
       - 'src/main.cpp'
       - 'src/core/DebugManager.cpp'
       - 'src/data/Encryption.cpp'
+      - 'src/core/ConfigManager.cpp'
+      - 'config/config.json.example'
       - 'config/config.json'
       - 'include/sensor/**'
       - 'src/sensor/**'
