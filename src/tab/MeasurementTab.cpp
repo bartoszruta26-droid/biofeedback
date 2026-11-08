@@ -4,6 +4,7 @@
 #include "measurement/Units.hpp"
 #include "core/RuntimePaths.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "tab/SampleJournalWriter.hpp"
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QTextStream>
@@ -501,12 +502,11 @@ void MeasurementTab::ensureCurrentSeriesInitialized()
 
 bool MeasurementTab::openSampleJournal()
 {
-    if (m_sampleJournal.isOpen()) return true;
+    if (m_sampleJournalWriter.isAccepting()) return true;
     if (m_sampleJournalFailed) {
-        // Keep the failed journal for recovery and start a fresh segment.
+        // Preserve the failed segment for recovery and begin a fresh journal.
         m_sampleJournalPath.clear();
         m_activeSessionId.clear();
-        m_sampleJournalPendingWrites = 0;
         m_sampleJournalFailed = false;
     }
     if (m_sampleJournalPath.isEmpty()) {
@@ -518,12 +518,8 @@ bool MeasurementTab::openSampleJournal()
             QStringLiteral("pomiar_%1.jsonl").arg(m_activeSessionId));
     }
 
-    const bool newFile = !QFile::exists(m_sampleJournalPath);
-    m_sampleJournal.setFileName(m_sampleJournalPath);
-    if (!m_sampleJournal.open(QIODevice::WriteOnly | QIODevice::Append))
-        return false;
-
-    if (newFile) {
+    QByteArray headerLine;
+    if (!QFile::exists(m_sampleJournalPath)) {
         QJsonObject header;
         header["recordType"] = "header";
         header["schemaVersion"] = 1;
@@ -535,16 +531,15 @@ bool MeasurementTab::openSampleJournal()
             ? m_elasticConstantInput->value() : 0.0;
         header["patientMassKg"] = m_patientMassInput
             ? m_patientMassInput->value() : 0.0;
-        const QByteArray line = QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n';
-        if (m_sampleJournal.write(line) != line.size() || !flushSampleJournal()) {
-            closeSampleJournal();
-            QFile::remove(m_sampleJournalPath);
-            m_sampleJournalPath.clear();
-            m_activeSessionId.clear();
-            return false;
-        }
-        QFile::setPermissions(m_sampleJournalPath,
-                              QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+        headerLine = QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n';
+    }
+
+    QString error;
+    if (!m_sampleJournalWriter.open(m_sampleJournalPath, headerLine, &error)) {
+        m_sampleJournalFailed = true;
+        if (m_lblStatus)
+            m_lblStatus->setText(tr("Status: BŁĄD OTWARCIA DZIENNIKA — %1").arg(error));
+        return false;
     }
     m_sampleJournalFailed = false;
     return true;
@@ -552,7 +547,8 @@ bool MeasurementTab::openSampleJournal()
 
 bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample)
 {
-    if (!m_sampleJournal.isOpen() || m_sampleJournalFailed) return false;
+    if (!m_sampleJournalWriter.isAccepting() || m_sampleJournalFailed)
+        return false;
 
     QJsonObject record;
     record["recordType"] = "sample";
@@ -569,15 +565,7 @@ bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample
     record["source"] = sample.source;
     record["quality"] = sample.quality;
     const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
-    if (m_sampleJournal.write(line) != line.size()) {
-        m_sampleJournalFailed = true;
-        return false;
-    }
-
-    ++m_sampleJournalPendingWrites;
-    // Bound the unflushed window to at most 31 samples. This avoids a full
-    // JSON rewrite in the acquisition path while keeping recovery loss bounded.
-    if (m_sampleJournalPendingWrites >= 32 && !flushSampleJournal()) {
+    if (!m_sampleJournalWriter.append(line)) {
         m_sampleJournalFailed = true;
         return false;
     }
@@ -586,20 +574,16 @@ bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample
 
 bool MeasurementTab::flushSampleJournal()
 {
-    if (!m_sampleJournal.isOpen()) return true;
-    if (!m_sampleJournal.flush()) return false;
-#ifdef Q_OS_UNIX
-    if (::fsync(m_sampleJournal.handle()) != 0) return false;
-#endif
-    m_sampleJournalPendingWrites = 0;
-    return true;
+    const bool flushed = m_sampleJournalWriter.finish();
+    if (!flushed)
+        m_sampleJournalFailed = true;
+    return flushed;
 }
 
 void MeasurementTab::closeSampleJournal()
 {
-    if (!m_sampleJournal.isOpen()) return;
-    flushSampleJournal();
-    m_sampleJournal.close();
+    if (!m_sampleJournalWriter.finish())
+        m_sampleJournalFailed = true;
 }
 
 bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
@@ -994,7 +978,7 @@ void MeasurementTab::setPatientId(const QString& id)
     // recoverable only in the directory belonging to its original patient.
     const bool hasActivePatientData =
         !m_recordedSamples.isEmpty() || !m_completedSeriesStats.isEmpty() ||
-        m_sampleJournal.isOpen() || !m_sampleJournalPath.isEmpty();
+        m_sampleJournalWriter.isAccepting() || !m_sampleJournalPath.isEmpty();
     if (hasActivePatientData)
         resetSession();
 
@@ -1194,8 +1178,7 @@ void MeasurementTab::resetSession()
     closeSampleJournal();
     m_sampleJournalPath.clear();
     m_activeSessionId.clear();
-    m_sampleJournalPendingWrites = 0;
-    m_sampleJournalFailed = false;
+        m_sampleJournalFailed = false;
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
@@ -1313,10 +1296,12 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
-    if (m_sampleJournal.isOpen()) {
-        const bool wasFailed = m_sampleJournalFailed;
-        if (!appendSampleJournal(recorded) && !wasFailed && m_lblStatus)
-            m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA"));
+    bool journalWriteFailed = false;
+    if (m_sampleJournalWriter.isAccepting() && !appendSampleJournal(recorded)) {
+        m_sampleJournalFailed = true;
+        journalWriteFailed = true;
+        if (m_lblStatus)
+            m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — pomiar zostanie zatrzymany"));
     }
 
     if (m_rawBox)
@@ -1357,6 +1342,8 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     updateLiveDisplay(forceValue);
 
     updateRawTableBatch();
+    if (journalWriteFailed && m_isMeasuring)
+        stopMeasurement();
 }
 
 void MeasurementTab::updateRawTableBatch(bool force)
