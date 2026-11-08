@@ -419,20 +419,31 @@ void drawModule(tui::Screen screen,
         }
         break;
     }
-    case tui::Screen::Patients:
+    case tui::Screen::Patients: {
+        QString selectedPatientId;
+        {
+            std::lock_guard<std::mutex> lock(live.mutex);
+            selectedPatientId = live.selectedPatientId;
+        }
         drawText(8, x + 2, "Karty pobrane z tego samego repozytorium co Desktop i WebUI.");
         if (patientSummaries.empty()) {
             drawText(10, x + 2, "Brak kart pacjentow lub brak uprawnien do ich odczytu.");
         } else {
             const int visible = std::min<int>(static_cast<int>(patientSummaries.size()), LINES - 14);
-            for (int i = 0; i < visible; ++i)
-                drawText(10 + i, x + 2, patientSummaries[static_cast<std::size_t>(i)], width - 4);
+            for (int i = 0; i < visible; ++i) {
+                const std::string& summary = patientSummaries[static_cast<std::size_t>(i)];
+                const bool selected = !selectedPatientId.isEmpty() &&
+                    summary.find(selectedPatientId.toStdString()) != std::string::npos;
+                drawText(10 + i, x + 2,
+                         std::string(selected ? "[WYBRANY] " : "          ") + summary, width - 4);
+            }
             if (static_cast<int>(patientSummaries.size()) > visible)
                 drawText(11 + visible, x + 2, "... pozostale rekordy: " +
                          std::to_string(patientSummaries.size() - static_cast<std::size_t>(visible)));
         }
-        drawText(LINES - 6, x + 2, "Odczyt odbywa sie przez uwierzytelnione API serwera.");
+        drawText(LINES - 6, x + 2, "Wybierz pacjenta: [ / ]   Brak wyboru = zapis bez przypisania.");
         break;
+    }
     case tui::Screen::Training: {
         bool active = false, paused = false;
         double target = 0.0;
@@ -633,6 +644,7 @@ int main(int argc, char** argv)
     sensor::SerialCommunication serial;
     serial.setVerbose(false);
     LiveData live;
+    int selectedPatientIndex = -1;
     auto measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
     // Firmware calibration is reported in grams. The shared engine normalizes
     // it to kilograms; presentation and training convert kg to SI force (N).
@@ -780,7 +792,6 @@ int main(int argc, char** argv)
                         live.currentSeries.clear();
                         live.sessionRepetitions.clear();
                         live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
-                        live.selectedPatientId.clear();
                         live.lastSeries = {};
                         live.trainingResting = false;
                         live.restRemaining = 0;
@@ -799,6 +810,18 @@ int main(int argc, char** argv)
                     live.trainingMessage = "Sesja zatrzymana przez operatora.";
                     live.repetitionDetector.reset();
                 }
+            }
+            break;
+        case '[':
+        case ']':
+            if (active == static_cast<std::size_t>(tui::Screen::Patients) && !patientIds.isEmpty()) {
+                if (ch == ']')
+                    selectedPatientIndex = (selectedPatientIndex + 1) % patientIds.size();
+                else
+                    selectedPatientIndex = selectedPatientIndex <= 0
+                        ? patientIds.size() - 1 : selectedPatientIndex - 1;
+                std::lock_guard<std::mutex> lock(live.mutex);
+                live.selectedPatientId = patientIds.at(selectedPatientIndex);
             }
             break;
         case 'p':
