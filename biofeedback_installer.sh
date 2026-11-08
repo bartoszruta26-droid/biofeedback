@@ -263,9 +263,13 @@ option_install_dependencies() {
         echo -e "${YELLOW}Configuring serial port permissions...${NC}"
         sudo usermod -a -G dialout $(whoami) 2>/dev/null || true
         
-        # Create udev rule for Arduino
-        echo -e "${CYAN}Creating udev rule for Arduino...${NC}"
-        echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", GROUP="dialout", MODE="0660"' | sudo tee /etc/udev/rules.d/50-arduino.rules > /dev/null 2>&1
+        # Install narrowly scoped serial-device permissions for Arduino and USB CDC.
+        echo -e "${CYAN}Installing serial-device udev rules...${NC}"
+        udev_rule_file="/etc/udev/rules.d/70-biofeedback-serial.rules"
+        udev_rule_content='SUBSYSTEM=="tty", KERNEL=="ttyUSB[0-9]*", GROUP="dialout", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="tty", KERNEL=="ttyACM[0-9]*", GROUP="dialout", MODE="0660", TAG+="uaccess"'
+        printf '%s\\n' "$udev_rule_content" | sudo tee "$udev_rule_file" > /dev/null
+        sudo chmod 0644 "$udev_rule_file"
         
         # Reload udev rules
         sudo udevadm control --reload-rules 2>/dev/null || true
