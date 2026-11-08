@@ -7,6 +7,7 @@ on:
       - 'biofeedback_installer.sh'
       - 'src/main.cpp'
       - 'src/core/DebugManager.cpp'
+      - 'src/data/Encryption.cpp'
       - 'config/config.json'
       - 'include/sensor/**'
       - 'src/sensor/**'
