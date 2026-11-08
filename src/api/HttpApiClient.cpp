@@ -94,6 +94,7 @@ bool HttpApiClient::request(const QByteArray& method, const QString& path,
     timer.stop();
 
     const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    payload.fill('\0');
     const QByteArray responseBytes = reply->readAll();
     const QString networkError = reply->errorString();
     reply->deleteLater();
