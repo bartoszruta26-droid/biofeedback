@@ -1012,7 +1012,11 @@ void SerialCommunication::startAsyncReading() {
                    m_impl->isConnected) {
                 SensorData data = readData(100);
                 if (data.hasFrame) notifyDataCallbacks(data);
-                std::this_thread::sleep_for(std::chrono::milliseconds(12));
+                // readData() already waits on the serial response with a bounded
+                // deadline. An additional fixed sleep throttles the acquisition
+                // loop (and adds up to 12 ms to every sample) without improving
+                // readiness or reducing busy-waiting.
+
             }
             {
                 std::lock_guard<std::mutex> workerLock(m_impl->asyncThreadMutex);

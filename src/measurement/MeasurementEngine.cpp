@@ -134,9 +134,10 @@ bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample&
         }
         ++m_nextSequence;
         m_history.push_back(sample);
+        // Keep the hot ingest path O(1): dropping the oldest sample must not
+        // shift the entire retained history on every acquisition frame.
         if (m_history.size() > m_config.historyCapacity)
-            m_history.erase(m_history.begin(), m_history.begin() +
-                            static_cast<std::ptrdiff_t>(m_history.size() - m_config.historyCapacity));
+            m_history.pop_front();
         callbacks.reserve(m_callbacks.size());
         for (const auto& entry : m_callbacks) callbacks.push_back(entry.second);
     }
@@ -185,7 +186,7 @@ void MeasurementEngine::unsubscribe(CallbackToken token) {
 
 std::vector<MeasurementSample> MeasurementEngine::history() const {
     std::lock_guard<std::mutex> lock(m_mutex);
-    return m_history;
+    return std::vector<MeasurementSample>(m_history.begin(), m_history.end());
 }
 
 void MeasurementEngine::clearHistory() {

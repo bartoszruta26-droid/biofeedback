@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <condition_variable>
+#include <deque>
 #include <functional>
 #include <map>
 #include <memory>
@@ -81,7 +82,7 @@ public:
 private:
     MeasurementEngineConfig m_config;
     mutable std::mutex m_mutex;
-    std::vector<MeasurementSample> m_history;
+    std::deque<MeasurementSample> m_history;
     struct CallbackEntry {
         explicit CallbackEntry(SampleCallback value) : callback(std::move(value)) {}
         SampleCallback callback;
