@@ -47,6 +47,7 @@
 - [x] Ograniczenie liczby oczekujących zdarzeń wejścia czujnika przez scalanie próbek do najnowszej wartości.
 - [x] `GameEngine::reset()` odtwarza również stan gry pochodnej; `start()` korzysta z tej samej ścieżki, bez podwójnego wywołania inicjalizacji. Test regresyjny sprawdza dokładną liczbę inicjalizacji po starcie, pauzie, resecie i ponownym uruchomieniu.
 - [x] Mario: inicjalizacja chmurek zabezpieczona dla widoku o zerowym rozmiarze; test resetu przed ustawieniem rozmiaru widgetu oraz podczas sesji.
+- [x] Mario: zabezpieczono wszystkie losowania położenia chmurek dodatnią granicą również podczas `initialize()` i aktualizacji po zmianie rozmiaru; poprawka statyczna, oczekuje na CI.
 - [x] Regresja dla serii 1000 próbek wysłanych z wątku roboczego.
 - [ ] Audyt i poprawki mechaniki istniejących gier (w pierwszej kolejności Arkanoid, Pong, Flappy Bird i Mario).
 - [x] Zabezpieczenia wejściowego deltaTime w Arkanoidzie, Flappy Bird, Mario, Sinus Force Trainer i Tan Force Trainer; normalizacja wektora odbicia piłki w Pongu.
@@ -75,6 +76,7 @@
 - [ ] Dalszy audyt mechaniki istniejących gier (Arkanoid, Pong, Flappy Bird i Mario), w tym kolizji i zachowania przy zmianie rozmiaru.
 - [x] CI dla commitu `98595bd8a3dd55ad0a4f2a267bac49f403cf044a`: 6/6 workflow zakończonych powodzeniem (Linux desktop GUI build, security regression i cztery polityki serial).
 - [ ] Scenariusz Galaga dodany w `1749b9d`, diagnostyczny getter w `9be675a`, a asercje czasu ochrony w `4367ea0`; wszystkie te zmiany oczekują na CI i nie były kompilowane/testowane.
+- [ ] Poprawka granic losowania chmurek Mario w `d156a81`; nie uruchamiano kompilacji ani testów zgodnie z bieżącym zakresem prac.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
