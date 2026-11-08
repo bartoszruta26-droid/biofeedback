@@ -20,6 +20,8 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <memory>
+#include <deque>
+#include <mutex>
 #include <vector>
 #include "training/RepetitionDetector.hpp"
 #include "training/TrainingSessionClock.hpp"
@@ -258,6 +260,8 @@ private slots:
     void onScoreChanged(int score);
 
 private:
+    void enqueueMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
+    void drainMeasurementSamples();
     void onMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void setupUI();
     void updateDisplay();
@@ -355,6 +359,10 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
     biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken = 0;
+    std::mutex m_measurementQueueMutex;
+    std::deque<biofeedback::measurement::MeasurementSample> m_measurementQueue;
+    bool m_measurementDrainScheduled{false};
+    std::size_t m_droppedMeasurementSamples{0};
     
     // Pomocnicze
     QString getExerciseDisplayName(int index) const;
