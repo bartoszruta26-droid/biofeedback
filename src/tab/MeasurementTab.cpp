@@ -1762,6 +1762,94 @@ QVector<SeriesStats> MeasurementTab::getAllSeriesStats() const
     return m_completedSeriesStats;
 }
 
+QJsonObject MeasurementTab::buildSharedSessionRecord(const QString& patientUuid) const
+{
+    if (patientUuid.isEmpty() || m_activeSessionId.isEmpty() || m_recordedSamples.isEmpty())
+        return {};
+
+    QJsonArray samples;
+    for (const RecordedMeasurementSample& sample : m_recordedSamples) {
+        samples.append(QJsonObject{
+            {QStringLiteral("sequence"), static_cast<qint64>(sample.sequence)},
+            {QStringLiteral("timestamp_unix_ms"), sample.timestampUnixMs},
+            {QStringLiteral("device_timestamp_ms"), static_cast<qint64>(sample.deviceTimestampMs)},
+            {QStringLiteral("elapsed_time_seconds"), sample.elapsedTimeSeconds},
+            {QStringLiteral("value"), sample.value},
+            {QStringLiteral("unit"), sample.unit},
+            {QStringLiteral("raw_value"), sample.hasRawValue ? QJsonValue(sample.rawValue) : QJsonValue()},
+            {QStringLiteral("has_raw_value"), sample.hasRawValue},
+            {QStringLiteral("calibrated_mass_kg"), sample.calibratedMassKg},
+            {QStringLiteral("has_calibrated_mass"), sample.hasCalibratedMass},
+            {QStringLiteral("source"), sample.source},
+            {QStringLiteral("quality"), sample.quality}
+        });
+    }
+
+    QJsonArray seriesRecords;
+    for (const SeriesStats& series : m_completedSeriesStats) {
+        QJsonArray repetitions;
+        for (const RepetitionStats& repetition : series.reps) {
+            repetitions.append(QJsonObject{
+                {QStringLiteral("repetition_number"), repetition.repNumber},
+                {QStringLiteral("peak_force_n"), repetition.peakForce},
+                {QStringLiteral("time_to_peak_seconds"), repetition.timeToPeak},
+                {QStringLiteral("rise_rate_n_per_s"), repetition.riseRate},
+                {QStringLiteral("fall_rate_n_per_s"), repetition.fallRate},
+                {QStringLiteral("duration_seconds"), repetition.duration},
+                {QStringLiteral("start_time_seconds"), repetition.startTime},
+                {QStringLiteral("end_time_seconds"), repetition.endTime},
+                {QStringLiteral("time_in_top_8_percent_seconds"), repetition.timeInTop8pct},
+                {QStringLiteral("time_in_bottom_8_percent_seconds"), repetition.timeInBottom8pct},
+                {QStringLiteral("impulse_ns"), repetition.areaUnderCurve},
+                {QStringLiteral("mean_force_n"), repetition.avgForce},
+                {QStringLiteral("median_force_n"), repetition.medianForce},
+                {QStringLiteral("mode_force_n"), repetition.modeForce},
+                {QStringLiteral("valid"), repetition.isValid}
+            });
+        }
+        seriesRecords.append(QJsonObject{
+            {QStringLiteral("series_number"), series.seriesNumber},
+            {QStringLiteral("average_peak_force_n"), series.avgPeakForce},
+            {QStringLiteral("median_peak_force_n"), series.medianPeakForce},
+            {QStringLiteral("fatigue_index_percent"), series.fatigueIndex},
+            {QStringLiteral("work_j"), series.totalWork},
+            {QStringLiteral("average_rise_rate_n_per_s"), series.avgRiseRate},
+            {QStringLiteral("average_fall_rate_n_per_s"), series.avgFallRate},
+            {QStringLiteral("series_speed_reps_per_s"), series.seriesSpeed},
+            {QStringLiteral("consistency_score_percent"), series.consistencyScore},
+            {QStringLiteral("total_impulse_ns"), series.impulseTotal},
+            {QStringLiteral("session_date"), series.sessionDate},
+            {QStringLiteral("repetitions"), repetitions}
+        });
+    }
+
+    const QDateTime startedAt = m_sessionStartTime > 0.0
+        ? QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(m_sessionStartTime * 1000.0), Qt::UTC)
+        : QDateTime();
+    const double elapsedSeconds = m_sessionElapsedTimer.isValid()
+        ? m_sessionElapsedOffsetSeconds + m_sessionElapsedTimer.elapsed() / 1000.0
+        : 0.0;
+
+    return QJsonObject{
+        {QStringLiteral("session_id"), m_activeSessionId},
+        {QStringLiteral("patient_id"), patientUuid},
+        {QStringLiteral("started_at"), startedAt.isValid()
+            ? startedAt.toString(Qt::ISODateWithMs) : QString()},
+        {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("status"), m_currentSeries > 3 ? QStringLiteral("completed") : QStringLiteral("stopped")},
+        {QStringLiteral("target_force_n"), m_targetForce},
+        {QStringLiteral("elapsed_seconds"), elapsedSeconds},
+        {QStringLiteral("elastic_constant_n_per_m"), m_elasticConstantInput
+            ? m_elasticConstantInput->value() : 0.0},
+        {QStringLiteral("patient_mass_kg"), m_patientMassInput
+            ? m_patientMassInput->value() : 0.0},
+        {QStringLiteral("sample_count"), samples.size()},
+        {QStringLiteral("samples"), samples},
+        {QStringLiteral("series"), seriesRecords},
+        {QStringLiteral("source_client"), QStringLiteral("desktop")}
+    };
+}
+
 void MeasurementTab::onToggleMeasurement()
 {
     if (m_isMeasuring) {
