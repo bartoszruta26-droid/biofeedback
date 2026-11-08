@@ -187,10 +187,9 @@ int main(int argc, char **argv)
     REQUIRE(carRaceGame != nullptr);
     carRaceGame->resize(640, 480);
     carRaceGame->start();
-    carRaceGame->handleSensorInput(95.0);
-    QKeyEvent carLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
-    QApplication::sendEvent(carRaceGame, &carLeft);
-    waitForEvents(1400); // Allow the first obstacle to spawn before resizing.
+    carRaceGame->handleSensorInput(50.0); // Stay in the first obstacle's deterministic lane.
+    waitForEvents(4000); // First obstacle spawns at 1.25 s and reaches the player after ~2 s.
+    REQUIRE(carRaceGame->livesRemaining() < 3);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->resize(180, 120);
     carRaceGame->handleSensorInput(50.0);
