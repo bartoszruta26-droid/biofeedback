@@ -50,3 +50,21 @@ Linux CI wykonało pełną kompilację aplikacji Qt, CTest, kontrolę zależnoś
 ## Status
 
 PR #200 zawiera poprawki routingu pacjenta, semantyki zawijania timestampu oraz synchronizacji cyklu życia callbacków, wraz z regresjami. CI zweryfikowano ponownie na aktualnym HEAD PR po tych zmianach. PR pozostaje skierowany do `integration/all-work`; `main` nie jest celem integracji.
+
+
+## GameEngine i gry — aktualizacja PR #203
+
+Stan audytu przed integracją zmian:
+- Wspólny `GameEngine` na bazie `integration/all-work` używa już zegara monotonicznego `QElapsedTimer`, symulacji ze stałym krokiem 120 Hz, akumulatora czasu, pomiaru czasu aktywnej sesji i kolejkowania próbek z wątku roboczego.
+- `getGameStats()` i `resetGameStats()` są zaimplementowane. Statystyki czasu, klatek i nieprawidłowych wejść są zachowywane niezależnie od renderowania.
+- Regresja `game_engine_regression` sprawdza cykl życia, pauzę/wznowienie, przekazanie próbki z wątku roboczego, NaN, statystyki i nasycanie wyniku.
+- Sinus zawiera korektę prędkości fazy i histerezę strefy trafienia.
+- Flappy Bird losuje rozmiar luki przed jej położeniem i kończy aktualizację po zatrzymaniu gry.
+- Mario generuje przeszkody w oparciu o deltaTime, ładuje skok czasem symulacji i rozpoznaje rzeczywiste upadnięcie przez otwór.
+- W tej iteracji na nowej gałęzi dodano podkroki fizyki Pong (maksymalnie 1/120 s), ograniczające przenikanie piłki przez paletki przy nierównych odstępach klatek. Do testu silnika dodano sprawdzenie, że delta symulacji nie zmienia się podczas pauzy.
+
+### Integracja i ograniczenia
+
+Pierwotna gałąź PR #203 rozeszła się z obecną bazą `integration/all-work` (19 commitów do przodu i 22 commity bazy poza historią PR). Z tego powodu przeniesiono poprawki selektywnie na nową gałąź roboczą `fix/game-engine-rebased-all-work`, zamiast nadpisywać aktualny silnik lub wycofywać późniejsze integracje gier (Tan, Arkanoid, Galaga).
+
+Wynik CI musi zostać potwierdzony na nowym HEAD po uruchomieniu workflow. Testy symulacyjne nie zastępują ręcznej walidacji gier ani testu fizycznego czujnika HX711/Arduino.
