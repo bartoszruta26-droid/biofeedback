@@ -501,12 +501,12 @@ void MeasurementTab::ensureCurrentSeriesInitialized()
 
 bool MeasurementTab::openSampleJournal()
 {
-    if (m_sampleJournal.isOpen()) return true;
+    if (m_sampleJournalWriter && m_sampleJournalWriter->isOpen()) return true;
     if (m_sampleJournalFailed) {
-        // Keep the failed journal for recovery and start a fresh segment.
+        // Preserve the failed segment for recovery and start a fresh segment.
+        if (m_sampleJournalWriter) m_sampleJournalWriter->close();
         m_sampleJournalPath.clear();
         m_activeSessionId.clear();
-        m_sampleJournalPendingWrites = 0;
         m_sampleJournalFailed = false;
     }
     if (m_sampleJournalPath.isEmpty()) {
@@ -519,10 +519,7 @@ bool MeasurementTab::openSampleJournal()
     }
 
     const bool newFile = !QFile::exists(m_sampleJournalPath);
-    m_sampleJournal.setFileName(m_sampleJournalPath);
-    if (!m_sampleJournal.open(QIODevice::WriteOnly | QIODevice::Append))
-        return false;
-
+    QByteArray headerLine;
     if (newFile) {
         QJsonObject header;
         header["recordType"] = "header";
@@ -535,14 +532,19 @@ bool MeasurementTab::openSampleJournal()
             ? m_elasticConstantInput->value() : 0.0;
         header["patientMassKg"] = m_patientMassInput
             ? m_patientMassInput->value() : 0.0;
-        const QByteArray line = QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n';
-        if (m_sampleJournal.write(line) != line.size() || !flushSampleJournal()) {
-            closeSampleJournal();
-            QFile::remove(m_sampleJournalPath);
-            m_sampleJournalPath.clear();
-            m_activeSessionId.clear();
-            return false;
-        }
+        headerLine = QJsonDocument(header).toJson(QJsonDocument::Compact) + '\n';
+    }
+
+    if (!m_sampleJournalWriter)
+        m_sampleJournalWriter = std::make_unique<SampleJournalWriter>();
+    if (!m_sampleJournalWriter->open(m_sampleJournalPath, headerLine)) {
+        m_sampleJournalFailed = true;
+        if (m_lblStatus)
+            m_lblStatus->setText(tr("Status: BŁĄD OTWARCIA DZIENNIKA — %1")
+                                     .arg(m_sampleJournalWriter->errorString()));
+        return false;
+    }
+    if (newFile) {
         QFile::setPermissions(m_sampleJournalPath,
                               QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     }
@@ -552,7 +554,9 @@ bool MeasurementTab::openSampleJournal()
 
 bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample)
 {
-    if (!m_sampleJournal.isOpen() || m_sampleJournalFailed) return false;
+    if (!m_sampleJournalWriter || m_sampleJournalFailed ||
+        !m_sampleJournalWriter->isOpen())
+        return false;
 
     QJsonObject record;
     record["recordType"] = "sample";
@@ -569,16 +573,16 @@ bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample
     record["source"] = sample.source;
     record["quality"] = sample.quality;
     const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
-    if (m_sampleJournal.write(line) != line.size()) {
+    if (!m_sampleJournalWriter->append(line)) {
         m_sampleJournalFailed = true;
-        return false;
-    }
-
-    ++m_sampleJournalPendingWrites;
-    // Bound the unflushed window to at most 31 samples. This avoids a full
-    // JSON rewrite in the acquisition path while keeping recovery loss bounded.
-    if (m_sampleJournalPendingWrites >= 32 && !flushSampleJournal()) {
-        m_sampleJournalFailed = true;
+        const QString reason = m_sampleJournalWriter->errorString();
+        if (m_lblStatus)
+            m_lblStatus->setText(tr("Status: DZIENNIK NIE PRZYJMUJE PRÓBEK — %1")
+                                     .arg(reason.isEmpty()
+                                         ? tr("przekroczono limit kolejki") : reason));
+        QMetaObject::invokeMethod(this, [this] {
+            if (m_isMeasuring) stopMeasurement();
+        }, Qt::QueuedConnection);
         return false;
     }
     return true;
@@ -586,20 +590,18 @@ bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample
 
 bool MeasurementTab::flushSampleJournal()
 {
-    if (!m_sampleJournal.isOpen()) return true;
-    if (!m_sampleJournal.flush()) return false;
-#ifdef Q_OS_UNIX
-    if (::fsync(m_sampleJournal.handle()) != 0) return false;
-#endif
-    m_sampleJournalPendingWrites = 0;
-    return true;
+    return !m_sampleJournalWriter || m_sampleJournalWriter->flush();
 }
 
 void MeasurementTab::closeSampleJournal()
 {
-    if (!m_sampleJournal.isOpen()) return;
-    flushSampleJournal();
-    m_sampleJournal.close();
+    if (!m_sampleJournalWriter) return;
+    if (!m_sampleJournalWriter->close()) {
+        m_sampleJournalFailed = true;
+        if (m_lblStatus)
+            m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — %1")
+                                     .arg(m_sampleJournalWriter->errorString()));
+    }
 }
 
 bool MeasurementTab::recoverSampleJournals(const QString& dataDir)
@@ -994,7 +996,7 @@ void MeasurementTab::setPatientId(const QString& id)
     // recoverable only in the directory belonging to its original patient.
     const bool hasActivePatientData =
         !m_recordedSamples.isEmpty() || !m_completedSeriesStats.isEmpty() ||
-        m_sampleJournal.isOpen() || !m_sampleJournalPath.isEmpty();
+        (m_sampleJournalWriter && m_sampleJournalWriter->isOpen()) || !m_sampleJournalPath.isEmpty();
     if (hasActivePatientData)
         resetSession();
 
@@ -1194,7 +1196,6 @@ void MeasurementTab::resetSession()
     closeSampleJournal();
     m_sampleJournalPath.clear();
     m_activeSessionId.clear();
-    m_sampleJournalPendingWrites = 0;
     m_sampleJournalFailed = false;
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
@@ -1313,7 +1314,7 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
-    if (m_sampleJournal.isOpen()) {
+    if (m_sampleJournalWriter && m_sampleJournalWriter->isOpen()) {
         const bool wasFailed = m_sampleJournalFailed;
         if (!appendSampleJournal(recorded) && !wasFailed && m_lblStatus)
             m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA"));
