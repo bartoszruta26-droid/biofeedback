@@ -4,6 +4,8 @@ from pathlib import Path
 
 source = Path("src/tab/MeasurementTab.cpp").read_text(encoding="utf-8")
 header = Path("include/tab/MeasurementTab.hpp").read_text(encoding="utf-8")
+journal_writer = Path("src/tab/SampleJournalWriter.cpp").read_text(encoding="utf-8")
+journal_writer_header = Path("include/tab/SampleJournalWriter.hpp").read_text(encoding="utf-8")
 
 for label, content in (("implementation", source), ("header", header)):
     if "connectToArduinoAsync" in content:
@@ -34,8 +36,9 @@ for required in (
     "m_recordedSamples.append(recorded)",
     "bool MeasurementTab::openSampleJournal()",
     "bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample)",
-    "m_sampleJournalPendingWrites >= 32",
-    "::fsync(m_sampleJournal.handle())",
+    "m_sampleJournalWriter->append(line)",
+    "m_sampleJournalWriter->flush()",
+    "m_sampleJournalWriter->close()",
     "recoverSampleJournals(dataDir)",
     "Never carry samples or a live journal across patient boundaries",
     "if (hasActivePatientData)\n        resetSession();",
@@ -111,6 +114,24 @@ if "quint64 m_rawTableLastSequence{0};" not in header:
     raise SystemExit("Raw-table presentation sequence must be tracked independently")
 
 
+
+
+# Journal I/O belongs to a dedicated bounded writer thread. The GUI only
+# serializes and enqueues; queue exhaustion is explicit and stops acquisition.
+for required in (
+    "MaximumQueuedRecords = 8192",
+    "m_queue.size() >= MaximumQueuedRecords",
+    "m_workAvailable.notify_one()",
+    "file.write(line)",
+    "recordsSinceFlush >= 32",
+    "::fsync(file.handle())",
+):
+    if required not in journal_writer and required not in journal_writer_header:
+        raise SystemExit(f"Missing asynchronous journal invariant: {required}")
+if "m_sampleJournalWriter->append(line)" not in source:
+    raise SystemExit("MeasurementTab must enqueue journal records instead of writing files")
+if "m_sampleJournal.write(" in source or "m_sampleJournal.flush()" in source:
+    raise SystemExit("MeasurementTab must not perform journal file I/O on the GUI thread")
 
 # Sensor-to-game control is a state input, so the GUI mailbox must coalesce
 # stale values instead of replaying a long FIFO backlog.
