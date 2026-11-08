@@ -52,6 +52,8 @@ struct MeasurementEngineConfig {
     double minimumValue{-1.0e12};
     double maximumValue{1.0e12};
     std::size_t historyCapacity{512};
+    // First sequence to assign; initialize from the recovered journal on server restart.
+    std::uint64_t initialSequence{1};
 };
 
 class MeasurementEngine final {
