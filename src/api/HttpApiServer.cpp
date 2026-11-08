@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTcpSocket>
+#include <QUrl>
 #include <QTimer>
 #include <openssl/rand.h>
 
@@ -127,8 +128,10 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
         bool contentLengthSeen = false;
         bool authorizationSeen = false;
         bool contentTypeSeen = false;
+        bool originSeen = false;
         QByteArray authorization;
         QByteArray contentType;
+        QByteArray origin;
 
         for (int i = 1; i < lines.size(); ++i) {
             QByteArray line = lines.at(i);
@@ -182,6 +185,13 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 }
                 contentTypeSeen = true;
                 contentType = value;
+            } else if (name.compare("Origin", Qt::CaseInsensitive) == 0) {
+                if (originSeen) {
+                    sendJson(socket, 400, errorBody("DUPLICATE_ORIGIN", "Powtórzony nagłówek Origin."));
+                    return;
+                }
+                originSeen = true;
+                origin = value;
             }
         }
 
@@ -194,6 +204,27 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
         const QByteArray method = requestLine.at(0);
         const QByteArray path = requestLine.at(1).split('?').first();
         const QByteArray body = buffer.mid(headerEnd + 4, static_cast<int>(contentLength));
+
+        if (originSeen) {
+            const QUrl originUrl(QString::fromUtf8(origin));
+            const QString host = originUrl.host().toLower();
+            const bool localHost = host == QStringLiteral("localhost") ||
+                host == QStringLiteral("127.0.0.1") || host == QStringLiteral("::1");
+            const bool allowedScheme = originUrl.scheme() == QStringLiteral("http") ||
+                originUrl.scheme() == QStringLiteral("https");
+            if (!originUrl.isValid() || !localHost || !allowedScheme ||
+                originUrl.path() != QStringLiteral("/") || !originUrl.query().isEmpty() ||
+                !originUrl.fragment().isEmpty()) {
+                sendJson(socket, 403, errorBody("ORIGIN_NOT_ALLOWED", "Dozwolone są wyłącznie lokalne źródła."));
+                return;
+            }
+            socket->setProperty("corsOrigin", origin);
+        }
+
+        if (method == "OPTIONS" && originSeen) {
+            sendJson(socket, 200, R"({"ok":true})");
+            return;
+        }
 
         if (method == "GET" && path == "/healthz") {
             sendJson(socket, 200, R"({"ok":true})");
@@ -376,6 +407,14 @@ void HttpApiServer::sendJson(QTcpSocket* socket, int status, const QByteArray& b
     response += "Content-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\n";
     response += "X-Content-Type-Options: nosniff\r\n";
     response += "Pragma: no-cache\r\n";
+    const QByteArray corsOrigin = socket->property("corsOrigin").toByteArray();
+    if (!corsOrigin.isEmpty()) {
+        response += "Access-Control-Allow-Origin: " + corsOrigin + "\r\n";
+        response += "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n";
+        response += "Access-Control-Allow-Headers: Authorization, Content-Type\r\n";
+        response += "Access-Control-Max-Age: 600\r\n";
+        response += "Vary: Origin\r\n";
+    }
     response += "Content-Length: " + QByteArray::number(body.size());
     response += "\r\nConnection: close\r\n\r\n" + body;
     socket->write(response);
