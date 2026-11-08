@@ -2,6 +2,7 @@
 
 #include "application/MeasurementService.hpp"
 
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -35,6 +36,9 @@ public:
 private:
     std::shared_ptr<MeasurementService> m_measurements;
     mutable std::mutex m_mutex;
+    std::condition_variable m_ingestIdle;
+    std::size_t m_inFlightIngests{0};
+    bool m_stopping{false};
     AcquisitionSession m_session;
 };
 
