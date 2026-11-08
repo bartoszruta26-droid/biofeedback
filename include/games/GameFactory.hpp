@@ -49,7 +49,8 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
         id == QStringLiteral("car-race"))
         return new CarRaceGame(parent);
 
-    if (id == QStringLiteral("scorched_earth") || id == QStringLiteral("scorched-earth") ||
+    if (id == QStringLiteral("scorched_earth") || id == QStringLiteral("scored_earth") ||
+        id == QStringLiteral("scorched-earth") ||
         id == QStringLiteral("scorchedearth"))
         return new ScorchedEarthGame(parent);
 
