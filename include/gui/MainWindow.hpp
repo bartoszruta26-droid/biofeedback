@@ -25,9 +25,7 @@
 #include <QDateTime>
 #include <QScrollBar>
 
-#include <deque>
 #include <mutex>
-#include <cstddef>
 
 #include "GraphWidget.hpp"
 #include "tab/OutlineTab.hpp"
@@ -315,10 +313,12 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
     sensor::SerialCommunication::CallbackToken m_serialDataCallbackToken = 0;
+    // Latest-value mailbox: game control should react to the newest sensor
+    // value instead of replaying stale samples from a GUI backlog.
     std::mutex m_gameInputQueueMutex;
-    std::deque<double> m_gameSensorInputQueue;
+    double m_pendingGameSensorInput{0.0};
+    bool m_gameSensorInputAvailable{false};
     bool m_gameInputDrainScheduled{false};
-    std::size_t m_droppedGameSensorInputs{0};
 };
 
 } // namespace gui
