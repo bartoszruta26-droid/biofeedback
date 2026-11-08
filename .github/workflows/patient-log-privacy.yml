@@ -1,0 +1,20 @@
+name: patient-log-privacy-regression
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  patient-log-privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify patient identity is excluded from logs
+        run: python3 tests/privacy_log_regression.py
