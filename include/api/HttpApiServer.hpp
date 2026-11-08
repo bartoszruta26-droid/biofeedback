@@ -26,10 +26,15 @@ private:
         std::shared_ptr<biofeedback::Authentication> authentication;
         QDateTime expiresAtUtc;
     };
+    struct LoginThrottle {
+        int failures{0};
+        QDateTime blockedUntilUtc;
+    };
     void handleConnection(QTcpSocket* socket);
     void sendJson(QTcpSocket* socket, int status, const QByteArray& body);
     QString bearerToken(const QByteArray& authorization) const;
     QHash<QString, ApiSession> m_sessions;
+    QHash<QString, LoginThrottle> m_loginAttempts;
     QString m_usersFilePath;
     QTcpServer m_server;
 };
