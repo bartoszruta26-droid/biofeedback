@@ -318,6 +318,291 @@ For detailed mathematical formulas used to calculate biomechanical and training 
 
 The formulas are designed for analyzing resistance band exercises with 3 sets × 8 repetitions, captured via HX711 strain gauge sensor on Raspberry Pi.
 
+## Architektura aplikacji i przepływ danych
+
+Biofeedback składa się z kilku interfejsów użytkownika, warstwy akwizycji pomiarów,
+logiki treningowej, firmware urządzeń oraz rozwijanej usługi wymiany danych.
+Należy rozróżniać funkcje już działające od elementów przygotowanych jako klient
+lub kontrakt przyszłej integracji. Obecnie nie wszystkie platformy współdzielą
+jeszcze dane przez serwer.
+
+### 1. Desktop GUI — Linux i docelowo Windows
+
+Główna aplikacja okienkowa jest napisana w C++17 z użyciem Qt5. Jej główne obszary
+funkcjonalne to:
+
+- **Logowanie i konta** — pierwsze uruchomienie prowadzi przez utworzenie konta
+  administratora; hasło konta jest przechowywane w postaci skrótu PBKDF2.
+- **Pulpit i nawigacja** — główne okno udostępnia moduły aplikacji.
+- **Pacjenci** — formularz kart pacjentów, operacje dodawania, odczytu, edycji
+  i usuwania oraz import i eksport CSV. Obecna integracja Desktop korzysta
+  z lokalnego magazynu plikowego.
+- **Pomiary** — połączenie z urządzeniem, prezentacja bieżącego przebiegu siły,
+  tabela próbek i statystyki pomiarowe.
+- **Trening** — konfiguracja ćwiczenia, celu, liczby serii i powtórzeń,
+  odpoczynku oraz analiza wykonania.
+- **Gry** — wybór gry biofeedbackowej i sterowanie rozgrywką sygnałem z czujnika.
+- **Diagnostyka i ustawienia** — konfiguracja portu, parametrów urządzenia,
+  kalibracji i zachowania aplikacji.
+
+Kod głównego okna i warstwa aplikacyjna nadal wymagają dalszego rozdzielenia
+odpowiedzialności. Kod współdzielony dla systemów Windows i Linux nie oznacza
+jeszcze potwierdzonego wydania Windows: osobna kompilacja MSVC, instalator
+i testy Windows muszą być weryfikowane niezależnie.
+
+### 2. TUI — interfejs terminalowy
+
+TUI jest klientem C++17 opartym na ncurses. Korzysta ze wspólnego adaptera
+komunikacji szeregowej i silnika pomiarowego, a nie z własnego parsera ramek.
+Udostępnia ekrany:
+
+- Pulpit — status programu, połączenia i ostatniej próbki.
+- Pomiary — aktualna wartość siły i krótki przebieg ostatnich próbek.
+- Pacjenci — informacja o stanie integracji repozytorium kart.
+- Trening — konfiguracja i przebieg sesji, serie, powtórzenia, cel siły i odpoczynek.
+- Urządzenia — skanowanie portów, wybór urządzenia, połączenie i rozłączenie.
+- Diagnostyka — liczba próbek prawidłowych i odrzuconych, jakość ostatniej próbki
+  oraz podstawowe statystyki ostatniego powtórzenia.
+- Ustawienia — skróty i parametry transmisji.
+
+Sterowanie obejmuje m.in. strzałki i Enter do nawigacji, C do połączenia,
+D do rozłączenia, R do ponownego skanowania, S do startu/zatrzymania,
+P do pauzy/wznowienia, a także klawisze zmiany celu, serii i powtórzeń.
+Dostępne są również tryby `--status`, `--list-ports`, `--version` i `--help`.
+
+TUI zapisuje historię sesji treningowej do lokalnego pliku CSV w katalogu danych
+użytkownika. Ten zapis jest obecnie lokalny, niezaszyfrowany i nie jest połączony
+z identyfikatorem pacjenta. Nie zastępuje dokumentacji pacjenta w magazynie
+plikowym Desktop ani przyszłego wspólnego repozytorium.
+
+### 3. WebUI — interfejs przeglądarkowy
+
+WebUI jest responsywną aplikacją HTML/CSS/JavaScript w katalogu
+`platforms/webui`. Oferuje nawigację modułową opartą o adresy URL, motyw jasny
+i ciemny oraz klienta API REST/WebSocket. Klient ma przygotowane metody do
+obsługi statusu i urządzeń, pacjentów, sesji pomiarowych i subskrypcji zdarzeń.
+
+Uruchomienie statycznego interfejsu:
+
+```bash
+python3 -m http.server 8080 --directory platforms/webui
+```
+
+Otwórz `http://localhost:8080`. Interfejs sprawdza dostępność
+`GET /api/v1/status` i jawnie pokazuje brak serwera. Nie tworzy fikcyjnych
+pacjentów, pomiarów ani wyników.
+
+**Ograniczenie:** klient WebUI jest przygotowany do integracji, ale backend API
+nie udostępnia jeszcze zasobów pacjentów, pomiarów, treningów ani gier.
+Serwerowy WebSocket również nie jest jeszcze zaimplementowany. Samo uruchomienie
+statycznej strony nie uruchamia serwera danych.
+
+### 4. Android GUI
+
+Aplikacja Android jest natywnym klientem Kotlin/Jetpack Compose z Material 3.
+Wersja 0.1 zawiera responsywną nawigację dolną oraz widoki:
+
+- Pulpit,
+- Pomiary,
+- Pacjenci,
+- Trening,
+- Urządzenia.
+
+Są to obecnie ekrany demonstracyjne/podglądowe. Aplikacja nie ma jeszcze
+komunikacji z serwerem API ani obsługi Bluetooth, USB lub portu szeregowego.
+Nie należy traktować jej jako gotowego rejestratora pomiarów lub dokumentacji
+pacjenta. Docelowo ma korzystać z tego samego wersjonowanego API co WebUI,
+Desktop i TUI.
+
+Budowanie opisano w `platforms/android/README.md`; wymagane są JDK 17
+i Android SDK Platform 35.
+
+### 5. Serwer wymiany danych i API
+
+Docelowy model zakłada jeden wspólny serwer danych dla wszystkich klientów.
+Serwer jest właścicielem trwałych rekordów i udostępnia je przez wersjonowane
+API, zamiast pozwalać klientom na bezpośredni dostęp do plików serwera lub bazy.
+
+Docelowe odpowiedzialności serwera:
+
+- repozytorium kart pacjentów i mapowanie tożsamości;
+- archiwum pomiarów, próbek i metadanych sesji;
+- plany treningowe, sesje, checkpointy i wyniki;
+- sesje gier, punktacja i historia wyników;
+- uwierzytelnianie, autoryzacja do konkretnych zasobów i rejestr audytowy;
+- kopie zapasowe, odtwarzanie, eksport, kontrola wersji rekordu i konfliktów;
+- powiadomienia o zmianach i zdarzeniach czasu rzeczywistego.
+
+Docelowe rodziny endpointów obejmują `/api/v1/patients`,
+`/api/v1/measurements`, `/api/v1/training-sessions`,
+`/api/v1/training-results`, `/api/v1/game-sessions`,
+`/api/v1/game-results` oraz kanał zdarzeń WebSocket lub SSE.
+
+**Stan obecny:** działający prototyp HTTP udostępnia `GET /healthz`,
+`GET /api/v1/status`, logowanie `POST /api/v1/auth/login`,
+`GET /api/v1/auth/me` i wylogowanie `POST /api/v1/auth/logout`.
+Nie udostępnia jeszcze CRUD pacjentów, trwałego API pomiarów/treningów/gier
+ani serwerowego WebSocket. Domyślnie nasłuchuje na loopback; nie wystawiaj
+prototypu bezpośrednio do sieci publicznej. Pełna autoryzacja zasobów i wspólne
+usługi domenowe są wymagane przed wdrożeniem wieloklientowym.
+
+Szczegółowy opis decyzji i etapów wdrożenia znajduje się w
+[docs/ARCHITECTURE_SHARED_DATA_SERVER.md](docs/ARCHITECTURE_SHARED_DATA_SERVER.md).
+
+### 6. Arduino Nano, HX711 i Raspberry Pi Pico
+
+**Arduino Nano + HX711** stanowią aktualną ścieżkę pozyskiwania pomiaru siły.
+Arduino odczytuje przetwornik HX711 i przesyła dane do komputera przez port
+szeregowy. Typowe parametry łącza to 115200 bit/s, 8N1. Firmware udostępnia
+m.in. identyfikację urządzenia, zerowanie (tare), odczyt, tryb ciągły, kalibrację
+znaną masą i reset. Strumień binarny zawiera 32-bitowy znacznik czasu,
+32-bitową wartość surową, CRC-8 i znaczniki końca ramki `0xAA 0x55`.
+Dostępna jest także odpowiedź tekstowa z odczytem siły.
+
+Przed użyciem pomiaru siły wymagane jest zerowanie i kalibracja znaną masą.
+Surowe wartości ADC bez potwierdzonej kalibracji są danymi diagnostycznymi,
+a nie wiarygodną siłą w niutonach. Szczegóły: [docs/HX711_CALIBRATION.md](docs/HX711_CALIBRATION.md).
+
+**Raspberry Pi Pico** ma obecnie firmware komunikacyjny UART0: GP0 TX, GP1 RX,
+115200 bit/s, 8N1, watchdog 2 s oraz ograniczony parser poleceń diagnostycznych
+PING, STATUS i SAFE. Akwizycja czujników, kalibracja i generowanie ramek
+pomiarowych w tym firmware nie są jeszcze zaimplementowane ani zweryfikowane
+na sprzęcie. Kanału diagnostycznego Pico nie wolno utożsamiać ze strumieniem
+pomiarowym HX711. Szczegóły: [firmware/pico/README.md](firmware/pico/README.md)
+i [docs/PICO_FIRMWARE_MEASUREMENT_STATUS.md](docs/PICO_FIRMWARE_MEASUREMENT_STATUS.md).
+
+### 7. Rejestracja pomiaru, walidacja i wykres
+
+Główna ścieżka pomiarowa Desktop przebiega następująco:
+
+```text
+HX711 -> Arduino Nano -> port szeregowy
+  -> SerialCommunication
+  -> MeasurementSerialAdapter
+  -> MeasurementEngine
+  -> MeasurementTab
+  -> RepetitionDetector
+  -> statystyki powtórzenia i serii
+  -> ForcePlotWidget + tabela próbek + tabela parametrów
+  -> eksport JSON / CSV
+```
+
+`SerialCommunication` odbiera dane z portu, a `MeasurementSerialAdapter`
+mapuje dane sterownika na wspólny model wejściowy. `MeasurementEngine`
+nadaje próbkom numer sekwencyjny i czas odbioru hosta UTC, zachowuje czas
+urządzenia, wartość surową, wartość przeliczoną, jednostkę, źródło i status
+jakości. Silnik normalizuje wyłącznie jawnie obsługiwane jednostki, sprawdza
+wartości niefinitywne, znaczniki czasu, źródło i skonfigurowany zakres.
+Próbki odrzucone są oznaczane statusem jakości; konsument musi sprawdzić
+poprawność próbki przed wykreśleniem, agregacją lub eksportem.
+
+Desktop używa `ForcePlotWidget` do prezentacji przebiegu siły w czasie.
+Widok pomiarowy obejmuje tabelę ostatnich próbek oraz tabele statystyk
+powtórzeń/serii. Wykres korzysta z próbek sesji i osi czasu, a nie z danych
+wymyślonych. Bufory interfejsu są ograniczane, aby długotrwały pomiar nie
+powodował nieograniczonego wzrostu pamięci.
+
+`MeasurementEngine` utrzymuje ograniczoną historię w pamięci RAM (domyślnie
+512 próbek); nie jest samodzielnym archiwum długoterminowym. W Desktop pełny
+strumień bieżącej sesji może zostać ręcznie wyeksportowany do JSON, natomiast
+CSV służy przede wszystkim do eksportu tabeli statystyk. Nagłe zamknięcie
+aplikacji przed eksportem może utracić bieżącą sesję. Trwały, przyrostowy
+dziennik próbek i automatyczna synchronizacja przez serwer pozostają do
+wdrożenia.
+
+TUI subskrybuje wspólny silnik i prezentuje skrócony przebieg próbek w terminalu.
+WebUI i Android nie otrzymują jeszcze rzeczywistego strumienia pomiarowego
+z backendu. Szczegółowy opis: [docs/MEASUREMENT_PIPELINE.md](docs/MEASUREMENT_PIPELINE.md)
+oraz [docs/REALTIME_MEASUREMENT_AUDIT.md](docs/REALTIME_MEASUREMENT_AUDIT.md).
+
+### 8. Obliczanie parametrów biomechanicznych
+
+`RepetitionDetector` wykorzystuje próg aktywacji i niższy próg zwolnienia
+(histereza), aby wyznaczać początek i koniec powtórzenia. Rekord powtórzenia
+zawiera m.in. czas początku i końca, czas trwania, czas do osiągnięcia szczytu,
+siłę szczytową, średnią siłę, liczbę próbek i próbki źródłowe.
+
+Podsumowanie serii obejmuje m.in. liczbę powtórzeń, średnią i maksymalną siłę
+szczytową, średni czas powtórzenia, średni czas do szczytu, współczynnik
+zmienności siły szczytowej oraz procent realizacji celu. Dodatkowe wzory
+biomechaniczne są zebrane w module `Formulas` i dokumentacji matematycznej.
+Parametry wymagające kalibracji, dodatkowego czujnika, historii lub
+wystarczającej liczby próbek powinny być oznaczane statusem dostępności;
+brak danych nie może być prezentowany jako wynik równy zero.
+
+Katalog modelu obejmuje 65 nazw parametrów, ale nie oznacza to, że wszystkie
+są już w pełni obliczane, wyświetlane i archiwizowane w każdym widoku.
+Dostępność zależy od danych wejściowych i stopnia integracji danego parametru.
+Nie należy interpretować wyniku matematycznego jako diagnozy klinicznej.
+Opis wzorów: [MATHEMATICAL_FORMULAS.md](MATHEMATICAL_FORMULAS.md).
+
+### 9. Trening i analiza sesji
+
+Logika treningowa obejmuje konfigurację ćwiczenia, celu siły, serii,
+powtórzeń i przerw. `SessionStateMachine` modeluje stany Idle, Active,
+Paused, Resting, Completed i Interrupted. `TrainingSessionClock` odpowiada
+za pomiar czasu sesji, a `RepetitionDetector` wykrywa powtórzenia na podstawie
+próbkowanej siły i progów histerezy.
+
+Po zakończeniu powtórzeń można analizować siłę szczytową i średnią, czas
+powtórzenia, czas do szczytu, realizację celu oraz zmienność pomiędzy
+powtórzeniami. Podsumowania serii są wykorzystywane w analizie treningowej
+i mogą być eksportowane z Desktop. TUI zapisuje własną lokalną historię CSV.
+Wspólne repozytorium sesji i wyników dla wszystkich platform jest elementem
+docelowego serwera danych, a nie ukończoną funkcją bieżącej wersji.
+
+### 10. Gry biofeedbackowe
+
+Gry korzystają ze wspólnego `GameEngine`: monotonicznego zegara, stałego kroku
+symulacji, ograniczonego nadrabiania czasu, wspólnego cyklu życia oraz
+obsługi wejścia z czujnika. Próbki czujnika są wejściem sterującym; nie powinny
+bezpośrednio modyfikować widgetów z wątku portu szeregowego. Gry obsługują
+lub rozwijają obsługę startu, pauzy, wznowienia, zatrzymania, resetu,
+zmiany rozmiaru i nieprawidłowych danych wejściowych.
+
+Dostępne identyfikatory gier w fabryce:
+
+| Gra | Charakter rozgrywki |
+|---|---|
+| **Sin Force Trainer** | Ćwiczenie sterowania siłą według przebiegu sinusoidalnego. |
+| **Tan Force Trainer** | Ćwiczenie sterowania siłą według przebiegu tangensoidalnego. |
+| **Pong** | Sterowanie paletką siłą z czujnika; odbijanie piłki i punktacja. |
+| **Arkanoid** | Sterowanie paletką, odbijanie piłki i niszczenie bloków. |
+| **Flappy Bird** | Sterowanie ruchem ptaka sygnałem siły, omijanie przeszkód. |
+| **Mario Run** | Bieg z przeszkodami i skokami sterowanymi wejściem biofeedback. |
+| **Galaga** | Strzelanka z falami przeciwników, pociskami, życiami i punktacją. |
+| **Archer** | Strzelanie z łuku do ruchomych celów; regulacja kąta i punktacja. |
+| **Car Race** | Wyścig z przeszkodami i sterowaniem pozycją pojazdu na pasach. |
+| **Scorched Earth** | Turowa artyleria z kątem, siłą strzału, grawitacją, wiatrem i terenem. |
+
+Gry są dostępne przez `GameFactory` i selektory interfejsu Desktop. Obecność
+gry w fabryce nie oznacza automatycznie, że każda platforma ma już jej klienta
+lub że każda mechanika przeszła pełne testy sprzętowe. Testy scenariuszowe,
+balans rozgrywki i walidacja z fizycznym czujnikiem pozostają osobnymi etapami.
+Wyniki gier nie są jeszcze zapisywane we wspólnym repozytorium serwera.
+
+### 11. Dane pacjentów i prywatność
+
+W bieżącej aplikacji Desktop pacjenci są obsługiwani przez lokalny magazyn
+plikowy oparty na `DataManager`. Konfiguracja `data.base_path` określa katalog
+danych. Nazwy katalogów rekordów są wyprowadzane z identyfikatora skrótem,
+zamiast używać bezpośrednio danych identyfikacyjnych w ścieżce. Zapis plikowy
+korzysta z atomowego zapisu Qt `QSaveFile`.
+
+Szyfrowanie danych w `DataManager` jest dostępne, ale w profilu deweloperskim
+może być wyłączone. Przed użyciem z rzeczywistymi danymi pacjentów należy
+wdrożyć i zweryfikować profil produkcyjny z szyfrowaniem oraz kluczem
+`BIOFEEDBACK_ENCRYPTION_KEY`. Nie należy przechowywać klucza w repozytorium.
+Uprawnienia do katalogu danych i kopii zapasowych powinny być ograniczone
+do konta usługi/operatora.
+
+Wybór `storage.patient_backend` dotyczy backendu kart pacjentów. Obecnie
+`files` jest obsługiwany; `mariadb` jest skonfigurowane i walidowane, lecz
+adapter MariaDB nie jest jeszcze dostępny. Pomiary, treningi i gry nie mają
+jeszcze kompletnego wspólnego, trwałego repozytorium API. Nie zakładaj więc,
+że dane lokalne TUI, Desktop i przyszłe rekordy serwera są już automatycznie
+synchronizowane.
+
 ## Configuration
 
 Edit `config/config.json` to customize:
