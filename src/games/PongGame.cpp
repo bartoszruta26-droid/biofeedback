@@ -206,9 +206,9 @@ void PongGame::checkCollisions() {
         // wektora z jednego kąta odbicia (bez niekontrolowanego przyspieszania).
         const float hitPos = (m_ballPos.y() - m_leftPaddle.top()) / m_paddleHeight;
         const float angle = (hitPos - 0.5f) * 1.5f;
-        const float speed = qMin(
-            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05f,
-            m_ballSpeed * 2.0f);
+        const double speed = qMin(
+            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
+            static_cast<double>(m_ballSpeed) * 2.0);
         m_ballVel.setX(std::cos(angle) * speed); // W prawo
         m_ballVel.setY(std::sin(angle) * speed);
         
@@ -223,9 +223,9 @@ void PongGame::checkCollisions() {
         
         const float hitPos = (m_ballPos.y() - m_rightPaddle.top()) / m_paddleHeight;
         const float angle = (hitPos - 0.5f) * 1.5f;
-        const float speed = qMin(
-            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05f,
-            m_ballSpeed * 2.0f);
+        const double speed = qMin(
+            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
+            static_cast<double>(m_ballSpeed) * 2.0);
         m_ballVel.setX(-std::cos(angle) * speed); // W lewo
         m_ballVel.setY(std::sin(angle) * speed);
         
