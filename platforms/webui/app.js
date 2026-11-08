@@ -77,6 +77,7 @@
     appShell.hidden = false;
     currentUser.textContent = user.username + " · " + user.role;
     loginMessage.textContent = "";
+    refreshSharedData();
   }
 
   loginForm.addEventListener("submit", async (event) => {
@@ -112,9 +113,202 @@
     appShell.hidden = true;
     authGate.hidden = false;
     currentUser.textContent = "";
+    clearResourceViews();
+    setMessage("patientMessage", "");
+    setMessage("measurementMessage", "");
+    setMessage("trainingMessage", "");
     document.getElementById("loginPassword").value = "";
     loginMessage.textContent = "Sesja została zakończona. Zaloguj się ponownie.";
   });
+
+  function setMessage(id, message) {
+    const element = document.getElementById(id);
+    if (element) element.textContent = message || "";
+  }
+
+  function clearResourceViews() {
+    ["patientRecords", "measurementRecords", "trainingSessions", "trainingResults",
+     "gameSessions", "gameResults"].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) element.replaceChildren();
+    });
+  }
+
+  function renderSimpleCollection(containerId, items, titleFor, detailFor) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted";
+      empty.textContent = "Brak zapisanych rekordów.";
+      container.append(empty);
+      return;
+    }
+    items.forEach((record) => {
+      const card = document.createElement("article");
+      card.className = "resource-card";
+      const content = document.createElement("div");
+      const title = document.createElement("h3");
+      title.textContent = titleFor(record);
+      const detail = document.createElement("p");
+      detail.textContent = detailFor(record);
+      content.append(title, detail);
+      card.append(content);
+      container.append(card);
+    });
+  }
+
+  async function refreshPatients() {
+    try {
+      const response = await api.getPatients();
+      const container = document.getElementById("patientRecords");
+      if (!container) return;
+      container.replaceChildren();
+      const items = Array.isArray(response.items) ? response.items : [];
+      if (!items.length) {
+        const empty = document.createElement("p");
+        empty.className = "muted";
+        empty.textContent = "Brak kart pacjentów.";
+        container.append(empty);
+      }
+      items.forEach((patient) => {
+        const card = document.createElement("article");
+        card.className = "resource-card";
+        const content = document.createElement("div");
+        const title = document.createElement("h3");
+        title.textContent = [patient.firstName, patient.lastName].filter(Boolean).join(" ") || "Pacjent";
+        const detail = document.createElement("p");
+        detail.textContent = "Wersja " + patient.version + " · ID " + patient.id;
+        content.append(title, detail);
+
+        const actions = document.createElement("div");
+        actions.className = "resource-actions";
+        const edit = document.createElement("button");
+        edit.type = "button";
+        edit.textContent = "Edytuj";
+        edit.addEventListener("click", async () => {
+          const firstName = window.prompt("Imię", patient.firstName || "");
+          if (firstName === null) return;
+          const lastName = window.prompt("Nazwisko", patient.lastName || "");
+          if (lastName === null) return;
+          const medicalHistory = window.prompt("Wywiad / uwagi", patient.medicalHistory || "");
+          if (medicalHistory === null) return;
+          try {
+            await api.updatePatient(patient.id, patient.version, {
+              firstName, lastName, pesel: patient.pesel || "", medicalHistory
+            });
+            await refreshPatients();
+            setMessage("patientMessage", "Karta została zaktualizowana.");
+          } catch (error) {
+            setMessage("patientMessage", error.message || "Nie udało się zaktualizować karty.");
+          }
+        });
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "danger";
+        remove.textContent = "Usuń";
+        remove.addEventListener("click", async () => {
+          if (!window.confirm("Usunąć tę kartę pacjenta?")) return;
+          try {
+            await api.deletePatient(patient.id, patient.version);
+            await refreshPatients();
+            setMessage("patientMessage", "Karta została usunięta.");
+          } catch (error) {
+            setMessage("patientMessage", error.message || "Nie udało się usunąć karty.");
+          }
+        });
+        actions.append(edit, remove);
+        card.append(content, actions);
+        container.append(card);
+      });
+      setMessage("patientMessage", "Pobrano kart: " + items.length);
+    } catch (error) {
+      setMessage("patientMessage", error.message || "Nie można pobrać kart pacjentów.");
+    }
+  }
+
+  async function refreshMeasurements() {
+    try {
+      const response = await api.listResources("measurements");
+      const items = Array.isArray(response.items) ? response.items : [];
+      renderSimpleCollection("measurementRecords", items,
+        (item) => item.started_at || item.session_id || item.id,
+        (item) => {
+          const parts = [];
+          if (item.status) parts.push("Status: " + item.status);
+          if (item.sample_count !== undefined) parts.push("Próbki: " + item.sample_count);
+          if (item.series) parts.push("Serie: " + item.series.length);
+          if (item.version) parts.push("Wersja: " + item.version);
+          return parts.join(" · ");
+        });
+      setMessage("measurementMessage", "Pobrano sesji: " + items.length);
+    } catch (error) {
+      setMessage("measurementMessage", error.message || "Nie można pobrać pomiarów.");
+    }
+  }
+
+  async function refreshTraining() {
+    try {
+      const [sessions, results, gameSessions, gameResults] = await Promise.all([
+        api.getTrainingSessions(), api.getTrainingResults(),
+        api.getGameSessions(), api.getGameResults()
+      ]);
+      const list = (response) => Array.isArray(response.items) ? response.items : [];
+      renderSimpleCollection("trainingSessions", list(sessions),
+        (item) => item.started_at || item.session_id || item.id,
+        (item) => "Status: " + (item.status || "—") + " · Ćwiczenia: " +
+          (Array.isArray(item.exercise_results) ? item.exercise_results.length : "—"));
+      renderSimpleCollection("trainingResults", list(results),
+        (item) => item.exercise_name || item.id,
+        (item) => "Powtórzenia: " + (item.completed_repetitions ?? "—") +
+          " · Maks. siła: " + (item.maximum_peak_force_n ?? "—") + " N");
+      renderSimpleCollection("gameSessions", list(gameSessions),
+        (item) => item.game_id || item.id,
+        (item) => "Wynik: " + (item.score ?? "—") + " · Status: " + (item.status || "—"));
+      renderSimpleCollection("gameResults", list(gameResults),
+        (item) => item.game_id || item.id,
+        (item) => "Wynik: " + (item.score ?? "—") + " · Sesja treningowa: " +
+          (item.training_session_id || "—"));
+      setMessage("trainingMessage", "Historia została odświeżona.");
+    } catch (error) {
+      setMessage("trainingMessage", error.message || "Nie można pobrać historii treningu i gier.");
+    }
+  }
+
+  function refreshSharedData() {
+    if (!api) return;
+    refreshPatients();
+    refreshMeasurements();
+    refreshTraining();
+  }
+
+  const patientForm = document.getElementById("patientForm");
+  if (patientForm) {
+    patientForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.getElementById("savePatientButton");
+      button.disabled = true;
+      try {
+        await api.createPatient({
+          firstName: document.getElementById("patientFirstName").value.trim(),
+          lastName: document.getElementById("patientLastName").value.trim(),
+          pesel: document.getElementById("patientPesel").value.trim(),
+          medicalHistory: document.getElementById("patientMedicalHistory").value
+        });
+        patientForm.reset();
+        await refreshPatients();
+        setMessage("patientMessage", "Karta została utworzona.");
+      } catch (error) {
+        setMessage("patientMessage", error.message || "Nie udało się utworzyć karty.");
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+  document.getElementById("refreshPatients")?.addEventListener("click", refreshPatients);
+  document.getElementById("refreshMeasurements")?.addEventListener("click", refreshMeasurements);
+  document.getElementById("refreshTraining")?.addEventListener("click", refreshTraining);
 
   async function checkApi() {
     if (!api) {
