@@ -1132,6 +1132,7 @@ void MeasurementTab::stopMeasurement()
     }
     
     m_isMeasuring = false;
+    updateRawTableBatch(true);
     const bool journalFlushed = flushSampleJournal();
     closeSampleJournal();
     
@@ -1208,6 +1209,8 @@ void MeasurementTab::resetSession()
     
     m_statsTable->setRowCount(0);
     m_rawTable->setRowCount(0);
+    m_rawTableLastSequence = 0;
+    m_lastRawTableRefreshMs = -100;
     if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(true);
     if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 }
@@ -1345,18 +1348,54 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     emit newForceSample(forceValue, currentTime, m_showRawValues);
     updateLiveDisplay(forceValue);
 
-    if (m_rawTable) {
-        if (m_rawTable->rowCount() >= 100)
-            m_rawTable->removeRow(0);
+    updateRawTableBatch();
+}
+
+void MeasurementTab::updateRawTableBatch(bool force)
+{
+    if (!m_rawTable || m_recordedSamples.isEmpty()) return;
+
+    const qint64 elapsedMs = static_cast<qint64>(
+        m_sessionElapsedTimer.isValid() ? m_sessionElapsedTimer.elapsed() : 0);
+    if (!force && elapsedMs - m_lastRawTableRefreshMs < 100) return;
+
+    const quint64 totalSamples = static_cast<quint64>(m_recordedSamples.size());
+    if (m_rawTableLastSequence > totalSamples) {
+        m_rawTable->setRowCount(0);
+        m_rawTableLastSequence = 0;
+    }
+
+    // If the GUI was stalled, rebuild only the visible tail instead of replaying
+    // an arbitrarily large table backlog. The full sample stream remains intact.
+    const quint64 firstVisible = totalSamples > 100 ? totalSamples - 100 : 0;
+    if (m_rawTableLastSequence < firstVisible) {
+        m_rawTable->setRowCount(0);
+        m_rawTableLastSequence = firstVisible;
+    }
+
+    if (m_rawTableLastSequence == totalSamples) {
+        m_lastRawTableRefreshMs = elapsedMs;
+        return;
+    }
+
+    m_rawTable->setUpdatesEnabled(false);
+    for (quint64 index = m_rawTableLastSequence; index < totalSamples; ++index) {
+        const auto& sample = m_recordedSamples[static_cast<int>(index)];
         const int row = m_rawTable->rowCount();
         m_rawTable->insertRow(row);
-        m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
-        const double displayedSample = m_showRawValues
-            ? forceValue
-            : (m_currentUnit == ForceUnit::Kilograms ? forceValue / 9.80665 : forceValue);
-        m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(displayedSample, 'f', 2)));
-        m_rawTable->scrollToBottom();
+        m_rawTable->setItem(row, 0, new QTableWidgetItem(
+            QString::number(sample.elapsedTimeSeconds, 'f', 3)));
+        const double displayed = m_showRawValues ? sample.value
+            : (m_currentUnit == ForceUnit::Kilograms ? sample.value / 9.80665 : sample.value);
+        m_rawTable->setItem(row, 1, new QTableWidgetItem(
+            QString::number(displayed, 'f', 2)));
     }
+    while (m_rawTable->rowCount() > 100)
+        m_rawTable->removeRow(0);
+    m_rawTable->setUpdatesEnabled(true);
+    m_rawTable->scrollToBottom();
+    m_rawTableLastSequence = totalSamples;
+    m_lastRawTableRefreshMs = elapsedMs;
 }
 
 void MeasurementTab::updateLiveDisplay(double force)
@@ -2186,6 +2225,8 @@ void MeasurementTab::showCurrentMeasurementData()
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
     m_rawTable->setRowCount(0);
+    m_rawTableLastSequence = 0;
+    m_lastRawTableRefreshMs = -100;
     m_forcePlot->clearData();
 
     if (m_recordedSamples.isEmpty()) {
@@ -2253,6 +2294,7 @@ void MeasurementTab::showCurrentMeasurementData()
     m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
     m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
     m_rawTable->scrollToBottom();
+    m_rawTableLastSequence = static_cast<quint64>(m_recordedSamples.size());
 }
 
 void MeasurementTab::loadPatientTrends()
