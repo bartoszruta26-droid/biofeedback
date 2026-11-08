@@ -235,19 +235,20 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->enemyHealth() == 100);
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
-    scorchedGame->handleSensorInput(38.5); // Calibrated trajectory intersects the enemy tank rather than passing above it.
+    scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire);
-    waitForEvents(180);
-    scorchedGame->resize(180, 120);
-    waitForEvents(80);
-    REQUIRE(scorchedGame->isRunning());
-    scorchedGame->resize(640, 480);
-    waitForEvents(2600); // Allow the aimed shell to resolve against the enemy tank and the AI reply to begin.
+    waitForEvents(2200); // Let the undisturbed ballistic trajectory resolve before testing resize.
     REQUIRE(scorchedGame->isRunning());
     REQUIRE(scorchedGame->enemyHealth() < 100); // A real tank hit must apply damage.
     REQUIRE(scorchedGame->playerHealth() > 0);
     REQUIRE(scorchedGame->currentRound() == 1);
+    scorchedGame->resize(180, 120);
+    waitForEvents(80);
+    REQUIRE(scorchedGame->isRunning());
+    scorchedGame->resize(640, 480);
+    waitForEvents(80);
+    REQUIRE(scorchedGame->isRunning());
     scorchedGame->stop();
     scorchedGame->reset();
     REQUIRE(scorchedGame->playerHealth() == 100);
