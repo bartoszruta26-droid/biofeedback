@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QTimer>
 #include <openssl/rand.h>
+#include <openssl/crypto.h>
 
 namespace biofeedback::api {
 namespace {
@@ -33,6 +34,23 @@ QByteArray reasonPhrase(int status) {
     default: return "Internal Server Error";
     }
 }
+
+struct ByteArrayWiper {
+    QByteArray& value;
+    ~ByteArrayWiper() {
+        if (!value.isEmpty()) OPENSSL_cleanse(value.data(), static_cast<std::size_t>(value.size()));
+    }
+};
+struct QStringWiper {
+    QString& value;
+    ~QStringWiper() { value.fill(QChar(0)); }
+};
+struct StringWiper {
+    std::string& value;
+    ~StringWiper() {
+        if (!value.empty()) OPENSSL_cleanse(value.data(), value.size());
+    }
+};
 
 QByteArray errorBody(const char* code, const char* message) {
     return QJsonDocument(QJsonObject{
@@ -203,7 +221,8 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
 
         const QByteArray method = requestLine.at(0);
         const QByteArray path = requestLine.at(1).split('?').first();
-        const QByteArray body = buffer.mid(headerEnd + 4, static_cast<int>(contentLength));
+        QByteArray body = buffer.mid(headerEnd + 4, static_cast<int>(contentLength));
+        ByteArrayWiper bodyWiper{body};
 
         if (originSeen) {
             const QUrl originUrl(QString::fromUtf8(origin));
@@ -261,14 +280,15 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 return;
             }
             QJsonParseError parseError;
-            const QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
+            QJsonDocument document = QJsonDocument::fromJson(body, &parseError);
             if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
                 sendJson(socket, 400, errorBody("INVALID_JSON", "Niepoprawna treść JSON."));
                 return;
             }
-            const QJsonObject credentials = document.object();
+            QJsonObject credentials = document.object();
             const QString username = credentials.value(QStringLiteral("username")).toString().trimmed();
-            const QString password = credentials.value(QStringLiteral("password")).toString();
+            QString password = credentials.value(QStringLiteral("password")).toString();
+            QStringWiper passwordWiper{password};
             if (username.isEmpty() || password.isEmpty() || username.size() > 128 || password.size() > 1024) {
                 sendJson(socket, 400, errorBody("INVALID_CREDENTIALS_FORMAT", "Niepoprawny format danych logowania."));
                 return;
@@ -294,7 +314,13 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 sendJson(socket, 503, errorBody("AUTH_STORE_UNAVAILABLE", "Nie można odczytać magazynu kont."));
                 return;
             }
-            if (!authentication->login(username.toStdString(), password.toStdString())) {
+            const std::string usernameUtf8 = username.toStdString();
+            std::string passwordUtf8 = password.toUtf8().toStdString();
+            StringWiper passwordUtf8Wiper{passwordUtf8};
+            const bool credentialsValid = authentication->login(usernameUtf8, passwordUtf8);
+            credentials.remove(QStringLiteral("password"));
+            document = QJsonDocument();
+            if (!credentialsValid) {
                 auto& attempt = m_loginAttempts[clientAddress];
                 ++attempt.failures;
                 if (attempt.failures >= 5) {
