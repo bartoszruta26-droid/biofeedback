@@ -93,3 +93,9 @@
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
+
+
+### Dalszy audyt i poprawki przed walidacją CI
+- [x] Pong: pozycja kontaktu z paletką jest ograniczana do przedziału 0–1, dzięki czemu trafienie obrysem piłki przy górnej/dolnej krawędzi nie generuje kąta odbicia spoza zakresu paletki. Punkt jest przyznawany dopiero po całkowitym opuszczeniu pola gry przez piłkę. Commit: `18e77b16913aa400764626b09f2c4d52028b2a8a`.
+- [x] Flappy Bird: parametry bazowej trudności i wysokości luk nie są już trwale zmniejszane podczas zmiany rozmiaru okna. Istniejące przeszkody nadal są dopasowywane do nowego widoku, a nowe luki są ograniczane do dostępnej wysokości. Commit: `4e2995d88603db25333a359234d019d950010f7e`.
+- [ ] Pełna kompilacja Qt5 i testy regresyjne po powyższych poprawkach; wynik CI należy przypisać wyłącznie do aktualnego SHA, nie do wcześniejszych przebiegów.
