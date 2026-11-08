@@ -8,6 +8,7 @@
 #include <QVector>
 
 class QKeyEvent;
+class QResizeEvent;
 
 namespace games {
 
@@ -25,6 +26,7 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     struct Projectile {
