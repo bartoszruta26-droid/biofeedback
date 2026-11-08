@@ -7,6 +7,8 @@
 #include <QFont>
 #include <QScrollBar>
 #include <QMessageBox>
+#include <QMetaObject>
+#include <QFile>
 #include <QThread>
 #include <iostream>
 #include <mutex>
@@ -46,9 +48,14 @@ DebugTab::DebugTab(QWidget *parent)
     registerAsDebugReceiver();
 }
 
-DebugTab::~DebugTab() override
+DebugTab::~DebugTab()
 {
-    // Odłącz callback przy niszczeniu
+    if (m_serialPort) {
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_serialPort->removeConnectionCallback(m_connectionCallbackToken);
+        m_dataCallbackToken = 0;
+        m_connectionCallbackToken = 0;
+    }
     core::DebugManager::instance().unregisterDebugCallback();
 }
 
@@ -225,14 +232,16 @@ void DebugTab::addDebugMessage(const QString& message, const QString& type)
 
 void DebugTab::clearTerminal()
 {
-    std::lock_guard<std::mutex> lock(m_messageMutex);
-    
-    if (m_debugTerminal) {
-        m_debugTerminal->clear();
-        m_messageCount = 0;
-        m_lblMessageCount->setText("Wiadomości: 0");
-        addDebugMessage("Terminal wyczyszczony", "INFO");
+    {
+        std::lock_guard<std::mutex> lock(m_messageMutex);
+        if (m_debugTerminal) {
+            m_debugTerminal->clear();
+            m_messageCount = 0;
+            if (m_lblMessageCount) m_lblMessageCount->setText("Wiadomości: 0");
+        }
     }
+    // addDebugMessage acquires the same mutex; call it after releasing the lock.
+    addDebugMessage("Terminal wyczyszczony", "INFO");
 }
 
 bool DebugTab::exportLogsToFile(const QString& filename)
@@ -260,20 +269,29 @@ bool DebugTab::exportLogsToFile(const QString& filename)
 
 void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
     if (m_serialPort) {
-        // Połącz sygnały SerialCommunication z slotami DebugTab
-        connect(m_serialPort.get(), &sensor::SerialCommunication::sensorDataReady,
-                this, &DebugTab::onSensorDataReceived, Qt::QueuedConnection);
-        
-        connect(m_serialPort.get(), &sensor::SerialCommunication::connectionStatusChanged,
-                this, &DebugTab::onConnectionStatusChanged, Qt::QueuedConnection);
-        
-        addDebugMessage("Połączenie z SerialCommunication nawiązane", "SERIAL");
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_serialPort->removeConnectionCallback(m_connectionCallbackToken);
+        m_dataCallbackToken = 0;
+        m_connectionCallbackToken = 0;
     }
-}
+    m_serialPort = serial;
+    if (!m_serialPort) return;
 
+    // SerialCommunication is a plain C++ service. Queue callbacks onto the Qt GUI thread.
+    m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
+        QMetaObject::invokeMethod(this, [this, data]() { onSensorDataReceived(data); }, Qt::QueuedConnection);
+    });
+    m_connectionCallbackToken = m_serialPort->addConnectionCallback([this](bool connected, const std::string& message) {
+        const QString qtMessage = QString::fromStdString(message);
+        QMetaObject::invokeMethod(this, [this, connected, qtMessage]() {
+            onConnectionStatusChanged(connected, qtMessage);
+        }, Qt::QueuedConnection);
+    });
+
+    if (m_serialPort->isConnected()) onConnectionStatusChanged(true, tr("Połączenie aktywne"));
+    else addDebugMessage("Usługa SerialCommunication gotowa; brak aktywnego połączenia", "SERIAL");
+}
 bool DebugTab::isArduinoConnected() const
 {
     return m_hasArduinoConnection;
@@ -338,7 +356,7 @@ void DebugTab::onConnectionStatusChanged(bool connected, const QString& message)
     m_hasArduinoConnection = connected;
     
     if (connected) {
-        m_currentPort = m_serialPort ? m_serialPort->getPortName() : "Unknown";
+        m_currentPort = m_serialPort ? QString::fromStdString(m_serialPort->getPortName()) : tr("Nieznany");
         m_baudRate = m_serialPort ? m_serialPort->getBaudRate() : 0;
         
         m_lblPortName->setText(QString("Port: %1").arg(m_currentPort));

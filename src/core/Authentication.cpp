@@ -11,7 +11,9 @@
  */
 
 #include "core/Authentication.hpp"
-#include "core/ConfigManager.hpp"
+#include "core/PasswordHasher.hpp"
+#include "data/Encryption.hpp"
+#include <openssl/crypto.h>
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -22,6 +24,10 @@
 #include <stdexcept>
 #include <mutex>
 #include <cstdlib>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <cerrno>
 
 // ============================================================================
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
@@ -583,6 +589,21 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
     }
 }
 
+bool writeUsersAtomically(const std::string& path,const std::string& content)
+{
+    if(path.empty())return false;
+    std::string temp=path+".tmp.XXXXXX";std::vector<char> n(temp.begin(),temp.end());n.push_back('\0');
+    int fd=::mkstemp(n.data());if(fd<0)return false;const std::string tmp(n.data());
+    bool ok=(::fchmod(fd,S_IRUSR|S_IWUSR)==0);std::size_t pos=0;
+    while(ok&&pos<content.size()){ssize_t w=::write(fd,content.data()+pos,content.size()-pos);if(w<0&&errno==EINTR)continue;if(w<=0){ok=false;break;}pos+=static_cast<std::size_t>(w);}
+    if (ok && ::fsync(fd) != 0) ok = false;
+    if (::close(fd) != 0) ok = false;
+    if(ok&&::rename(tmp.c_str(),path.c_str())!=0)ok=false;
+    if(ok){auto slash=path.find_last_of('/');std::string dir=slash==std::string::npos?".":(slash==0?"/":path.substr(0,slash));int d=::open(dir.c_str(),O_RDONLY|O_DIRECTORY);if(d>=0){if(::fsync(d)!=0)ok=false;::close(d);}}
+    if (!ok) ::unlink(tmp.c_str());
+    return ok;
+}
+
 } // namespace
 
 // ============================================================================
@@ -607,7 +628,8 @@ std::string UserData::toJson() const
         json << "  \"username\": \"" << escapeJsonString(username) << "\",\n";
         json << "  \"password\": \"" << escapeJsonString(password) << "\",\n";
         json << "  \"role\": \"" << escapeJsonString(role) << "\",\n";
-        json << "  \"encrypted\": " << (encrypted ? "true" : "false") << "\n";
+        json << "  \"encrypted\": " << (encrypted ? "true" : "false") << ",\n";
+        json << "  \"mustChangePassword\": " << (mustChangePassword ? "true" : "false") << "\n";
         json << "}";
         
         #if DEBUG_USER_OPERATIONS
@@ -653,6 +675,7 @@ UserData UserData::fromJson(const std::string& jsonText)
         user.password = extractJsonStringField(jsonText, "password");
         user.role = extractJsonStringField(jsonText, "role");
         user.encrypted = extractJsonBoolField(jsonText, "encrypted", false);
+        user.mustChangePassword = extractJsonBoolField(jsonText, "mustChangePassword", false);
         
         #if DEBUG_USER_OPERATIONS
         // Security: Do not log raw username - use redacted form
@@ -677,7 +700,7 @@ UserData UserData::fromJson(const std::string& jsonText)
  * @param usersFilePath Ścieżka do pliku z danymi użytkowników
  */
 Authentication::Authentication(const std::string& usersFilePath)
-    : usersFilePath(usersFilePath)
+    : usersFilePath(usersFilePath), currentUser(nullptr)
 {
     AUTH_DEBUG(1, "Tworzenie instancji Authentication");
     AUTH_DEBUG(2, "Ścieżka do pliku użytkowników: " << usersFilePath);
@@ -697,7 +720,8 @@ Authentication::~Authentication()
     
     // Bezpieczne czyszczenie wrażliwych danych
     currentUser = nullptr;
-    encryptionKey.clear();
+    if (!fileEncryptionKey.empty()) OPENSSL_cleanse(fileEncryptionKey.data(), fileEncryptionKey.size());
+    fileEncryptionKey.clear();
 }
 
 /**
@@ -734,6 +758,18 @@ bool Authentication::loadUsers()
         content << file.rdbuf();
         std::string jsonContent = content.str();
         file.close();
+        const bool encryptedUsersFile = jsonContent.rfind("BFENC:v1:", 0) == 0;
+        if (fileEncryptionEnabled && !encryptedUsersFile) {
+            AUTH_ERROR("Szyfrowanie pliku kont jest włączone, ale plik jest jawny; wymagana jest kontrolowana migracja");
+            return false;
+        }
+        if (encryptedUsersFile) {
+            if (fileEncryptionKey.empty()) {
+                AUTH_ERROR("Plik użytkowników jest zaszyfrowany, ale brak klucza deszyfrującego");
+                return false;
+            }
+            jsonContent = Encryption::decrypt(jsonContent, fileEncryptionKey);
+        }
         
         #if DEBUG_FILE_OPERATIONS
         AUTH_DEBUG(2, "Wczytano zawartość pliku, rozmiar: " << jsonContent.length() << " bajtów");
@@ -791,69 +827,39 @@ bool Authentication::loadUsers()
  * 
  * @return true jeśli zapisywanie powiodło się, false w przeciwnym razie
  */
+void Authentication::setFileEncryption(bool enabled, const std::string& key)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (!key.empty() && key.size() < 32) {
+        fileEncryptionEnabled = false;
+        if (!fileEncryptionKey.empty()) OPENSSL_cleanse(fileEncryptionKey.data(), fileEncryptionKey.size());
+        fileEncryptionKey.clear();
+        return;
+    }
+    if (!fileEncryptionKey.empty()) OPENSSL_cleanse(fileEncryptionKey.data(), fileEncryptionKey.size());
+    fileEncryptionKey = key;
+    fileEncryptionEnabled = enabled && !fileEncryptionKey.empty();
+}
+
 bool Authentication::saveUsers()
 {
-    AUTH_DEBUG(1, "Rozpoczynanie zapisywania użytkowników do pliku");
-    
     std::lock_guard<std::mutex> lock(m_mutex);
-    
-    AUTH_DEBUG(2, "Liczba użytkowników do zapisu: " << users.size());
-    
+    if (usersFilePath.empty()) return false;
     try {
-        // Sprawdzenie czy ścieżka nie jest pusta
-        if (usersFilePath.empty()) {
-            AUTH_ERROR("Pusta ścieżka do pliku użytkowników");
-            return false;
+        std::ostringstream output;
+        output << "{\n    \"users\": [\n";
+        for (std::size_t i = 0; i < users.size(); ++i) {
+            output << "        " << users[i].toJson();
+            if (i + 1 < users.size()) output << ",";
+            output << "\n";
         }
-
-        std::ofstream file(usersFilePath);
-        if (!file.is_open()) {
-            AUTH_ERROR("Nie można zapisać do pliku użytkowników: " << usersFilePath);
-            return false;
-        }
-        
-        #if DEBUG_FILE_OPERATIONS
-        AUTH_DEBUG(2, "Plik otwarty do zapisu: " << usersFilePath);
-        #endif
-
-        file << "{\n    \"users\": [\n";
-
-        for (size_t i = 0; i < users.size(); ++i) {
-            try {
-                file << "        " << users[i].toJson();
-                if (i < users.size() - 1) {
-                    file << ",";
-                }
-                file << "\n";
-            } catch (const std::exception& e) {
-                AUTH_WARN("Błąd podczas zapisywania użytkownika #" << i << ": " << e.what());
-                // Kontynuujemy z następnym użytkownikiem (gentle code)
-            }
-        }
-
-        file << "    ]\n}\n";
-        
-        if (!file.good()) {
-            AUTH_ERROR("Błąd podczas zapisywania do pliku");
-            file.close();
-            return false;
-        }
-        
-        file.close();
-
-        AUTH_DEBUG(1, "Zapisano " << users.size() << " użytkowników");
-        return true;
-        
-    } catch (const std::ios_base::failure& e) {
-        AUTH_ERROR("Błąd I/O podczas zapisywania pliku: " << e.what());
-        return false;
-    } catch (const std::bad_alloc& e) {
-        AUTH_ERROR("Błąd alokacji pamięci podczas zapisywania użytkowników: " << e.what());
-        return false;
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas zapisywania użytkowników: " << e.what());
-        return false;
-    }
+        output << "    ]\n}\n";
+        const std::string serialized = output.str();
+        if (fileEncryptionEnabled && fileEncryptionKey.empty()) return false;
+        const std::string payload = fileEncryptionEnabled
+            ? Encryption::encrypt(serialized, fileEncryptionKey) : serialized;
+        return writeUsersAtomically(usersFilePath, payload);
+    } catch (...) { return false; }
 }
 
 /**
@@ -904,54 +910,6 @@ UserData* Authentication::findUser(const std::string& username)
  * @param password Hasło do zaszyfrowania
  * @return Zaszyfrowane hasło lub oryginalne jeśli błąd
  */
-std::string Authentication::encryptPassword(const std::string& password)
-{
-    #if DEBUG_PASSWORD_ENCRYPTION
-    AUTH_DEBUG(2, "Szyfrowanie hasła, długość: " << password.length());
-    #endif
-    
-    // Gentle code: obsługa pustego hasła
-    if (password.empty()) {
-        AUTH_WARN("Próba szyfrowania pustego hasła");
-        return "";
-    }
-    
-    try {
-        if (encryptionKey.empty()) {
-            // Pobranie klucza z zmiennej środowiskowej lub ConfigManager
-            const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-            if (envKey && std::string(envKey).length() >= 16) {
-                encryptionKey = std::string(envKey);
-                AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
-            } else {
-                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
-                
-                if (encryptionKey.empty() || encryptionKey.length() < 16) {
-                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
-                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
-                }
-                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
-            }
-        }
-
-        std::string result = Encryption::encrypt(password, encryptionKey);
-        
-        #if DEBUG_PASSWORD_ENCRYPTION
-        AUTH_DEBUG(2, "Szyfrowanie hasła zakończone sukcesem");
-        #endif
-        
-        return result;
-        
-    } catch (const std::invalid_argument& e) {
-        AUTH_ERROR("Błąd argumentu podczas szyfrowania hasła: " << e.what());
-        return password;  // Gentle code: zwracamy oryginał
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Błąd szyfrowania hasła: " << e.what());
-        return password;  // Gentle code: zwracamy oryginał zamiast rzucać wyjątek
-    }
-}
 
 /**
  * @brief Deszyfruje hasło za pomocą klucza
@@ -959,54 +917,6 @@ std::string Authentication::encryptPassword(const std::string& password)
  * @param encryptedPassword Zaszyfrowane hasło
  * @return Odszyfrowane hasło lub pusty string jeśli błąd
  */
-std::string Authentication::decryptPassword(const std::string& encryptedPassword)
-{
-    #if DEBUG_PASSWORD_ENCRYPTION
-    AUTH_DEBUG(2, "Deszyfrowanie hasła");
-    #endif
-    
-    // Gentle code: obsługa pustego hasła
-    if (encryptedPassword.empty()) {
-        AUTH_WARN("Próba deszyfrowania pustego hasła");
-        return "";
-    }
-    
-    try {
-        if (encryptionKey.empty()) {
-            // Pobranie klucza z zmiennej środowiskowej lub ConfigManager
-            const char* envKey = std::getenv("BIOFEEDBACK_ENCRYPTION_KEY");
-            if (envKey && std::string(envKey).length() >= 16) {
-                encryptionKey = std::string(envKey);
-                AUTH_DEBUG(2, "Użyto klucza z zmiennej środowiskowej BIOFEEDBACK_ENCRYPTION_KEY");
-            } else {
-                // Jeśli brak zmiennej środowiskowej, użyj klucza z ConfigManager
-                auto& config = core::ConfigManager::instance();
-                encryptionKey = config.getEncryptionKey();
-                
-                if (encryptionKey.empty() || encryptionKey.length() < 16) {
-                    AUTH_ERROR("Brak poprawnego klucza szyfrującego. Konfiguracja wymaga ustawienia klucza min. 16 znaków.");
-                    throw std::runtime_error("Niepoprawny klucz szyfrujący - wymagany klucz min. 16 znaków");
-                }
-                AUTH_DEBUG(2, "Użyto klucza z ConfigManager");
-            }
-        }
-
-        std::string result = Encryption::decrypt(encryptedPassword, encryptionKey);
-        
-        #if DEBUG_PASSWORD_ENCRYPTION
-        AUTH_DEBUG(2, "Deszyfrowanie hasła zakończone sukcesem");
-        #endif
-        
-        return result;
-        
-    } catch (const std::invalid_argument& e) {
-        AUTH_ERROR("Błąd argumentu podczas deszyfrowania hasła: " << e.what());
-        return "";  // Gentle code
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Błąd deszyfrowania hasła: " << e.what());
-        return "";  // Gentle code: zwracamy pusty string zamiast rzucać wyjątek
-    }
-}
 
 /**
  * @brief Szyfruje hasła wszystkich nieszyfrowanych użytkowników
@@ -1016,52 +926,31 @@ std::string Authentication::decryptPassword(const std::string& encryptedPassword
  */
 int Authentication::encryptPasswordsIfNeeded(const std::string& key)
 {
-    AUTH_DEBUG(1, "Rozpoczynanie szyfrowania haseł");
-    
-    // Walidacja parametru
-    if (key.empty()) {
-        AUTH_ERROR("Klucz szyfrujący jest pusty");
-        return 0;
-    }
-    
-    int encryptedCount = 0;
-    
+    (void)key;
+    std::unique_lock<std::mutex> lock(m_mutex);
+    const auto previous = users;
+    int migrated = 0;
     try {
-        encryptionKey = key;
-        AUTH_DEBUG(2, "Ustawiono klucz szyfrujący");
-
         for (auto& user : users) {
-            try {
-                if (!user.encrypted && !user.password.empty()) {
-                    // Zaszyfruj hasło
-                    user.password = encryptPassword(user.password);
-                    user.encrypted = true;
-                    encryptedCount++;
-                    
-                    #if DEBUG_PASSWORD_ENCRYPTION
-                    // Security: Do not log raw username - use redacted form
-                    AUTH_DEBUG(2, "Zaszyfrowano hasło dla użytkownika: [REDACTED] (length: " << user.username.length() << ")");
-                    #endif
-                }
-            } catch (const std::exception& e) {
-                // Security: Do not log raw username in error message
-                AUTH_WARN("Błąd podczas szyfrowania hasła dla użytkownika: [REDACTED]: " << e.what());
-                // Kontynuujemy z następnym użytkownikiem (gentle code)
+            if (!PasswordHasher::isEncoded(user.password) && !user.encrypted && !user.password.empty()) {
+                user.password = PasswordHasher::hash(user.password);
+                user.encrypted = true;
+                user.mustChangePassword = true;
+                ++migrated;
             }
         }
-
-        // Zapisz zaktualizowane dane
-        if (encryptedCount > 0) {
-            AUTH_DEBUG(2, "Zapisywanie zaktualizowanych danych użytkowników");
-            saveUsers();
-        }
-
-        AUTH_DEBUG(1, "Zaszyfrowano " << encryptedCount << " haseł");
-        return encryptedCount;
-        
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas szyfrowania haseł: " << e.what());
-        return encryptedCount;  // Zwracamy to co udało się zrobić
+        if (migrated == 0) return 0;
+        lock.unlock();
+        if (saveUsers()) return migrated;
+        lock.lock();
+        users = previous;
+        currentUser = nullptr;
+        return 0;
+    } catch (...) {
+        if (!lock.owns_lock()) lock.lock();
+        users = previous;
+        currentUser = nullptr;
+        return 0;
     }
 }
 
@@ -1074,65 +963,32 @@ int Authentication::encryptPasswordsIfNeeded(const std::string& key)
  */
 bool Authentication::login(const std::string& username, const std::string& password)
 {
-    // Security: Do not log raw username - use redacted form with length only
-    AUTH_DEBUG(1, "Próba logowania użytkownika: [REDACTED] (length: " << username.length() << ")");
-    
-    // Walidacja parametrów - gentle code
-    if (username.empty()) {
-        AUTH_WARN("Pusta nazwa użytkownika");
-        return false;
+    if (username.empty() || password.empty()) return false;
+    std::unique_lock<std::mutex> lock(m_mutex);
+    UserData* user = findUser(username);
+    if (!user) { currentUser = nullptr; return false; }
+    if (PasswordHasher::isEncoded(user->password)) {
+        const bool valid = PasswordHasher::verify(password, user->password);
+        currentUser = valid ? user : nullptr;
+        return valid;
     }
-    
-    // Uwaga: puste hasło może być dozwolone w niektórych systemach
-    
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
+    // One-time plaintext migration. Existing reversible XOR records are rejected.
+    if (user->encrypted || user->password != password) { currentUser = nullptr; return false; }
+    const std::string old = user->password;
     try {
-        UserData* user = findUser(username);
-
-        if (user == nullptr) {
-            currentUser = nullptr;
-            // Security: Do not log the username that was not found
-            AUTH_DEBUG(2, "Nie znaleziono użytkownika: [REDACTED]");
-            return false;
-        }
-
-        std::string storedPassword;
-
-        try {
-            if (user->encrypted) {
-                // Hasło jest zaszyfrowane - musimy je odszyfrować do porównania
-                #if DEBUG_PASSWORD_ENCRYPTION
-                AUTH_DEBUG(3, "Hasło jest zaszyfrowane - deszyfrowanie");
-                #endif
-                storedPassword = decryptPassword(user->password);
-            } else {
-                // Hasło nie jest zaszyfrowane - używamy bezpośrednio
-                #if DEBUG_PASSWORD_ENCRYPTION
-                AUTH_DEBUG(3, "Hasło nie jest zaszyfrowane");
-                #endif
-                storedPassword = user->password;
-            }
-        } catch (const std::exception& e) {
-            AUTH_ERROR("Błąd podczas deszyfrowania hasła: " << e.what());
-            currentUser = nullptr;
-            return false;
-        }
-
-        if (storedPassword == password) {
-            currentUser = user;
-            // Security: Log success without exposing username, only role
-            AUTH_DEBUG(1, "Zalogowano użytkownika: [REDACTED] (rola: " << user->role << ")");
-            return true;
-        }
-
+        user->password = PasswordHasher::hash(password);
+        user->encrypted = true;
+        user->mustChangePassword = true;
+        currentUser = user;
+        lock.unlock();
+        if (saveUsers()) return true;
+        lock.lock();
+        user->password = old;
+        user->encrypted = false;
+        user->mustChangePassword = false;
         currentUser = nullptr;
-        // Security: Do not reveal which username had invalid password
-        AUTH_DEBUG(2, "Nieprawidłowe hasło dla użytkownika: [REDACTED]");
         return false;
-        
-    } catch (const std::exception& e) {
-        AUTH_ERROR("Nieoczekiwany błąd podczas logowania: " << e.what());
+    } catch (...) {
         currentUser = nullptr;
         return false;
     }
@@ -1158,10 +1014,97 @@ void Authentication::logout()
  * 
  * @return true jeśli użytkownik jest zalogowany, false w przeciwnym razie
  */
+bool Authentication::requiresPasswordChange() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return currentUser && currentUser->mustChangePassword;
+}
+
+bool Authentication::changePassword(const std::string& newPassword)
+{
+    if (newPassword.size() < 12) return false;
+    std::unique_lock<std::mutex> lock(m_mutex);
+    if (!currentUser) return false;
+    UserData* user=currentUser;
+    if (PasswordHasher::verify(newPassword, user->password)) return false;
+    const auto oldHash=user->password; const bool oldEncrypted=user->encrypted; const bool oldFlag=user->mustChangePassword;
+    try {
+        user->password=PasswordHasher::hash(newPassword); user->encrypted=true; user->mustChangePassword=false;
+        lock.unlock();
+        if(saveUsers()) return true;
+        lock.lock(); user->password=oldHash; user->encrypted=oldEncrypted; user->mustChangePassword=oldFlag; return false;
+    } catch(...) {
+        if(!lock.owns_lock()) lock.lock();
+        user->password=oldHash; user->encrypted=oldEncrypted; user->mustChangePassword=oldFlag; return false;
+    }
+}
+
+bool Authentication::createUser(const std::string& username,const std::string& password,const std::string& role)
+{
+    if(username.empty()||password.size()<12||role.empty())return false;
+    std::string actor;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if(!currentUser || currentUser->mustChangePassword || currentUser->role!="administrator")return false;
+        if(findUser(username))return false;
+        actor=currentUser->username;
+        UserData user{};
+        user.username=username;
+        try { user.password=PasswordHasher::hash(password); } catch (...) { return false; }
+        user.role=role;
+        user.encrypted=true;
+        user.mustChangePassword=false;
+        users.push_back(user);
+        currentUser=findUser(actor); // vector growth may invalidate the previous pointer.
+    }
+    if(saveUsers())return true;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    users.erase(std::remove_if(users.begin(),users.end(),[&](const UserData& u){return u.username==username;}),users.end());
+    currentUser=findUser(actor);
+    return false;
+}
+
+bool Authentication::hasUsers() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return !users.empty();
+}
+
+bool Authentication::createInitialAdministrator(
+    const std::string& username, const std::string& password)
+{
+    if (username.empty() || password.size() < 12) return false;
+
+    UserData administrator{};
+    administrator.username = username;
+    try {
+        administrator.password = PasswordHasher::hash(password);
+    } catch (...) {
+        return false;
+    }
+    administrator.role = "administrator";
+    administrator.encrypted = true;
+    administrator.mustChangePassword = false;
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!users.empty()) return false;
+        users.push_back(administrator);
+        currentUser = nullptr;
+    }
+
+    if (saveUsers()) return true;
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    users.clear();
+    currentUser = nullptr;
+    return false;
+}
+
 bool Authentication::isLoggedIn() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    return currentUser != nullptr;
+    return currentUser != nullptr && !currentUser->mustChangePassword;
 }
 
 /**
@@ -1197,22 +1140,5 @@ std::string Authentication::getCurrentUserRole() const
  * 
  * @param key Klucz szyfrujący
  */
-void Authentication::setEncryptionKey(const std::string& key)
-{
-    AUTH_DEBUG(2, "Ustawianie klucza szyfrującego");
-    
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
-    // Walidacja parametru - gentle code
-    if (key.empty()) {
-        AUTH_WARN("Próba ustawienia pustego klucza szyfrującego");
-    }
-    
-    encryptionKey = key;
-    
-    #if DEBUG_PASSWORD_ENCRYPTION
-    AUTH_DEBUG(3, "Klucz szyfrujący ustawiony");
-    #endif
-}
 
 } // namespace biofeedback

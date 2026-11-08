@@ -7,6 +7,13 @@
 #include "tab/DebugTab.hpp"
 #include "games/GameEngine.hpp"
 #include "games/SinGame.hpp"
+#include "games/PongGame.hpp"
+#include "games/FlappyBirdGame.hpp"
+#include "games/MarioGame.hpp"
+#include "games/TanGame.hpp"
+#include "games/ArkanoidGame.hpp"
+#include "games/GameFactory.hpp"
+#include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QApplication>
 #include <QSettings>
@@ -14,6 +21,10 @@
 #include <QTabWidget>
 #include <QStackedWidget>
 #include <QMessageBox>
+#include <QGridLayout>
+#include <QFrame>
+#include <QMetaObject>
+#include <cmath>
 #include <memory>
 
 namespace gui {
@@ -38,23 +49,50 @@ MainWindow::MainWindow(QWidget *parent)
     , m_weightLabel(nullptr)
     , m_weightValue(nullptr)
     , m_statusLabel(nullptr)
+    , m_dashboardConnectionValue(nullptr)
+    , m_dashboardForceValue(nullptr)
+    , m_dashboardMeasurementValue(nullptr)
     , m_samplingRateSpin(nullptr)
     , m_graphDurationSpin(nullptr)
     , m_unitCombo(nullptr)
+    , m_devicePortCombo(nullptr)
+    , m_connectDeviceButton(nullptr)
     , m_updateTimer(nullptr)
+    , m_settingsWidget(nullptr)
     , m_isCollectingData(false)
     , m_isConnected(false)
-    , m_settingsWidget(nullptr)
     , m_debugTerminal(nullptr)
     , m_debugMaxLines(500)
     , m_serialPort(nullptr)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
     setMinimumSize(1280, 800);
+    setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:10px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:11px 18px;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:12px;} QLabel#dashboardValue{color:#14243a;font-size:21pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:8px;padding:10px 16px;font-weight:600;} QPushButton:hover{background:#06696c;}");
     
-    // Inicjalizacja połączenia szeregowego
+    // Shared serial service; UI tabs subscribe independently to its data stream.
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
-    
+    m_serialConnectionCallbackToken = m_serialPort->addConnectionCallback(
+        [this](bool connected, const std::string& message) {
+            const QString deviceName = connected ? QString::fromStdString(m_serialPort->getPortName()) : QString();
+            const QString detail = QString::fromStdString(message);
+            QMetaObject::invokeMethod(this, [this, connected, deviceName, detail]() {
+                updateConnectionStatus(connected, deviceName);
+                if (m_connectDeviceButton) m_connectDeviceButton->setText(connected ? tr("Rozłącz") : tr("Połącz"));
+                if (!detail.isEmpty()) addDebugMessage(detail, connected ? "INFO" : "WARNING");
+            }, Qt::QueuedConnection);
+        });
+
+    m_serialDataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
+        if (!data.isValid || !data.hasCalibratedValue) return;
+        const double forceNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
+        if (!std::isfinite(forceNewtons) || forceNewtons < 0.0) return;
+        constexpr double gameReferenceForceN = 50.0;
+        const double normalizedGameInput = qBound(0.0, forceNewtons / gameReferenceForceN * 100.0, 100.0);
+        QMetaObject::invokeMethod(this, [this, normalizedGameInput]() {
+            forwardSensorToGame(normalizedGameInput);
+        }, Qt::QueuedConnection);
+    });
+
     setupUI();
     setupMenuBar();
     setupToolBar();
@@ -66,6 +104,14 @@ MainWindow::MainWindow(QWidget *parent)
 MainWindow::~MainWindow()
 {
     saveSettings();
+    if (m_serialPort) {
+        m_serialPort->removeDataCallback(m_serialDataCallbackToken);
+        m_serialDataCallbackToken = 0;
+        m_serialPort->removeConnectionCallback(m_serialConnectionCallbackToken);
+        m_serialConnectionCallbackToken = 0;
+        m_serialPort->stopAsyncReading();
+        m_serialPort->disconnect();
+    }
 }
 
 void MainWindow::setupUI()
@@ -121,18 +167,120 @@ void MainWindow::setupTabs()
         m_measurementTab->setSerialConnection(m_serialPort);
         m_outlineTab->setSerialConnection(m_serialPort);
         m_trainingTab->setSerialConnection(m_serialPort);
+        m_trainingTab->setMeasurementEngine(m_measurementTab->measurementEngine());
         m_debugTab->setSerialConnection(m_serialPort);
     }
+
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            m_trainingTab, &tab::TrainingTab::setCurrentPatientContext);
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            m_measurementTab, &tab::MeasurementTab::onPatientChanged);
+    connect(m_measurementTab, &tab::MeasurementTab::newForceSample,
+            this, [this](double value, double, bool isRaw) {
+                updateWeightDisplay(value, isRaw);
+                if (m_dashboardMeasurementValue)
+                    m_dashboardMeasurementValue->setText(isRaw ? tr("Diagnostyka RAW") : tr("Próbka skalibrowana"));
+            });
+    connect(m_trainingTab, &tab::TrainingTab::trainingStarted,
+            m_patientTab, [this]() {
+                m_patientTab->setEnabled(false);
+                m_measurementTab->setEnabled(false);
+            });
+    connect(m_trainingTab, &tab::TrainingTab::trainingStopped,
+            m_patientTab, [this]() {
+                if (!m_measurementTab->isMeasurementActive()) {
+                    m_patientTab->setEnabled(true);
+                    m_measurementTab->setEnabled(true);
+                }
+            });
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStarted,
+            m_patientTab, [this]() {
+                m_patientTab->setEnabled(false);
+                m_trainingTab->setEnabled(false);
+            });
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
+            m_patientTab, [this]() {
+                if (!m_trainingTab->isTrainingActive() && !m_trainingTab->isTrainingPaused()) {
+                    m_patientTab->setEnabled(true);
+                    m_trainingTab->setEnabled(true);
+                }
+            });
     
-    // Add tabs to widget - DebugTab jako ostatnia zakładka
+    QWidget* dashboard = new QWidget(m_tabWidget);
+    QVBoxLayout* dashboardLayout = new QVBoxLayout(dashboard);
+    dashboardLayout->setContentsMargins(28, 26, 28, 26);
+    QLabel* dashboardTitle = new QLabel(tr("Centrum Biofeedback"), dashboard);
+    dashboardTitle->setStyleSheet("font-size:24px;font-weight:700;color:#14243a;");
+    dashboardLayout->addWidget(dashboardTitle);
+    QGridLayout* cards = new QGridLayout();
+    cards->setHorizontalSpacing(14);
+    cards->setVerticalSpacing(14);
+    auto makeDashboardCard = [dashboard](const QString& heading, const QString& value,
+                                         const QString& detail, QLabel** valueLabelOut) {
+        QFrame* card = new QFrame(dashboard);
+        card->setObjectName("dashboardCard");
+        QVBoxLayout* cardLayout = new QVBoxLayout(card);
+        cardLayout->setContentsMargins(18, 16, 18, 16);
+        QLabel* headingLabel = new QLabel(heading, card);
+        headingLabel->setStyleSheet("color:#64748b;font-size:10pt;font-weight:600;");
+        QLabel* valueLabel = new QLabel(value, card);
+        valueLabel->setObjectName("dashboardValue");
+        QLabel* detailLabel = new QLabel(detail, card);
+        detailLabel->setStyleSheet("color:#74839a;font-size:9pt;");
+        cardLayout->addWidget(headingLabel);
+        cardLayout->addWidget(valueLabel);
+        cardLayout->addWidget(detailLabel);
+        if (valueLabelOut) *valueLabelOut = valueLabel;
+        return card;
+    };
+    cards->addWidget(makeDashboardCard(tr("POŁĄCZENIE"), tr("Rozłączono"),
+        tr("Urządzenie pomiarowe"), &m_dashboardConnectionValue), 0, 0);
+    cards->addWidget(makeDashboardCard(tr("OSTATNI ODCZYT"), tr("-- N"),
+        tr("Oczekiwanie na próbkę"), &m_dashboardForceValue), 0, 1);
+    cards->addWidget(makeDashboardCard(tr("POMIAR"), tr("Bezczynny"),
+        tr("Brak aktywnej sesji"), &m_dashboardMeasurementValue), 1, 0);
+    cards->addWidget(makeDashboardCard(tr("TRYB"), tr("Gotowy"),
+        tr("Aplikacja desktopowa Qt"), nullptr), 1, 1);
+    dashboardLayout->addLayout(cards);
+    QLabel* hint = new QLabel(tr("Wybierz moduł, aby przejść do pacjentów, pomiarów lub treningu."), dashboard);
+    hint->setStyleSheet("color:#74839a;font-size:11pt;");
+    dashboardLayout->addWidget(hint);
+    QHBoxLayout* actions = new QHBoxLayout();
+    QPushButton* patientsButton = new QPushButton(tr("Pacjenci"), dashboard);
+    QPushButton* measurementsButton = new QPushButton(tr("Otwórz pomiary"), dashboard);
+    QPushButton* trainingButton = new QPushButton(tr("Trening"), dashboard);
+    actions->addWidget(patientsButton); actions->addWidget(measurementsButton); actions->addWidget(trainingButton); actions->addStretch();
+    dashboardLayout->addLayout(actions);
+
+    QLabel* deviceHeading = new QLabel(tr("Połączenie z urządzeniem"), dashboard);
+    deviceHeading->setStyleSheet("font-size:14px;font-weight:700;color:#24364d;");
+    dashboardLayout->addWidget(deviceHeading);
+    QHBoxLayout* deviceControls = new QHBoxLayout();
+    m_devicePortCombo = new QComboBox(dashboard);
+    m_devicePortCombo->setMinimumWidth(260);
+    m_devicePortCombo->setMinimumHeight(40);
+    QPushButton* scanPortsButton = new QPushButton(tr("Skanuj porty"), dashboard);
+    m_connectDeviceButton = new QPushButton(tr("Połącz"), dashboard);
+    deviceControls->addWidget(m_devicePortCombo, 2);
+    deviceControls->addWidget(scanPortsButton);
+    deviceControls->addWidget(m_connectDeviceButton);
+    deviceControls->addStretch();
+    dashboardLayout->addLayout(deviceControls);
+    connect(scanPortsButton, &QPushButton::clicked, this, &MainWindow::refreshSerialPorts);
+    connect(m_connectDeviceButton, &QPushButton::clicked, this, &MainWindow::toggleSerialConnection);
+    refreshSerialPorts();
+
+    dashboardLayout->addStretch();
+    m_tabWidget->addTab(dashboard, tr("⌂ Pulpit"));
     m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));
     m_tabWidget->addTab(m_measurementTab, tr("📊 Pomiary"));
     m_tabWidget->addTab(m_outlineTab, tr("🎮 Trening (Outline)"));
     m_tabWidget->addTab(m_trainingTab, tr("🏋️ Trening (Gry)"));
     m_tabWidget->addTab(m_debugTab, tr("🔍 Debug Terminal"));
-    
-    // Set default tab
-    m_tabWidget->setCurrentIndex(0);
+    connect(patientsButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_patientTab); });
+    connect(measurementsButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_measurementTab); });
+    connect(trainingButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_trainingTab); });
+    m_tabWidget->setCurrentWidget(dashboard);
 }
 
 void MainWindow::setupDebugTerminal()
@@ -431,27 +579,78 @@ void MainWindow::saveSettings()
     }
 }
 
-void MainWindow::updateWeightDisplay(double weight)
+void MainWindow::refreshSerialPorts()
 {
-    // m_weightValue jest tworzony dopiero po otwarciu okna ustawień,
-    // więc podczas normalnej pracy może być null.
-    if (!m_weightValue) {
+    if (!m_devicePortCombo) return;
+    const QString previousPort = m_devicePortCombo->currentData().toString();
+    m_devicePortCombo->clear();
+    const auto ports = sensor::SerialCommunication::scanAvailablePorts();
+    for (const auto& port : ports) {
+        const QString value = QString::fromStdString(port);
+        m_devicePortCombo->addItem(value, value);
+    }
+    if (ports.empty()) {
+        m_devicePortCombo->addItem(tr("Brak wykrytych portów"), QString());
+        return;
+    }
+    const int previousIndex = m_devicePortCombo->findData(previousPort);
+    if (previousIndex >= 0) m_devicePortCombo->setCurrentIndex(previousIndex);
+}
+
+void MainWindow::toggleSerialConnection()
+{
+    if (!m_serialPort) {
+        QMessageBox::warning(this, tr("Urządzenie"), tr("Usługa portu szeregowego nie jest dostępna."));
+        return;
+    }
+    if (m_serialPort->isConnected()) {
+        m_serialPort->disconnect();
+        updateConnectionStatus(false);
+        if (m_connectDeviceButton) m_connectDeviceButton->setText(tr("Połącz"));
+        addDebugMessage(tr("Rozłączono urządzenie pomiarowe"), "SERIAL");
         return;
     }
 
-    m_weightValue->setText(QString("%1 N").arg(weight, 0, 'f', 2));
+    const QString port = m_devicePortCombo ? m_devicePortCombo->currentData().toString() : QString();
+    if (port.isEmpty()) {
+        QMessageBox::information(this, tr("Urządzenie"), tr("Najpierw wybierz wykryty port szeregowy."));
+        refreshSerialPorts();
+        return;
+    }
+    if (!m_serialPort->connect(port.toStdString(), DEFAULT_BAUD_RATE)) {
+        updateConnectionStatus(false);
+        QMessageBox::warning(this, tr("Połączenie"), tr("Nie udało się otworzyć portu %1.").arg(port));
+        addDebugMessage(tr("Nie udało się połączyć z %1").arg(port), "ERROR");
+        return;
+    }
+    m_serialPort->startAsyncReading();
+    updateConnectionStatus(true, port);
+    if (m_connectDeviceButton) m_connectDeviceButton->setText(tr("Rozłącz"));
+    addDebugMessage(tr("Uruchomiono odczyt z portu %1 przy %2 baud").arg(port).arg(DEFAULT_BAUD_RATE), "SERIAL");
+}
+
+void MainWindow::updateWeightDisplay(double value, bool isRaw)
+{
+    const QString valueText = isRaw
+        ? QString("%1 ADC").arg(value, 0, 'f', 0)
+        : QString("%1 N").arg(value, 0, 'f', 2);
+    if (m_weightValue) m_weightValue->setText(valueText);
+    if (m_dashboardForceValue) m_dashboardForceValue->setText(valueText);
 }
 
 void MainWindow::updateConnectionStatus(bool connected, const QString& deviceName)
 {
     m_isConnected = connected;
+    m_currentDevice = connected ? deviceName : QString();
+    if (m_connectDeviceButton) m_connectDeviceButton->setText(connected ? tr("Rozłącz") : tr("Połącz"));
     
+    const QString device = deviceName.isEmpty() ? tr("Urządzenie") : deviceName;
     if (connected) {
-        m_statusLabel->setText(tr("Status: Połączono z %1").arg(deviceName.isEmpty() ? tr("Urządzenie") : deviceName));
-        m_statusLabel->setStyleSheet("color: green; font-weight: bold;");
+        if (m_statusLabel) { m_statusLabel->setText(tr("Status: Połączono z %1").arg(device)); m_statusLabel->setStyleSheet("color:#087f82;font-weight:bold;"); }
+        if (m_dashboardConnectionValue) m_dashboardConnectionValue->setText(tr("Połączono"));
     } else {
-        m_statusLabel->setText(tr("Status: Rozłączono"));
-        m_statusLabel->setStyleSheet("color: orange; font-weight: bold;");
+        if (m_statusLabel) { m_statusLabel->setText(tr("Status: Rozłączono")); m_statusLabel->setStyleSheet("color:#b7791f;font-weight:bold;"); }
+        if (m_dashboardConnectionValue) m_dashboardConnectionValue->setText(tr("Rozłączono"));
     }
 }
 
@@ -460,6 +659,7 @@ void MainWindow::startDataCollection()
     if (m_isCollectingData) return;
     
     m_isCollectingData = true;
+    if (m_dashboardMeasurementValue) m_dashboardMeasurementValue->setText(tr("Aktywny"));
     if (m_startButton) m_startButton->setEnabled(false);
     if (m_stopButton) m_stopButton->setEnabled(true);
     m_actionStart->setEnabled(false);
@@ -476,6 +676,7 @@ void MainWindow::stopDataCollection()
     if (!m_isCollectingData) return;
     
     m_isCollectingData = false;
+    if (m_dashboardMeasurementValue) m_dashboardMeasurementValue->setText(tr("Bezczynny"));
     if (m_startButton) m_startButton->setEnabled(true);
     if (m_stopButton) m_stopButton->setEnabled(false);
     m_actionStart->setEnabled(true);
@@ -571,57 +772,70 @@ void MainWindow::onUpdateTimerTimeout()
 void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerciseData)
 {
     qDebug() << "Starting game:" << gameId << "for exercise:" << exerciseData.name;
-    
-    // Stop existing game if any
+
     stopGame();
-    
-    // Create appropriate game based on ID
-    if (gameId == "sin_game") {
-        m_currentGame = new games::SinGame(this);
-        
-        // Connect game signals
-        connect(m_currentGame, &games::GameEngine::gameEnded,
-                this, [this](int score) {
-                    onGameFinished(score);
-                });
-        
-        // Add game to stack
-        m_gameStack->addWidget(m_currentGame);
-        m_gameStack->setCurrentWidget(m_currentGame);
-        m_gameStack->show();
-        
-        // Start the game
-        m_currentGame->start();
-        
-        qDebug() << "SinGame started successfully";
-    }
-    else if (gameId == "tan_game") {
-        // Placeholder for TanGame - can be implemented similarly
-        QMessageBox::information(this, tr("Gra"), 
-                                tr("Gra TanGame będzie dostępna w przyszłej wersji."));
-    }
-    else if (gameId.isEmpty() || gameId == "-- Wybierz grę --") {
-        QMessageBox::warning(this, tr("Brak gry"), 
-                            tr("Nie wybrano gry do uruchomienia."));
+
+    if (gameId.trimmed().isEmpty() || gameId == "-- Wybierz grę --") {
+        QMessageBox::warning(this, tr("Brak gry"),
+                             tr("Nie wybrano gry do uruchomienia."));
         return;
     }
-    else {
-        QMessageBox::warning(this, tr("Nieznana gra"), 
-                            tr("Nieznany identyfikator gry: %1").arg(gameId));
+
+    games::GameEngine* selectedGame = games::createGame(gameId, this);
+    if (!selectedGame) {
+        QMessageBox::warning(this, tr("Gra niedostępna"),
+                             tr("Ta gra nie ma jeszcze aktywnej implementacji: %1").arg(gameId));
         return;
     }
+
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        delete selectedGame;
+        QMessageBox::warning(this, tr("Brak urządzenia"),
+                             tr("Podłącz czujnik HX711 przed uruchomieniem gry."));
+        return;
+    }
+
+    if (auto* game = dynamic_cast<games::PongGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::FlappyBirdGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::MarioGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::SinGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::TanGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+    else if (auto* game = dynamic_cast<games::ArkanoidGame*>(selectedGame))
+        game->setSerialConnection(m_serialPort);
+
+    m_currentGame = selectedGame;
+    connect(m_currentGame, &games::GameEngine::gameEnded,
+            this, [this](int score) { onGameFinished(score); });
+
+    m_gameStack->addWidget(m_currentGame);
+    m_gameStack->setCurrentWidget(m_currentGame);
+    m_gameStack->show();
+    m_currentGame->start();
+
+    qDebug() << "Game started successfully:" << m_currentGame->gameName();
 }
 
 void MainWindow::stopGame()
 {
-    if (m_currentGame) {
-        m_currentGame->stop();
-        m_gameStack->removeWidget(m_currentGame);
-        delete m_currentGame;
-        m_currentGame = nullptr;
-        m_gameStack->hide();
-        qDebug() << "Game stopped";
-    }
+    if (!m_currentGame)
+        return;
+
+    // Odłącz callback przed stop(): gameEnded może wywołać onGameFinished(),
+    // które również sprząta widget. Ustawienie wskaźnika na nullptr przed
+    // emisją sygnałów chroni przed rekurencyjnym i podwójnym usuwaniem.
+    games::GameEngine* game = m_currentGame;
+    m_currentGame = nullptr;
+    disconnect(game, nullptr, this, nullptr);
+    game->stop();
+    m_gameStack->removeWidget(game);
+    game->deleteLater();
+    m_gameStack->hide();
+    qDebug() << "Game stopped";
 }
 
 void MainWindow::forwardSensorToGame(double value)

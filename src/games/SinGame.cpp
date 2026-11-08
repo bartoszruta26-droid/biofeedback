@@ -41,22 +41,8 @@ void SinGame::initialize() {
     m_phase = 0.0;
     m_isHit = false;
     
-    // Jeśli mamy podłączonego seriala, upewnijmy się że callbacki są ustawione
-    if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Wywołanie slotu w wątku głównym Qt
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
-        
-        m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
-            QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(bool, connected),
-                                     Q_ARG(std::string, message));
-        });
-    }
+    // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
+
 }
 
 void SinGame::setDifficultyLevel(int level) {
@@ -69,7 +55,7 @@ void SinGame::setDifficultyLevel(int level) {
     m_tolerance = qMax(10.0, 50.0 - (m_difficultyLevel * 8.0)); 
     m_frequency = 0.015 + (m_difficultyLevel * 0.005);
     
-    emit scoreChanged(0); // Reset punktów przy zmianie poziomu
+    setScore(0); // Keep the base score and scoreChanged signal consistent
 }
 
 int SinGame::getDifficultyLevel() const {
@@ -130,9 +116,13 @@ void SinGame::onConnectionStatusChanged(bool connected, const std::string& messa
 }
 
 void SinGame::normalizeForceValue(double rawValue) {
-    // Normalizacja siły do zakresu 0.0 - 1.0
-    // Zakładamy, że rawValue jest w zakresie 0-m_maxForce (np. 0-100)
-    double normalizedForce = rawValue / m_maxForce;
+    // Odrzuć uszkodzoną próbkę, zachowując ostatnią poprawną wartość.
+    if (!std::isfinite(rawValue) || !std::isfinite(m_maxForce) || m_maxForce <= 0.0)
+        return;
+
+    const double normalizedForce = rawValue / m_maxForce;
+    if (!std::isfinite(normalizedForce))
+        return;
     m_currentForce = qBound(0.0, normalizedForce, 1.0);
 }
 
@@ -154,10 +144,14 @@ void SinGame::calculateTargetY(double x) {
 }
 
 void SinGame::update(double deltaTime) {
-    if (!isRunning()) return;
+    if (!isRunning() || width() <= 0 || height() <= 0 ||
+        !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+    deltaTime = qMin(deltaTime, 0.1);
 
     // Aktualizacja fazy sinusa (ruch wykresu w lewo)
-    m_phase -= m_scrollSpeed * deltaTime;
+    // Przelicz prędkość przesuwania w pikselach/s na zmianę fazy.
+    m_phase -= m_scrollSpeed * m_frequency * deltaTime;
     
     // Pozycja X "bramki" sprawdzającej trafienie (stała w prawo od środka)
     // Gracz celuje w linię pionową na 75% szerokości ekranu
@@ -177,12 +171,14 @@ void SinGame::update(double deltaTime) {
     // Sprawdzamy czy kursor jest w pobliżu linii sinusa w punkcie checkX
     double distance = std::abs(m_cursorY - m_targetY);
     
-    if (distance < m_tolerance) {
+    // Histereza ogranicza wielokrotne naliczanie punktów przy szumie sygnału.
+    const double exitTolerance = m_tolerance * 1.5;
+    if (distance < (m_isHit ? exitTolerance : m_tolerance)) {
         if (!m_isHit) {
             m_isHit = true;
             // Punktacja: im mniejszy dystans, tym więcej punktów
-            int points = static_cast<int>((m_tolerance - distance) * 10);
-            addScore(points);
+            const double accuracy = qBound(0.0, (m_tolerance - distance) / m_tolerance, 1.0);
+            addScore(qBound(1, static_cast<int>(std::ceil(accuracy * 10.0)), 10));
         }
     } else {
         m_isHit = false;

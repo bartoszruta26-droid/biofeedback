@@ -9,8 +9,10 @@
 #include <QGroupBox>
 #include <QProgressBar>
 #include <QTimer>
+#include <QElapsedTimer>
 #include <QVector>
 #include <QString>
+#include <QJsonObject>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QComboBox>
@@ -18,11 +20,18 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <memory>
+#include <vector>
+#include "training/RepetitionDetector.hpp"
+#include "training/TrainingSessionClock.hpp"
+#include "training/SessionStateMachine.hpp"
+#include "measurement/MeasurementEngine.hpp"
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "core/DebugManager.hpp"
 
 namespace tab {
+
+class TrainingAnalyticsWidget;
 
 /**
  * @brief Widget do wizualizacji postępu treningu
@@ -73,6 +82,15 @@ struct TrainingExercise {
 };
 
 /**
+ * @brief Pojedyncze, wykryte powtórzenie przypisane do serii.
+ */
+struct TrainingRepetitionRecord {
+    int seriesIndex{0};
+    int repetitionIndex{0};
+    biofeedback::training::RepetitionRecord measurement;
+};
+
+/**
  * @brief Statystyki pojedynczego ćwiczenia
  */
 struct ExerciseStats {
@@ -84,6 +102,9 @@ struct ExerciseStats {
     double avgReactionTime;
     double consistencyScore;
     bool isCompleted;
+    int gameScore{0};
+    QVector<TrainingRepetitionRecord> repetitions;
+    QVector<biofeedback::training::SeriesSummary> series;
     
     ExerciseStats() : completedSeries(0), completedReps(0), avgPeakForce(0),
                       maxPeakForce(0), avgReactionTime(0), consistencyScore(0),
@@ -104,6 +125,7 @@ struct ExerciseStats {
 class TrainingTab : public QWidget
 {
     Q_OBJECT
+    friend class TrainingTabProcessRestartRegression;
 
 public:
     explicit TrainingTab(QWidget *parent = nullptr);
@@ -142,7 +164,7 @@ public:
     /**
      * @brief Zatrzymuje sesję treningową
      */
-    void stopTraining();
+    void stopTraining(bool completed = false);
     
     /**
      * @brief Pauzuje trening
@@ -168,11 +190,13 @@ public:
      * @brief Podłącza obiekt SerialCommunication
      */
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    void setMeasurementEngine(std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine);
     
     /**
      * @brief Podłącza silnik gry
      */
     void setGameEngine(games::GameEngine* game);
+    void setCurrentPatientContext(const QString& patientPesel, const QString& patientDataPath);
     
     /**
      * @brief Pobiera aktualny wynik treningu
@@ -225,22 +249,31 @@ private slots:
     void onPauseResumeClicked();
     void onExerciseSelected(int index);
     void onTimerTick();
-    void onSensorDataReceived(const sensor::SensorData& data);
+    void updateSessionClocks();
+
     void onGameEnded(int score);
     void onGameStarted();
     void onScoreChanged(int score);
 
 private:
+    void onMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void setupUI();
     void updateDisplay();
     void updateProgressWidgets();
+    void refreshAnalytics();
+    void configureGameForExercise();
     void loadNextExercise();
     void loadNextSeries();
     void loadNextRep();
-    void checkExerciseCompletion();
     void calculateExerciseStats();
+    void onRepetitionDetected(const biofeedback::training::RepetitionRecord& repetition);
+    void finishCurrentSeries();
+    void advanceAfterRest();
     void startRestTimer();
     void updateRestDisplay();
+    QJsonObject buildExecutionCheckpoint() const;
+    bool restoreExecutionCheckpoint(const QJsonObject& checkpoint);
+    bool saveExecutionCheckpoint();
     
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
@@ -279,16 +312,26 @@ private:
     // Widget gry (embedowany)
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
+    QString m_activeGameType;
+    QString m_currentPatientPesel;
+    QString m_currentPatientDataPath;
     
     // Tabela statystyk
     QGroupBox* m_statsBox;
     QWidget* m_statsContainer;
+    QLabel* m_statsSummaryLabel;
+    TrainingAnalyticsWidget* m_analyticsWidget;
     
     // Logika i dane
     QTimer* m_timer;
     QTimer* m_restTimer;
-    bool m_isTraining;
-    bool m_isPaused;
+    QElapsedTimer m_sessionClock;
+    QElapsedTimer m_restClock;
+    biofeedback::training::TrainingSessionClock m_trainingClock;
+    biofeedback::training::SessionStateMachine m_stateMachine;
+    qint64 m_restDurationMs{0};
+    qint64 m_sessionElapsedOffsetMs{0};
+    int m_lastCheckpointSeconds{-1};
     
     QVector<TrainingExercise> m_exercisePlan;
     QVector<ExerciseStats> m_exerciseStats;
@@ -299,12 +342,15 @@ private:
     
     int m_sessionTime;
     int m_restTimeRemaining;
-    bool m_inRestPeriod;
-    
+    biofeedback::training::RepetitionDetector m_repetitionDetector;
+    std::vector<biofeedback::training::RepetitionRecord> m_currentSeriesRepetitions;
+
     double m_currentForce;
     double m_peakForceInRep;
     
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
+    biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken = 0;
     
     // Pomocnicze
     QString getExerciseDisplayName(int index) const;

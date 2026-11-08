@@ -12,6 +12,7 @@ BiomechanicalParams::BiomechanicalParams() {
 }
 
 void BiomechanicalParams::reset() {
+    availability.fill(ParameterAvailability::InsufficientData);
     // Kategoria 1: Parametry Siłowe
     F_peak = 0.0; F_mean = 0.0; F_min = 0.0; F_range = 0.0;
     F_set_mean = 0.0; F_set_peak = 0.0; W_total = 0.0; W_rep_avg = 0.0;
@@ -45,15 +46,105 @@ void BiomechanicalParams::reset() {
     FG = 0.0; ESI = 0.0; BRC = 0.0; CEI = 0.0; LPT = 0.0;
 }
 
+const char* BiomechanicalParams::parameterUnit(std::size_t index) noexcept
+{
+    static constexpr const char* units[ParameterCount] = {
+        "N", "N", "N", "N", "N", "N", "J", "J", "N·s", "N·s", "s", "s", "s", "—", "s", "s", "s", "s", "m/s", "Hz", "W", "W", "W", "J", "W/kg", "N/s", "N/s", "N/s", "J", "%", "N", "%", "%", "%", "—", "—", "s²", "N/s²", "bit", "—", "N", "N·s", "N²", "%", "powt./s", "m/s", "%", "%", "s", "s", "—", "—", "—", "—", "—", "—", "—", "—", "%", "—", "—", "—", "—", "—", "%"
+    };
+    return index < ParameterCount ? units[index] : "";
+}
+
+std::array<double, BiomechanicalParams::ParameterCount> BiomechanicalParams::values() const noexcept
+{
+    return {F_peak, F_mean, F_min, F_range, F_set_mean, F_set_peak, W_total, W_rep_avg, I_impulse, I_set_avg, T_rep, T_conc, T_ecc, R_CE, T_rest_rep, T_set, T_rest_set, T_rep_avg, v_avg, f_rep, P_peak, P_rep_avg, P_set_avg, E_total, P_norm, RFD, RFD_set_avg, RFD_max, E_elastic, eta, sigma_F, CV_F, FI_set, FI_inter, MCI, PSI, Var_T, SI, H_entropy, BPR, F_grand_mean, I_total, V_training, INT, D_training, SEI, FMC, ISI, TUT_avg, TUT_total, MQS, NML, PSE, TRI, IRI, TAI, MEI, LBI, FRI, CTS, FG, ESI, BRC, CEI, LPT};
+}
+
+void BiomechanicalParams::assignValues(
+    const std::array<double, BiomechanicalParams::ParameterCount>& v) noexcept
+{
+    F_peak = v[0];
+    F_mean = v[1];
+    F_min = v[2];
+    F_range = v[3];
+    F_set_mean = v[4];
+    F_set_peak = v[5];
+    W_total = v[6];
+    W_rep_avg = v[7];
+    I_impulse = v[8];
+    I_set_avg = v[9];
+    T_rep = v[10];
+    T_conc = v[11];
+    T_ecc = v[12];
+    R_CE = v[13];
+    T_rest_rep = v[14];
+    T_set = v[15];
+    T_rest_set = v[16];
+    T_rep_avg = v[17];
+    v_avg = v[18];
+    f_rep = v[19];
+    P_peak = v[20];
+    P_rep_avg = v[21];
+    P_set_avg = v[22];
+    E_total = v[23];
+    P_norm = v[24];
+    RFD = v[25];
+    RFD_set_avg = v[26];
+    RFD_max = v[27];
+    E_elastic = v[28];
+    eta = v[29];
+    sigma_F = v[30];
+    CV_F = v[31];
+    FI_set = v[32];
+    FI_inter = v[33];
+    MCI = v[34];
+    PSI = v[35];
+    Var_T = v[36];
+    SI = v[37];
+    H_entropy = v[38];
+    BPR = v[39];
+    F_grand_mean = v[40];
+    I_total = v[41];
+    V_training = v[42];
+    INT = v[43];
+    D_training = v[44];
+    SEI = v[45];
+    FMC = v[46];
+    ISI = v[47];
+    TUT_avg = v[48];
+    TUT_total = v[49];
+    MQS = v[50];
+    NML = v[51];
+    PSE = v[52];
+    TRI = v[53];
+    IRI = v[54];
+    TAI = v[55];
+    MEI = v[56];
+    LBI = v[57];
+    FRI = v[58];
+    CTS = v[59];
+    FG = v[60];
+    ESI = v[61];
+    BRC = v[62];
+    CEI = v[63];
+    LPT = v[64];
+}
+
+const char* BiomechanicalParams::parameterName(std::size_t index) noexcept
+{
+    static constexpr const char* names[ParameterCount] = {
+        "F_peak", "F_mean", "F_min", "F_range", "F_set_mean", "F_set_peak", "W_total", "W_rep_avg", "I_impulse", "I_set_avg", "T_rep", "T_conc", "T_ecc", "R_CE", "T_rest_rep", "T_set", "T_rest_set", "T_rep_avg", "v_avg", "f_rep", "P_peak", "P_rep_avg", "P_set_avg", "E_total", "P_norm", "RFD", "RFD_set_avg", "RFD_max", "E_elastic", "eta", "sigma_F", "CV_F", "FI_set", "FI_inter", "MCI", "PSI", "Var_T", "SI", "H_entropy", "BPR", "F_grand_mean", "I_total", "V_training", "INT", "D_training", "SEI", "FMC", "ISI", "TUT_avg", "TUT_total", "MQS", "NML", "PSE", "TRI", "IRI", "TAI", "MEI", "LBI", "FRI", "CTS", "FG", "ESI", "BRC", "CEI", "LPT"
+    };
+    return index < ParameterCount ? names[index] : "";
+}
+
 // ============================================================================
 // Formulas - Implementacja
 // ============================================================================
 
 Formulas::Formulas(double k_elastic, double patientMass, double sampleRate)
-    : k_elastic_(k_elastic)
-    , patient_mass_(patientMass)
-    , sample_rate_(sampleRate)
-    , dt_(1.0 / sampleRate)
+    : k_elastic_(std::isfinite(k_elastic) && k_elastic > 0.0 ? k_elastic : 0.0)
+    , patient_mass_(std::isfinite(patientMass) && patientMass > 0.0 ? patientMass : 0.0)
+    , sample_rate_(std::isfinite(sampleRate) && sampleRate > 0.0 ? sampleRate : 0.0)
 {
 }
 
@@ -61,9 +152,8 @@ std::vector<double> Formulas::extractForces(const std::vector<SensorSample>& sam
     std::vector<double> forces;
     forces.reserve(samples.size());
     for (const auto& s : samples) {
-        if (s.isValid) {
+        if (s.isValid && std::isfinite(s.force))
             forces.push_back(s.force);
-        }
     }
     return forces;
 }
@@ -82,16 +172,40 @@ std::vector<double> Formulas::extractTimes(const std::vector<SensorSample>& samp
 
 double Formulas::calculateDerivative(const std::vector<SensorSample>& samples, size_t index) const {
     if (index == 0 || index >= samples.size() - 1) return 0.0;
-    double df = samples[index + 1].force - samples[index - 1].force;
-    double dt = (samples[index + 1].timestamp - samples[index - 1].timestamp) / 1000.0;
-    return (dt > 0) ? df / dt : 0.0;
+    const auto& before = samples[index - 1];
+    const auto& current = samples[index];
+    const auto& after = samples[index + 1];
+    if (!before.isValid || !current.isValid || !after.isValid ||
+        !std::isfinite(before.force) || !std::isfinite(after.force))
+        return 0.0;
+
+    const std::uint32_t deltaMs = after.timestamp - before.timestamp;
+    if (deltaMs == 0 || deltaMs >= 0x80000000u) return 0.0;
+    const double dt = static_cast<double>(deltaMs) / 1000.0;
+    return (after.force - before.force) / dt;
 }
 
 double Formulas::calculateSecondDerivative(const std::vector<SensorSample>& samples, size_t index) const {
-    if (index == 0 || index >= samples.size() - 2) return 0.0;
-    double d2f = samples[index + 1].force - 2.0 * samples[index].force + samples[index - 1].force;
-    double dt2 = std::pow((samples[index + 1].timestamp - samples[index].timestamp) / 1000.0, 2);
-    return (dt2 > 0) ? d2f / dt2 : 0.0;
+    if (index == 0 || index >= samples.size() - 1) return 0.0;
+    const auto& before = samples[index - 1];
+    const auto& current = samples[index];
+    const auto& after = samples[index + 1];
+    if (!before.isValid || !current.isValid || !after.isValid ||
+        !std::isfinite(before.force) || !std::isfinite(current.force) ||
+        !std::isfinite(after.force))
+        return 0.0;
+
+    const std::uint32_t leftMs = current.timestamp - before.timestamp;
+    const std::uint32_t rightMs = after.timestamp - current.timestamp;
+    if (leftMs == 0 || rightMs == 0 ||
+        leftMs >= 0x80000000u || rightMs >= 0x80000000u)
+        return 0.0;
+
+    const double left = static_cast<double>(leftMs) / 1000.0;
+    const double right = static_cast<double>(rightMs) / 1000.0;
+    const double leftSlope = (current.force - before.force) / left;
+    const double rightSlope = (after.force - current.force) / right;
+    return 2.0 * (rightSlope - leftSlope) / (left + right);
 }
 
 // ==================== Kategoria 1: Parametry Siłowe ====================
@@ -125,13 +239,22 @@ double Formulas::calculateSetPeakForce(const std::vector<double>& repPeakForces)
 }
 
 double Formulas::calculateWork(const std::vector<SensorSample>& samples) const {
-    if (samples.size() < 2) return 0.0;
+    if (samples.size() < 2 || !std::isfinite(k_elastic_) || k_elastic_ <= 0.0)
+        return 0.0;
     double work = 0.0;
-    for (size_t i = 0; i < samples.size() - 1; ++i) {
-        double dF = samples[i + 1].force - samples[i].force;
-        work += samples[i].force * dF;
+    for (size_t i = 0; i + 1 < samples.size(); ++i) {
+        if (!samples[i].isValid || !samples[i + 1].isValid ||
+            !std::isfinite(samples[i].force) || !std::isfinite(samples[i + 1].force))
+            continue;
+        const double dF = samples[i + 1].force - samples[i].force;
+        // Hooke-law displacement is dx = dF/k. Trapezoidal integration
+        // estimates each segment's work; absolute segment work counts both
+        // loading and controlled unloading as mechanical work magnitude.
+        const double meanForce =
+            0.5 * (samples[i].force + samples[i + 1].force);
+        work += std::abs(meanForce * dF) / k_elastic_;
     }
-    return work / k_elastic_;
+    return work;
 }
 
 double Formulas::calculateAvgWorkPerRep(double totalWork, int numReps) {
@@ -139,10 +262,26 @@ double Formulas::calculateAvgWorkPerRep(double totalWork, int numReps) {
 }
 
 double Formulas::calculateImpulse(const std::vector<SensorSample>& samples) const {
-    if (samples.empty()) return 0.0;
+    if (samples.size() < 2) return 0.0;
+
+    // Integrate the measured force against each actual device timestamp.
+    // A configured nominal sample rate is not a substitute for observed dt:
+    // USB/serial buffering and dropped frames make the interval non-uniform.
     double impulse = 0.0;
-    for (const auto& s : samples) {
-        impulse += s.force * dt_;
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
+        const auto& current = samples[i];
+        const auto& next = samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force))
+            continue;
+
+        // Unsigned subtraction handles a single uint32 device-clock wrap.
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u)
+            continue;
+
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        impulse += 0.5 * (current.force + next.force) * dt;
     }
     return impulse;
 }
@@ -154,15 +293,21 @@ double Formulas::calculateSetAvgImpulse(const std::vector<double>& repImpulses) 
 // ==================== Kategoria 2: Parametry Czasowe ====================
 
 double Formulas::calculateRepDuration(uint32_t startTime, uint32_t endTime) {
-    return (endTime - startTime) / 1000.0;  // Konwersja ms -> s
+    const std::uint32_t delta = endTime - startTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateConcentricTime(uint32_t startTime, uint32_t peakTime) {
-    return (peakTime - startTime) / 1000.0;
+    const std::uint32_t delta = peakTime - startTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateEccentricTime(uint32_t peakTime, uint32_t endTime) {
-    return (endTime - peakTime) / 1000.0;
+    const std::uint32_t delta = endTime - peakTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateCERatio(double concTime, double eccTime) {
@@ -170,15 +315,21 @@ double Formulas::calculateCERatio(double concTime, double eccTime) {
 }
 
 double Formulas::calculateInterRepRest(uint32_t prevEndTime, uint32_t nextStartTime) {
-    return (nextStartTime > prevEndTime) ? (nextStartTime - prevEndTime) / 1000.0 : 0.0;
+    const std::uint32_t delta = nextStartTime - prevEndTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateSetDuration(uint32_t startTime, uint32_t endTime) {
-    return (endTime - startTime) / 1000.0;
+    const std::uint32_t delta = endTime - startTime;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateInterSetRest(uint32_t prevSetEnd, uint32_t nextSetStart) {
-    return (nextSetStart > prevSetEnd) ? (nextSetStart - prevSetEnd) / 1000.0 : 0.0;
+    const std::uint32_t delta = nextSetStart - prevSetEnd;
+    return (delta > 0 && delta < 0x80000000u)
+        ? static_cast<double>(delta) / 1000.0 : 0.0;
 }
 
 double Formulas::calculateAvgRepTime(const std::vector<double>& repTimes) {
@@ -186,7 +337,10 @@ double Formulas::calculateAvgRepTime(const std::vector<double>& repTimes) {
 }
 
 double Formulas::calculateVelocity(double forceRange, double repDuration) const {
-    return (repDuration > 0) ? forceRange / (k_elastic_ * repDuration) : 0.0;
+    if (!std::isfinite(forceRange) || !std::isfinite(repDuration) ||
+        !std::isfinite(k_elastic_) || k_elastic_ <= 0.0 || repDuration <= 0.0)
+        return 0.0;
+    return forceRange / (k_elastic_ * repDuration);
 }
 
 double Formulas::calculateRepFrequency(int numReps, double setDuration) {
@@ -196,13 +350,33 @@ double Formulas::calculateRepFrequency(int numReps, double setDuration) {
 // ==================== Kategoria 3: Parametry Mocy i Energii ====================
 
 double Formulas::calculatePeakPower(double peakForce, const std::vector<SensorSample>& samples) const {
-    if (samples.empty()) return 0.0;
-    double maxVel = 0.0;
-    for (size_t i = 1; i < samples.size(); ++i) {
-        double vel = std::abs(calculateDerivative(samples, i)) / k_elastic_;
-        if (vel > maxVel) maxVel = vel;
+    if (samples.size() < 2 || !std::isfinite(peakForce) || peakForce < 0.0 ||
+        !std::isfinite(k_elastic_) || k_elastic_ <= 0.0)
+        return 0.0;
+
+    // Estimate power on each measured interval using its mean force and
+    // force-derived extension velocity. This keeps force and velocity
+    // synchronous and also works for the minimum two-sample interval.
+    double maxPower = 0.0;
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
+        const auto& current = samples[i];
+        const auto& next = samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force) ||
+            current.force < 0.0 || next.force < 0.0)
+            continue;
+
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        const double meanForce = 0.5 * (current.force + next.force);
+        const double velocity = std::abs(next.force - current.force) /
+                                (k_elastic_ * dt);
+        const double intervalPower = meanForce * velocity;
+        if (std::isfinite(intervalPower))
+            maxPower = std::max(maxPower, intervalPower);
     }
-    return peakForce * maxVel;
+    return maxPower;
 }
 
 double Formulas::calculateAvgPower(double work, double duration) {
@@ -218,7 +392,8 @@ double Formulas::calculateTotalEnergy(const std::vector<double>& setWorks) {
 }
 
 double Formulas::calculateNormalizedPower(double power) const {
-    return (patient_mass_ > 0) ? power / patient_mass_ : 0.0;
+    return (std::isfinite(power) && std::isfinite(patient_mass_) && patient_mass_ > 0.0)
+        ? power / patient_mass_ : 0.0;
 }
 
 double Formulas::calculateRFD(double peakForce, double startForce, double concTime) {
@@ -235,7 +410,8 @@ double Formulas::calculateMaxRFD(const std::vector<double>& repRFDs) {
 }
 
 double Formulas::calculateElasticEnergy(double peakForce) const {
-    return (k_elastic_ > 0) ? (peakForce * peakForce) / (2.0 * k_elastic_) : 0.0;
+    return (std::isfinite(peakForce) && std::isfinite(k_elastic_) && k_elastic_ > 0.0)
+        ? (peakForce * peakForce) / (2.0 * k_elastic_) : 0.0;
 }
 
 double Formulas::calculateEfficiency(double work, double metabolicEstimate) const {
@@ -287,10 +463,16 @@ double Formulas::calculateTimeVariance(const std::vector<double>& repTimes) {
 double Formulas::calculateSmoothnessIndex(const std::vector<SensorSample>& samples) const {
     if (samples.size() < 3) return 0.0;
     double sum = 0.0;
-    for (size_t i = 1; i < samples.size() - 1; ++i) {
-        sum += std::abs(calculateSecondDerivative(samples, i));
+    std::size_t validDerivatives = 0;
+    for (size_t i = 1; i + 1 < samples.size(); ++i) {
+        if (!samples[i - 1].isValid || !samples[i].isValid || !samples[i + 1].isValid)
+            continue;
+        const double derivative = calculateSecondDerivative(samples, i);
+        if (!std::isfinite(derivative)) continue;
+        sum += std::abs(derivative);
+        ++validDerivatives;
     }
-    return sum / (samples.size() - 2);
+    return validDerivatives > 0 ? sum / static_cast<double>(validDerivatives) : 0.0;
 }
 
 double Formulas::calculateEntropy(const std::vector<double>& forces, int numBins) {
@@ -370,25 +552,33 @@ double Formulas::calculateAvgTUT(const std::vector<std::vector<SensorSample>>& r
     if (repSamples.empty()) return 0.0;
     
     double totalTUT = 0.0;
+    std::size_t validRepetitions = 0;
     for (const auto& reps : repSamples) {
-        if (reps.empty()) continue;
-        
+        if (reps.size() < 2) continue;
+
         double maxF = 0.0;
-        for (const auto& s : reps) {
-            if (s.force > maxF) maxF = s.force;
+        for (const auto& sample : reps) {
+            if (sample.isValid && std::isfinite(sample.force))
+                maxF = std::max(maxF, sample.force);
         }
-        double threshold = maxF * thresholdFactor;
-        
+        if (maxF <= 0.0) continue;
+        const double threshold = maxF * thresholdFactor;
+
         double tut = 0.0;
         for (size_t i = 1; i < reps.size(); ++i) {
-            if (reps[i].force > threshold) {
-                tut += (reps[i].timestamp - reps[i-1].timestamp) / 1000.0;
-            }
+            if (!reps[i - 1].isValid || !reps[i].isValid ||
+                reps[i - 1].force <= threshold || reps[i].force <= threshold)
+                continue;
+            const std::uint32_t deltaMs = reps[i].timestamp - reps[i - 1].timestamp;
+            if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+            tut += static_cast<double>(deltaMs) / 1000.0;
         }
         totalTUT += tut;
+        ++validRepetitions;
     }
-    
-    return totalTUT / repSamples.size();
+
+    return validRepetitions > 0
+        ? totalTUT / static_cast<double>(validRepetitions) : 0.0;
 }
 
 double Formulas::calculateTotalTUT(const std::vector<std::vector<SensorSample>>& repSamples,
@@ -398,15 +588,20 @@ double Formulas::calculateTotalTUT(const std::vector<std::vector<SensorSample>>&
         if (reps.empty()) continue;
         
         double maxF = 0.0;
-        for (const auto& s : reps) {
-            if (s.force > maxF) maxF = s.force;
+        for (const auto& sample : reps) {
+            if (sample.isValid && std::isfinite(sample.force))
+                maxF = std::max(maxF, sample.force);
         }
-        double threshold = maxF * thresholdFactor;
-        
+        if (maxF <= 0.0) continue;
+        const double threshold = maxF * thresholdFactor;
+
         for (size_t i = 1; i < reps.size(); ++i) {
-            if (reps[i].force > threshold) {
-                totalTUT += (reps[i].timestamp - reps[i-1].timestamp) / 1000.0;
-            }
+            if (!reps[i - 1].isValid || !reps[i].isValid ||
+                reps[i - 1].force <= threshold || reps[i].force <= threshold)
+                continue;
+            const std::uint32_t deltaMs = reps[i].timestamp - reps[i - 1].timestamp;
+            if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+            totalTUT += static_cast<double>(deltaMs) / 1000.0;
         }
     }
     
@@ -516,27 +711,37 @@ double Formulas::calculateBRC(double minForce, double baselineForce) {
 
 double Formulas::calculateCEI(const std::vector<SensorSample>& samples, double peakForce,
                                uint32_t peakTime, uint32_t endTime) const {
-    if (samples.empty() || peakForce <= 0) return 0.0;
-    
-    // Znajdź próbki w fazie ekscentrycznej (od peakTime do endTime)
-    std::vector<SensorSample> eccentricSamples;
-    for (const auto& s : samples) {
-        if (s.timestamp >= peakTime && s.timestamp <= endTime) {
-            eccentricSamples.push_back(s);
-        }
+    const std::uint32_t eccentricDurationMs = endTime - peakTime;
+    if (samples.size() < 2 || !std::isfinite(peakForce) || peakForce <= 0.0 ||
+        eccentricDurationMs == 0 || eccentricDurationMs >= 0x80000000u)
+        return 0.0;
+
+    const double eccentricDurationSeconds =
+        static_cast<double>(eccentricDurationMs) / 1000.0;
+    double normalizedForceTime = 0.0;
+
+    // Integrate only contiguous, valid sample pairs inside the eccentric phase.
+    // Never let an invalid/NaN sample create a fabricated force contribution
+    // or bridge a missing interval.
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i) {
+        const auto& current = samples[i];
+        const auto& next = samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force) ||
+            current.force < 0.0 || next.force < 0.0 ||
+            current.timestamp < peakTime || next.timestamp > endTime)
+            continue;
+
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        const double meanNormalizedForce =
+            0.5 * (current.force + next.force) / peakForce;
+        normalizedForceTime += meanNormalizedForce * dt;
     }
-    
-    if (eccentricSamples.size() < 2) return 0.0;
-    
-    double integral = 0.0;
-    for (size_t i = 0; i < eccentricSamples.size() - 1; ++i) {
-        double avgF = (eccentricSamples[i].force + eccentricSamples[i+1].force) / 2.0;
-        double dt = (eccentricSamples[i+1].timestamp - eccentricSamples[i].timestamp) / 1000.0;
-        integral += (avgF / peakForce) * dt;
-    }
-    
-    double tEcc = (endTime - peakTime) / 1000.0;
-    return (tEcc > 0) ? integral / tEcc : 0.0;
+
+    return normalizedForceTime / eccentricDurationSeconds;
 }
 
 double Formulas::calculateLPT(double currentCTS, double previousCTS) {
@@ -548,11 +753,42 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     BiomechanicalParams params;
     
     std::vector<double> forces = extractForces(rep.samples);
-    if (forces.empty()) return params;
-    
+    if (forces.size() < 3) return params;
+    bool hasPreviousTimestamp = false;
+    std::uint32_t previousTimestamp = 0;
+    for (const auto& sample : rep.samples) {
+        if (!sample.isValid || !std::isfinite(sample.force)) continue;
+        if (hasPreviousTimestamp) {
+            const std::uint32_t delta = sample.timestamp - previousTimestamp;
+            if (delta == 0 || delta >= 0x80000000u) {
+                params.availability.fill(ParameterAvailability::InvalidInput);
+                return params;
+            }
+        }
+        previousTimestamp = sample.timestamp;
+        hasPreviousTimestamp = true;
+    }
+
     // Parametry siłowe
     params.F_peak = calculatePeakForce(forces);
-    params.F_mean = calculateMeanForce(forces);
+    // Time-weighted mean force: sample-count averaging is biased when
+    // serial delivery intervals are non-uniform.
+    double forceTimeIntegral = 0.0;
+    double validDurationSeconds = 0.0;
+    for (std::size_t i = 0; i + 1 < rep.samples.size(); ++i) {
+        const auto& current = rep.samples[i];
+        const auto& next = rep.samples[i + 1];
+        if (!current.isValid || !next.isValid ||
+            !std::isfinite(current.force) || !std::isfinite(next.force))
+            continue;
+        const std::uint32_t deltaMs = next.timestamp - current.timestamp;
+        if (deltaMs == 0 || deltaMs >= 0x80000000u) continue;
+        const double dt = static_cast<double>(deltaMs) / 1000.0;
+        forceTimeIntegral += 0.5 * (current.force + next.force) * dt;
+        validDurationSeconds += dt;
+    }
+    params.F_mean = validDurationSeconds > 0.0
+        ? forceTimeIntegral / validDurationSeconds : calculateMeanForce(forces);
     params.F_min = calculateMinForce(forces);
     params.F_range = calculateForceRange(params.F_peak, params.F_min);
     
@@ -561,6 +797,20 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     params.T_conc = calculateConcentricTime(rep.startTime, rep.peakTime);
     params.T_ecc = calculateEccentricTime(rep.peakTime, rep.endTime);
     params.R_CE = calculateCERatio(params.T_conc, params.T_ecc);
+    params.v_avg = 0.0;
+    if (std::isfinite(k_elastic_) && k_elastic_ > 0.0 && params.T_rep > 0.0) {
+        double totalForceTravel = 0.0;
+        for (std::size_t i = 0; i + 1 < rep.samples.size(); ++i) {
+            const auto& current = rep.samples[i];
+            const auto& next = rep.samples[i + 1];
+            if (!current.isValid || !next.isValid ||
+                !std::isfinite(current.force) || !std::isfinite(next.force))
+                continue;
+            totalForceTravel += std::abs(next.force - current.force);
+        }
+        // Mean absolute extension velocity over the complete repetition path.
+        params.v_avg = totalForceTravel / (k_elastic_ * params.T_rep);
+    }
     
     // Praca i impuls
     params.W_total = calculateWork(rep.samples);
@@ -581,6 +831,17 @@ BiomechanicalParams Formulas::calculateRepParams(const RepetitionData& rep) {
     params.PSI = calculatePSI(params.T_conc, params.T_ecc);
     params.H_entropy = calculateEntropy(forces);
     
+    // A single repetition can support these metrics directly. Values that
+    // require calibrated mechanics or additional context remain unavailable.
+    for (std::size_t index : {0u, 1u, 2u, 3u, 10u, 11u, 12u, 13u,
+                              25u, 35u, 37u, 38u})
+        params.setAvailability(index, ParameterAvailability::Available);
+    const bool hasElasticCalibration = std::isfinite(k_elastic_) && k_elastic_ > 0.0;
+    const auto calibrationStatus = hasElasticCalibration
+        ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration;
+    for (std::size_t index : {6u, 18u, 20u, 21u, 28u})
+        params.setAvailability(index, calibrationStatus);
+
     return params;
 }
 
@@ -588,12 +849,51 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     BiomechanicalParams params;
     
     if (series.reps.empty()) return params;
-    
+
+    const std::uint32_t setDurationMs = series.endTime - series.startTime;
+    if (setDurationMs == 0 || setDurationMs >= 0x80000000u) {
+        params.availability.fill(ParameterAvailability::InvalidInput);
+        return params;
+    }
+    for (const auto& rep : series.reps) {
+        const std::uint32_t durationMs = rep.endTime - rep.startTime;
+        const std::uint32_t concentricMs = rep.peakTime - rep.startTime;
+        const std::uint32_t eccentricMs = rep.endTime - rep.peakTime;
+        const auto validSamples = std::count_if(
+            rep.samples.begin(), rep.samples.end(),
+            [](const SensorSample& sample) {
+                return sample.isValid && std::isfinite(sample.force);
+            });
+        bool hasPreviousTimestamp = false;
+        std::uint32_t previousTimestamp = 0;
+        bool timestampsValid = true;
+        for (const auto& sample : rep.samples) {
+            if (!sample.isValid || !std::isfinite(sample.force)) continue;
+            if (hasPreviousTimestamp) {
+                const std::uint32_t delta = sample.timestamp - previousTimestamp;
+                if (delta == 0 || delta >= 0x80000000u) {
+                    timestampsValid = false;
+                    break;
+                }
+            }
+            previousTimestamp = sample.timestamp;
+            hasPreviousTimestamp = true;
+        }
+        if (validSamples < 3 || durationMs == 0 || durationMs >= 0x80000000u ||
+            concentricMs > durationMs || eccentricMs > durationMs || !timestampsValid) {
+            params.availability.fill(ParameterAvailability::InvalidInput);
+            return params;
+        }
+    }
+
     std::vector<double> repPeakForces;
     std::vector<double> repMeanForces;
+    std::vector<double> repMinForces;
     std::vector<double> repImpulses;
     std::vector<double> repTimes;
     std::vector<double> repRFDs;
+    std::vector<double> repPeakPowers;
+    std::vector<double> repMeanVelocities;
     std::vector<std::vector<SensorSample>> allRepSamples;
     
     // Oblicz parametry dla każdego powtórzenia
@@ -601,9 +901,12 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
         BiomechanicalParams repParams = calculateRepParams(rep);
         repPeakForces.push_back(repParams.F_peak);
         repMeanForces.push_back(repParams.F_mean);
+        repMinForces.push_back(repParams.F_min);
         repImpulses.push_back(repParams.I_impulse);
         repTimes.push_back(repParams.T_rep);
         repRFDs.push_back(repParams.RFD);
+        repPeakPowers.push_back(repParams.P_peak);
+        repMeanVelocities.push_back(repParams.v_avg);
         allRepSamples.push_back(rep.samples);
         
         params.W_total += repParams.W_total;
@@ -614,6 +917,8 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.F_set_peak = calculateSetPeakForce(repPeakForces);
     params.F_peak = params.F_set_peak;  // Maksymalna z wszystkich
     params.F_mean = params.F_set_mean;
+    params.F_min = *std::min_element(repMinForces.begin(), repMinForces.end());
+    params.F_range = calculateForceRange(params.F_peak, params.F_min);
     
     // Praca średnia na powtórzenie
     params.W_rep_avg = calculateAvgWorkPerRep(params.W_total, series.reps.size());
@@ -626,6 +931,23 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.T_set = calculateSetDuration(series.startTime, series.endTime);
     params.T_rep_avg = calculateAvgRepTime(repTimes);
     params.f_rep = calculateRepFrequency(series.reps.size(), params.T_set);
+    // Set mean absolute velocity is the mean of each repetition's
+    // measured force-path distance converted through the elastic constant.
+    params.v_avg = calculateMeanForce(repMeanVelocities);
+
+    double totalInterRepRest = 0.0;
+    std::size_t interRepRestIntervals = 0;
+    for (std::size_t i = 1; i < series.reps.size(); ++i) {
+        const std::uint32_t restMs =
+            series.reps[i].startTime - series.reps[i - 1].endTime;
+        if (restMs > 0 && restMs < 0x80000000u) {
+            totalInterRepRest += static_cast<double>(restMs) / 1000.0;
+            ++interRepRestIntervals;
+        }
+    }
+    if (interRepRestIntervals > 0)
+        params.T_rest_rep = totalInterRepRest /
+                            static_cast<double>(interRepRestIntervals);
     
     // Średni czas koncentryczny i ekscentryczny
     double totalConc = 0.0, totalEcc = 0.0;
@@ -640,7 +962,9 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     // Moc
     params.P_set_avg = calculateSetAvgPower(params.W_total, params.T_set);
     params.P_rep_avg = calculateAvgPower(params.W_total / series.reps.size(), params.T_rep_avg);
-    params.P_peak = calculatePeakPower(params.F_set_peak, series.reps.back().samples);
+    // W / (T * F) has dimensions of velocity (m/s), not a dimensionless score.
+    params.SEI = calculateSEI(params.W_total, params.T_set, params.F_set_mean);
+    params.P_peak = calculateSetPeakForce(repPeakPowers);
     
     // RFD
     params.RFD_set_avg = calculateSetAvgRFD(repRFDs);
@@ -695,13 +1019,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     params.TUT_avg = calculateAvgTUT(allRepSamples);
     params.TUT_total = calculateTotalTUT(allRepSamples);
 
-    // ==================== Kategoria 6: Parametry Zaawansowane (54-60) ====================
-
-    // 54. Indeks Gotowości Treningowej (TRI) - wymaga historycznego maksimum
-    // Dla pojedynczej serii używamy F_set_peak jako currentSetPeak
-    // F_peak_historical musi być przekazane zewnętrznie lub wczytane z historii pacjenta
-    double historicalPeak = params.F_set_peak * 1.1;  // Przyjmujemy 110% aktualnego jako historyczne maksimum
-    params.TRI = calculateTRI(params.F_set_peak, historicalPeak, params.CV_F);
+    // Historical readiness cannot be inferred from the current set.
 
     // 55. Wskaźnik Ryzyka Kontuzji (IRI) - średni dla serii
     double totalIRI = 0.0;
@@ -715,32 +1033,20 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     }
     params.IRI = totalIRI / series.reps.size();
 
-    // 56. Indeks Adaptacji Treningowej (TAI) - wymaga danych z wielu serii
-    // Dla pojedynczej serii przyjmujemy domyślną wartość
-    // TAI wymaga porównania mocy między serią 1 a 3
-    params.TAI = 0.0;  // Wymaga danych z co najmniej 3 serii do obliczenia
+    // TAI requires at least three comparable sets.
 
     // 57. Wskaźnik Ekonomii Ruchu (MEI)
     params.MEI = calculateMEI(params.W_total, params.I_impulse * series.reps.size(), params.F_set_mean);
 
-    // 58. Indeks Zrównoważenia Obciążenia (LBI) - wymaga danych z 3 serii
-    // Dla pojedynczej serii przyjmujemy idealne zrównoważenie
-    params.LBI = 1.0;  // Wymaga danych z co najmniej 3 serii do obliczenia
+    // LBI requires three comparable sets.
 
-    // 59. Wskaźnik Rezerwy Funkcjonalnej (FRI)
-    double maxSensorForce = 500.0;  // Maksymalna siła czujnika [N] - powinna być konfiguracją
-    params.FRI = calculateFRI(params.F_set_peak, maxSensorForce);
+    // FRI requires the configured, calibrated sensor force limit.
 
-    // 60. Kompleksowy Wynik Treningowy (CTS)
-    double refForce = historicalPeak;  // Siła referencyjna
-    params.CTS = calculateCTS(params.F_set_mean, refForce, params.CV_F, 
-                              params.MCI, params.FI_inter);
+    // CTS requires a real reference force and inter-set fatigue context.
 
     // ==================== Kategoria 7: Parametry Dodatkowe (61-65) ====================
 
-    // 61. Gradient Zmęczenia (FG) - wymaga danych z 3 serii
-    // Dla pojedynczej serii używamy FI_set jako wszystkich trzech wartości
-    params.FG = calculateFG(params.FI_set, params.FI_set, params.FI_set);
+    // FG requires fatigue values from three separate sets.
 
     // 62. Indeks Eksplozywnej Siły (ESI) - średni dla serii
     double totalESI = 0.0;
@@ -750,14 +1056,7 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     }
     params.ESI = totalESI / series.reps.size();
 
-    // 63. Współczynnik Powrotu do Bazy (BRC) - średni dla serii
-    double baselineForce = 10.0;  // Siła bazowa/spoczynkowa [N] - powinna być zmierzona przed ćwiczeniem
-    double totalBRC = 0.0;
-    for (const auto& rep : series.reps) {
-        double brc = calculateBRC(rep.endForce, baselineForce);
-        totalBRC += brc;
-    }
-    params.BRC = totalBRC / series.reps.size();
+    // BRC requires a measured resting baseline before the exercise.
 
     // 64. Indeks Kontrolowanego Opuszczania (CEI) - średni dla serii
     double totalCEI = 0.0;
@@ -767,9 +1066,198 @@ BiomechanicalParams Formulas::calculateAllParams(const SeriesData& series) {
     }
     params.CEI = totalCEI / series.reps.size();
 
-    // 65. Wskaźnik Postępu Longitudinalnego (LPT) - wymaga poprzedniej sesji
-    // Dla pojedynczej sesji przyjmujemy 0 (brak porównania)
-    params.LPT = 0.0;  // Wymaga danych z poprzedniej sesji treningowej
+    // LPT requires a previous comparable session.
 
+
+    // Explicitly mark only metrics backed by this set's inputs. A value left
+    // at its reset value is not evidence that the measured quantity was zero.
+    for (std::size_t index : {4u, 5u, 8u, 9u, 11u, 12u, 13u, 15u, 17u, 19u,
+                              25u, 26u, 27u, 30u, 31u, 32u, 34u, 35u, 36u,
+                              37u, 38u, 48u, 49u, 50u, 51u, 54u, 61u, 63u})
+        params.setAvailability(index, ParameterAvailability::Available);
+
+    // Mechanics-derived values are unavailable until the elastic system is calibrated.
+    const bool hasElasticCalibration = std::isfinite(k_elastic_) && k_elastic_ > 0.0;
+    const bool hasPatientMass = std::isfinite(patient_mass_) && patient_mass_ > 0.0;
+    const auto elasticStatus = hasElasticCalibration
+        ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration;
+    for (std::size_t index : {6u, 7u, 20u, 21u, 22u, 23u, 28u, 56u})
+        params.setAvailability(index, elasticStatus);
+    params.setAvailability(0, ParameterAvailability::Available);
+    params.setAvailability(1, ParameterAvailability::Available);
+    params.setAvailability(2, ParameterAvailability::Available);
+    params.setAvailability(3, ParameterAvailability::Available);
+    params.setAvailability(18, elasticStatus);
+    params.setAvailability(24, hasElasticCalibration && hasPatientMass
+        ? ParameterAvailability::Available : ParameterAvailability::RequiresCalibration);
+    params.setAvailability(45, hasElasticCalibration && params.T_set > 0.0 &&
+        params.F_set_mean > 0.0
+        ? ParameterAvailability::Available
+        : (hasElasticCalibration ? ParameterAvailability::InsufficientData
+                                 : ParameterAvailability::RequiresCalibration));
+
+    // Explicit external dependencies; do not fabricate proxy values.
+    params.setAvailability(14, interRepRestIntervals > 0
+        ? ParameterAvailability::Available : ParameterAvailability::InsufficientData);
+    params.setAvailability(16, ParameterAvailability::InsufficientData);
+    params.setAvailability(29, ParameterAvailability::RequiresAdditionalSensor);
+    params.setAvailability(33, ParameterAvailability::InsufficientData);
+    params.setAvailability(39, ParameterAvailability::RequiresAdditionalSensor);
+    params.setAvailability(40, ParameterAvailability::InsufficientData);
+    params.setAvailability(41, ParameterAvailability::InsufficientData);
+    params.setAvailability(42, ParameterAvailability::InsufficientData);
+    params.setAvailability(43, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(44, ParameterAvailability::InsufficientData);
+    params.setAvailability(46, ParameterAvailability::InsufficientData);
+    params.setAvailability(47, ParameterAvailability::InsufficientData);
+    params.setAvailability(52, ParameterAvailability::RequiresAdditionalSensor);
+    params.setAvailability(53, ParameterAvailability::RequiresHistory);
+    params.setAvailability(55, ParameterAvailability::RequiresHistory);
+    params.setAvailability(57, ParameterAvailability::InsufficientData);
+    params.setAvailability(58, ParameterAvailability::RequiresCalibration);
+    params.setAvailability(59, ParameterAvailability::RequiresHistory);
+    params.setAvailability(60, ParameterAvailability::InsufficientData);
+    // BRC needs a measured resting baseline, not an elastic-constant calibration.
+    params.setAvailability(62, ParameterAvailability::RequiresHistory);
+    params.setAvailability(64, ParameterAvailability::RequiresHistory);
     return params;
+
 }
+
+BiomechanicalParams Formulas::calculateSessionParams(const std::vector<SeriesData>& inputSeries) {
+    BiomechanicalParams result;
+    if (inputSeries.empty()) return result;
+
+    std::vector<const SeriesData*> ordered;
+    ordered.reserve(inputSeries.size());
+    for (const auto& series : inputSeries) {
+        if (series.reps.empty()) continue;
+        ordered.push_back(&series);
+    }
+    std::sort(ordered.begin(), ordered.end(),
+              [](const SeriesData* a, const SeriesData* b) {
+                  return a->seriesNumber < b->seriesNumber;
+              });
+    if (ordered.empty()) return result;
+
+    std::vector<BiomechanicalParams> setResults;
+    setResults.reserve(ordered.size());
+    std::size_t totalReps = 0;
+    double weightedMeanForce = 0.0;
+    double totalImpulse = 0.0;
+    std::vector<std::pair<double, double>> repForceRanges;
+    std::vector<double> fatigueIndices;
+    std::vector<double> setWorks;
+    std::vector<double> setPowers;
+    std::uint32_t firstStart = ordered.front()->startTime;
+    std::uint32_t previousEnd = ordered.front()->endTime;
+    double totalSetRestSeconds = 0.0;
+    std::size_t setRestIntervals = 0;
+
+    for (std::size_t setIndex = 0; setIndex < ordered.size(); ++setIndex) {
+        const SeriesData& set = *ordered[setIndex];
+        const BiomechanicalParams setParams = calculateAllParams(set);
+        for (std::size_t metric = 0; metric < BiomechanicalParams::ParameterCount; ++metric) {
+            if (setParams.availabilityAt(metric) == ParameterAvailability::InvalidInput) {
+                result.availability.fill(ParameterAvailability::InvalidInput);
+                return result;
+            }
+        }
+        setResults.push_back(setParams);
+        const std::size_t repsInSet = set.reps.size();
+        totalReps += repsInSet;
+        if (setParams.availabilityAt(4) == ParameterAvailability::Available) {
+            weightedMeanForce += setParams.F_set_mean * static_cast<double>(repsInSet);
+        }
+        for (const auto& rep : set.reps) {
+            const auto repParams = calculateRepParams(rep);
+            totalImpulse += repParams.I_impulse;
+            repForceRanges.emplace_back(repParams.F_mean, repParams.F_range);
+        }
+        fatigueIndices.push_back(setParams.FI_set);
+        setWorks.push_back(setParams.W_total);
+        setPowers.push_back(setParams.P_set_avg);
+
+        if (setIndex > 0) {
+            const std::uint32_t restMs = set.startTime - previousEnd;
+            if (restMs < 0x80000000u) {
+                totalSetRestSeconds += static_cast<double>(restMs) / 1000.0;
+                ++setRestIntervals;
+            }
+        }
+        previousEnd = set.endTime;
+    }
+
+    if (totalReps > 0) {
+        result.F_grand_mean = weightedMeanForce / static_cast<double>(totalReps);
+        result.I_total = totalImpulse;
+        result.V_training = calculateTrainingVolume(repForceRanges);
+        result.setAvailability(40, ParameterAvailability::Available);
+        result.setAvailability(41, ParameterAvailability::Available);
+        result.setAvailability(42, ParameterAvailability::Available);
+    }
+
+    const std::uint32_t totalDurationMs = previousEnd - firstStart;
+    if (totalDurationMs > 0 && totalDurationMs < 0x80000000u) {
+        result.D_training = calculateDensity(static_cast<int>(ordered.size()),
+                                             static_cast<int>(totalReps),
+                                             static_cast<double>(totalDurationMs) / 1000.0);
+        result.setAvailability(44, ParameterAvailability::Available);
+    }
+    if (setRestIntervals > 0) {
+        result.T_rest_set = totalSetRestSeconds / static_cast<double>(setRestIntervals);
+        result.setAvailability(16, ParameterAvailability::Available);
+    }
+
+    if (setResults.size() >= 2) {
+        const double firstPeak = setResults.front().F_set_peak;
+        const double lastPeak = setResults.back().F_set_peak;
+        if (firstPeak > 0.0) {
+            result.FI_inter = ((firstPeak - lastPeak) / firstPeak) * 100.0;
+            result.setAvailability(33, ParameterAvailability::Available);
+        }
+
+        const double secondSetPeak = setResults[1].F_set_peak;
+        if (firstPeak > 0.0) {
+            result.ISI = calculateISI(secondSetPeak, firstPeak);
+            result.setAvailability(47, ParameterAvailability::Available);
+        }
+    }
+
+    if (setResults.size() >= 3) {
+        const double firstSetMean = setResults.front().F_set_mean;
+        const double thirdSetMean = setResults[2].F_set_mean;
+        if (firstSetMean > 0.0) {
+            result.FMC = calculateFMC(thirdSetMean, firstSetMean);
+            result.setAvailability(46, ParameterAvailability::Available);
+        }
+        result.FG = calculateFG(fatigueIndices[0], fatigueIndices[1], fatigueIndices[2]);
+        result.setAvailability(60, ParameterAvailability::Available);
+
+        const bool allWorkAvailable = std::all_of(
+            setResults.begin(), setResults.begin() + 3,
+            [](const BiomechanicalParams& p) {
+                return p.availabilityAt(6) == ParameterAvailability::Available;
+            });
+        if (allWorkAvailable) {
+            result.LBI = calculateLBI(setWorks[0], setWorks[1], setWorks[2]);
+            result.setAvailability(57, ParameterAvailability::Available);
+        } else {
+            result.setAvailability(57, ParameterAvailability::RequiresCalibration);
+        }
+
+        const bool allPowerAvailable = std::all_of(
+            setResults.begin(), setResults.begin() + 3,
+            [](const BiomechanicalParams& p) {
+                return p.availabilityAt(22) == ParameterAvailability::Available;
+            });
+        if (allPowerAvailable && result.FI_inter > 0.0) {
+            result.TAI = calculateTAI(setPowers[2], setPowers[0], result.FI_inter);
+            result.setAvailability(55, ParameterAvailability::Available);
+        } else if (!allPowerAvailable) {
+            result.setAvailability(55, ParameterAvailability::RequiresCalibration);
+        }
+    }
+    return result;
+}
+

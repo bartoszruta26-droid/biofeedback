@@ -1,6 +1,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include <QPainter>
 #include <QPaintEvent>
+#include <QResizeEvent>
 #include <QtMath>
 #include <QDebug>
 #include <QPen>
@@ -8,6 +9,7 @@
 #include <QFont>
 #include <QRectF>
 #include <QRandomGenerator>
+#include <cmath>
 
 namespace games {
 
@@ -29,6 +31,7 @@ FlappyBirdGame::FlappyBirdGame(QWidget *parent)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
     , m_currentForce(0.0)
+    , m_wasFlapping(false)
     , m_obstaclesPassed(0)
 {
 }
@@ -45,8 +48,12 @@ void FlappyBirdGame::initialize() {
     setDifficultyLevel(1);
     m_gameSpeed = 1.0f;
     m_currentForce = 0.0;
+    m_wasFlapping = false;
     m_obstaclesPassed = 0;
     
+    // Zachowaj rozmiar logiczny także wtedy, gdy widget jest jeszcze ukryty.
+    m_lastKnownSize = QSize(width(), height());
+
     // Inicjalizacja ptaka
     resetBird();
     
@@ -54,21 +61,8 @@ void FlappyBirdGame::initialize() {
     m_obstacles.clear();
     m_obstacleSpawnTimer = 0.0f;
     
-    // Jeśli mamy podłączonego seriala, ustaw callbacki
-    if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
-        
-        m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
-            QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(bool, connected),
-                                     Q_ARG(std::string, message));
-        });
-    }
+    // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
+
 }
 
 void FlappyBirdGame::setDifficultyLevel(int level) {
@@ -120,7 +114,8 @@ void FlappyBirdGame::setDifficultyLevel(int level) {
             break;
     }
     
-    emit scoreChanged(0);
+    m_obstaclesPassed = 0;
+    setScore(0);
 }
 
 int FlappyBirdGame::getDifficultyLevel() const {
@@ -128,7 +123,8 @@ int FlappyBirdGame::getDifficultyLevel() const {
 }
 
 void FlappyBirdGame::setGameSpeed(float speed) {
-    m_gameSpeed = qBound(0.5f, speed, 2.0f);
+    if (std::isfinite(speed))
+        m_gameSpeed = qBound(0.5f, speed, 2.0f);
 }
 
 float FlappyBirdGame::getGameSpeed() const {
@@ -192,6 +188,10 @@ void FlappyBirdGame::normalizeForceValue(double rawValue) {
 
 bool FlappyBirdGame::handleInput(double value) {
     normalizeForceValue(value);
+    const bool isPressing = m_currentForce > 0.1;
+    if (isPressing && !m_wasFlapping && isRunning())
+        m_birdVelocity.setY(static_cast<float>(m_currentForce) * m_flapForce);
+    m_wasFlapping = isPressing;
     return true;
 }
 
@@ -204,33 +204,92 @@ void FlappyBirdGame::resetBird() {
     m_birdRadius = m_birdBaseRadius;
 }
 
+void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
+    if (newSize.width() <= 0 || newSize.height() <= 0)
+        return;
+
+    if (oldSize.width() > 0 && oldSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        const double scaleRadius = qMin(scaleX, scaleY);
+
+        m_birdPos.setX(m_birdPos.x() * scaleX);
+        m_birdPos.setY(m_birdPos.y() * scaleY);
+        m_birdVelocity.setY(m_birdVelocity.y() * scaleY);
+        m_birdRadius = static_cast<float>(qMax(1.0, m_birdRadius * scaleRadius));
+        m_obstacleWidth = static_cast<float>(qMax(1.0, m_obstacleWidth * scaleX));
+
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.xPosition = static_cast<float>(obstacle.xPosition * scaleX);
+            obstacle.gapY = static_cast<float>(obstacle.gapY * scaleY);
+            obstacle.gapHeight = static_cast<float>(obstacle.gapHeight * scaleY);
+        }
+    } else {
+        // A hidden widget may not receive resizeEvent until it is shown.
+        // If no previous logical dimensions exist, restore the start layout.
+        m_birdPos = QPointF(newSize.width() / 4.0, newSize.height() / 2.0);
+        m_birdRadius = m_birdBaseRadius;
+    }
+
+    m_birdRadius = static_cast<float>(qMin(
+        static_cast<double>(m_birdRadius),
+        qMin(newSize.width(), newSize.height()) / 2.0));
+    const double radius = m_birdRadius;
+    m_birdPos.setX(qBound(radius, m_birdPos.x(),
+                          static_cast<double>(newSize.width()) - radius));
+    m_birdPos.setY(qBound(radius, m_birdPos.y(),
+                          static_cast<double>(newSize.height()) - radius));
+
+    const double safeGapHeight = qMax(
+        0.0, static_cast<double>(newSize.height()) - 2.0 * radius);
+    for (Obstacle& obstacle : m_obstacles) {
+        obstacle.gapHeight = static_cast<float>(
+            qBound(0.0, static_cast<double>(obstacle.gapHeight), safeGapHeight));
+        const double minGapCenter = radius + obstacle.gapHeight / 2.0;
+        const double maxGapCenter = static_cast<double>(newSize.height()) -
+                                    radius - obstacle.gapHeight / 2.0;
+        obstacle.gapY = static_cast<float>(
+            qBound(minGapCenter, static_cast<double>(obstacle.gapY), maxGapCenter));
+        obstacle.xPosition = static_cast<float>(qBound(
+            -static_cast<double>(m_obstacleWidth),
+            static_cast<double>(obstacle.xPosition),
+            static_cast<double>(newSize.width())));
+    }
+}
+
+void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
+    const QSize newSize = event->size();
+    adaptToSize(m_lastKnownSize, newSize);
+    m_lastKnownSize = newSize;
+    GameEngine::resizeEvent(event);
+}
+
 void FlappyBirdGame::spawnObstacle() {
     Obstacle obs;
     obs.xPosition = static_cast<float>(width());
     obs.passed = false;
     
-    // Losowa wysokość luki
-    float availableHeight = static_cast<float>(height()) - m_minGapHeight;
-    float minGapY = m_minGapHeight / 2.0f;
-    float maxGapY = availableHeight - m_minGapHeight / 2.0f;
-    
-    obs.gapY = minGapY + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (maxGapY - minGapY);
-    obs.gapHeight = m_minGapHeight + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (m_maxGapHeight - m_minGapHeight);
+    // Najpierw losuj wysokość luki, potem środek z marginesem na ptaka.
+    const float safeHeight = qMax(0.0f, static_cast<float>(height()) - 2.0f * m_birdRadius);
+    const float minGap = qMin(m_minGapHeight, safeHeight);
+    const float maxGap = qMax(minGap, qMin(m_maxGapHeight, safeHeight));
+    obs.gapHeight = minGap + static_cast<float>(QRandomGenerator::global()->generateDouble()) * (maxGap - minGap);
+    const float minGapY = m_birdRadius + obs.gapHeight / 2.0f;
+    const float maxGapY = static_cast<float>(height()) - m_birdRadius - obs.gapHeight / 2.0f;
+    const float centerRange = qMax(0.0f, maxGapY - minGapY);
+    obs.gapY = minGapY + static_cast<float>(QRandomGenerator::global()->generateDouble()) * centerRange;
     
     m_obstacles.push_back(obs);
 }
 
 void FlappyBirdGame::updateBird(double deltaTime) {
-    // Aplikowanie grawitacji
+    // Grawitacja działa stale; naciśnięcie wyzwala pojedynczy impuls w górę.
     m_birdVelocity.setY(m_birdVelocity.y() + m_gravity * deltaTime);
-    
-    // Aplikowanie siły z sensora (naciąg tensometru)
-    if (m_currentForce > 0.1) {
-        // Im większa siła, tym silniejsze odbicie w górę
-        float flapStrength = static_cast<float>(m_currentForce) * m_flapForce;
-        m_birdVelocity.setY(flapStrength);
-    }
-    
+    const bool flapping = m_currentForce > 0.1;
+    if (flapping && !m_wasFlapping)
+        m_birdVelocity.setY(m_flapForce * static_cast<float>(m_currentForce));
+    m_wasFlapping = flapping;
+
     // Aktualizacja pozycji
     m_birdPos.setY(m_birdPos.y() + m_birdVelocity.y() * deltaTime);
     
@@ -306,10 +365,21 @@ void FlappyBirdGame::checkCollisions() {
 }
 
 void FlappyBirdGame::update(double deltaTime) {
-    if (!isRunning()) return;
-    
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+    const QSize currentSize(width(), height());
+    if (currentSize != m_lastKnownSize) {
+        adaptToSize(m_lastKnownSize, currentSize);
+        m_lastKnownSize = currentSize;
+    }
+
+
+    // Ochrona wywołań bezpośrednich: nie wykonuj nieograniczonego skoku czasu.
+    deltaTime = qMin(deltaTime, 0.1);
+
     // Aktualizacja ptaka
     updateBird(deltaTime);
+    if (!isRunning()) return;
     
     // Aktualizacja przeszkód
     updateObstacles(deltaTime);

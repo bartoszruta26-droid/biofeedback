@@ -8,6 +8,8 @@
 #include <vector>
 #include <memory>
 
+class QResizeEvent;
+
 namespace games {
 
 /**
@@ -116,6 +118,9 @@ private slots:
      */
     void onConnectionStatusChanged(bool connected, const std::string& message);
 
+protected:
+    void resizeEvent(QResizeEvent* event) override;
+
 private:
     // Struktura reprezentująca przeszkodę (gałęzie drzewa)
     struct Obstacle {
@@ -126,6 +131,16 @@ private:
         
         Obstacle() : xPosition(0), gapY(0), gapHeight(0), passed(false) {}
     };
+
+    // Stałe fizyczne/logiczne muszą być zadeklarowane przed polami,
+    // których inicjalizatory konstruktora z nich korzystają.
+    const float m_birdBaseRadius = 12.0f;
+    const float m_obstacleBaseWidth = 60.0f;
+    const double m_minForce = 0.0;
+    const double m_maxForce = 100.0; ///< Zakres siły w jednostkach umownych
+
+    // Ostatni znany rozmiar logicznego widoku (działa także dla ukrytych widgetów).
+    QSize m_lastKnownSize;
 
     // Stan gry - Ptak
     QPointF m_birdPos;            ///< Pozycja ptaka
@@ -151,19 +166,16 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort; ///< Współdzielony wskaźnik do komunikacji
     bool m_ownSerial;                                          ///< Czy gra jest właścicielem obiektu serial
     
-    // Stałe fizyczne/logiczne
-    const float m_birdBaseRadius = 12.0f;
-    const float m_obstacleBaseWidth = 60.0f;
-    const double m_minForce = 0.0;
-    const double m_maxForce = 100.0; ///< Zakres siły w jednostkach umownych
     
     // Aktualna siła z sensora (znormalizowana 0.0 - 1.0)
     double m_currentForce;
+    bool m_wasFlapping;
     
     // Licznik punktów za przeszkody
     int m_obstaclesPassed;
     
     // Pomocnicze
+    void adaptToSize(const QSize& oldSize, const QSize& newSize);
     void resetBird();
     void spawnObstacle();
     void normalizeForceValue(double rawValue);

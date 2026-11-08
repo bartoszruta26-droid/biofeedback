@@ -60,21 +60,8 @@ void PongGame::initialize() {
     // Reset piłki
     resetBall();
     
-    // Jeśli mamy podłączonego seriala, ustaw callbacki
-    if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
-        });
-        
-        m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
-            QMetaObject::invokeMethod(this, "onConnectionStatusChanged",
-                                     Qt::QueuedConnection,
-                                     Q_ARG(bool, connected),
-                                     Q_ARG(std::string, message));
-        });
-    }
+    // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
+
 }
 
 void PongGame::setDifficultyLevel(int level) {
@@ -86,7 +73,9 @@ void PongGame::setDifficultyLevel(int level) {
     m_aiSpeed = 150.0f + (m_difficultyLevel * 80.0f);
     m_ballSpeed = 250.0f + (m_difficultyLevel * 70.0f);
     
-    emit scoreChanged(0);
+    m_playerScore = 0;
+    m_aiScore = 0;
+    setScore(0);
 }
 
 int PongGame::getDifficultyLevel() const {
@@ -190,13 +179,14 @@ void PongGame::updateAIPaddle(double deltaTime) {
     }
     
     // Ograniczenie do obszaru gry
-    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, static_cast<float>(height() - m_paddleHeight));
+    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, qMax(0.0f, static_cast<float>(height()) - m_paddleHeight));
     m_rightPaddle.setY(m_rightPaddleY);
 }
 
 void PongGame::checkCollisions() {
     // Aktualizacja pozycji paletki gracza na podstawie siły
-    m_leftPaddleY = (1.0f - static_cast<float>(m_currentForce)) * (height() - m_paddleHeight);
+    const float maxPaddleY = qMax(0.0f, static_cast<float>(height()) - m_paddleHeight);
+    m_leftPaddleY = (1.0f - static_cast<float>(m_currentForce)) * maxPaddleY;
     m_leftPaddle.setY(m_leftPaddleY);
     
     // Kolizja piłki z górną i dolną krawędzią
@@ -205,54 +195,57 @@ void PongGame::checkCollisions() {
         m_ballPos.setY(qMax(static_cast<qreal>(m_ballRadius), qMin(static_cast<qreal>(m_ballPos.y()), static_cast<qreal>(height() - m_ballRadius))));
     }
     
-    // Kolizja z lewą paletką (gracz)
-    if (m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
-        m_ballPos.x() - m_ballRadius >= m_leftPaddle.left() &&
-        m_ballPos.y() >= m_leftPaddle.top() &&
-        m_ballPos.y() <= m_leftPaddle.bottom()) {
+    // Kolizja z lewą paletką (gracz). Uwzględnij cały obrys piłki,
+    // a nie wyłącznie jej środek; kierunek ruchu zapobiega ponownemu
+    // naliczaniu kontaktu po odbiciu.
+    if (m_ballVel.x() < 0.0 &&
+        m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
+        m_ballPos.x() + m_ballRadius >= m_leftPaddle.left() &&
+        m_ballPos.y() + m_ballRadius >= m_leftPaddle.top() &&
+        m_ballPos.y() - m_ballRadius <= m_leftPaddle.bottom()) {
         
         // Odbicie piłki z lekkim przyspieszeniem
-        m_ballVel.setX(-m_ballVel.x() * 1.05f);
-        
-        // Zmiana kąta odbicia w zależności od miejsca uderzenia w paletce
-        float hitPos = (m_ballPos.y() - m_leftPaddle.top()) / m_paddleHeight;
-        float angle = (hitPos - 0.5f) * 1.5f; // Kąt od -0.75 do 0.75
-        
-        float speed = std::sqrt(m_ballVel.x() * m_ballVel.x() + m_ballVel.y() * m_ballVel.y());
-        speed = qMin(speed, m_ballSpeed * 2.0f); // Ograniczenie maksymalnej prędkości
-        
-        m_ballVel.setX(std::abs(m_ballVel.x())); // W prawo
-        m_ballVel.setY(angle * speed);
+        // Zachowaj ograniczoną prędkość całkowitą i wyznacz oba składniki
+        // wektora z jednego kąta odbicia (bez niekontrolowanego przyspieszania).
+        const double hitPos = qBound(0.0,
+            (m_ballPos.y() - m_leftPaddle.top()) /
+                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
+        const float angle = (hitPos - 0.5f) * 1.5f;
+        const double speed = qMin(
+            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
+            static_cast<double>(m_ballSpeed) * 2.0);
+        m_ballVel.setX(std::cos(angle) * speed); // W prawo
+        m_ballVel.setY(std::sin(angle) * speed);
         
         m_ballPos.setX(m_leftPaddle.right() + m_ballRadius);
     }
     
-    // Kolizja z prawą paletką (AI)
-    if (m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
-        m_ballPos.x() + m_ballRadius <= m_rightPaddle.right() &&
-        m_ballPos.y() >= m_rightPaddle.top() &&
-        m_ballPos.y() <= m_rightPaddle.bottom()) {
+    // Analogiczna kolizja dla paletki AI.
+    if (m_ballVel.x() > 0.0 &&
+        m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
+        m_ballPos.x() - m_ballRadius <= m_rightPaddle.right() &&
+        m_ballPos.y() + m_ballRadius >= m_rightPaddle.top() &&
+        m_ballPos.y() - m_ballRadius <= m_rightPaddle.bottom()) {
         
-        m_ballVel.setX(-m_ballVel.x() * 1.05f);
-        
-        float hitPos = (m_ballPos.y() - m_rightPaddle.top()) / m_paddleHeight;
-        float angle = (hitPos - 0.5f) * 1.5f;
-        
-        float speed = std::sqrt(m_ballVel.x() * m_ballVel.x() + m_ballVel.y() * m_ballVel.y());
-        speed = qMin(speed, m_ballSpeed * 2.0f);
-        
-        m_ballVel.setX(-std::abs(m_ballVel.x())); // W lewo
-        m_ballVel.setY(angle * speed);
+        const double hitPos = qBound(0.0,
+            (m_ballPos.y() - m_rightPaddle.top()) /
+                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
+        const float angle = (hitPos - 0.5f) * 1.5f;
+        const double speed = qMin(
+            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
+            static_cast<double>(m_ballSpeed) * 2.0);
+        m_ballVel.setX(-std::cos(angle) * speed); // W lewo
+        m_ballVel.setY(std::sin(angle) * speed);
         
         m_ballPos.setX(m_rightPaddle.left() - m_ballRadius);
     }
     
     // Punktacja - piłka poza ekranem
-    if (m_ballPos.x() < 0) {
+    if (m_ballPos.x() + m_ballRadius < 0) {
         // Punkt dla AI
         m_aiScore++;
         resetBall();
-    } else if (m_ballPos.x() > width()) {
+    } else if (m_ballPos.x() - m_ballRadius > width()) {
         // Punkt dla gracza
         m_playerScore++;
         addScore(10); // 10 punktów za każde trafienie
@@ -261,17 +254,22 @@ void PongGame::checkCollisions() {
 }
 
 void PongGame::update(double deltaTime) {
-    if (!isRunning()) return;
-    
-    // Aktualizacja pozycji piłki
-    m_ballPos.setX(m_ballPos.x() + m_ballVel.x() * deltaTime);
-    m_ballPos.setY(m_ballPos.y() + m_ballVel.y() * deltaTime);
-    
-    // Aktualizacja AI
-    updateAIPaddle(deltaTime);
-    
-    // Sprawdzenie kolizji
-    checkCollisions();
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0) return;
+
+    // Match GameEngine's stall policy before converting the step count to int.
+    // The normal GameEngine path already supplies fixed 1/120 s steps; this
+    // subdivision is a defensive guard for direct callers with larger deltas.
+    deltaTime = qMin(deltaTime, 0.1);
+    constexpr double maxPhysicsStep = 1.0 / 120.0;
+    const int steps = qMax(1, static_cast<int>(std::ceil(deltaTime / maxPhysicsStep)));
+    const double stepTime = deltaTime / steps;
+
+    for (int step = 0; step < steps && isRunning(); ++step) {
+        m_ballPos.setX(m_ballPos.x() + m_ballVel.x() * stepTime);
+        m_ballPos.setY(m_ballPos.y() + m_ballVel.y() * stepTime);
+        updateAIPaddle(stepTime);
+        checkCollisions();
+    }
 }
 
 void PongGame::render(QPainter &painter) {

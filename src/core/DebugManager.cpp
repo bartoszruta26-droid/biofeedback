@@ -1,6 +1,8 @@
 #include "core/DebugManager.hpp"
 #include <QDebug>
 #include <QThread>
+#include <functional>
+#include <thread>
 
 namespace core {
 
@@ -106,7 +108,7 @@ void DebugManager::sendDebugMessage(const QString& message, DebugLevel level, co
     msg.source = source;
     msg.type = type;  // Preserve the original type string
     msg.timestamp = QDateTime::currentDateTime();
-    msg.threadId = static_cast<int>(QThread::currentThreadId());
+    msg.threadId = static_cast<int>(std::hash<std::thread::id>{}(std::this_thread::get_id()) & 0x7fffffffU);
     
     logMessageInternal(msg);
 }

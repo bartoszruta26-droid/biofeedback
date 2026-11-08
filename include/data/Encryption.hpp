@@ -44,7 +44,7 @@ namespace EncryptionTypes {
         std::atomic<uint64_t> keyGenerations{0};         ///< Liczba generowań kluczy
         std::atomic<uint64_t> base64EncodeOps{0};        ///< Liczba kodowań Base64
         std::atomic<uint64_t> base64DecodeOps{0};        ///< Liczba dekodowań Base64
-        std::atomic<uint64_t> xorOperations{0};          ///< Liczba operacji XOR
+        std::atomic<uint64_t> xorOperations{0};          ///< Historyczny licznik; nowy kod nie wykonuje XOR
         std::atomic<uint64_t> validationErrors{0};       ///< Liczba błędów walidacji
         std::atomic<uint64_t> memoryErrors{0};           ///< Liczba błędów alokacji pamięci
         std::atomic<uint64_t> otherErrors{0};            ///< Liczba innych błędów
@@ -117,16 +117,14 @@ namespace EncryptionTypes {
 
 /**
  * @class Encryption
- * @brief Klasa zapewniająca podstawowe funkcje kryptograficzne
+ * @brief Klasa zapewniająca funkcje kryptograficzne AES-256-GCM
  * 
  * Klasa udostępnia statyczne metody do szyfrowania i deszyfrowania danych
- * przy użyciu algorytmu XOR z kodowaniem Base64. Zawiera zaawansowane
+ * przy użyciu uwierzytelnionego szyfrowania AES-256-GCM. Zawiera zaawansowane
  * mechanizmy debugowania, obsługi błędów, logowania i statystyk.
  * 
- * @note Algorytm XOR jest prostym szyfrem i nie powinien być używany
- * do zabezpieczania wrażliwych danych w środowisku produkcyjnym.
- * Do celów medycznych zalecane jest użycie AES lub innych certyfikowanych
- * algorytmów.
+ * @note Starsze szyfrogramy XOR nie są automatycznie odszyfrowywane; wymagają jawnej migracji.
+ * @note Klucz wejściowy powinien być losowym, tajnym materiałem o wysokiej entropii.
  * 
  * @threadsafe Tak, wszystkie metody są thread-safe
  */
@@ -145,17 +143,17 @@ public:
     // ========================================================================
     
     /**
-     * @brief Szyfruje dane za pomocą klucza (XOR) i koduje Base64
+     * @brief Szyfruje dane AES-256-GCM i koduje wynik Base64 z prefiksem BFENC:v1
      * 
      * Metoda przeprowadza pełny proces szyfrowania:
      * 1. Walidacja parametrów wejściowych
      * 2. Konwersja danych do wektora bajtów
-     * 3. Szyfrowanie XOR z użyciem podanego klucza
+     * 3. Szyfrowanie uwierzytelnione AES-256-GCM
      * 4. Kodowanie wyniku do Base64
      * 5. Logowanie operacji i aktualizacja statystyk
      * 
      * @param data Dane do zaszyfrowania (string tekstowy)
-     * @param key Klucz szyfrujący (minimum 4 znaki, zalecane 8+)
+     * @param key Klucz szyfrujący (co najmniej 32 bajty losowego materiału kluczowego)
      * @return Zaszyfrowane dane zakodowane w Base64
      * 
      * @throws std::invalid_argument Jeśli klucz jest pusty
@@ -167,14 +165,13 @@ public:
     static std::string encrypt(const std::string& data, const std::string& key);
     
     /**
-     * @brief Dekoduje Base64 i odszyfrowuje dane za pomocą klucza (XOR)
+     * @brief Weryfikuje tag i odszyfrowuje dane AES-256-GCM
      * 
      * Metoda przeprowadza pełny proces deszyfrowania:
      * 1. Walidacja parametrów wejściowych
-     * 2. Dekodowanie Base64 do wektora bajtów
-     * 3. Deszyfrowanie XOR z użyciem podanego klucza
-     * 4. Konwersja wyniku do stringa
-     * 5. Logowanie operacji i aktualizacja statystyk
+     * 2. Dekodowanie wersjonowanego payloadu Base64
+     * 3. Weryfikacja tagu uwierzytelniającego AES-GCM
+     * 4. Deszyfrowanie i konwersja wyniku do stringa
      * 
      * @param encryptedData Dane zaszyfrowane w formacie Base64
      * @param key Klucz szyfrujący (ten sam co użyty do szyfrowania)
@@ -199,7 +196,7 @@ public:
      * 
      * @note Dla length = 0 ustawiana jest wartość domyślna 32
      * @note Dla length > 1024 klucz jest ograniczany do 1024 znaków (gentle code)
-     * @warning Przed użyciem należy wywołać srand() do inicjalizacji generatora losowego
+     * @warning Klucz jest generowany z użyciem kryptograficznego generatora systemowego
      * @note Zalecane minimum to 8 znaków dla podstawowego bezpieczeństwa
      */
     static std::string generateKey(size_t length = 32);
@@ -329,21 +326,6 @@ private:
     // ========================================================================
     // METODY PRYWATNE
     // ========================================================================
-    
-    /**
-     * @brief Prosty algorytm XOR do szyfrowania/deszyfrowania
-     * 
-     * Wykonuje operację XOR na danych z cyklicznie powtarzanym kluczem.
-     * Ta sama operacja służy zarówno do szyfrowania jak i deszyfrowania.
-     * 
-     * @param data Dane do przetworzenia
-     * @param key Klucz do operacji XOR
-     * @return Wynik operacji XOR
-     * 
-     * @throws std::invalid_argument Jeśli klucz jest pusty
-     * @throws std::runtime_error Jeśli wystąpi błąd alokacji pamięci
-     */
-    static std::vector<uint8_t> xorCipher(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key);
     
     /**
      * @brief Loguje komunikat z odpowiednim poziomem ważności

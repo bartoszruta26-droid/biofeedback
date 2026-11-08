@@ -1,4 +1,6 @@
 #include "tab/TrainingTab.hpp"
+#include "tab/TrainingAnalyticsWidget.hpp"
+#include "measurement/Units.hpp"
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTextStream>
@@ -7,10 +9,20 @@
 #include <QFont>
 #include <QColor>
 #include <QStackedWidget>
+#include <QDir>
+#include <QElapsedTimer>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <cmath>
+#include <limits>
+#include <utility>
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
+#include "games/TanGame.hpp"
+#include "games/ArkanoidGame.hpp"
+#include "games/GameFactory.hpp"
 
 namespace tab {
 
@@ -170,27 +182,34 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_lblRestTimer(nullptr)
     , m_gameBox(nullptr)
     , m_currentGame(nullptr)
+    , m_activeGameType("none")
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
+    , m_statsSummaryLabel(nullptr)
+    , m_analyticsWidget(nullptr)
     , m_timer(nullptr)
     , m_restTimer(nullptr)
-    , m_isTraining(false)
-    , m_isPaused(false)
     , m_currentExerciseIndex(0)
     , m_currentSeriesIndex(0)
     , m_currentRepIndex(0)
     , m_sessionTime(0)
     , m_restTimeRemaining(0)
-    , m_inRestPeriod(false)
+    , m_repetitionDetector()
+    , m_currentSeriesRepetitions()
     , m_currentForce(0.0)
     , m_peakForceInRep(0.0)
     , m_serialPort(nullptr)
+    , m_measurementEngine(nullptr)
 {
     setupUI();
 }
 
 TrainingTab::~TrainingTab()
 {
+    if (m_measurementEngine && m_measurementCallbackToken) {
+        m_measurementEngine->unsubscribe(m_measurementCallbackToken);
+        m_measurementCallbackToken = 0;
+    }
     stopTraining();
 }
 
@@ -249,8 +268,15 @@ void TrainingTab::setupUI()
     configLayout->addWidget(new QLabel("Gra:", this));
     m_gameTypeCombo = new QComboBox(this);
     m_gameTypeCombo->addItem("Pong", "pong");
+    m_gameTypeCombo->addItem("Arkanoid", "arkanoid");
     m_gameTypeCombo->addItem("Flappy Bird", "flappy");
     m_gameTypeCombo->addItem("Mario", "mario");
+    m_gameTypeCombo->addItem("Sinusoidalna", "sin");
+    m_gameTypeCombo->addItem("Tangensoidalna", "tan");
+    m_gameTypeCombo->addItem("Galaga", "galaga");
+    m_gameTypeCombo->addItem("Archer", "archer");
+    m_gameTypeCombo->addItem("Scorched Earth", "scorched_earth");
+    m_gameTypeCombo->addItem("Car Race", "car_race");
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_gameTypeCombo);
@@ -358,7 +384,7 @@ void TrainingTab::setupUI()
     gameLayout->setSpacing(0);
     
     // Placeholder dla gry - będzie zastąpiony przez rzeczywisty widget gry
-    QLabel* gamePlaceholder = new QLabel("Wybierz grę i rozpocznij trening", this);
+    QLabel* gamePlaceholder = new QLabel("Wybierz grę i rozpocznij trening", m_gameBox);
     gamePlaceholder->setAlignment(Qt::AlignCenter);
     gamePlaceholder->setMinimumHeight(400);
     gamePlaceholder->setStyleSheet("background-color: #1a1a1a; color: #888; font-size: 18px; border: 2px solid #333;");
@@ -368,10 +394,16 @@ void TrainingTab::setupUI()
     
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki sesji", this);
-    m_statsBox->setMaximumHeight(150);
     QVBoxLayout* statsLayout = new QVBoxLayout(m_statsBox);
     
     m_statsContainer = new QWidget(this);
+    QVBoxLayout* statsContentLayout = new QVBoxLayout(m_statsContainer);
+    statsContentLayout->setContentsMargins(4, 4, 4, 4);
+    m_statsSummaryLabel = new QLabel("Brak zarejestrowanych powtórzeń.", m_statsContainer);
+    m_statsSummaryLabel->setWordWrap(true);
+    statsContentLayout->addWidget(m_statsSummaryLabel);
+    m_analyticsWidget = new TrainingAnalyticsWidget(m_statsContainer);
+    statsContentLayout->addWidget(m_analyticsWidget, 1);
     statsLayout->addWidget(m_statsContainer);
     
     m_mainLayout->addWidget(m_statsBox);
@@ -382,10 +414,10 @@ void TrainingTab::setupUI()
     
     // Timer
     m_timer = new QTimer(this);
-    m_timer->setInterval(100);  // 10 Hz
+    m_timer->setInterval(1000);  // 1 Hz — licznik sesji zwiększa się raz na sekundę
     
     m_restTimer = new QTimer(this);
-    m_restTimer->setInterval(1000);  // 1 Hz
+    m_restTimer->setInterval(100);  // 10 Hz; remaining time is measured monotonically
     
     // Połączenia sygnałów
     connect(m_btnStartStop, &QPushButton::clicked, this, &TrainingTab::onStartStopClicked);
@@ -413,13 +445,10 @@ void TrainingTab::setupUI()
             this, &TrainingTab::onExerciseSelected);
     connect(m_timer, &QTimer::timeout, this, &TrainingTab::onTimerTick);
     connect(m_restTimer, &QTimer::timeout, this, [this]() {
-        m_restTimeRemaining--;
         updateRestDisplay();
         if (m_restTimeRemaining <= 0) {
             m_restTimer->stop();
-            m_inRestPeriod = false;
-            m_lblRestTimer->setText("");
-            loadNextSeries();
+            advanceAfterRest();
         }
     });
 }
@@ -472,17 +501,43 @@ void TrainingTab::setCurrentExerciseIndex(int index)
 
 void TrainingTab::startTraining()
 {
+    if (!m_stateMachine.canStart()) return;
     if (m_exercisePlan.isEmpty()) {
         QMessageBox::warning(this, "Brak planu", "Dodaj ćwiczenia przed rozpoczęciem treningu.");
         return;
     }
-    
-    m_isTraining = true;
-    m_isPaused = false;
+    if (!m_serialPort || !m_serialPort->isConnected()) {
+        QMessageBox::warning(this, tr("Brak urządzenia"),
+                             tr("Podłącz czujnik HX711 przed rozpoczęciem treningu."));
+        return;
+    }
+
+    if (m_analyticsWidget && !m_analyticsWidget->beginSession()) {
+        QMessageBox::warning(this, tr("Niezapisana sesja"),
+                             tr("Zapisz poprzednią sesję treningową przed rozpoczęciem kolejnej."));
+        return;
+    }
+    if (!m_stateMachine.start()) return;
     m_sessionTime = 0;
+    m_restTimeRemaining = 0;
+    m_restDurationMs = 0;
+    m_restClock.invalidate();
+    m_sessionElapsedOffsetMs = 0;
+    m_lastCheckpointSeconds = -1;
+    m_trainingClock.reset();
+    m_sessionClock.start();
+    m_trainingClock.update(0, true);
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
+    m_currentSeriesRepetitions.clear();
+    m_repetitionDetector.reset();
+    for (int i = 0; i < m_exerciseStats.size(); ++i) {
+        ExerciseStats fresh;
+        fresh.exerciseName = m_exercisePlan[i].name;
+        m_exerciseStats[i] = fresh;
+    }
+    refreshAnalytics();
     
     // Inicjalizacja pierwszego ćwiczenia
     loadNextExercise();
@@ -497,24 +552,33 @@ void TrainingTab::startTraining()
     m_btnPauseResume->setText("Pauza");
     m_configBox->setEnabled(false);
     
+    if (!saveExecutionCheckpoint())
+        addDebugMessage("Nie udało się utworzyć początkowego punktu kontrolnego sesji.", "ERROR");
     emit trainingStarted();
 }
 
-void TrainingTab::stopTraining()
+void TrainingTab::stopTraining(bool completed)
 {
-    if (!m_isTraining) return;
-    
+    if (!m_stateMachine.running()) return;
+
+    updateSessionClocks();
+    if (completed) m_stateMachine.complete();
+    else m_stateMachine.interrupt();
     m_timer->stop();
     m_restTimer->stop();
-    
-    m_isTraining = false;
-    m_isPaused = false;
-    m_inRestPeriod = false;
-    
-    // Zatrzymanie gry jeśli aktywna
-    if (m_currentGame && m_currentGame->isRunning()) {
+
+    // Stop the game before snapshotting analytics: gameEnded may add final points.
+    if (m_currentGame && m_currentGame->isRunning())
         m_currentGame->stop();
+
+    refreshAnalytics();
+    if (m_analyticsWidget) {
+        m_analyticsWidget->setSessionCompleted(completed);
+        if (!m_analyticsWidget->saveSessionAutomatically())
+            addDebugMessage("Nie udało się automatycznie zapisać sesji treningowej; sesja pozostaje do ponownego zapisu.", "ERROR");
     }
+
+    m_repetitionDetector.reset();
     
     // Aktualizacja UI
     m_btnStartStop->setText("Start");
@@ -535,10 +599,16 @@ void TrainingTab::stopTraining()
 
 void TrainingTab::pauseTraining()
 {
-    if (!m_isTraining || m_isPaused) return;
-    
-    m_isPaused = true;
-    m_timer->stop();
+    if (!m_stateMachine.running() || !m_stateMachine.pause()) return;
+
+    updateSessionClocks();
+    if (m_stateMachine.resting() && m_restClock.isValid()) {
+        // Preserve the exact millisecond remainder; the label is rounded up
+        // for display only and must not extend the actual rest interval.
+        m_restDurationMs = qMax<qint64>(0, m_restDurationMs - m_restClock.elapsed());
+        m_restTimeRemaining = static_cast<int>((m_restDurationMs + 999) / 1000);
+        m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
+    }
     m_restTimer->stop();
     
     if (m_currentGame && m_currentGame->isRunning()) {
@@ -547,16 +617,18 @@ void TrainingTab::pauseTraining()
     
     m_btnPauseResume->setText("Wznów");
     
+    if (!saveExecutionCheckpoint())
+        addDebugMessage("Nie udało się zapisać punktu kontrolnego pauzy.", "ERROR");
     emit trainingPaused();
 }
 
 void TrainingTab::resumeTraining()
 {
-    if (!m_isTraining || !m_isPaused) return;
-    
-    m_isPaused = false;
-    m_timer->start();
-    if (m_inRestPeriod) {
+    if (!m_stateMachine.running() || !m_stateMachine.resume()) return;
+
+    if (m_stateMachine.resting()) {
+        // m_restDurationMs already contains the exact frozen remainder.
+        m_restClock.restart();
         m_restTimer->start();
     }
     
@@ -566,66 +638,152 @@ void TrainingTab::resumeTraining()
     
     m_btnPauseResume->setText("Pauza");
     
+    if (!saveExecutionCheckpoint())
+        addDebugMessage("Nie udało się zapisać punktu kontrolnego wznowienia.", "ERROR");
     emit trainingResumed();
 }
 
 bool TrainingTab::isTrainingActive() const
 {
-    return m_isTraining && !m_isPaused;
+    return m_stateMachine.running() && !m_stateMachine.paused();
 }
 
 bool TrainingTab::isTrainingPaused() const
 {
-    return m_isPaused;
+    return m_stateMachine.paused();
 }
 
 void TrainingTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    m_serialPort = serial;
-    
-    if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback w wątku sensora - używamy QMetaObject dla bezpieczeństwa
-            QMetaObject::invokeMethod(this, "onSensorDataReceived", 
-                                     Qt::QueuedConnection,
-                                     Q_ARG(sensor::SensorData, data));
+    // Serial ownership and acquisition stay in MainWindow/MeasurementTab.
+    // Training receives calibrated samples only through MeasurementEngine.
+    m_serialPort = std::move(serial);
+}
+
+void TrainingTab::setMeasurementEngine(
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine)
+{
+    if (m_measurementEngine && m_measurementCallbackToken) {
+        m_measurementEngine->unsubscribe(m_measurementCallbackToken);
+        m_measurementCallbackToken = 0;
+    }
+    m_measurementEngine = std::move(engine);
+    if (!m_measurementEngine) return;
+
+    m_measurementCallbackToken = m_measurementEngine->subscribe(
+        [this](const biofeedback::measurement::MeasurementSample& sample) {
+            QMetaObject::invokeMethod(this, [this, sample]() {
+                onMeasurementSample(sample);
+            }, Qt::QueuedConnection);
         });
+}
+
+void TrainingTab::setCurrentPatientContext(const QString& patientPesel,
+                                             const QString& patientDataPath)
+{
+    if (m_stateMachine.running()) return;
+    m_currentPatientPesel = patientPesel;
+    m_currentPatientDataPath = patientDataPath;
+    if (m_analyticsWidget) {
+        const QString historyPath = patientDataPath.isEmpty()
+            ? QString()
+            : QDir(patientDataPath).filePath(QStringLiteral("training_history.json"));
+        m_analyticsWidget->setHistoryFilePath(historyPath);
+        QJsonObject recovered;
+        if (m_analyticsWidget->recoverPendingSession(recovered)) {
+            const auto answer = QMessageBox::question(this, tr("Odzyskiwanie treningu"),
+                tr("Znaleziono niedokończoną sesję treningową. Czy wznowić ją od zapisanego miejsca?"),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+            if (answer == QMessageBox::Yes && restoreExecutionCheckpoint(recovered.value("execution_state").toObject())) {
+                addDebugMessage("Odzyskano sesję treningową. Trening jest wstrzymany do chwili wybrania Wznów.", "INFO");
+            } else {
+                m_analyticsWidget->setSessionCompleted(false);
+                m_analyticsWidget->saveSessionAutomatically();
+                addDebugMessage("Odzyskana sesja została oznaczona jako przerwana.", "WARNING");
+            }
+        }
     }
 }
 
 void TrainingTab::setGameEngine(games::GameEngine* game)
 {
     m_currentGame = game;
-    
-    if (m_currentGame) {
-        // Podłączenie sygnałów gry
-        connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
-        connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
-        connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
-        
-        // Jeśli mamy SerialCommunication, podłącz go do gry
-        if (m_serialPort) {
-            // Spróbuj rzutować na konkretny typ gry i podłącz SerialCommunication
-            auto pongGame = dynamic_cast<games::PongGame*>(m_currentGame);
-            if (pongGame) {
-                pongGame->setSerialConnection(m_serialPort);
+    if (!m_currentGame) return;
+
+    m_currentGame->setParent(m_gameBox);
+    m_currentGame->setMinimumHeight(400);
+    if (m_gameBox->layout() && m_gameBox->layout()->indexOf(m_currentGame) < 0) {
+        while (QLayoutItem* item = m_gameBox->layout()->takeAt(0)) {
+            if (QWidget* widget = item->widget()) {
+                widget->hide();
+                widget->deleteLater();
             }
-            
-            auto flappyGame = dynamic_cast<games::FlappyBirdGame*>(m_currentGame);
-            if (flappyGame) {
-                flappyGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto marioGame = dynamic_cast<games::MarioGame*>(m_currentGame);
-            if (marioGame) {
-                marioGame->setSerialConnection(m_serialPort);
-            }
-            
-            auto sinGame = dynamic_cast<games::SinGame*>(m_currentGame);
-            if (sinGame) {
-                sinGame->setSerialConnection(m_serialPort);
-            }
+            delete item;
         }
+        m_gameBox->layout()->addWidget(m_currentGame);
+    }
+
+    disconnect(m_currentGame, nullptr, this, nullptr);
+    connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
+    connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
+    connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
+
+    if (m_serialPort) {
+        if (auto* game = dynamic_cast<games::PongGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::FlappyBirdGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::MarioGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::SinGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::TanGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+        if (auto* game = dynamic_cast<games::ArkanoidGame*>(m_currentGame))
+            game->setSerialConnection(m_serialPort);
+    }
+}
+
+void TrainingTab::configureGameForExercise()
+{
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size())
+        return;
+
+    QString type = m_exercisePlan[m_currentExerciseIndex].gameType.trimmed().toLower();
+    if (type == "sinusoidal" || type == "sin_game" || type == "sinus")
+        type = "sin";
+    if (type.isEmpty()) type = "none";
+    if (type == m_activeGameType && (type == "none" || m_currentGame)) return;
+
+    if (m_currentGame) {
+        if (m_currentGame->isRunning()) m_currentGame->stop();
+        if (m_gameBox->layout()) m_gameBox->layout()->removeWidget(m_currentGame);
+        delete m_currentGame;
+        m_currentGame = nullptr;
+    }
+    if (m_gameBox->layout()) {
+        while (QLayoutItem* item = m_gameBox->layout()->takeAt(0)) {
+            if (QWidget* widget = item->widget()) delete widget;
+            delete item;
+        }
+    }
+
+    m_activeGameType = type;
+    games::GameEngine* selectedGame = nullptr;
+    if (type != "none")
+        selectedGame = games::createGame(type, m_gameBox);
+
+    if (selectedGame) {
+        m_gameBox->layout()->addWidget(selectedGame);
+        setGameEngine(selectedGame);
+    } else {
+        auto* placeholder = new QLabel(
+            type == "none" ? tr("Trening bez gry") : tr("Nieznany typ gry: %1").arg(type),
+            m_gameBox);
+        placeholder->setAlignment(Qt::AlignCenter);
+        placeholder->setMinimumHeight(400);
+        placeholder->setStyleSheet("background-color:#1a1a1a;color:#888;font-size:18px;");
+        m_gameBox->layout()->addWidget(placeholder);
     }
 }
 
@@ -634,29 +792,53 @@ QVector<ExerciseStats> TrainingTab::getTrainingStats() const
     return m_exerciseStats;
 }
 
+void TrainingTab::refreshAnalytics()
+{
+    if (m_analyticsWidget) {
+        m_analyticsWidget->setStats(m_exerciseStats, m_sessionTime,
+            static_cast<int>(m_trainingClock.activeSeconds()));
+    }
+}
+
 bool TrainingTab::exportResultsToCSV(const QString& filename)
 {
     QFile file(filename);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        return false;
-    }
-    
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return false;
+
     QTextStream out(&file);
-    
-    // Nagłówek
-    out << "Ćwiczenie,Seria,Powtórzenie,Siła szczytowa,Czas do szczytu,Wynik\n";
-    
-    for (const auto& stats : m_exerciseStats) {
-        out << stats.exerciseName << ","
-            << stats.completedSeries << ","
-            << stats.completedReps << ","
-            << stats.avgPeakForce << ","
-            << stats.avgReactionTime << ","
-            << stats.consistencyScore << "\n";
+    out << "Ćwiczenie,Seria,Powtórzenie,Czas_trwania_ms,Czas_do_szczytu_ms,"
+           "Siła_średnia_N,Siła_szczytowa_N,Próbki,Cel_osiągnięty,"
+           "Średni_szczyt_serii_N,Maks_szczyt_serii_N,Cel_serii_pct,CV_serii_pct,Punkty_gry\n";
+
+    for (int exerciseIndex = 0; exerciseIndex < m_exerciseStats.size(); ++exerciseIndex) {
+        const auto& stats = m_exerciseStats[exerciseIndex];
+        const double targetForce = exerciseIndex < m_exercisePlan.size()
+            ? m_exercisePlan[exerciseIndex].targetForce : 0.0;
+        QString escapedName = stats.exerciseName;
+        escapedName.replace("\"", "\"\"");
+        for (const auto& item : stats.repetitions) {
+            const auto& rep = item.measurement;
+            const bool targetReached = targetForce > 0.0 && rep.peakForceN >= targetForce;
+            const int seriesOffset = item.seriesIndex - 1;
+            const bool hasSeriesSummary = seriesOffset >= 0 && seriesOffset < stats.series.size();
+            const auto seriesSummary = hasSeriesSummary
+                ? stats.series[seriesOffset] : biofeedback::training::SeriesSummary{};
+            out << "\"" << escapedName << "\"" << ","
+                << item.seriesIndex << "," << item.repetitionIndex << ","
+                << rep.durationMs << "," << rep.timeToPeakMs << ","
+                << QString::number(rep.meanForceN, 'f', 4) << ","
+                << QString::number(rep.peakForceN, 'f', 4) << ","
+                << rep.sampleCount << "," << (targetReached ? "tak" : "nie") << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.averagePeakForceN, 'f', 4) : QString()) << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.maximumPeakForceN, 'f', 4) : QString()) << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.targetAchievementPercent, 'f', 2) : QString()) << ","
+                << (hasSeriesSummary ? QString::number(seriesSummary.peakForceCoefficientOfVariationPercent, 'f', 2) : QString()) << ","
+                << stats.gameScore << "\n";
+        }
     }
-    
+
     file.close();
-    return true;
+    return file.error() == QFile::NoError;
 }
 
 bool TrainingTab::importTrainingPlan(const QString& filename)
@@ -683,6 +865,8 @@ bool TrainingTab::importTrainingPlan(const QString& filename)
             ex.restTime = parts[4].toDouble();
             if (parts.size() > 5) {
                 ex.gameType = parts[5];
+                if (ex.gameType == QStringLiteral("scored_earth"))
+                    ex.gameType = QStringLiteral("scorched_earth");
             }
             addExercise(ex);
         }
@@ -758,7 +942,7 @@ void TrainingTab::onExportPlan()
 
 void TrainingTab::onStartStopClicked()
 {
-    if (m_isTraining) {
+    if (m_stateMachine.running()) {
         stopTraining();
     } else {
         startTraining();
@@ -767,7 +951,7 @@ void TrainingTab::onStartStopClicked()
 
 void TrainingTab::onPauseResumeClicked()
 {
-    if (m_isPaused) {
+    if (m_stateMachine.paused()) {
         resumeTraining();
     } else {
         pauseTraining();
@@ -792,61 +976,91 @@ void TrainingTab::onExerciseSelected(int index)
 
 void TrainingTab::onTimerTick()
 {
-    if (!m_isTraining || m_isPaused) return;
-    
-    m_sessionTime++;
-    
-    // Aktualizacja wyświetlacza czasu
-    int minutes = m_sessionTime / 60;
-    int seconds = m_sessionTime % 60;
-    m_lblTimer->setText(QString("Czas: %1:%2")
+    if (!m_stateMachine.running()) return;
+    updateSessionClocks();
+    if (m_stateMachine.resting() && !m_stateMachine.paused()) updateRestDisplay();
+
+    const int activeSeconds = static_cast<int>(m_trainingClock.activeSeconds());
+    const int activeMinutes = activeSeconds / 60;
+    const int activeRemainder = activeSeconds % 60;
+    const int minutes = m_sessionTime / 60;
+    const int seconds = m_sessionTime % 60;
+    m_lblTimer->setText(QString("Sesja: %1:%2 | Aktywnie: %3:%4")
                         .arg(minutes, 2, 10, QChar('0'))
-                        .arg(seconds, 2, 10, QChar('0')));
-    
+                        .arg(seconds, 2, 10, QChar('0'))
+                        .arg(activeMinutes, 2, 10, QChar('0'))
+                        .arg(activeRemainder, 2, 10, QChar('0')));
     updateProgressWidgets();
+    // Atomically keep a recent snapshot of current progress, including rest
+    // milliseconds and the in-flight repetition detector.
+    if (m_stateMachine.running() && !m_stateMachine.paused() &&
+        !saveExecutionCheckpoint()) {
+        addDebugMessage("Nie udało się zapisać bieżącego punktu kontrolnego.", "ERROR");
+    }
+    if (m_sessionTime > 0 && m_sessionTime % 5 == 0 && m_sessionTime != m_lastCheckpointSeconds) {
+        m_lastCheckpointSeconds = m_sessionTime;
+        if (!saveExecutionCheckpoint())
+            addDebugMessage("Nie udało się zapisać okresowego punktu kontrolnego.", "ERROR");
+    }
 }
 
-void TrainingTab::onSensorDataReceived(const sensor::SensorData& data)
+void TrainingTab::updateSessionClocks()
 {
-    if (!m_isTraining || m_isPaused) return;
-    
-    double force = data.calibratedValue;
+    if (!m_stateMachine.running() || !m_sessionClock.isValid()) return;
+    const qint64 elapsedMs = m_sessionClock.elapsed();
+    m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_stateMachine.paused() && !m_stateMachine.resting());
+    m_sessionTime = static_cast<int>(m_trainingClock.sessionSeconds());
+}
+
+void TrainingTab::onMeasurementSample(
+    const biofeedback::measurement::MeasurementSample& sample)
+{
+    if (!m_stateMachine.running()) return;
+
+    // MeasurementEngine normalizes firmware grams to kilograms. Convert the
+    // canonical mass-equivalent value to SI force exactly once for biomechanics.
+    if (m_stateMachine.paused() || m_stateMachine.resting() || !sample.isValid() || sample.unit != "kg" ||
+        m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) {
+        biofeedback::training::RepetitionRecord discarded;
+        m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
+        return;
+    }
+
+    const double force = sample.value * biofeedback::measurement::standardGravityMetersPerSecondSquared;
+    if (!std::isfinite(force) || force < 0.0) {
+        biofeedback::training::RepetitionRecord discarded;
+        m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
+        return;
+    }
     m_currentForce = force;
-    
-    // Dodaj dane z Arduino do terminala debugowania
-    QString arduinoDebug = QString("Arduino: RAW=%1 | CALIBRATED=%.2fN")
-        .arg(data.value)
-        .arg(data.calibratedValue);
-    addDebugMessage(arduinoDebug, "ARDUINO");
-    
-    // Śledzenie siły szczytowej w powtórzeniu
-    if (force > m_peakForceInRep) {
-        m_peakForceInRep = force;
-    }
-    
-    // Aktualizacja UI
-    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 1));
+
+    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
     m_progressWidget->setCurrentForce(force);
-    
-    double targetForce = 0.0;
-    if (!m_exercisePlan.isEmpty() && m_currentExerciseIndex < m_exercisePlan.size()) {
-        targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
-    }
-    int barValue = targetForce > 0 ? static_cast<int>((force / targetForce) * 100) : 0;
+
+    const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
+    const int barValue = targetForce > 0.0
+        ? static_cast<int>((force / targetForce) * 100.0) : 0;
     m_forceBar->setValue(qBound(0, barValue, 100));
-    
-    // Przekazanie danych do gry
+
     if (m_currentGame && m_currentGame->isRunning()) {
-        m_currentGame->handleSensorInput(force);
+        const double gameInput = targetForce > 0.0
+            ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
+        m_currentGame->handleSensorInput(gameInput);
     }
-    
+
+    biofeedback::training::RepetitionRecord repetition;
+    if (m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition))
+        onRepetitionDetected(repetition);
+
     emit newForceSample(force);
 }
 
-void TrainingTab::onGameEnded(int /*score*/)
+void TrainingTab::onGameEnded(int score)
 {
-    // Gra zakończona - można zarejestrować wynik
-    calculateExerciseStats();
+    if (m_currentExerciseIndex >= 0 && m_currentExerciseIndex < m_exerciseStats.size()) {
+        m_exerciseStats[m_currentExerciseIndex].gameScore += score;
+        refreshAnalytics();
+    }
 }
 
 void TrainingTab::onGameStarted()
@@ -872,191 +1086,592 @@ void TrainingTab::updateDisplay()
 void TrainingTab::updateProgressWidgets()
 {
     m_progressWidget->setCurrentExercise(m_currentExerciseIndex, m_exercisePlan.size());
-    m_progressWidget->setCurrentSeries(m_currentSeriesIndex, 
-                                       m_exercisePlan[m_currentExerciseIndex].seriesCount);
-    m_progressWidget->setCurrentRep(m_currentRepIndex,
-                                    m_exercisePlan[m_currentExerciseIndex].repsPerSeries);
     m_progressWidget->setSessionTime(m_sessionTime);
-    
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) {
+        m_progressWidget->setCurrentSeries(0, 0);
+        m_progressWidget->setCurrentRep(0, 0);
+        m_lblCurrentExercise->setText(QString("Ćwiczenie: %1/%2")
+                                      .arg(m_exercisePlan.size()).arg(m_exercisePlan.size()));
+        m_lblCurrentSeries->setText("Seria: -");
+        m_lblCurrentRep->setText("Powtórzenie: -");
+        return;
+    }
+    const auto& exercise = m_exercisePlan[m_currentExerciseIndex];
+    m_progressWidget->setCurrentSeries(m_currentSeriesIndex, exercise.seriesCount);
+    m_progressWidget->setCurrentRep(m_currentRepIndex, exercise.repsPerSeries);
     m_lblCurrentExercise->setText(QString("Ćwiczenie: %1/%2")
-                                  .arg(m_currentExerciseIndex + 1)
-                                  .arg(m_exercisePlan.size()));
+                                  .arg(m_currentExerciseIndex + 1).arg(m_exercisePlan.size()));
     m_lblCurrentSeries->setText(QString("Seria: %1/%2")
-                                .arg(m_currentSeriesIndex + 1)
-                                .arg(m_exercisePlan[m_currentExerciseIndex].seriesCount));
+                                .arg(qMin(m_currentSeriesIndex + 1, exercise.seriesCount))
+                                .arg(exercise.seriesCount));
     m_lblCurrentRep->setText(QString("Powtórzenie: %1/%2")
-                             .arg(m_currentRepIndex + 1)
-                             .arg(m_exercisePlan[m_currentExerciseIndex].repsPerSeries));
+                             .arg(qMin(m_currentRepIndex + 1, exercise.repsPerSeries))
+                             .arg(exercise.repsPerSeries));
 }
 
 void TrainingTab::loadNextExercise()
 {
     if (m_currentExerciseIndex >= m_exercisePlan.size()) {
-        // Wszystkie ćwiczenia zakończone
-        stopTraining();
-        emit trainingFinished(m_exerciseStats);
+        const QVector<ExerciseStats> completed = m_exerciseStats;
+        stopTraining(true);
+        emit trainingFinished(completed);
         return;
     }
-    
+
     m_currentSeriesIndex = 0;
     m_currentRepIndex = 0;
-    
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    // Konfiguracja gry dla tego ćwiczenia
-    QString currentGameType = m_gameTypeCombo->currentData().toString();
-    if (currentGameType != ex.gameType) {
-        // Przełączenie typu gry
-        int index = m_gameTypeCombo->findData(ex.gameType);
-        if (index >= 0) {
-            m_gameTypeCombo->setCurrentIndex(index);
-        }
-        reconfigureGameForExercise(ex);
-    }
-    
+    m_currentSeriesRepetitions.clear();
+    const auto& exercise = m_exercisePlan[m_currentExerciseIndex];
+    m_repetitionDetector.setTargetForce(exercise.targetForce);
+    m_progressWidget->setTargetForce(exercise.targetForce);
+    m_lblTargetForce->setText(QString("%1 N").arg(exercise.targetForce, 0, 'f', 1));
+    const int gameIndex = m_gameTypeCombo->findData(exercise.gameType);
+    if (gameIndex >= 0) m_gameTypeCombo->setCurrentIndex(gameIndex);
+    configureGameForExercise();
     loadNextSeries();
+    saveExecutionCheckpoint();
 }
 
 void TrainingTab::loadNextSeries()
 {
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    if (m_currentSeriesIndex >= ex.seriesCount) {
-        // Seria zakończona, następne ćwiczenie
-        m_currentExerciseIndex++;
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) {
         loadNextExercise();
         return;
     }
-    
+    const auto& exercise = m_exercisePlan[m_currentExerciseIndex];
+    if (m_currentSeriesIndex >= exercise.seriesCount) {
+        calculateExerciseStats();
+        ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+        stats.isCompleted = true;
+        emit exerciseCompleted(m_currentExerciseIndex, stats);
+        ++m_currentExerciseIndex;
+        if (m_currentExerciseIndex >= m_exercisePlan.size()) {
+            const QVector<ExerciseStats> completed = m_exerciseStats;
+            stopTraining(true);
+            emit trainingFinished(completed);
+        } else {
+            // The last repetition normally stages this rest in finishCurrentSeries.
+            if (!m_stateMachine.resting()) {
+                m_restTimeRemaining = 120;
+                m_restDurationMs = 120000;
+                if (!m_stateMachine.beginRest(biofeedback::training::RestTarget::NextExercise))
+                    return;
+                m_restClock.start();
+            }
+            if (m_stateMachine.restTarget() != biofeedback::training::RestTarget::NextExercise)
+                return;
+            m_lblRestTimer->setText(QString("Odpoczynek przed kolejnym ćwiczeniem: %1 s")
+                                    .arg(m_restTimeRemaining));
+            m_restTimer->start();
+            saveExecutionCheckpoint();
+        }
+        return;
+    }
+
     m_currentRepIndex = 0;
-    m_peakForceInRep = 0;
-    
-    // Start gry dla tej serii
+    m_peakForceInRep = 0.0;
+    m_currentSeriesRepetitions.clear();
+    m_repetitionDetector.setTargetForce(exercise.targetForce);
     if (m_currentGame) {
         m_currentGame->reset();
         m_currentGame->start();
     }
-    
     updateProgressWidgets();
+    saveExecutionCheckpoint();
 }
 
 void TrainingTab::loadNextRep()
 {
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    if (m_currentRepIndex >= ex.repsPerSeries) {
-        // Powtórzenia w serii zakończone
-        checkExerciseCompletion();
-        return;
-    }
-    
-    m_peakForceInRep = 0;
+    m_peakForceInRep = 0.0;
     updateProgressWidgets();
+    saveExecutionCheckpoint();
 }
 
-void TrainingTab::checkExerciseCompletion()
+void TrainingTab::onRepetitionDetected(
+    const biofeedback::training::RepetitionRecord& repetition)
 {
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    if (m_currentSeriesIndex >= ex.seriesCount) {
-        // Ćwiczenie zakończone
-        calculateExerciseStats();
-        
-        ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-        stats.isCompleted = true;
-        
-        emit exerciseCompleted(m_currentExerciseIndex, stats);
-        
-        // Następne ćwiczenie
-        m_currentExerciseIndex++;
-        
-        // Odpoczynek między ćwiczeniami
-        if (m_currentExerciseIndex < m_exercisePlan.size()) {
-            m_inRestPeriod = true;
-            m_restTimeRemaining = 120;  // 2 minuty odpoczynku między ćwiczeniami
-            m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-            m_restTimer->start();
-        } else {
-            stopTraining();
-            emit trainingFinished(m_exerciseStats);
-        }
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exerciseStats.size())
+        return;
+
+    m_peakForceInRep = repetition.peakForceN;
+    m_currentSeriesRepetitions.push_back(repetition);
+
+    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    TrainingRepetitionRecord record;
+    record.seriesIndex = m_currentSeriesIndex + 1;
+    record.repetitionIndex = m_currentRepIndex + 1;
+    record.measurement = repetition;
+    stats.repetitions.append(record);
+    stats.completedReps = stats.repetitions.size();
+    stats.maxPeakForce = qMax(stats.maxPeakForce, repetition.peakForceN);
+    stats.avgPeakForce = 0.0;
+    for (const auto& item : stats.repetitions)
+        stats.avgPeakForce += item.measurement.peakForceN;
+    stats.avgPeakForce /= static_cast<double>(stats.repetitions.size());
+    stats.avgReactionTime = 0.0;
+    for (const auto& item : stats.repetitions)
+        stats.avgReactionTime += item.measurement.timeToPeakMs / 1000.0;
+    stats.avgReactionTime /= static_cast<double>(stats.repetitions.size());
+    refreshAnalytics();
+
+    const auto seriesSummary = biofeedback::training::summarizeSeries(
+        m_currentSeriesRepetitions, m_exercisePlan[m_currentExerciseIndex].targetForce);
+    m_statsSummaryLabel->setText(
+        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\n"
+                "Ostatnie: szczyt %4 N, średnia %5 N, czas %6 ms, czas do szczytu %7 ms\n"
+                "Seria: średni szczyt %8 N, maksymalny %9 N")
+            .arg(stats.completedReps).arg(stats.completedSeries)
+            .arg(m_exercisePlan[m_currentExerciseIndex].seriesCount)
+            .arg(repetition.peakForceN, 0, 'f', 2)
+            .arg(repetition.meanForceN, 0, 'f', 2)
+            .arg(repetition.durationMs).arg(repetition.timeToPeakMs)
+            .arg(seriesSummary.averagePeakForceN, 0, 'f', 2)
+            .arg(seriesSummary.maximumPeakForceN, 0, 'f', 2));
+    emit repetitionCompleted(m_currentExerciseIndex, m_currentSeriesIndex, m_currentRepIndex);
+    ++m_currentRepIndex;
+    if (m_currentRepIndex >= m_exercisePlan[m_currentExerciseIndex].repsPerSeries) {
+        finishCurrentSeries();
     } else {
-        // Odpoczynek między seriami
-        m_inRestPeriod = true;
-        m_restTimeRemaining = static_cast<int>(ex.restTime);
+        loadNextRep();
+    }
+    if (!saveExecutionCheckpoint())
+        addDebugMessage("Nie udało się zapisać punktu kontrolnego powtórzenia.", "ERROR");
+}
+
+void TrainingTab::finishCurrentSeries()
+{
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size())
+        return;
+
+    const int completedSeriesIndex = m_currentSeriesIndex;
+    const int completedExerciseIndex = m_currentExerciseIndex;
+    const auto& exercise = m_exercisePlan[m_currentExerciseIndex];
+    const auto summary = biofeedback::training::summarizeSeries(
+        m_currentSeriesRepetitions, exercise.targetForce);
+    ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
+    stats.series.append(summary);
+    stats.completedSeries = stats.series.size();
+    refreshAnalytics();
+    const double cv = biofeedback::training::summarizeSeries(
+        stats.repetitions.isEmpty()
+            ? std::vector<biofeedback::training::RepetitionRecord>{}
+            : [&stats]() {
+                std::vector<biofeedback::training::RepetitionRecord> all;
+                all.reserve(static_cast<std::size_t>(stats.repetitions.size()));
+                for (const auto& item : stats.repetitions) all.push_back(item.measurement);
+                return all;
+              }(), exercise.targetForce).peakForceCoefficientOfVariationPercent;
+    stats.consistencyScore = qMax(0.0, 100.0 - cv);
+    m_statsSummaryLabel->setText(
+        QString("Powtórzenia: %1 | Serie ukończone: %2/%3\n"
+                "Ostatnia seria: średni szczyt %4 N, maksymalny %5 N\n"
+                "Czas powtórzenia: %6 ms | czas do szczytu: %7 ms\n"
+                "Trafienia w cel: %8% | zmienność szczytu (CV): %9%")
+            .arg(stats.completedReps).arg(stats.completedSeries)
+            .arg(exercise.seriesCount)
+            .arg(summary.averagePeakForceN, 0, 'f', 2)
+            .arg(summary.maximumPeakForceN, 0, 'f', 2)
+            .arg(summary.averageDurationMs, 0, 'f', 0)
+            .arg(summary.averageTimeToPeakMs, 0, 'f', 0)
+            .arg(summary.targetAchievementPercent, 0, 'f', 0)
+            .arg(summary.peakForceCoefficientOfVariationPercent, 0, 'f', 1));
+    emit seriesCompleted(m_currentExerciseIndex, completedSeriesIndex);
+
+    if (m_currentGame && m_currentGame->isRunning()) m_currentGame->stop();
+    // Compute the next cursor but do not publish it until all statistics
+    // and the rest target have been staged.
+    const bool exerciseWillFinish = (m_currentSeriesIndex + 1 >= exercise.seriesCount);
+    const int nextSeriesIndex = exerciseWillFinish ? 0 : m_currentSeriesIndex + 1;
+    m_currentSeriesIndex = nextSeriesIndex;
+    m_currentRepIndex = 0;
+    m_repetitionDetector.reset();
+
+    if (exerciseWillFinish) {
+        calculateExerciseStats();
+        stats.isCompleted = true;
+        emit exerciseCompleted(m_currentExerciseIndex, stats);
+        ++m_currentExerciseIndex;
+        if (m_currentExerciseIndex >= m_exercisePlan.size()) {
+            const QVector<ExerciseStats> completed = m_exerciseStats;
+            stopTraining(true);
+            emit trainingFinished(completed);
+            return;
+        }
+        m_currentSeriesIndex = 0;
+        m_currentRepIndex = 0;
+        m_restTimeRemaining = 120;
+        m_restDurationMs = 120000;
+    } else {
+        m_restTimeRemaining = qMax(0, static_cast<int>(exercise.restTime));
+        m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
+    }
+
+    updateProgressWidgets();
+    if (m_restTimeRemaining > 0) {
+        updateSessionClocks();
+        const auto target = m_currentExerciseIndex != completedExerciseIndex
+            ? biofeedback::training::RestTarget::NextExercise
+            : biofeedback::training::RestTarget::NextSeries;
+        if (!m_stateMachine.beginRest(target)) {
+            addDebugMessage("Nie można rozpocząć odpoczynku z bieżącego stanu.", "ERROR");
+            return;
+        }
+        m_restClock.start();
         m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
         m_restTimer->start();
+    } else {
+        // No rest: advance directly without introducing a Resting transition.
+        if (m_currentExerciseIndex != completedExerciseIndex)
+            loadNextExercise();
+        else
+            loadNextSeries();
     }
+    if (!saveExecutionCheckpoint())
+        addDebugMessage("Nie udało się zapisać przejścia na następną serię.", "ERROR");
+}
+
+void TrainingTab::advanceAfterRest()
+{
+    if (!m_stateMachine.running() || m_stateMachine.paused()) return;
+    updateRestDisplay();
+    if (m_restTimeRemaining > 0) return;
+    updateSessionClocks();
+    m_restTimer->stop();
+    const auto target = m_stateMachine.restTarget();
+    m_restDurationMs = 0;
+    m_restTimeRemaining = 0;
+    m_restClock.invalidate();
+    if (m_stateMachine.resting() && !m_stateMachine.paused()) {
+        if (!m_stateMachine.endRest()) return;
+    }
+    m_lblRestTimer->clear();
+    if (target == biofeedback::training::RestTarget::NextExercise) {
+        loadNextExercise();
+    } else {
+        loadNextSeries();
+    }
+    saveExecutionCheckpoint();
 }
 
 void TrainingTab::calculateExerciseStats()
 {
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exerciseStats.size())
+        return;
     ExerciseStats& stats = m_exerciseStats[m_currentExerciseIndex];
-    stats.completedSeries = m_currentSeriesIndex;
-    stats.completedReps = m_currentRepIndex;
-    
-    // Obliczenie pełnych statystyk ćwiczenia
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    
-    // Średnia siła szczytowa na powtórzenie
-    if (stats.peakForcePerRep.size() > 0) {
-        double totalPeakForce = 0.0;
-        for (double peakForce : stats.peakForcePerRep) {
-            totalPeakForce += peakForce;
-        }
-        stats.averagePeakForce = totalPeakForce / static_cast<double>(stats.peakForcePerRep.size());
-    } else {
-        stats.averagePeakForce = 0.0;
-    }
-    
-    // Maksymalna siła szczytowa
-    stats.maxPeakForce = 0.0;
-    for (double peakForce : stats.peakForcePerRep) {
-        if (peakForce > stats.maxPeakForce) {
-            stats.maxPeakForce = peakForce;
-        }
-    }
-    
-    // Minimalna siła szczytowa
-    if (!stats.peakForcePerRep.empty()) {
-        stats.minPeakForce = stats.peakForcePerRep[0];
-        for (double peakForce : stats.peakForcePerRep) {
-            if (peakForce < stats.minPeakForce) {
-                stats.minPeakForce = peakForce;
-            }
-        }
-    } else {
-        stats.minPeakForce = 0.0;
-    }
-    
-    // Czas trwania ćwiczenia
-    stats.duration = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - stats.startTime
-    ).count();
-    
-    // Współczynnik wykonania (procent ukończonych serii i powtórzeń)
-    if (ex.seriesCount > 0 && ex.repsPerSeries > 0) {
-        int totalExpectedReps = ex.seriesCount * ex.repsPerSeries;
-        int actualReps = stats.completedSeries * ex.repsPerSeries + stats.completedReps;
-        stats.completionRate = static_cast<double>(actualReps) / static_cast<double>(totalExpectedReps) * 100.0;
-    } else {
-        stats.completionRate = 0.0;
-    }
-    
-    stats.isCompleted = true;
+    std::vector<biofeedback::training::RepetitionRecord> all;
+    all.reserve(static_cast<std::size_t>(stats.repetitions.size()));
+    for (const auto& item : stats.repetitions) all.push_back(item.measurement);
+    const double target = m_currentExerciseIndex < m_exercisePlan.size()
+        ? m_exercisePlan[m_currentExerciseIndex].targetForce : 0.0;
+    const auto summary = biofeedback::training::summarizeSeries(all, target);
+    stats.completedReps = static_cast<int>(summary.repetitionCount);
+    stats.maxPeakForce = summary.maximumPeakForceN;
+    stats.avgPeakForce = summary.averagePeakForceN;
+    stats.avgReactionTime = summary.averageTimeToPeakMs / 1000.0;
+    stats.consistencyScore = qMax(0.0, 100.0 -
+        summary.peakForceCoefficientOfVariationPercent);
+    stats.completedSeries = stats.series.size();
+    if (m_currentExerciseIndex < m_exercisePlan.size())
+        stats.isCompleted = stats.completedSeries >= m_exercisePlan[m_currentExerciseIndex].seriesCount;
 }
 
 void TrainingTab::startRestTimer()
 {
-    const auto& ex = m_exercisePlan[m_currentExerciseIndex];
-    m_restTimeRemaining = static_cast<int>(ex.restTime);
-    m_inRestPeriod = true;
+    if (m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size())
+        return;
+    updateSessionClocks();
+    m_restTimeRemaining = qMax(0, static_cast<int>(m_exercisePlan[m_currentExerciseIndex].restTime));
+    m_restDurationMs = static_cast<qint64>(m_restTimeRemaining) * 1000;
+    if (m_restTimeRemaining <= 0) {
+        advanceAfterRest();
+        return;
+    }
+    m_stateMachine.beginRest();
+    m_restClock.start();
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
-    m_restTimer->start();
+    if (!m_stateMachine.paused()) m_restTimer->start();
+    saveExecutionCheckpoint();
+}
+
+
+QJsonObject TrainingTab::buildExecutionCheckpoint() const
+{
+    QJsonObject state;
+    state.insert("format_version", 2);
+    state.insert("state", static_cast<int>(m_stateMachine.state()));
+    state.insert("resume_state", static_cast<int>(m_stateMachine.resumeState()));
+    state.insert("current_exercise_index", m_currentExerciseIndex);
+    state.insert("current_series_index", m_currentSeriesIndex);
+    state.insert("current_repetition_index", m_currentRepIndex);
+    state.insert("rest_target", static_cast<int>(m_stateMachine.restTarget()));
+    state.insert("session_elapsed_ms", static_cast<double>(m_trainingClock.sessionMilliseconds()));
+    state.insert("active_elapsed_ms", static_cast<double>(m_trainingClock.activeMilliseconds()));
+    qint64 remainingRestMs = m_restDurationMs;
+    if (m_stateMachine.resting() && !m_stateMachine.paused() && m_restClock.isValid())
+        remainingRestMs = qMax<qint64>(0, m_restDurationMs - m_restClock.elapsed());
+    state.insert("rest_remaining_ms", static_cast<double>(remainingRestMs));
+
+    const auto detectorSnapshot = m_repetitionDetector.snapshot();
+    QJsonObject detector;
+    detector.insert("version", static_cast<int>(detectorSnapshot.version));
+    detector.insert("active", detectorSnapshot.active);
+    detector.insert("waiting_for_release", detectorSnapshot.waitingForRelease);
+    detector.insert("start_timestamp_ms", static_cast<double>(detectorSnapshot.startTimestampMs));
+    detector.insert("last_timestamp_ms", static_cast<double>(detectorSnapshot.lastTimestampMs));
+    detector.insert("peak_timestamp_ms", static_cast<double>(detectorSnapshot.peakTimestampMs));
+    detector.insert("peak_force_n", detectorSnapshot.peakForceN);
+    detector.insert("area_force_ms", detectorSnapshot.areaForceMs);
+    detector.insert("previous_force_n", detectorSnapshot.previousForceN);
+    detector.insert("sample_count", static_cast<double>(detectorSnapshot.sampleCount));
+    QJsonArray inFlightSamples;
+    for (const auto& sample : detectorSnapshot.samples) {
+        QJsonObject value;
+        value.insert("timestamp_ms", static_cast<double>(sample.timestampMs));
+        value.insert("force_n", sample.forceN);
+        inFlightSamples.append(value);
+    }
+    detector.insert("samples", inFlightSamples);
+    state.insert("repetition_detector", detector);
+
+    QJsonArray plan;
+    for (const auto& exercise : m_exercisePlan) {
+        QJsonObject item;
+        item.insert("name", exercise.name);
+        item.insert("series_count", exercise.seriesCount);
+        item.insert("repetitions_per_series", exercise.repsPerSeries);
+        item.insert("target_force_n", exercise.targetForce);
+        item.insert("rest_seconds", exercise.restTime);
+        item.insert("game_type", exercise.gameType);
+        plan.append(item);
+    }
+    state.insert("exercise_plan", plan);
+    return state;
+}
+
+bool TrainingTab::saveExecutionCheckpoint()
+{
+    if (!m_analyticsWidget) return false;
+    if (!m_stateMachine.running()) return true;
+    updateSessionClocks();
+    m_analyticsWidget->setExecutionState(buildExecutionCheckpoint());
+    return m_analyticsWidget->saveSessionCheckpoint();
+}
+
+bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
+{
+    const auto reject = [](const QString& reason) {
+        qWarning().noquote() << "Checkpoint restore rejected at" << reason;
+        return false;
+    };
+    qWarning() << "Checkpoint restore started; version =" << checkpoint.value("format_version").toInt()
+               << "keys =" << checkpoint.keys();
+    // Phase 1: parse and validate everything into temporary values. No live
+    // session, analytics, timer, or widget state is changed in this phase.
+    const int checkpointVersion = checkpoint.value("format_version").toInt();
+    if ((checkpointVersion != 1 && checkpointVersion != 2) ||
+        !checkpoint.value("exercise_plan").isArray() || !m_analyticsWidget)
+        return reject(QStringLiteral("validation-1"));
+
+    const auto isFiniteNonNegative = [](double value) {
+        return std::isfinite(value) && value >= 0.0;
+    };
+    const auto readUnsignedTimestamp = [&reject](const QJsonValue& value, std::uint32_t& result) {
+        if (!value.isDouble()) return reject(QStringLiteral("validation-2"));
+        const double number = value.toDouble();
+        if (!std::isfinite(number) || number < 0.0 ||
+            number > static_cast<double>(std::numeric_limits<std::uint32_t>::max()) ||
+            std::floor(number) != number) return reject(QStringLiteral("validation-3"));
+        result = static_cast<std::uint32_t>(number);
+        return true;
+    };
+
+    QVector<TrainingExercise> stagedPlan;
+    const QJsonArray planValues = checkpoint.value("exercise_plan").toArray();
+    if (planValues.isEmpty() || planValues.size() > 256) return reject(QStringLiteral("validation-4"));
+    for (const QJsonValue& value : planValues) {
+        if (!value.isObject()) return reject(QStringLiteral("validation-5"));
+        const QJsonObject item = value.toObject();
+        TrainingExercise exercise;
+        exercise.name = item.value("name").toString();
+        exercise.seriesCount = item.value("series_count").toInt(-1);
+        exercise.repsPerSeries = item.value("repetitions_per_series").toInt(-1);
+        exercise.targetForce = item.value("target_force_n").toDouble(-1.0);
+        exercise.restTime = item.value("rest_seconds").toDouble(-1.0);
+        exercise.gameType = item.value("game_type").toString();
+        if (exercise.gameType == QStringLiteral("scored_earth"))
+            exercise.gameType = QStringLiteral("scorched_earth");
+        if (exercise.name.trimmed().isEmpty() || exercise.seriesCount < 1 ||
+            exercise.seriesCount > 100 || exercise.repsPerSeries < 1 ||
+            exercise.repsPerSeries > 1000 ||
+            !isFiniteNonNegative(exercise.targetForce) || exercise.targetForce > 100000.0 ||
+            !isFiniteNonNegative(exercise.restTime) || exercise.restTime > 86400.0)
+            return reject(QStringLiteral("validation-6"));
+        stagedPlan.append(exercise);
+    }
+
+    const int exerciseIndex = checkpoint.value("current_exercise_index").toInt(-1);
+    const int seriesIndex = checkpoint.value("current_series_index").toInt(-1);
+    const int repetitionIndex = checkpoint.value("current_repetition_index").toInt(-1);
+    if (exerciseIndex < 0 || exerciseIndex >= stagedPlan.size() ||
+        seriesIndex < 0 || seriesIndex >= stagedPlan[exerciseIndex].seriesCount ||
+        repetitionIndex < 0 || repetitionIndex >= stagedPlan[exerciseIndex].repsPerSeries)
+        return reject(QStringLiteral("validation-7"));
+
+    const int savedStateValue = checkpoint.value("state").toInt(
+        static_cast<int>(biofeedback::training::SessionState::Active));
+    const int resumeStateValue = checkpoint.value("resume_state").toInt(
+        static_cast<int>(biofeedback::training::SessionState::Active));
+    if (savedStateValue < static_cast<int>(biofeedback::training::SessionState::Active) ||
+        savedStateValue > static_cast<int>(biofeedback::training::SessionState::Resting) ||
+        resumeStateValue < static_cast<int>(biofeedback::training::SessionState::Active) ||
+        resumeStateValue > static_cast<int>(biofeedback::training::SessionState::Resting))
+        return reject(QStringLiteral("validation-8"));
+
+    const auto savedState = static_cast<biofeedback::training::SessionState>(savedStateValue);
+    auto resumeState = static_cast<biofeedback::training::SessionState>(resumeStateValue);
+    if (savedState == biofeedback::training::SessionState::Resting)
+        resumeState = biofeedback::training::SessionState::Resting;
+    else if (savedState != biofeedback::training::SessionState::Paused)
+        resumeState = biofeedback::training::SessionState::Active;
+    if (savedState != biofeedback::training::SessionState::Active &&
+        savedState != biofeedback::training::SessionState::Paused &&
+        savedState != biofeedback::training::SessionState::Resting)
+        return reject(QStringLiteral("validation-9"));
+
+    const int savedRestTarget = checkpoint.value("rest_target").toInt(
+        static_cast<int>(biofeedback::training::RestTarget::NextSeries));
+    if (savedRestTarget < static_cast<int>(biofeedback::training::RestTarget::NextSeries) ||
+        savedRestTarget > static_cast<int>(biofeedback::training::RestTarget::NextExercise))
+        return reject(QStringLiteral("validation-10"));
+    const auto restTarget = static_cast<biofeedback::training::RestTarget>(savedRestTarget);
+
+    const double restMsValue = checkpoint.value("rest_remaining_ms").toDouble(0.0);
+    const double sessionMsValue = checkpoint.value("session_elapsed_ms").toDouble(-1.0);
+    const double activeMsValue = checkpoint.value("active_elapsed_ms").toDouble(-1.0);
+    if (!isFiniteNonNegative(restMsValue) || restMsValue > 86400000.0 ||
+        !isFiniteNonNegative(sessionMsValue) || sessionMsValue > 9.0e15 ||
+        !isFiniteNonNegative(activeMsValue) || activeMsValue > sessionMsValue)
+        return reject(QStringLiteral("validation-11"));
+    const qint64 stagedRestMs = static_cast<qint64>(std::floor(restMsValue));
+    const qint64 sessionMs = static_cast<qint64>(std::floor(sessionMsValue));
+    const qint64 activeMs = static_cast<qint64>(std::floor(activeMsValue));
+    if (resumeState == biofeedback::training::SessionState::Resting && stagedRestMs <= 0)
+        return reject(QStringLiteral("validation-12"));
+    const qint64 effectiveRestMs = resumeState == biofeedback::training::SessionState::Resting
+        ? stagedRestMs : 0;
+
+    biofeedback::training::SessionStateMachine stagedStateMachine;
+    if (!stagedStateMachine.restore(biofeedback::training::SessionState::Paused,
+                                    resumeState, restTarget)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan automatu sesji.", "ERROR"); return reject(QStringLiteral("validation-13")); }
+
+    // Parse and validate the detector independently of the live detector.
+    biofeedback::training::RepetitionDetector stagedDetector;
+    stagedDetector.setTargetForce(stagedPlan[exerciseIndex].targetForce);
+    const QJsonObject detectorObject = checkpoint.value("repetition_detector").toObject();
+    const bool hasDetectorSnapshot = !detectorObject.isEmpty();
+    if (checkpointVersion >= 2 && !hasDetectorSnapshot) return reject(QStringLiteral("validation-14"));
+    if (hasDetectorSnapshot && resumeState == biofeedback::training::SessionState::Active) {
+        biofeedback::training::RepetitionDetectorSnapshot detectorSnapshot;
+        const int detectorVersion = detectorObject.value("version").toInt(-1);
+        if (detectorVersion != 1 || !detectorObject.value("samples").isArray())
+            return reject(QStringLiteral("validation-15"));
+        detectorSnapshot.version = static_cast<std::uint32_t>(detectorVersion);
+        detectorSnapshot.active = detectorObject.value("active").toBool(false);
+        detectorSnapshot.waitingForRelease = detectorObject.value("waiting_for_release").toBool(false);
+        if (!readUnsignedTimestamp(detectorObject.value("start_timestamp_ms"), detectorSnapshot.startTimestampMs) ||
+            !readUnsignedTimestamp(detectorObject.value("last_timestamp_ms"), detectorSnapshot.lastTimestampMs) ||
+            !readUnsignedTimestamp(detectorObject.value("peak_timestamp_ms"), detectorSnapshot.peakTimestampMs))
+            return reject(QStringLiteral("validation-16"));
+        detectorSnapshot.peakForceN = detectorObject.value("peak_force_n").toDouble(
+            std::numeric_limits<double>::quiet_NaN());
+        detectorSnapshot.areaForceMs = detectorObject.value("area_force_ms").toDouble(
+            std::numeric_limits<double>::quiet_NaN());
+        detectorSnapshot.previousForceN = detectorObject.value("previous_force_n").toDouble(
+            std::numeric_limits<double>::quiet_NaN());
+        const double sampleCount = detectorObject.value("sample_count").toDouble(-1.0);
+        const QJsonArray samples = detectorObject.value("samples").toArray();
+        if (!std::isfinite(sampleCount) || sampleCount < 0.0 || sampleCount > 100000.0 ||
+            std::floor(sampleCount) != sampleCount || samples.size() != static_cast<int>(sampleCount))
+            return reject(QStringLiteral("validation-17"));
+        detectorSnapshot.sampleCount = static_cast<std::size_t>(sampleCount);
+        detectorSnapshot.samples.reserve(static_cast<std::size_t>(samples.size()));
+        for (const QJsonValue& value : samples) {
+            if (!value.isObject()) return reject(QStringLiteral("validation-18"));
+            const QJsonObject sample = value.toObject();
+            std::uint32_t timestamp = 0;
+            const double force = sample.value("force_n").toDouble(
+                std::numeric_limits<double>::quiet_NaN());
+            if (!readUnsignedTimestamp(sample.value("timestamp_ms"), timestamp) ||
+                !isFiniteNonNegative(force)) return reject(QStringLiteral("validation-19"));
+            detectorSnapshot.samples.push_back({timestamp, force});
+        }
+        if (!stagedDetector.restore(detectorSnapshot)) { addDebugMessage("Punkt kontrolny odrzucony: nieprawidłowy stan detektora.", "ERROR"); return reject(QStringLiteral("validation-20")); }
+    }
+
+    // The statistics are already loaded from the recovered history entry.
+    // Stage their shape before committing any of the execution state.
+    const QVector<ExerciseStats> stagedStats = m_analyticsWidget->currentStats();
+    if (stagedStats.size() != stagedPlan.size()) { addDebugMessage(QString("Punkt kontrolny odrzucony: liczba zestawów statystyk (%1) różni się od planu (%2).").arg(stagedStats.size()).arg(stagedPlan.size()), "ERROR"); return reject(QStringLiteral("validation-21")); }
+    for (int index = 0; index < stagedPlan.size(); ++index) {
+        if (stagedStats[index].exerciseName != stagedPlan[index].name) { addDebugMessage(QString("Punkt kontrolny odrzucony: nazwa ćwiczenia %1 nie zgadza się z planem %2.").arg(stagedStats[index].exerciseName, stagedPlan[index].name), "ERROR"); return reject(QStringLiteral("validation-22")); }
+    }
+
+    std::vector<biofeedback::training::RepetitionRecord> stagedSeriesRepetitions;
+    for (const auto& record : stagedStats[exerciseIndex].repetitions) {
+        if (record.seriesIndex == seriesIndex + 1)
+            stagedSeriesRepetitions.push_back(record.measurement);
+    }
+
+    // Phase 2: commit. All rejectable input has been checked above.
+    m_exercisePlan = std::move(stagedPlan);
+    m_exerciseStats = std::move(stagedStats);
+    m_analyticsWidget->setExecutionState(checkpoint);
+    m_currentExerciseIndex = exerciseIndex;
+    m_currentSeriesIndex = seriesIndex;
+    m_currentRepIndex = repetitionIndex;
+    m_restDurationMs = effectiveRestMs;
+    m_restTimeRemaining = static_cast<int>((effectiveRestMs + 999) / 1000);
+    m_restClock.invalidate();
+    m_sessionElapsedOffsetMs = sessionMs;
+    m_trainingClock.restore(sessionMs, activeMs);
+    m_sessionTime = static_cast<int>(sessionMs / 1000);
+    m_sessionClock.start();
+    m_stateMachine = stagedStateMachine;
+    m_repetitionDetector = stagedDetector;
+    m_currentSeriesRepetitions = std::move(stagedSeriesRepetitions);
+
+    m_exerciseSelector->clear();
+    for (const auto& exercise : m_exercisePlan) m_exerciseSelector->addItem(exercise.name);
+    m_exerciseSelector->setCurrentIndex(m_currentExerciseIndex);
+    m_configBox->setEnabled(false);
+    m_btnStartStop->setText("Stop");
+    m_btnStartStop->setStyleSheet("background-color: #cc4444; color: white;");
+    m_btnPauseResume->setEnabled(true);
+    m_btnPauseResume->setText("Wznów");
+    configureGameForExercise();
+    if (m_currentGame) {
+        m_currentGame->reset();
+        m_currentGame->start();
+        m_currentGame->pause();
+    }
+    updateProgressWidgets();
+    updateDisplay();
+    if (m_stateMachine.resting()) {
+        m_lblRestTimer->setText(QString("Odpoczynek: %1 s — sesja odzyskana, wstrzymana").arg(m_restTimeRemaining));
+        m_restTimer->stop();
+    } else {
+        m_lblRestTimer->clear();
+    }
+    m_timer->start();
+    return true;
 }
 
 void TrainingTab::updateRestDisplay()
 {
+    if (!m_restClock.isValid()) return;
+    const qint64 remainingMs = qMax<qint64>(
+        0, m_restDurationMs - m_restClock.elapsed());
+    m_restTimeRemaining = static_cast<int>((remainingMs + 999) / 1000);
     m_lblRestTimer->setText(QString("Odpoczynek: %1 s").arg(m_restTimeRemaining));
 }
 

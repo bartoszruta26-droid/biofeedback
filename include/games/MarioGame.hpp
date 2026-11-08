@@ -9,6 +9,8 @@
 #include <QRandomGenerator>
 #include <memory>
 
+class QResizeEvent;
+
 namespace games {
 
 /**
@@ -41,6 +43,7 @@ public:
 
 protected:
     void initialize() override;
+    void resizeEvent(QResizeEvent* event) override;
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
@@ -85,7 +88,7 @@ private:
     void updatePlayer(double deltaTime);
 
     // Generowanie przeszkód
-    void generateObstacles();
+    void generateObstacles(double deltaTime);
 
     // Aktualizacja przeszkód
     void updateObstacles(double deltaTime);
@@ -149,7 +152,6 @@ private:
     
     // Tensometr
     double m_sensorThreshold;      // Próg aktywacji
-    double m_chargeStartTime;      // Czas rozpoczęcia ładowania
     
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
@@ -169,11 +171,6 @@ public:
     bool isSerialConnected() const;
     
 private:
-    /**
-     * @brief Inicjalizuje nasłuchiwanie danych z sensora
-     */
-    void setupSensorListening();
-    
     /**
      * @brief Odłącza się od sensora
      */

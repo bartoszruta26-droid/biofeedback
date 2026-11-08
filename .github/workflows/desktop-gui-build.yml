@@ -1,0 +1,122 @@
+name: Linux desktop GUI build
+
+on:
+  push:
+    branches:
+      - integration/all-work
+      - 'sync/**'
+      - fix/desktop-gui-full-build-2026-11-07
+  pull_request:
+    branches:
+      - main
+      - integration/all-work
+    paths:
+      - 'CMakeLists.txt'
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'resources/**'
+      - 'packaging/**'
+      - 'docs/**'
+      - '.github/workflows/desktop-gui-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-qt5-desktop:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install full desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config git \
+            qtbase5-dev qtbase5-dev-tools libqt5charts5-dev \
+            libserialport-dev nlohmann-json3-dev libssl-dev libncurses-dev
+      - name: Validate Linux packaging scripts
+        run: bash -n packaging/linux/run.sh packaging/linux/install.sh packaging/linux/uninstall.sh
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+      - name: Build complete desktop application and test targets
+        run: cmake --build build --parallel 2
+      - name: Run registered regression tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Verify desktop executable
+        run: test -x build/biofeedback
+      - name: Check runtime dependencies
+        run: |
+          ldd build/biofeedback | tee build/runtime-dependencies.txt
+          if grep -q "not found" build/runtime-dependencies.txt; then
+            echo "Unresolved runtime dependencies detected"
+            exit 1
+          fi
+      - name: Build Debian package
+        run: |
+          mkdir -p dist
+          cpack --config build/CPackConfig.cmake -G DEB -B dist
+          package="$(find dist -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$package"
+          dpkg-deb --info "$package"
+          contents="$(dpkg-deb --contents "$package")"
+          grep -q '/usr/bin/biofeedback' <<< "$contents"
+          grep -q '/usr/share/applications/biofeedback.desktop' <<< "$contents"
+          grep -q '/usr/share/icons/hicolor/scalable/apps/biofeedback.svg' <<< "$contents"
+      - name: Assemble and test user-local Linux bundle
+        run: |
+          mkdir -p dist/biofeedback-linux
+          cp build/biofeedback dist/biofeedback-linux/
+          cp -a config resources dist/biofeedback-linux/
+          mkdir -p dist/biofeedback-linux/data
+          cp packaging/linux/run.sh packaging/linux/install.sh packaging/linux/uninstall.sh packaging/linux/biofeedback.desktop.in dist/biofeedback-linux/
+          chmod +x dist/biofeedback-linux/run.sh dist/biofeedback-linux/install.sh dist/biofeedback-linux/uninstall.sh
+          cp build/runtime-dependencies.txt dist/biofeedback-linux/
+          cat > dist/biofeedback-linux/README.txt <<'EOF'
+          Biofeedback — pakiet Linux x86_64 (Ubuntu 22.04)
+
+          Wymagania uruchomieniowe: Qt 5 Widgets/Charts/Network, libserialport i OpenSSL.
+          Na Debianie/Ubuntu doinstaluj:
+            sudo apt install libqt5widgets5 libqt5charts5 libqt5network5 libserialport0 libssl3
+
+          Instalacja lokalna (bez uprawnień administratora):
+            ./install.sh
+          Program pojawi się w menu aplikacji. Alternatywnie można uruchomić bez instalacji:
+            ./run.sh
+          Odinstalowanie:
+            ~/.local/opt/biofeedback/uninstall.sh
+
+          Dostęp do portu USB:
+            sudo usermod -aG dialout "$USER"
+          Następnie wyloguj się i zaloguj ponownie.
+
+          Przed pomiarem, treningiem lub grą podłącz czujnik HX711. Kalibrację i poprawność
+          pomiaru należy sprawdzić na rzeczywistym urządzeniu. Ten pakiet jest kompilacją
+          programową, a nie potwierdzeniem odbioru sprzętowego ani walidacji klinicznej.
+          EOF
+          TEST_HOME="$PWD/build/package-test-home"
+          mkdir -p "$TEST_HOME"
+          HOME="$TEST_HOME" USER="$(id -un)" BIOFEEDBACK_INSTALL_DIR="$TEST_HOME/opt/biofeedback" dist/biofeedback-linux/install.sh
+          test -x "$TEST_HOME/opt/biofeedback/run.sh"
+          grep -q 'Name=Biofeedback' "$TEST_HOME/.local/share/applications/biofeedback.desktop"
+          HOME="$TEST_HOME" BIOFEEDBACK_INSTALL_DIR="$TEST_HOME/opt/biofeedback" "$TEST_HOME/opt/biofeedback/uninstall.sh"
+          test ! -e "$TEST_HOME/opt/biofeedback"
+          test ! -e "$TEST_HOME/.local/share/applications/biofeedback.desktop"
+          tar -czf dist/biofeedback-linux-x86_64-ubuntu22.04.tar.gz -C dist biofeedback-linux
+      - name: Upload Debian package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: biofeedback-linux-deb
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload user-local Linux bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: biofeedback-linux-x86_64-ubuntu22.04
+          path: dist/biofeedback-linux-x86_64-ubuntu22.04.tar.gz
+          if-no-files-found: error
+          retention-days: 14

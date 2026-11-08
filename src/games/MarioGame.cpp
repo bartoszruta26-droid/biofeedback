@@ -1,7 +1,7 @@
 #include "games/MarioGame.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QPaintEvent>
-#include <QTime>
+#include <QResizeEvent>
 #include <cmath>
 
 namespace games {
@@ -13,16 +13,15 @@ MarioGame::MarioGame(QWidget *parent)
     , m_obstaclesToNextLevel(10)
     , m_timeSinceLastObstacle(0.0)
     , m_obstacleSpawnInterval(2.0)
-    , m_sensorThreshold(0.3)
-    , m_chargeStartTime(0.0)
+    , m_sensorThreshold(30.0)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
 {
     // Inicjalizacja chmurek dekoracyjnych
     for (int i = 0; i < 5; ++i) {
         Cloud cloud;
-        cloud.pos.setX(QRandomGenerator::global()->bounded(width()));
-        cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+        cloud.pos.setX(QRandomGenerator::global()->bounded(qMax(1, width())));
+        cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         cloud.speed = 20.0 + QRandomGenerator::global()->bounded(30);
         cloud.size = 20 + QRandomGenerator::global()->bounded(30);
         m_clouds.append(cloud);
@@ -48,12 +47,58 @@ void MarioGame::initialize()
     m_clouds.clear();
     for (int i = 0; i < 5; ++i) {
         Cloud cloud;
-        cloud.pos.setX(QRandomGenerator::global()->bounded(width()));
-        cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+        cloud.pos.setX(QRandomGenerator::global()->bounded(qMax(1, width())));
+        cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         cloud.speed = 20.0 + QRandomGenerator::global()->bounded(30);
         cloud.size = 20 + QRandomGenerator::global()->bounded(30);
         m_clouds.append(cloud);
     }
+}
+
+void MarioGame::resizeEvent(QResizeEvent* event)
+{
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        const double scaleDecor = qMin(scaleX, scaleY);
+
+        m_player.body = QRectF(m_player.body.x() * scaleX,
+                               m_player.body.y() * scaleY,
+                               m_player.body.width() * scaleX,
+                               m_player.body.height() * scaleY);
+        m_player.velocityY *= scaleY;
+
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.rect = QRectF(obstacle.rect.x() * scaleX,
+                                   obstacle.rect.y() * scaleY,
+                                   obstacle.rect.width() * scaleX,
+                                   obstacle.rect.height() * scaleY);
+        }
+
+        for (Cloud& cloud : m_clouds) {
+            cloud.pos.setX(cloud.pos.x() * scaleX);
+            cloud.pos.setY(cloud.pos.y() * scaleY);
+            cloud.size = qMax(1, static_cast<int>(std::lround(cloud.size * scaleDecor)));
+        }
+
+        const double groundY = newSize.height() * GROUND_Y_RATIO;
+        const double maxPlayerY = qMax(0.0, static_cast<double>(newSize.height()) -
+                                             m_player.body.height());
+        m_player.body.moveTop(qBound(0.0, m_player.body.top(), maxPlayerY));
+        if (m_player.isOnGround && m_obstacles.isEmpty())
+            m_player.body.moveBottom(groundY);
+        for (Cloud& cloud : m_clouds) {
+            cloud.pos.setX(qBound(-static_cast<double>(cloud.size),
+                                  cloud.pos.x(),
+                                  static_cast<double>(newSize.width() + cloud.size)));
+            cloud.pos.setY(qBound(0.0, cloud.pos.y(),
+                                  static_cast<double>(newSize.height() / 3)));
+        }
+    }
+    GameEngine::resizeEvent(event);
 }
 
 void MarioGame::initPlayer()
@@ -90,19 +135,27 @@ void MarioGame::increaseDifficulty()
 
 void MarioGame::update(double deltaTime)
 {
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+
+    // Ogranicz bezpośrednie wywołania, tak jak w GameEngine.
+    deltaTime = qMin(deltaTime, 0.1);
+
     // Aktualizacja gracza
     updatePlayer(deltaTime);
+    if (!isRunning()) return;
     
     // Generowanie i aktualizacja przeszkód
-    generateObstacles();
+    generateObstacles(deltaTime);
     updateObstacles(deltaTime);
+    if (!isRunning()) return;
     
     // Aktualizacja chmurek
     for (auto& cloud : m_clouds) {
         cloud.pos.setX(cloud.pos.x() - cloud.speed * deltaTime);
         if (cloud.pos.x() + cloud.size < 0) {
             cloud.pos.setX(width() + cloud.size);
-            cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+            cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         }
     }
     
@@ -124,18 +177,36 @@ void MarioGame::updatePlayer(double deltaTime)
     // Aktualizacja pozycji
     m_player.body.setY(m_player.body.y() + m_player.velocityY * deltaTime);
     
-    // Kolizja z ziemią
-    if (m_player.body.bottom() >= groundY) {
+    // Dziura jest rzeczywistą przerwą w podłożu.
+    bool overGap = false;
+    for (const auto& obstacle : m_obstacles) {
+        if (obstacle.type == Obstacle::GAP &&
+            m_player.body.right() > obstacle.rect.left() &&
+            m_player.body.left() < obstacle.rect.right()) {
+            overGap = true;
+            break;
+        }
+    }
+
+    if (!overGap && m_player.body.bottom() >= groundY) {
+        const bool landed = !m_player.isOnGround;
         m_player.body.setBottom(groundY);
         m_player.velocityY = 0.0;
         m_player.isJumping = false;
         m_player.isOnGround = true;
-        m_player.chargeLevel = 0.0;
-        m_player.isCharging = false;
+        if (landed) {
+            m_player.chargeLevel = 0.0;
+            m_player.isCharging = false;
+        }
     } else {
         m_player.isOnGround = false;
     }
-    
+
+    // Ładowanie skoku odbywa się w czasie symulacji; pauza go nie nalicza.
+    if (m_player.isCharging && m_player.isOnGround) {
+        m_player.chargeLevel = qMin(1.0, m_player.chargeLevel + deltaTime / MAX_CHARGE_TIME);
+    }
+
     // Animacja biegu
     if (m_player.isOnGround && !m_player.isCharging) {
         m_player.frameTimer += deltaTime;
@@ -146,9 +217,9 @@ void MarioGame::updatePlayer(double deltaTime)
     }
 }
 
-void MarioGame::generateObstacles()
+void MarioGame::generateObstacles(double deltaTime)
 {
-    m_timeSinceLastObstacle += 0.016; // Zakładamy ~60 FPS
+    m_timeSinceLastObstacle += qMax(0.0, deltaTime);
     
     if (m_timeSinceLastObstacle >= m_obstacleSpawnInterval) {
         m_timeSinceLastObstacle = 0.0;
@@ -189,8 +260,6 @@ void MarioGame::generateObstacles()
 
 void MarioGame::updateObstacles(double deltaTime)
 {
-    double groundY = height() * GROUND_Y_RATIO;
-    
     for (int i = m_obstacles.size() - 1; i >= 0; --i) {
         auto& obs = m_obstacles[i];
         
@@ -218,21 +287,20 @@ void MarioGame::updateObstacles(double deltaTime)
         // Wykrywanie kolizji
         if (checkCollision(m_player, obs)) {
             stop();
+            return;
         }
     }
 }
 
 bool MarioGame::checkCollision(const Player& player, const Obstacle& obstacle)
 {
-    // Dla dziur sprawdzamy czy gracz jest nad dziurą i nie skacze
+    // Dziura staje się śmiertelna, gdy postać opadnie o własną
+    // wysokość poniżej poziomu podłoża, pozostając nad otworem.
     if (obstacle.type == Obstacle::GAP) {
-        double playerCenterX = player.body.center().x();
-        if (playerCenterX > obstacle.rect.left() && 
-            playerCenterX < obstacle.rect.right() &&
-            player.isOnGround) {
-            return true;
-        }
-        return false;
+        const double groundY = height() * GROUND_Y_RATIO;
+        const bool overlapsGap = player.body.right() > obstacle.rect.left() &&
+                                 player.body.left() < obstacle.rect.right();
+        return overlapsGap && player.body.bottom() > groundY + player.body.height();
     }
     
     // Dla innych przeszkód sprawdzamy prostokąty
@@ -248,14 +316,11 @@ bool MarioGame::handleInput(double value)
         // Rozpoczęcie ładowania skoku
         m_player.isCharging = true;
         m_player.frame = 0; // Zatrzymanie animacji biegu
-        m_chargeStartTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
+        m_player.chargeLevel = 0.0;
     } else if (!isPressing && m_player.isCharging && m_player.isOnGround) {
         // Zwolnienie tensometru - wykonanie skoku
-        double currentTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
-        double chargeDuration = currentTime - m_chargeStartTime;
-        
-        // Obliczenie siły skoku na podstawie czasu ładowania
-        double chargeRatio = qMin(1.0, chargeDuration / MAX_CHARGE_TIME);
+        // chargeLevel jest aktualizowany przez updatePlayer(deltaTime).
+        const double chargeRatio = qBound(0.0, m_player.chargeLevel, 1.0);
         double jumpForce = JUMP_FORCE * (0.3 + 0.7 * chargeRatio);
         
         m_player.velocityY = -jumpForce;
@@ -266,10 +331,7 @@ bool MarioGame::handleInput(double value)
         
         return true;
     } else if (isPressing && m_player.isCharging) {
-        // Kontynuacja ładowania
-        double currentTime = QTime::currentTime().msecsSinceStartOfDay() / 1000.0;
-        double chargeDuration = currentTime - m_chargeStartTime;
-        m_player.chargeLevel = qMin(1.0, chargeDuration / MAX_CHARGE_TIME);
+        // Poziom ładowania aktualizuje pętla symulacji.
     }
     
     return false;
@@ -383,7 +445,12 @@ void MarioGame::renderObstacles(QPainter& painter)
     
     // Rysowanie ziemi (z przerwami na dziury)
     painter.fillRect(QRectF(0, groundY, width(), height() - groundY), COLOR_GROUND);
-    
+    // Narysuj otwory ponownie po podłożu, aby pozostały widoczne.
+    for (const auto& obs : m_obstacles) {
+        if (obs.type == Obstacle::GAP)
+            painter.fillRect(obs.rect, Qt::black);
+    }
+
     // Detale ziemi (prosty wzór)
     painter.setPen(QColor(0xA0, 0x30, 0x00));
     for (double x = 0; x < width(); x += 40) {
@@ -422,7 +489,8 @@ void MarioGame::renderBackground(QPainter& painter)
     painter.setBrush(QColor(0x00, 0xA8, 0x00));
     painter.setPen(QColor(0x00, 0xA8, 0x00));
     for (int i = 0; i < 3; ++i) {
-        double x = fmod(-QTime::currentTime().msecsSinceStartOfDay() / 50.0 + i * 300, width() + 200) - 100;
+        const qint64 elapsedMs = m_accumulatedSessionMs + (m_monotonicClock.isValid() ? m_monotonicClock.elapsed() : 0);
+        double x = fmod(-static_cast<double>(elapsedMs) / 50.0 + i * 300, width() + 200) - 100;
         QVector<QPoint> hill = {
             QPoint(x, height() * GROUND_Y_RATIO),
             QPoint(x + 100, height() * GROUND_Y_RATIO - 60),
@@ -501,37 +569,12 @@ void MarioGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication>
     
     m_serialPort = serial;
     
-    if (m_serialPort && m_serialPort->isConnected()) {
-        setupSensorListening();
-    }
-    
     m_ownSerial = false;
 }
 
 bool MarioGame::isSerialConnected() const
 {
     return m_serialPort && m_serialPort->isConnected();
-}
-
-void MarioGame::setupSensorListening()
-{
-    if (!m_serialPort) return;
-    
-    m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-        QMetaObject::invokeMethod(this, [this, data]() {
-            handleSensorInput(data.calibratedValue);
-        }, Qt::QueuedConnection);
-    });
-    
-    m_serialPort->setConnectionCallback([this](bool connected, const std::string& message) {
-        QMetaObject::invokeMethod(this, [this, connected, message]() {
-            if (!connected) {
-                // Można wyświetlić komunikat o utracie połączenia
-            }
-        }, Qt::QueuedConnection);
-    });
-    
-    m_serialPort->startAsyncReading();
 }
 
 void MarioGame::cleanupSensorConnection()

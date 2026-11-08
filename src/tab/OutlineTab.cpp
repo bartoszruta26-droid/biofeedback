@@ -11,6 +11,7 @@
 #include <QPainter>
 #include <QDesktopServices>
 #include <QUrl>
+#include <QStandardItemModel>
 
 namespace tab {
 
@@ -80,6 +81,10 @@ OutlineTab::OutlineTab(QWidget *parent)
 
 OutlineTab::~OutlineTab()
 {
+    if (m_serialPort && m_dataCallbackToken) {
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_dataCallbackToken = 0;
+    }
     if (m_isSessionActive) {
         stopSession();
     }
@@ -411,6 +416,8 @@ bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline)
         exercise.imagePath = exerciseObj["imagePath"].toString();
         exercise.videoPath = exerciseObj["videoPath"].toString();
         exercise.gameId = exerciseObj["gameId"].toString();
+        if (exercise.gameId == QStringLiteral("scored_earth"))
+            exercise.gameId = QStringLiteral("scorched_earth");
         exercise.durationSeconds = exerciseObj["durationSeconds"].toInt(0);
         exercise.targetRepetitions = exerciseObj["targetRepetitions"].toInt(0);
         exercise.difficulty = exerciseObj["difficulty"].toString("medium");
@@ -484,8 +491,21 @@ void OutlineTab::populateGameCombo()
     m_gameCombo->addItem(tr("Mario"), "mario");
     m_gameCombo->addItem(tr("Galaga"), "galaga");
     m_gameCombo->addItem(tr("Archer"), "archer");
-    m_gameCombo->addItem(tr("Scored Earth"), "scored_earth");
+    m_gameCombo->addItem(tr("Scorched Earth"), "scorched_earth");
     m_gameCombo->addItem(tr("Car Race"), "car_race");
+
+    // Nie pokazuj jako dostępnych gier, których implementacje nie są jeszcze
+    // dołączone do aplikacji. Identyfikatory pozostają rozpoznawalne przy
+    // odczycie starszych konspektów, ale użytkownik nie może ich wybrać.
+    const int unavailableIndexes[] = {7, 8, 9, 10};
+    if (auto* model = qobject_cast<QStandardItemModel*>(m_gameCombo->model())) {
+        for (const int index : unavailableIndexes) {
+            if (QStandardItem* item = model->item(index)) {
+                item->setEnabled(false);
+                item->setText(item->text() + tr(" (w przygotowaniu)"));
+            }
+        }
+    }
     m_gameCombo->blockSignals(false);
 }
 
@@ -900,11 +920,13 @@ QVector<OutlineData> OutlineTab::getOutlines() const
 
 void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
+    if (m_serialPort && m_dataCallbackToken) {
+        m_serialPort->removeDataCallback(m_dataCallbackToken);
+        m_dataCallbackToken = 0;
+    }
     m_serialPort = serial;
     if (m_serialPort) {
-        m_serialPort->setDataCallback([this](const sensor::SensorData& data) {
-            // Callback przychodzi z wątku odczytu szeregowego -
-            // przekaż dane bezpiecznie do wątku GUI.
+        m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
             QMetaObject::invokeMethod(this, [this, data]() {
                 onSensorDataReceived(data);
             }, Qt::QueuedConnection);

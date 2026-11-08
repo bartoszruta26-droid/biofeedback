@@ -1,9 +1,9 @@
 /**
  * @file Encryption.cpp
- * @brief Implementacja klasy Encryption - szyfrowanie XOR z kodowaniem Base64
+ * @brief Implementacja klasy Encryption - szyfrowanie uwierzytelnione AES-256-GCM
  * 
  * Ten plik zawiera implementację mechanizmów szyfrowania i deszyfrowania danych
- * z wykorzystaniem algorytmu XOR oraz kodowania Base64. Kod zawiera rozbudowane
+ * z wykorzystaniem AES-256-GCM oraz kodowania Base64. Kod zawiera rozbudowane
  * mechanizmy debugowania, obsługi błędów, wyjątków oraz logowania operacji.
  * 
  * @author AI Assistant
@@ -11,13 +11,18 @@
  */
 
 #include "data/Encryption.hpp"
-#include <cstdlib>
 #include <stdexcept>
 #include <iostream>
 #include <sstream>
 #include <chrono>
+#include <ctime>
 #include <iomanip>
 #include <algorithm>
+#include <utility>
+#include <climits>
+#include <openssl/evp.h>
+#include <openssl/crypto.h>
+#include <openssl/rand.h>
 
 // ============================================================================
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
@@ -128,9 +133,11 @@ std::function<void(const std::string&)> Encryption::m_criticalErrorCallback;
 // ============================================================================
 
 void Encryption::setMinimumLogLevel(EncryptionTypes::EncryptionLogLevel level) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_minimumLogLevel = level;
-    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_minimumLogLevel = level;
+    }
+    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__,
                "Poziom logowania ustawiony na: " + logLevelToString(level));
 }
 
@@ -140,8 +147,10 @@ EncryptionTypes::EncryptionLogLevel Encryption::getMinimumLogLevel() {
 }
 
 void Encryption::setConsoleOutputEnabled(bool enabled) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_consoleOutputEnabled = enabled;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_consoleOutputEnabled = enabled;
+    }
     logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__,
                "Wyjście na konsolę " + std::string(enabled ? "włączone" : "wyłączone"));
 }
@@ -202,14 +211,18 @@ std::string Encryption::getStatisticsSummary() {
 }
 
 void Encryption::setErrorCallback(std::function<void(const std::string&)> callback) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_errorCallback = callback;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_errorCallback = std::move(callback);
+    }
     logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, "Callback błędów zarejestrowany");
 }
 
 void Encryption::setCriticalErrorCallback(std::function<void(const std::string&)> callback) {
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    m_criticalErrorCallback = callback;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        m_criticalErrorCallback = std::move(callback);
+    }
     logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, "Callback błędów krytycznych zarejestrowany");
 }
 
@@ -217,48 +230,41 @@ void Encryption::setCriticalErrorCallback(std::function<void(const std::string&)
 // IMPLEMENTACJA METOD PRYWATNYCH - LOGOWANIE
 // ============================================================================
 
-void Encryption::logMessage(EncryptionTypes::EncryptionLogLevel level, 
-                           const std::string& function, 
+void Encryption::logMessage(EncryptionTypes::EncryptionLogLevel level,
+                           const std::string& function,
                            const std::string& message) {
-    // Sprawdzenie czy poziom jest wystarczający
-    if (level < m_minimumLogLevel) {
-        return;
+    std::function<void(const std::string&)> errorCallback;
+    std::function<void(const std::string&)> criticalCallback;
+    {
+        std::lock_guard<std::mutex> lock(m_logMutex);
+        if (level < m_minimumLogLevel || !m_consoleOutputEnabled) return;
+        errorCallback = m_errorCallback;
+        criticalCallback = m_criticalErrorCallback;
     }
-    
-    // Sprawdzenie czy wyjście na konsolę jest włączone
-    if (!m_consoleOutputEnabled) {
-        return;
-    }
-    
-    std::lock_guard<std::mutex> lock(m_logMutex);
-    
+
     auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    
+    const auto time = std::chrono::system_clock::to_time_t(now);
+    std::tm localTime{};
+#if defined(_WIN32)
+    localtime_s(&localTime, &time);
+#else
+    localtime_r(&time, &localTime);
+#endif
     std::stringstream ss;
-    ss << "[" << logLevelToString(level) << "][ENCRYPTION][" 
-       << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "] "
+    ss << "[" << logLevelToString(level) << "][ENCRYPTION]["
+       << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << "] "
        << function << ": " << message << std::endl;
-    
-    if (level >= EncryptionTypes::EncryptionLogLevel::ERROR) {
-        std::cerr << ss.str();
-    } else {
-        std::cout << ss.str();
-    }
-    
-    // Wywołanie callbacka dla błędów krytycznych
-    if (level == EncryptionTypes::EncryptionLogLevel::CRITICAL && m_criticalErrorCallback) {
-        try {
-            m_criticalErrorCallback(message);
-        } catch (...) {
-            // Gentle code: ignorujemy błędy w callbacku
-        }
-    } else if (level >= EncryptionTypes::EncryptionLogLevel::ERROR && m_errorCallback) {
-        try {
-            m_errorCallback(message);
-        } catch (...) {
-            // Gentle code: ignorujemy błędy w callbacku
-        }
+    if (level >= EncryptionTypes::EncryptionLogLevel::ERROR) std::cerr << ss.str();
+    else std::cout << ss.str();
+
+    // User callbacks are deliberately invoked outside the logging mutex.
+    try {
+        if (level == EncryptionTypes::EncryptionLogLevel::CRITICAL && criticalCallback)
+            criticalCallback(message);
+        else if (level >= EncryptionTypes::EncryptionLogLevel::ERROR && errorCallback)
+            errorCallback(message);
+    } catch (...) {
+        // Logging must not propagate callback exceptions.
     }
 }
 
@@ -313,254 +319,110 @@ void EncryptionTypes::EncryptionStatistics::reset() {
     totalBytesProcessed.store(0);
 }
 std::string Encryption::encrypt(const std::string& data, const std::string& key) {
-    auto startTime = std::chrono::high_resolution_clock::now();
-    
-    // Rozpoczęcie procesu szyfrowania
-    logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
-               "Rozpoczynanie szyfrowania danych");
-    logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
-               "Długość danych wejściowych: " + std::to_string(data.length()) + " bajtów");
-    logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
-               "Długość klucza: " + std::to_string(key.length()) + " bajtów");
-    
-    // Walidacja parametrów wejściowych - gentle code: bezpieczne sprawdzenie
-    try {
-        if (key.empty()) {
-            m_statistics.validationErrors.fetch_add(1);
-            logMessage(EncryptionTypes::EncryptionLogLevel::ERROR, __FUNCTION__, 
-                      "Próba szyfrowania z pustym kluczem - zgłaszanie wyjątku");
-            throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
-        }
-        
-        if (data.empty()) {
-            logMessage(EncryptionTypes::EncryptionLogLevel::WARNING, __FUNCTION__, 
-                      "Szyfrowanie pustych danych - zwracanie pustego wyniku");
-            return "";  // Gentle code: zwracamy pusty string zamiast błędu
-        }
-        
-        // Dodatkowa walidacja długości klucza (zbyt krótki klucz może być niebezpieczny)
-        if (key.length() < MIN_KEY_LENGTH) {
-            logMessage(EncryptionTypes::EncryptionLogLevel::WARNING, __FUNCTION__, 
-                      "Klucz jest bardzo krótki (" + std::to_string(key.length()) 
-                      + " znaków). Zalecany klucz minimum " + std::to_string(MIN_KEY_LENGTH) + " znaków.");
-        }
-        
-        // Sprawdzenie maksymalnego rozmiaru danych
-        if (data.length() > MAX_DATA_SIZE) {
-            m_statistics.validationErrors.fetch_add(1);
-            logMessage(EncryptionTypes::EncryptionLogLevel::ERROR, __FUNCTION__,
-                      "Dane przekraczają maksymalny rozmiar (" + std::to_string(MAX_DATA_SIZE) + " bajtów)");
-            throw std::invalid_argument("Dane zbyt duże do zaszyfrowania");
-        }
-        
-    } catch (const std::invalid_argument& e) {
-        logMessage(EncryptionTypes::EncryptionLogLevel::ERROR, __FUNCTION__, 
-                  "Błąd walidacji parametrów: " + std::string(e.what()));
-        throw;  // Propagacja wyjątku dalej
-    } catch (const std::exception& e) {
-        m_statistics.otherErrors.fetch_add(1);
-        logMessage(EncryptionTypes::EncryptionLogLevel::CRITICAL, __FUNCTION__, 
-                  "Nieoczekiwany błąd podczas walidacji: " + std::string(e.what()));
-        throw std::runtime_error("Krytyczny błąd walidacji parametrów szyfrowania");
+    if (key.size() < 32) throw std::invalid_argument("Klucz AES musi zawierać co najmniej 32 bajty losowego materiału");
+    if (data.size() > MAX_DATA_SIZE || data.size() > static_cast<std::size_t>(INT_MAX))
+        throw std::invalid_argument("Dane przekraczają dopuszczalny rozmiar");
+    unsigned char aesKey[32]{};
+    unsigned int keyLen=0;
+    if(EVP_Digest(key.data(),key.size(),aesKey,&keyLen,EVP_sha256(),nullptr)!=1||keyLen!=32) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
+        throw std::runtime_error("Nie udało się wyprowadzić klucza AES-256");
     }
-    
-    std::vector<uint8_t> dataBytes;
-    std::vector<uint8_t> keyBytes;
-    std::vector<uint8_t> encryptedBytes;
-    
-    try {
-        // Konwersja danych i klucza do wektorów bajtów
-        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__, 
-                  "Konwersja danych do wektora bajtów");
-        dataBytes.assign(data.begin(), data.end());
-        
-        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__, 
-                  "Konwersja klucza do wektora bajtów");
-        keyBytes.assign(key.begin(), key.end());
-        
-        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
-                  "Liczba bajtów danych: " + std::to_string(dataBytes.size()));
-        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
-                  "Liczba bajtów klucza: " + std::to_string(keyBytes.size()));
-        
-        // Szyfrowanie XOR
-        logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
-                  "Wykonywanie szyfrowania XOR");
-        encryptedBytes = xorCipher(dataBytes, keyBytes);
-        
-        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
-                  "Szyfrowanie zakończone, wynik: " + std::to_string(encryptedBytes.size()) + " bajtów");
-        
-        // Kodowanie Base64
-        logMessage(EncryptionTypes::EncryptionLogLevel::DEBUG, __FUNCTION__, 
-                  "Kodowanie wyników do Base64");
-        std::string result = base64Encode(encryptedBytes);
-        
-        auto endTime = std::chrono::high_resolution_clock::now();
-        double execTimeMs = std::chrono::duration<double, std::milli>(endTime - startTime).count();
-        
-        // Aktualizacja statystyk
-        m_statistics.encryptOperations.fetch_add(1);
-        m_statistics.totalBytesProcessed.fetch_add(data.length());
-        
-        logMessage(EncryptionTypes::EncryptionLogLevel::INFO, __FUNCTION__, 
-                  "Szyfrowanie zakończone sukcesem (czas: " + std::to_string(execTimeMs) + " ms)");
-        logMessage(EncryptionTypes::EncryptionLogLevel::VERBOSE, __FUNCTION__,
-                  "Długość zaszyfrowanych danych: " + std::to_string(result.length()) + " znaków");
-        
-        return result;
-        
-    } catch (const std::bad_alloc& e) {
-        m_statistics.memoryErrors.fetch_add(1);
-        logMessage(EncryptionTypes::EncryptionLogLevel::CRITICAL, __FUNCTION__, 
-                  "Błąd alokacji pamięci podczas szyfrowania: " + std::string(e.what()));
-        throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji szyfrowania");
-    } catch (const std::exception& e) {
-        m_statistics.otherErrors.fetch_add(1);
-        logMessage(EncryptionTypes::EncryptionLogLevel::CRITICAL, __FUNCTION__, 
-                  "Nieoczekiwany błąd podczas szyfrowania: " + std::string(e.what()));
-        throw std::runtime_error("Krytyczny błąd podczas operacji szyfrowania");
+    unsigned char nonce[12]{}, tag[16]{};
+    if(RAND_bytes(nonce,sizeof(nonce))!=1) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
+        throw std::runtime_error("CSPRNG nie wygenerował nonce");
     }
+    EVP_CIPHER_CTX* ctx=EVP_CIPHER_CTX_new();
+    if(!ctx) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
+        throw std::runtime_error("Nie można utworzyć kontekstu AES-GCM");
+    }
+    std::vector<unsigned char> ciphertext(data.size()+16);
+    int outLen=0,total=0;
+    bool ok=EVP_EncryptInit_ex(ctx,EVP_aes_256_gcm(),nullptr,nullptr,nullptr)==1 &&
+        EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_SET_IVLEN,sizeof(nonce),nullptr)==1 &&
+        EVP_EncryptInit_ex(ctx,nullptr,nullptr,aesKey,nonce)==1 &&
+        EVP_EncryptUpdate(ctx,ciphertext.data(),&outLen,
+            reinterpret_cast<const unsigned char*>(data.data()),static_cast<int>(data.size()))==1;
+    total=outLen;
+    if(ok)ok=EVP_EncryptFinal_ex(ctx,ciphertext.data()+total,&outLen)==1;
+    total+=outLen;
+    if(ok)ok=EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_GET_TAG,sizeof(tag),tag)==1;
+    EVP_CIPHER_CTX_free(ctx);
+    OPENSSL_cleanse(aesKey,sizeof(aesKey));
+    if(!ok)throw std::runtime_error("Szyfrowanie AES-256-GCM nie powiodło się");
+    std::vector<unsigned char> payload;
+    payload.insert(payload.end(),nonce,nonce+sizeof(nonce));
+    payload.insert(payload.end(),tag,tag+sizeof(tag));
+    payload.insert(payload.end(),ciphertext.begin(),ciphertext.begin()+total);
+    if(payload.size()>static_cast<std::size_t>(INT_MAX))throw std::runtime_error("Wynik szyfrowania jest zbyt duży");
+    std::string encoded(4*((payload.size()+2)/3)+1,'\0');
+    const int n=EVP_EncodeBlock(reinterpret_cast<unsigned char*>(&encoded[0]),payload.data(),static_cast<int>(payload.size()));
+    if(n<0)throw std::runtime_error("Kodowanie Base64 nie powiodło się");
+    encoded.resize(static_cast<std::size_t>(n));
+    m_statistics.encryptOperations.fetch_add(1);
+    m_statistics.totalBytesProcessed.fetch_add(data.size());
+    return "BFENC:v1:"+encoded;
 }
 std::string Encryption::decrypt(const std::string& encryptedData, const std::string& key) {
-    // Rozpoczęcie procesu deszyfrowania
-    ENCRYPT_DEBUG(1, "Rozpoczynanie deszyfrowania danych");
-    ENCRYPT_DEBUG(2, "Długość zaszyfrowanych danych: " << encryptedData.length() << " znaków");
-    ENCRYPT_DEBUG(2, "Długość klucza: " << key.length() << " bajtów");
-    
-    // Walidacja parametrów wejściowych
-    try {
-        if (key.empty()) {
-            ENCRYPT_ERROR("Próba deszyfrowania z pustym kluczem - zgłaszanie wyjątku");
-            throw std::invalid_argument("Klucz szyfrujący nie może być pusty");
-        }
-        
-        if (encryptedData.empty()) {
-            ENCRYPT_WARN("Deszyfrowanie pustych danych - zwracanie pustego wyniku");
-            return "";  // Gentle code: zwracamy pusty string zamiast błędu
-        }
-        
-        // Walidacja formatu Base64 (podstawowa)
-        if (encryptedData.length() % 4 != 0) {
-            ENCRYPT_WARN("Dane nie są poprawnie wyrównane dla Base64 (długość: " 
-                        << encryptedData.length() << "). Spróbuję kontynuować.");
-        }
-        
-    } catch (const std::invalid_argument& e) {
-        ENCRYPT_ERROR("Błąd walidacji parametrów: " << e.what());
-        throw;
-    } catch (const std::exception& e) {
-        ENCRYPT_ERROR("Nieoczekiwany błąd podczas walidacji: " << e.what());
-        throw std::runtime_error("Krytyczny błąd walidacji parametrów deszyfrowania");
+    static const std::string prefix="BFENC:v1:";
+    if(key.size()<32)throw std::invalid_argument("Klucz AES musi zawierać co najmniej 32 bajty losowego materiału");
+    if(encryptedData.compare(0,prefix.size(),prefix)!=0)
+        throw std::invalid_argument("Nieobsługiwany format szyfrogramu; migracja danych legacy musi być jawna");
+    const std::string encoded=encryptedData.substr(prefix.size());
+    if(encoded.empty()||encoded.size()%4!=0||encoded.size()>static_cast<std::size_t>(INT_MAX))
+        throw std::invalid_argument("Nieprawidłowy format Base64 szyfrogramu");
+    std::vector<unsigned char> payload((encoded.size()/4)*3);
+    const int decoded=EVP_DecodeBlock(payload.data(),reinterpret_cast<const unsigned char*>(encoded.data()),static_cast<int>(encoded.size()));
+    if(decoded<0)throw std::invalid_argument("Nieprawidłowy Base64 szyfrogramu");
+    std::size_t payloadLen=static_cast<std::size_t>(decoded);
+    if(!encoded.empty()&&encoded.back()=='=')--payloadLen;
+    if(encoded.size()>1&&encoded[encoded.size()-2]=='=')--payloadLen;
+    if(payloadLen<28||payloadLen>MAX_DATA_SIZE+28)throw std::invalid_argument("Nieprawidłowa długość szyfrogramu");
+    unsigned char aesKey[32]{}; unsigned int keyLen=0;
+    if(EVP_Digest(key.data(),key.size(),aesKey,&keyLen,EVP_sha256(),nullptr)!=1||keyLen!=32) {
+        OPENSSL_cleanse(aesKey,sizeof(aesKey));
+        throw std::runtime_error("Nie udało się wyprowadzić klucza AES-256");
     }
-    
-    std::vector<uint8_t> encryptedBytes;
-    std::vector<uint8_t> keyBytes;
-    std::vector<uint8_t> decryptedBytes;
-    
-    try {
-        // Dekodowanie Base64
-        ENCRYPT_DEBUG(2, "Dekodowanie danych z Base64");
-        encryptedBytes = base64Decode(encryptedData);
-        
-        #if DEBUG_BASE64_OPERATIONS
-        ENCRYPT_DEBUG(3, "Dekodowanie Base64 zakończone: " << encryptedBytes.size() << " bajtów");
-        #endif
-        
-        // Konwersja klucza do wektora bajtów
-        ENCRYPT_DEBUG(3, "Konwersja klucza do wektora bajtów");
-        keyBytes.assign(key.begin(), key.end());
-        
-        // Deszyfrowanie XOR (ta sama operacja co szyfrowanie)
-        ENCRYPT_DEBUG(2, "Wykonywanie deszyfrowania XOR");
-        decryptedBytes = xorCipher(encryptedBytes, keyBytes);
-        
-        #if DEBUG_XOR_OPERATIONS
-        ENCRYPT_DEBUG(3, "Deszyfrowanie zakończone: " << decryptedBytes.size() << " bajtów");
-        #endif
-        
-        // Konwersja do stringa
-        ENCRYPT_DEBUG(2, "Konwersja wyniku do stringa");
-        std::string result(decryptedBytes.begin(), decryptedBytes.end());
-        
-        ENCRYPT_DEBUG(1, "Deszyfrowanie zakończone sukcesem");
-        ENCRYPT_DEBUG(2, "Długość odszyfrowanych danych: " << result.length() << " znaków");
-        
-        return result;
-        
-    } catch (const std::invalid_argument& e) {
-        ENCRYPT_ERROR("Błąd niepoprawnych danych zaszyfrowanych: " << e.what());
-        throw std::invalid_argument("Niepoprawny format danych zaszyfrowanych");
-    } catch (const std::bad_alloc& e) {
-        ENCRYPT_ERROR("Błąd alokacji pamięci podczas deszyfrowania: " << e.what());
-        throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji deszyfrowania");
-    } catch (const std::exception& e) {
-        ENCRYPT_ERROR("Nieoczekiwany błąd podczas deszyfrowania: " << e.what());
-        throw std::runtime_error("Krytyczny błąd podczas operacji deszyfrowania");
-    }
+    const unsigned char* nonce=payload.data();
+    const unsigned char* tag=payload.data()+12;
+    const unsigned char* cipher=payload.data()+28;
+    const std::size_t cipherLen=payloadLen-28;
+    EVP_CIPHER_CTX* ctx=EVP_CIPHER_CTX_new();
+    if(!ctx){OPENSSL_cleanse(aesKey,sizeof(aesKey));throw std::runtime_error("Nie można utworzyć kontekstu AES-GCM");}
+    std::vector<unsigned char> plainBuffer(cipherLen+16);
+    int outLen=0,total=0;
+    bool ok=EVP_DecryptInit_ex(ctx,EVP_aes_256_gcm(),nullptr,nullptr,nullptr)==1 &&
+        EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_SET_IVLEN,12,nullptr)==1 &&
+        EVP_DecryptInit_ex(ctx,nullptr,nullptr,aesKey,nonce)==1 &&
+        EVP_DecryptUpdate(ctx,plainBuffer.data(),&outLen,cipher,static_cast<int>(cipherLen))==1;
+    total=outLen;
+    if(ok)ok=EVP_CIPHER_CTX_ctrl(ctx,EVP_CTRL_GCM_SET_TAG,16,const_cast<unsigned char*>(tag))==1;
+    if(ok)ok=EVP_DecryptFinal_ex(ctx,plainBuffer.data()+total,&outLen)==1;
+    total+=outLen;
+    EVP_CIPHER_CTX_free(ctx);
+    OPENSSL_cleanse(aesKey,sizeof(aesKey));
+    if(!ok){OPENSSL_cleanse(plainBuffer.data(),plainBuffer.size());throw std::runtime_error("Weryfikacja tagu AES-256-GCM nie powiodła się");}
+    std::string plaintext(reinterpret_cast<const char*>(plainBuffer.data()),static_cast<std::size_t>(total));
+    OPENSSL_cleanse(plainBuffer.data(),plainBuffer.size());
+    m_statistics.decryptOperations.fetch_add(1);
+    m_statistics.totalBytesProcessed.fetch_add(plaintext.size());
+    return plaintext;
 }
 
 std::string Encryption::generateKey(size_t length) {
-    ENCRYPT_DEBUG(1, "Generowanie nowego klucza o długości: " << length << " znaków");
-    
-    // Walidacja parametru length
-    try {
-        if (length == 0) {
-            ENCRYPT_WARN("Próba wygenerowania klucza o zerowej długości - ustawiam domyślną wartość 32");
-            length = 32;  // Gentle code: ustawienie rozsądnej wartości domyślnej
-        }
-        
-        if (length > 1024) {
-            ENCRYPT_WARN("Żądana długość klucza (" << length 
-                        << ") jest bardzo duża. Ograniczam do 1024 znaków.");
-            length = 1024;  // Gentle code: ograniczenie maksymalnej długości
-        }
-        
-    } catch (const std::exception& e) {
-        ENCRYPT_ERROR("Błąd podczas walidacji długości klucza: " << e.what());
-        throw std::runtime_error("Krytyczny błąd walidacji parametru długości klucza");
-    }
-    
-    std::string key;
-    
-    try {
-        key.reserve(length);  // Rezerwacja pamięci z wyprzedzeniem dla wydajności
-        
-        #if DEBUG_KEY_GENERATION
-        ENCRYPT_DEBUG(2, "Pamięć zarezerwowana dla klucza: " << key.capacity() << " znaków");
-        ENCRYPT_DEBUG(3, "Rozpoczynanie pętli generowania znaków");
-        #endif
-        
-        for (size_t i = 0; i < length; ++i) {
-            // Generowanie losowego znaku z zakresu ASCII drukowalnego (33-126)
-            // Zakres 93 znaków: od '!' (33) do '~' (126)
-            char randomChar = static_cast<char>(33 + (std::rand() % 93));
-            key += randomChar;
-            
-            #if DEBUG_KEY_GENERATION && DEBUG_ENCRYPTION >= 3
-            if (i < 10 || i % 100 == 0) {  // Loguj tylko pierwsze 10 i co 100 znak
-                ENCRYPT_DEBUG(3, "Wygenerowano znak #" << i << ": '" << randomChar 
-                            << "' (ASCII: " << static_cast<int>(randomChar) << ")");
-            }
-            #endif
-        }
-        
-        ENCRYPT_DEBUG(1, "Klucz wygenerowany pomyślnie");
-        ENCRYPT_DEBUG(2, "Rzeczywista długość klucza: " << key.length() << " znaków");
-        
-        // Ostrzeżenie jeśli rand() nie został zainicjalizowany (słaba losowość)
-        // Uwaga: użytkownik powinien wywołać srand() przed pierwszym użyciem
-        ENCRYPT_DEBUG(3, "Uwaga: Upewnij się, że srand() zostało wywołane przed użyciem tej funkcji");
-        
-        return key;
-        
-    } catch (const std::bad_alloc& e) {
-        ENCRYPT_ERROR("Błąd alokacji pamięci podczas generowania klucza: " << e.what());
-        throw std::runtime_error("Nie udało się zaalokować pamięci dla generowanego klucza");
-    } catch (const std::exception& e) {
-        ENCRYPT_ERROR("Nieoczekiwany błąd podczas generowania klucza: " << e.what());
-        throw std::runtime_error("Krytyczny błąd podczas generowania klucza");
-    }
+    if(length==0)length=32;
+    if(length>1024)throw std::invalid_argument("Żądana długość klucza przekracza limit");
+    std::vector<unsigned char> bytes(length);
+    if(RAND_bytes(bytes.data(),static_cast<int>(bytes.size()))!=1)
+        throw std::runtime_error("CSPRNG nie wygenerował klucza");
+    static const char hex[]="0123456789abcdef";
+    std::string result; result.reserve(length*2);
+    for(unsigned char b:bytes){result.push_back(hex[b>>4]);result.push_back(hex[b&15]);}
+    m_statistics.keyGenerations.fetch_add(1);
+    OPENSSL_cleanse(bytes.data(),bytes.size());
+    return result;
 }
 
 // ============================================================================
@@ -725,67 +587,3 @@ std::vector<uint8_t> Encryption::base64Decode(const std::string& input) {
     }
 }
 
-std::vector<uint8_t> Encryption::xorCipher(const std::vector<uint8_t>& data, const std::vector<uint8_t>& key) {
-    #if DEBUG_XOR_OPERATIONS
-    ENCRYPT_DEBUG(2, "Rozpoczynanie operacji XOR Cipher");
-    ENCRYPT_DEBUG(3, "Długość danych: " << data.size() << " bajtów");
-    ENCRYPT_DEBUG(3, "Długość klucza: " << key.size() << " bajtów");
-    #endif
-    
-    // Walidacja danych wejściowych
-    if (data.empty()) {
-        ENCRYPT_DEBUG(3, "Puste dane wejściowe - zwracanie pustego wektora");
-        return std::vector<uint8_t>();  // Gentle code: puste dane -> pusty wynik
-    }
-    
-    if (key.empty()) {
-        ENCRYPT_ERROR("Próba wykonania XOR z pustym kluczem");
-        throw std::invalid_argument("Klucz nie może być pusty w operacji XOR");
-    }
-    
-    std::vector<uint8_t> result;
-    
-    try {
-        // Rezerwacja pamięci z wyprzedzeniem
-        result.resize(data.size());
-        
-        #if DEBUG_XOR_OPERATIONS && DEBUG_ENCRYPTION >= 3
-        size_t loggedOps = 0;
-        #endif
-        
-        for (size_t i = 0; i < data.size(); ++i) {
-            // Operacja XOR z cyklicznym użyciem klucza
-            result[i] = data[i] ^ key[i % key.size()];
-            
-            #if DEBUG_XOR_OPERATIONS && DEBUG_ENCRYPTION >= 3
-            loggedOps++;
-            if (loggedOps <= 5 || loggedOps % 50 == 0) {
-                ENCRYPT_DEBUG(3, "XOR operacja #" << i 
-                            << ": data[0x" << std::hex << static_cast<int>(data[i]) << "]"
-                            << " ^ key[0x" << static_cast<int>(key[i % key.size()]) << "]"
-                            << " = 0x" << static_cast<int>(result[i]) << std::dec);
-            }
-            #endif
-        }
-        
-        #if DEBUG_XOR_OPERATIONS
-        ENCRYPT_DEBUG(2, "Operacja XOR Cipher zakończona");
-        ENCRYPT_DEBUG(3, "Liczba przetworzonych bajtów: " << result.size());
-        #if DEBUG_ENCRYPTION >= 3
-        ENCRYPT_DEBUG(3, "Liczba zalogowanych operacji: " << loggedOps);
-        #endif
-        #endif
-        
-        return result;
-        
-    } catch (const std::bad_alloc& e) {
-        ENCRYPT_ERROR("Błąd alokacji pamięci podczas operacji XOR: " << e.what());
-        throw std::runtime_error("Nie udało się zaalokować pamięci dla operacji XOR");
-    } catch (const std::out_of_range& e) {
-        ENCRYPT_ERROR("Błąd indeksu podczas operacji XOR: " << e.what());
-        throw std::runtime_error("Błąd indeksu przy dostępie do danych/klucza");
-    } catch (const std::exception& e) {
-        ENCRYPT_ERROR("Nieoczekiwany błąd podczas operacji XOR: " << e.what());
-        throw std::runtime_error("Krytyczny błąd podczas operacji XOR Cipher");
-    }
-}

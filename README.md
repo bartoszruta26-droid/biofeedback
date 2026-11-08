@@ -1,20 +1,35 @@
 # Biofeedback Application for Raspberry Pi 4
 
-A professional medical-grade biofeedback application built with C++, Qt5, and Arduino Nano integration for strain gauge sensor (HX711) data acquisition.
+A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live force visualization, repetition analysis, and sensor-driven training. Hardware calibration and clinical validation remain separate acceptance requirements.
 
 ## Features
 
 - **Patient Management**: Create, edit, import, export, and delete patient records
-- **Live Measurement**: Real-time graph visualization of sensor data with statistical analysis
+- **Live Measurement**: Real-time graph visualization, validated sample stream, and statistical analysis
+- **Repetition and Set Analysis**: Hysteresis-based repetition detection, peak/mean force, duration, time-to-peak, target achievement, and set variability (CV%)
+- **Desktop Training Analytics**: Peak-force chart, repetition and series tables, explicit local session-history snapshots, and detailed CSV reports including game points
 - **Training Games**: Multiple biofeedback-controlled games including:
   - **Sin/Tan Games** - Wave-based training exercises
   - **Flappy Bird** - Classic flapping game controlled by strain gauge
   - **Pong** - Retro tennis game with biofeedback paddle control
   - **Mario Run** - 4-bit endless runner with charge-based jumping mechanics
-- **Data Security**: JSON storage with optional encryption for sensitive medical data
+- **Data Security**: PBKDF2 password hashing, first-run administrator setup, per-user account storage, and optional encryption for sensitive records
 - **Medical Standards**: Comprehensive logging, data validation, and audit trails
 
+## Interfejsy użytkownika
+
+- **Desktop GUI (Qt5)** — główna aplikacja okienkowa: pacjenci, pomiary, trening, analityka powtórzeń i serii, wykres siły, historia sesji oraz raporty CSV.
+- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia; konfiguracja ćwiczenia, celu, serii, powtórzeń i odpoczynku, zapis sesji CSV oraz diagnostyka jakości próbek. Zobacz `docs/TUI_DESIGN.md`.
+- **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
+- **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
+
+Pierwsze uruchomienie GUI prowadzi przez utworzenie konta administratora z hasłem o długości co najmniej 12 znaków; nie ma zaszytego domyślnego loginu ani hasła. Konfiguracja, konta i dane pacjentów trafiają do katalogów użytkownika XDG.
+
+Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać rzeczywiste próbki z podłączonego, skalibrowanego czujnika (wykres tekstowy). Desktop GUI prezentuje wykres siły, trendy pomiarowe oraz analizę serii i powtórzeń. WebUI i Android pozostają trybami podglądu: ich wykresy są celowo pustymi stanami, ponieważ nie mają jeszcze strumienia pomiarowego ani wspólnego API sesji. Nie należy traktować tych dwóch interfejsów jako gotowych do rejestracji treningu. Żaden interfejs nie tworzy fikcyjnych danych pacjentów.
+
 ## Hardware Requirements
+
+Before force-based training, calibrate the HX711 using a known reference mass and confirm the firmware reports `CAL:1`. See [docs/HX711_CALIBRATION.md](docs/HX711_CALIBRATION.md). Uncalibrated RAW frames are diagnostic only.
 
 - Raspberry Pi 4
 - Arduino Nano
@@ -42,6 +57,8 @@ sudo apt install -y qtbase5-dev libqt5charts5-dev libserialport-dev \
 > `qtcharts5-dev`.
 
 ## Installation
+
+For the current Debian/Ubuntu build and DEB package instructions, see [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
 
 ### System Setup
 
@@ -341,3 +358,17 @@ Please read CONTRIBUTING.md for details on our code of conduct and the process f
 ## Disclaimer
 
 This software is for research and development purposes. For medical use, proper certification and regulatory approval are required.
+
+
+## Lokalny serwer API
+
+Minimalny serwer statusu HTTP (Qt Network) można zbudować i uruchomić:
+
+    cmake -S . -B build
+    cmake --build build --target biofeedback_api
+    ./build/biofeedback_api --port 8765
+
+Usługa nasłuchuje wyłącznie na `127.0.0.1` i udostępnia `/healthz` oraz
+`/api/v1/status`. Sterowanie sprzętem, dane pacjentów i strumień pomiarowy
+pozostają wyłączone do czasu wdrożenia uwierzytelniania, autoryzacji oraz
+wspólnych usług domenowych. Nie wystawiaj tego prototypu na sieć publiczną.

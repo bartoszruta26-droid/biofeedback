@@ -83,7 +83,7 @@ public:
      * @brief Aktualizuje wyświetlaną wartość wagi
      * @param weight Wartość wagi do wyświetlenia
      */
-    void updateWeightDisplay(double weight);
+    void updateWeightDisplay(double value, bool isRaw = false);
 
     /**
      * @brief Aktualizuje status połączenia z urządzeniem
@@ -219,6 +219,8 @@ private slots:
     void onAutoScaleToggled(bool enabled);
     void onUpdateTimerTimeout();
     void showSettingsDialog();
+    void refreshSerialPorts();
+    void toggleSerialConnection();
 
 private:
     void setupUI();
@@ -265,10 +267,15 @@ private:
     QLabel* m_weightLabel;
     QLabel* m_weightValue;
     QLabel* m_statusLabel;
+    QLabel* m_dashboardConnectionValue;
+    QLabel* m_dashboardForceValue;
+    QLabel* m_dashboardMeasurementValue;
     
     QSpinBox* m_samplingRateSpin;
     QSpinBox* m_graphDurationSpin;
     QComboBox* m_unitCombo;
+    QComboBox* m_devicePortCombo;
+    QPushButton* m_connectDeviceButton;
     
     // Timer do aktualizacji UI
     QTimer* m_updateTimer;
@@ -300,6 +307,8 @@ private:
     
     // Połączenie szeregowe z Arduino - współdzielone między zakładkami
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
+    sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
+    sensor::SerialCommunication::CallbackToken m_serialDataCallbackToken = 0;
 };
 
 } // namespace gui
