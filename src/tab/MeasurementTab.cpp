@@ -204,26 +204,35 @@ void ForcePlotWidget::addSample(double force, double time)
 
     // The live trace is ordered by the session clock. Reject a clock regression
     // instead of drawing a backwards segment or corrupting the visible window.
-    if (!m_times.isEmpty() && time < m_times.last())
+    if (!m_times.empty() && time < m_times.back())
         return;
 
-    m_forces.append(force);
-    m_times.append(time);
+    m_forces.push_back(force);
+    m_times.push_back(time);
+
+    // Monotonic queues make extrema maintenance amortized O(1), rather than
+    // scanning and shifting the entire visible trace on every sensor sample.
+    while (!m_maxCandidates.empty() && m_maxCandidates.back().second <= force)
+        m_maxCandidates.pop_back();
+    m_maxCandidates.emplace_back(time, force);
+    while (!m_minCandidates.empty() && m_minCandidates.back().second >= force)
+        m_minCandidates.pop_back();
+    m_minCandidates.emplace_back(time, force);
 
     const double cutoff = time - m_maxTimeWindow;
-    while (!m_times.isEmpty() && m_times.first() < cutoff) {
-        m_forces.removeFirst();
-        m_times.removeFirst();
+    while (!m_times.empty() && m_times.front() < cutoff) {
+        m_forces.pop_front();
+        m_times.pop_front();
     }
+    while (!m_maxCandidates.empty() && m_maxCandidates.front().first < cutoff)
+        m_maxCandidates.pop_front();
+    while (!m_minCandidates.empty() && m_minCandidates.front().first < cutoff)
+        m_minCandidates.pop_front();
 
-    // Recompute the scale from the visible window. Historical peaks that have
-    // left the window must not keep compressing the current trace.
-    m_maxObservedForce = 0.0;
-    m_minObservedForce = 0.0;
-    for (double sample : m_forces) {
-        m_maxObservedForce = std::max(m_maxObservedForce, sample);
-        m_minObservedForce = std::min(m_minObservedForce, sample);
-    }
+    m_maxObservedForce = m_maxCandidates.empty()
+        ? 0.0 : std::max(0.0, m_maxCandidates.front().second);
+    m_minObservedForce = m_minCandidates.empty()
+        ? 0.0 : std::min(0.0, m_minCandidates.front().second);
     const double observedMagnitude = std::max(
         std::abs(m_maxObservedForce), std::abs(m_minObservedForce));
     m_maxForce = std::max(5.0, observedMagnitude * 1.2);
@@ -234,6 +243,8 @@ void ForcePlotWidget::clearData()
 {
     m_forces.clear();
     m_times.clear();
+    m_maxCandidates.clear();
+    m_minCandidates.clear();
     m_maxObservedForce = 0.0;
     m_minObservedForce = 0.0;
     m_maxForce = 100.0;
@@ -250,18 +261,20 @@ void ForcePlotWidget::setMaxTimeWindow(double seconds)
 {
     if (std::isfinite(seconds) && seconds > 0.0) {
         m_maxTimeWindow = seconds;
-        if (!m_times.isEmpty()) {
-            const double cutoff = m_times.last() - m_maxTimeWindow;
-            while (!m_times.isEmpty() && m_times.first() < cutoff) {
-                m_forces.removeFirst();
-                m_times.removeFirst();
+        if (!m_times.empty()) {
+            const double cutoff = m_times.back() - m_maxTimeWindow;
+            while (!m_times.empty() && m_times.front() < cutoff) {
+                m_forces.pop_front();
+                m_times.pop_front();
             }
-            m_maxObservedForce = 0.0;
-            m_minObservedForce = 0.0;
-            for (double sample : m_forces) {
-                m_maxObservedForce = std::max(m_maxObservedForce, sample);
-                m_minObservedForce = std::min(m_minObservedForce, sample);
-            }
+            while (!m_maxCandidates.empty() && m_maxCandidates.front().first < cutoff)
+                m_maxCandidates.pop_front();
+            while (!m_minCandidates.empty() && m_minCandidates.front().first < cutoff)
+                m_minCandidates.pop_front();
+            m_maxObservedForce = m_maxCandidates.empty()
+                ? 0.0 : std::max(0.0, m_maxCandidates.front().second);
+            m_minObservedForce = m_minCandidates.empty()
+                ? 0.0 : std::min(0.0, m_minCandidates.front().second);
             m_maxForce = std::max(5.0, std::max(
                 std::abs(m_maxObservedForce), std::abs(m_minObservedForce)) * 1.2);
         }
@@ -283,7 +296,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     int plotWidth = width - 2 * margin;
     int plotHeight = height - 2 * margin;
     
-    if (plotWidth <= 0 || plotHeight <= 0 || m_forces.isEmpty()) {
+    if (plotWidth <= 0 || plotHeight <= 0 || m_forces.empty()) {
         return;
     }
     
@@ -334,14 +347,14 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
         return;
     }
     
-    double minTime = m_times.first();
-    double maxTime = m_times.last();
+    double minTime = m_times.front();
+    double maxTime = m_times.back();
     double timeRange = maxTime - minTime;
     if (timeRange <= 0) timeRange = 1.0;
     
     painter.setPen(QPen(QColor(0, 100, 200), 2, Qt::SolidLine));
     
-    for (int i = 1; i < m_forces.size(); ++i) {
+    for (std::size_t i = 1; i < m_forces.size(); ++i) {
         double x1 = margin + ((m_times[i-1] - minTime) / timeRange) * plotWidth;
         // Skalowanie z zakresem symetrycznym: -m_maxForce do +m_maxForce
         double y1 = margin + plotHeight - ((m_forces[i-1] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
@@ -359,7 +372,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     QVector<QPoint> fillPoints;
     // Zaczynamy od linii zera (używamy istniejącej zmiennej zeroY zdefiniowanej wcześniej)
     fillPoints.append(QPoint(margin, zeroY));
-    for (int i = 0; i < m_forces.size(); ++i) {
+    for (std::size_t i = 0; i < m_forces.size(); ++i) {
         double x = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
         double y = margin + plotHeight - ((m_forces[i] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
         fillPoints.append(QPoint(static_cast<int>(x), static_cast<int>(y)));
@@ -1119,6 +1132,7 @@ void MeasurementTab::stopMeasurement()
     }
     
     m_isMeasuring = false;
+    updateRawTableBatch(true);
     const bool journalFlushed = flushSampleJournal();
     closeSampleJournal();
     
@@ -1195,6 +1209,8 @@ void MeasurementTab::resetSession()
     
     m_statsTable->setRowCount(0);
     m_rawTable->setRowCount(0);
+    m_rawTableLastSequence = 0;
+    m_lastRawTableRefreshMs = -100;
     if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(true);
     if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 }
@@ -1332,18 +1348,54 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     emit newForceSample(forceValue, currentTime, m_showRawValues);
     updateLiveDisplay(forceValue);
 
-    if (m_rawTable) {
-        if (m_rawTable->rowCount() >= 100)
-            m_rawTable->removeRow(0);
+    updateRawTableBatch();
+}
+
+void MeasurementTab::updateRawTableBatch(bool force)
+{
+    if (!m_rawTable || m_recordedSamples.isEmpty()) return;
+
+    const qint64 elapsedMs = static_cast<qint64>(
+        m_sessionElapsedTimer.isValid() ? m_sessionElapsedTimer.elapsed() : 0);
+    if (!force && elapsedMs - m_lastRawTableRefreshMs < 100) return;
+
+    const quint64 totalSamples = static_cast<quint64>(m_recordedSamples.size());
+    if (m_rawTableLastSequence > totalSamples) {
+        m_rawTable->setRowCount(0);
+        m_rawTableLastSequence = 0;
+    }
+
+    // If the GUI was stalled, rebuild only the visible tail instead of replaying
+    // an arbitrarily large table backlog. The full sample stream remains intact.
+    const quint64 firstVisible = totalSamples > 100 ? totalSamples - 100 : 0;
+    if (m_rawTableLastSequence < firstVisible) {
+        m_rawTable->setRowCount(0);
+        m_rawTableLastSequence = firstVisible;
+    }
+
+    if (m_rawTableLastSequence == totalSamples) {
+        m_lastRawTableRefreshMs = elapsedMs;
+        return;
+    }
+
+    m_rawTable->setUpdatesEnabled(false);
+    for (quint64 index = m_rawTableLastSequence; index < totalSamples; ++index) {
+        const auto& sample = m_recordedSamples[static_cast<int>(index)];
         const int row = m_rawTable->rowCount();
         m_rawTable->insertRow(row);
-        m_rawTable->setItem(row, 0, new QTableWidgetItem(QString::number(currentTime, 'f', 3)));
-        const double displayedSample = m_showRawValues
-            ? forceValue
-            : (m_currentUnit == ForceUnit::Kilograms ? forceValue / 9.80665 : forceValue);
-        m_rawTable->setItem(row, 1, new QTableWidgetItem(QString::number(displayedSample, 'f', 2)));
-        m_rawTable->scrollToBottom();
+        m_rawTable->setItem(row, 0, new QTableWidgetItem(
+            QString::number(sample.elapsedTimeSeconds, 'f', 3)));
+        const double displayed = m_showRawValues ? sample.value
+            : (m_currentUnit == ForceUnit::Kilograms ? sample.value / 9.80665 : sample.value);
+        m_rawTable->setItem(row, 1, new QTableWidgetItem(
+            QString::number(displayed, 'f', 2)));
     }
+    while (m_rawTable->rowCount() > 100)
+        m_rawTable->removeRow(0);
+    m_rawTable->setUpdatesEnabled(true);
+    m_rawTable->scrollToBottom();
+    m_rawTableLastSequence = totalSamples;
+    m_lastRawTableRefreshMs = elapsedMs;
 }
 
 void MeasurementTab::updateLiveDisplay(double force)
@@ -2173,6 +2225,8 @@ void MeasurementTab::showCurrentMeasurementData()
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
     m_rawTable->setRowCount(0);
+    m_rawTableLastSequence = 0;
+    m_lastRawTableRefreshMs = -100;
     m_forcePlot->clearData();
 
     if (m_recordedSamples.isEmpty()) {
@@ -2240,6 +2294,7 @@ void MeasurementTab::showCurrentMeasurementData()
     m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
     m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
     m_rawTable->scrollToBottom();
+    m_rawTableLastSequence = static_cast<quint64>(m_recordedSamples.size());
 }
 
 void MeasurementTab::loadPatientTrends()
@@ -2692,9 +2747,15 @@ void MeasurementTab::enqueueMeasurementSample(
         }
     }
     if (scheduleDrain) {
-        QMetaObject::invokeMethod(this, [this]() {
+        const bool queued = QMetaObject::invokeMethod(this, [this]() {
             drainMeasurementSamples();
         }, Qt::QueuedConnection);
+        if (!queued) {
+            std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+            m_droppedMeasurementSamples += m_measurementQueue.size();
+            m_measurementQueue.clear();
+            m_measurementDrainScheduled = false;
+        }
     }
 }
 
@@ -2727,9 +2788,15 @@ void MeasurementTab::drainMeasurementSamples()
     for (const auto& sample : batch)
         onMeasurementSample(sample);
     if (scheduleAgain) {
-        QMetaObject::invokeMethod(this, [this]() {
+        const bool queued = QMetaObject::invokeMethod(this, [this]() {
             drainMeasurementSamples();
         }, Qt::QueuedConnection);
+        if (!queued) {
+            std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+            m_droppedMeasurementSamples += m_measurementQueue.size();
+            m_measurementQueue.clear();
+            m_measurementDrainScheduled = false;
+        }
     }
 }
 

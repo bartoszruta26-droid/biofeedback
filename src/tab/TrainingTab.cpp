@@ -1138,9 +1138,15 @@ void TrainingTab::enqueueMeasurementSample(
         }
     }
     if (scheduleDrain) {
-        QMetaObject::invokeMethod(this, [this]() {
+        const bool queued = QMetaObject::invokeMethod(this, [this]() {
             drainMeasurementSamples();
         }, Qt::QueuedConnection);
+        if (!queued) {
+            std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+            m_droppedMeasurementSamples += m_measurementQueue.size();
+            m_measurementQueue.clear();
+            m_measurementDrainScheduled = false;
+        }
     }
 }
 
@@ -1173,9 +1179,15 @@ void TrainingTab::drainMeasurementSamples()
     for (const auto& sample : batch)
         onMeasurementSample(sample);
     if (scheduleAgain) {
-        QMetaObject::invokeMethod(this, [this]() {
+        const bool queued = QMetaObject::invokeMethod(this, [this]() {
             drainMeasurementSamples();
         }, Qt::QueuedConnection);
+        if (!queued) {
+            std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+            m_droppedMeasurementSamples += m_measurementQueue.size();
+            m_measurementQueue.clear();
+            m_measurementDrainScheduled = false;
+        }
     }
 }
 
