@@ -174,8 +174,8 @@ target_link_libraries(acquisition_serial_adapter_regression PRIVATE
 add_test(NAME acquisition_serial_adapter_regression COMMAND acquisition_serial_adapter_regression)
 set_tests_properties(acquisition_serial_adapter_regression PROPERTIES TIMEOUT 20)
 
-# Local loopback HTTP API. Sensitive and hardware operations remain disabled
-# until authentication, authorization and measurement services are integrated.
+# Local loopback HTTP API. Hardware acquisition is opt-in and requires an explicitly
+# configured, connected serial adapter plus an authorized active patient session.
 add_executable(biofeedback_api
     src/api/main.cpp
     src/api/HttpApiServer.cpp
