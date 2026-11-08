@@ -247,11 +247,8 @@ void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
             obstacle.gapY = static_cast<float>(
                 qBound(minGapCenter, static_cast<double>(obstacle.gapY), maxGapCenter));
         }
-        m_minGapHeight = static_cast<float>(qMin(
-            static_cast<double>(m_minGapHeight), safeGapHeight));
-        m_maxGapHeight = static_cast<float>(qBound(
-            static_cast<double>(m_minGapHeight),
-            static_cast<double>(m_maxGapHeight), safeGapHeight));
+        // Keep difficulty settings independent of transient widget size.
+        // spawnObstacle() clamps generated gaps to the currently available height.
     }
     GameEngine::resizeEvent(event);
 }
