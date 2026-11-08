@@ -131,14 +131,21 @@ niezaimplementowany.
   trafiają do kolekcji game-sessions i game-results. Stare pliki pacjentów są
   migrowane bez usuwania źródeł migracji.
 - API ma CRUD kolekcji, sesje Bearer, kontrolę wersji i tymczasową blokadę
-  dostępu do roli administratora. Pełne RBAC, audyt operacji i WebSocket/SSE
-  pozostają do wdrożenia.
+  dostępu do roli administratora. Dla pomiarów, treningów i gier walidowany
+  jest patient_id, jeżeli został podany; wyniki treningowe mogą wskazywać tylko
+  istniejącą sesję treningową, a patient_id wyniku i sesji nie mogą być różne.
+  Pełne RBAC, audyt operacji i WebSocket/SSE pozostają do wdrożenia.
 - WebUI obsługuje CRUD kart pacjentów oraz odczyt archiwów pomiarów,
-  treningów i gier. Android obsługuje CRUD kart pacjentów i odczyt tych samych
-  archiwów; nie prowadzi jeszcze akwizycji ani tworzenia sesji z czujnika.
-- TUI loguje się przez API, odczytuje listę pacjentów i zapisuje sesje oraz
-  wyniki treningowe. Nie dołącza jeszcze identyfikatora pacjenta do treningu
-  ani nie archiwizuje pomiarów i wyników gier.
+  treningów i gier. Android obsługuje CRUD kart pacjentów, odczyt sześciu
+  kolekcji API (w tym sesji gier) oraz bezpośredni odczyt pojedynczych rekordów.
+  Ekrany Androida pozostają w trybie podglądu: aplikacja nie prowadzi jeszcze
+  akwizycji ani tworzenia rzeczywistych sesji z czujnika, treningu i gry.
+- TUI loguje się przez API, odczytuje listę pacjentów, zapisuje sesje pomiarowe
+  przy rozłączeniu czujnika lub zamknięciu aplikacji oraz zapisuje sesje i wyniki
+  treningowe. Sesje i wyniki treningowe zawierają patient_id (domyślnie pierwszy
+  pacjent z listy, gdy operator nie wskazał innego). TUI nie implementuje
+  obecnie silnika gier ani zapisu wyników gier; nie należy utożsamiać tego
+  z pełną obsługą gier w TUI.
 - MariaDB pozostaje niewdrożona; wybranie jej jako backendu pacjentów nie
   powoduje fallbacku do plików.
 
