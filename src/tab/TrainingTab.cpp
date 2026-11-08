@@ -673,6 +673,11 @@ void TrainingTab::setMeasurementEngine(
         m_measurementEngine->unsubscribe(m_measurementCallbackToken);
         m_measurementCallbackToken = 0;
     }
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        m_measurementQueue.clear();
+        m_droppedMeasurementSamples = 0;
+    }
     m_measurementEngine = std::move(engine);
     if (!m_measurementEngine) return;
 
