@@ -15,6 +15,7 @@ GalagaGame::GalagaGame(QWidget *parent)
     , m_fireCooldown(0.0)
     , m_enemyDirection(1.0)
     , m_enemyFireCooldown(1.0)
+    , m_hitCooldown(0.0)
     , m_lives(3)
     , m_wave(1)
     , m_fireHeld(false)
@@ -34,6 +35,7 @@ void GalagaGame::initialize()
     m_fireCooldown = 0.0;
     m_enemyDirection = 1.0;
     m_enemyFireCooldown = 1.0;
+    m_hitCooldown = 0.0;
     m_lives = 3;
     m_wave = 1;
     m_fireHeld = false;
@@ -133,14 +135,24 @@ void GalagaGame::firePlayerShot()
     m_projectiles.push_back(shot);
 }
 
-void GalagaGame::loseLife()
+bool GalagaGame::loseLife()
 {
+    if (m_hitCooldown > 0.0)
+        return false;
+
     --m_lives;
     if (m_lives <= 0) {
         stop();
-        return;
+        return true;
     }
+
+    // Brief post-hit protection prevents overlapping hostile shots or a
+    // descending formation from consuming several lives in adjacent frames.
+    m_hitCooldown = 1.2;
     m_player.moveCenter(QPointF(width() * 0.5, height() - 46.0));
+    m_projectiles.erase(std::remove_if(m_projectiles.begin(), m_projectiles.end(),
+        [](const Projectile& shot) { return !shot.fromPlayer; }), m_projectiles.end());
+    return true;
 }
 
 void GalagaGame::update(double deltaTime)
@@ -148,6 +160,7 @@ void GalagaGame::update(double deltaTime)
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
     deltaTime = qMin(deltaTime, 0.1);
+    m_hitCooldown = qMax(0.0, m_hitCooldown - deltaTime);
 
     const double sensorX = 18.0 + m_force * qMax(0.0, width() - 36.0 - m_player.width());
     const double keyboardX = m_player.x() + m_keyboardDirection * 360.0 * deltaTime;
@@ -201,10 +214,11 @@ void GalagaGame::update(double deltaTime)
             continue;
         enemy.rect.translate(m_enemyDirection * enemySpeed * deltaTime, 0.0);
         if (enemy.rect.bottom() >= m_player.top()) {
-            loseLife();
+            const bool lostLife = loseLife();
             if (!isRunning())
                 return;
-            createWave();
+            if (lostLife)
+                createWave();
             return;
         }
     }
