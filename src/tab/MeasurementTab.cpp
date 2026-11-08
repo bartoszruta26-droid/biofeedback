@@ -1321,6 +1321,8 @@ void MeasurementTab::stopMeasurement()
     closeSampleJournal();
     const bool journalRestored = journalFlushed && !m_sampleJournalFailed &&
                                  restoreSampleJournalIntoSession();
+    if (journalFlushed && !journalRestored)
+        m_sampleJournalFailed = true;
     updateRawTableBatch(true);
     
     // An unfinished contraction is discarded; it must not be stored as a
@@ -2336,6 +2338,17 @@ bool MeasurementTab::importFromCSV(const QString& filename)
 
 bool MeasurementTab::exportToJSON(const QString& filename)
 {
+    if (m_isMeasuring) {
+        QMessageBox::warning(this, tr("Pomiar w toku"),
+                             tr("Zatrzymaj pomiar przed eksportem, aby zachować kompletny dziennik."));
+        return false;
+    }
+    if (m_sampleJournalFailed) {
+        QMessageBox::critical(this, tr("Dziennik wymaga odzyskania"),
+                              tr("Eksport sesji został wstrzymany, ponieważ dziennik nie przeszedł pełnej kontroli zapisu lub odtworzenia. Zachowano plik dziennika do odzyskania."));
+        return false;
+    }
+
     MeasurementSession session;
     if (m_activeSessionId.isEmpty())
         m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
@@ -2360,9 +2373,20 @@ bool MeasurementTab::exportToJSON(const QString& filename)
     }
     QFile::setPermissions(filename, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
     closeSampleJournal();
-    if (!m_sampleJournalPath.isEmpty()) QFile::remove(m_sampleJournalPath);
-    m_sampleJournalPath.clear();
-    m_activeSessionId.clear();
+    if (m_sampleJournalFailed) {
+        QMessageBox::warning(this, tr("Eksport zapisany"),
+                             tr("Plik JSON został zapisany, ale dziennik źródłowy pozostawiono do odzyskania."));
+        return true;
+    }
+    if (!m_sampleJournalPath.isEmpty()) {
+        if (QFile::exists(m_sampleJournalPath) && !QFile::remove(m_sampleJournalPath)) {
+            QMessageBox::warning(this, tr("Eksport zapisany"),
+                                 tr("Plik JSON zapisano, ale nie udało się usunąć dziennika źródłowego."));
+            return true;
+        }
+        m_sampleJournalPath.clear();
+        m_activeSessionId.clear();
+    }
     QMessageBox::information(this, tr("Sukces"), tr("Dane sesji zapisano do: %1").arg(filename));
     return true;
 }
