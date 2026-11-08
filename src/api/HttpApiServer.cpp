@@ -479,6 +479,8 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 if (!m_resources->create(collection, document.object(), created, &repositoryError)) {
                     const bool invalid = repositoryError == "EMPTY_RESOURCE" ||
                         repositoryError == "RESOURCE_TOO_LARGE" ||
+                        repositoryError == "INVALID_PATIENT_RECORD" ||
+                        repositoryError == "DUPLICATE_PATIENT_REFERENCE" ||
                         repositoryError == "UNSUPPORTED_COLLECTION";
                     sendJson(socket, invalid ? 400 : 503,
                         errorBody(invalid ? "INVALID_RESOURCE" : "RESOURCE_CREATE_FAILED",
