@@ -202,13 +202,151 @@ private fun BiofeedbackApp() {
                     item { EmptyChartCard() }
                 }
                 1 -> item { EmptyModule("Pomiary", "Sesje i wykresy pojawią się po integracji z MeasurementEngine.") }
-                2 -> item { EmptyModule("Pacjenci", "Repozytorium kart nie jest podłączone. Aplikacja nie tworzy fikcyjnych rekordów.") }
+                2 -> item { PatientsModule(apiClient) }
                 3 -> item { EmptyModule("Trening", "Moduł oczekuje na wspólne usługi treningowe i sesyjne.") }
                 4 -> item { EmptyModule("Urządzenia", "Brak połączenia. Aplikacja nie wysyła komend sprzętowych w trybie podglądu.") }
                 5 -> item { DiagnosticsModule() }
                 6 -> item { SettingsModule() }
             }
             item { Spacer(Modifier.height(8.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun PatientsModule(client: ApiClient?) {
+    var firstName by remember { mutableStateOf("") }
+    var lastName by remember { mutableStateOf("") }
+    var patientReference by remember { mutableStateOf("") }
+    var medicalHistory by remember { mutableStateOf("") }
+    var editingId by remember { mutableStateOf<String?>(null) }
+    var editingVersion by remember { mutableIntStateOf(0) }
+    var patients by remember { mutableStateOf<org.json.JSONObject?>(null) }
+    var errorMessage by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun refresh() {
+        if (client == null) {
+            errorMessage = "Brak klienta API."
+            return
+        }
+        scope.launch {
+            busy = true
+            errorMessage = ""
+            try {
+                patients = withContext(Dispatchers.IO) { client.getPatients() }
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "Nie można pobrać kart pacjentów."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    fun savePatient() {
+        if (client == null || firstName.isBlank() || lastName.isBlank()) {
+            errorMessage = "Podaj imię i nazwisko pacjenta oraz sprawdź połączenie API."
+            return
+        }
+        val payload = org.json.JSONObject()
+            .put("firstName", firstName.trim())
+            .put("lastName", lastName.trim())
+            .put("pesel", patientReference.trim())
+            .put("medicalHistory", medicalHistory)
+        scope.launch {
+            busy = true
+            errorMessage = ""
+            try {
+                withContext(Dispatchers.IO) {
+                    val id = editingId
+                    if (id == null) client.createPatient(payload)
+                    else client.updatePatient(id, editingVersion, payload)
+                }
+                editingId = null
+                editingVersion = 0
+                firstName = ""
+                lastName = ""
+                patientReference = ""
+                medicalHistory = ""
+                patients = withContext(Dispatchers.IO) { client.getPatients() }
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "Nie udało się zapisać karty."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Wspólne repozytorium pacjentów", color = Navy, fontWeight = FontWeight.Bold)
+        Text("Dane są pobierane i zapisywane przez serwer Biofeedback.", color = Muted, fontSize = 12.sp)
+        OutlinedTextField(firstName, { firstName = it }, label = { Text("Imię") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(lastName, { lastName = it }, label = { Text("Nazwisko") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(patientReference, { patientReference = it }, label = { Text("PESEL / identyfikator") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(medicalHistory, { medicalHistory = it }, label = { Text("Uwagi medyczne") }, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { savePatient() }, enabled = !busy) {
+                Text(if (editingId == null) "Dodaj kartę" else "Zapisz zmiany")
+            }
+            Button(onClick = { refresh() }, enabled = !busy && client != null) {
+                Text("Odśwież")
+            }
+            if (editingId != null) {
+                Button(onClick = {
+                    editingId = null
+                    editingVersion = 0
+                    firstName = ""
+                    lastName = ""
+                    patientReference = ""
+                    medicalHistory = ""
+                }, enabled = !busy) { Text("Anuluj") }
+            }
+        }
+        if (busy) CircularProgressIndicator()
+        if (errorMessage.isNotBlank()) Text(errorMessage, color = Color(0xFFB42318), fontSize = 12.sp)
+
+        val items = patients?.optJSONArray("items")
+        Text("Liczba kart: ${items?.length() ?: 0}", color = Navy, fontWeight = FontWeight.SemiBold)
+        if (items != null) {
+            for (index in 0 until items.length()) {
+                val patient = items.optJSONObject(index) ?: continue
+                val id = patient.optString("id")
+                val version = patient.optInt("version", 0)
+                Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            patient.optString("firstName") + " " + patient.optString("lastName"),
+                            color = Navy, fontWeight = FontWeight.Bold
+                        )
+                        Text("Wersja rekordu: $version", color = Muted, fontSize = 11.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = {
+                                editingId = id
+                                editingVersion = version
+                                firstName = patient.optString("firstName")
+                                lastName = patient.optString("lastName")
+                                patientReference = patient.optString("pesel")
+                                medicalHistory = patient.optString("medicalHistory")
+                            }, enabled = !busy) { Text("Edytuj") }
+                            Button(onClick = {
+                                scope.launch {
+                                    busy = true
+                                    errorMessage = ""
+                                    try {
+                                        withContext(Dispatchers.IO) { client?.deletePatient(id, version) }
+                                        patients = withContext(Dispatchers.IO) { client?.getPatients() }
+                                    } catch (error: Exception) {
+                                        errorMessage = error.message ?: "Nie udało się usunąć karty."
+                                    } finally {
+                                        busy = false
+                                    }
+                                }
+                            }, enabled = !busy && client != null) { Text("Usuń") }
+                        }
+                    }
+                }
+            }
         }
     }
 }
