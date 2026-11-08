@@ -184,8 +184,6 @@ void ScorchedEarthGame::update(double deltaTime)
 
         // Integrate a bounded number of micro-steps and test the whole swept
         // segment so fast shells cannot tunnel through tanks or terrain.
-        const double frameStart = 0.0;
-        Q_UNUSED(frameStart);
         const QPointF oldPosition = projectile.position;
         const QPointF oldVelocity = projectile.velocity;
         projectile.velocity.ry() += m_gravity * deltaTime;
