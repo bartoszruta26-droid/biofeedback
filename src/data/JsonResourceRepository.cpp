@@ -115,6 +115,7 @@ bool JsonResourceRepository::create(const QString& collection, const QJsonObject
     if (!isReady()) { setError(error, m_initializationError); return false; }
     if (!isSupportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return false; }
     if (payload.isEmpty()) { setError(error, QStringLiteral("EMPTY_RESOURCE")); return false; }
+    if (!validatePayload(collection, QString(), payload, error)) return false;
 
     QJsonObject record = payload;
     record.remove(QStringLiteral("id"));
@@ -146,6 +147,7 @@ bool JsonResourceRepository::update(const QString& collection, const QString& id
 
     QJsonObject current;
     if (!readRecord(collection, id, current, error)) return false;
+    if (!validatePayload(collection, id, payload, error)) return false;
     const int version = current.value(QStringLiteral("version")).toInt(0);
     if (version != expectedVersion) { setError(error, QStringLiteral("VERSION_CONFLICT")); return false; }
 
@@ -183,6 +185,43 @@ bool JsonResourceRepository::remove(const QString& collection, const QString& id
     if (!QFile::remove(recordPath(collection, id))) {
         setError(error, QStringLiteral("RESOURCE_DELETE_FAILED"));
         return false;
+    }
+    return true;
+}
+
+bool JsonResourceRepository::validatePayload(const QString& collection,
+                                                     const QString& idToExclude,
+                                                     const QJsonObject& payload,
+                                                     QString* error) const {
+    if (collection != QStringLiteral("patients")) return true;
+    const QString reference = payload.value(QStringLiteral("pesel")).toString().trimmed();
+    const QString firstName = payload.value(QStringLiteral("firstName")).toString().trimmed();
+    const QString lastName = payload.value(QStringLiteral("lastName")).toString().trimmed();
+    if (reference.isEmpty() || reference.size() > 32 ||
+        firstName.isEmpty() || firstName.size() > 100 ||
+        lastName.isEmpty() || lastName.size() > 100) {
+        setError(error, QStringLiteral("INVALID_PATIENT_RECORD"));
+        return false;
+    }
+
+    const QDir directory(collectionPath(collection));
+    if (!directory.exists()) return true;
+    const QFileInfoList files = directory.entryInfoList(QStringList{QStringLiteral("*.json")},
+                                                         QDir::Files | QDir::Readable, QDir::Name);
+    for (const QFileInfo& fileInfo : files) {
+        const QString existingId = fileInfo.completeBaseName();
+        if (!validId(existingId) || existingId.compare(idToExclude, Qt::CaseInsensitive) == 0)
+            continue;
+        QJsonObject existing;
+        QString readError;
+        if (!readRecord(collection, existingId, existing, &readError)) {
+            setError(error, readError);
+            return false;
+        }
+        if (existing.value(QStringLiteral("pesel")).toString().trimmed() == reference) {
+            setError(error, QStringLiteral("DUPLICATE_PATIENT_REFERENCE"));
+            return false;
+        }
     }
     return true;
 }
