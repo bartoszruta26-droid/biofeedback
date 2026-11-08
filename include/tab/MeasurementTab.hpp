@@ -27,11 +27,11 @@
 #include <utility>
 #include <QComboBox>
 #include <QDoubleSpinBox>
-#include <QFile>
 #include <QJsonObject>
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
+#include "tab/SampleJournalWriter.hpp"
 #include "training/RepetitionDetector.hpp"
 #include "core/DebugManager.hpp"
 #include "formulas.hpp"
@@ -444,9 +444,8 @@ private:
     QVector<RecordedMeasurementSample> m_recordedSamples;
     quint64 m_rawTableLastSequence{0};
     qint64 m_lastRawTableRefreshMs{-100};
-    QFile m_sampleJournal;
+    SampleJournalWriter m_sampleJournalWriter;
     QString m_sampleJournalPath;
-    quint32 m_sampleJournalPendingWrites{0};
     QString m_activeSessionId;
     bool m_sampleJournalFailed{false};
     

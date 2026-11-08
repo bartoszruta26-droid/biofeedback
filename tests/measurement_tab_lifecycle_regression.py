@@ -34,8 +34,10 @@ for required in (
     "m_recordedSamples.append(recorded)",
     "bool MeasurementTab::openSampleJournal()",
     "bool MeasurementTab::appendSampleJournal(const RecordedMeasurementSample& sample)",
-    "m_sampleJournalPendingWrites >= 32",
-    "::fsync(m_sampleJournal.handle())",
+    "SampleJournalWriter m_sampleJournalWriter",
+    "m_sampleJournalWriter.append(line)",
+    "m_sampleJournalWriter.finish()",
+    "m_sampleJournalWriter.isAccepting()",
     "recoverSampleJournals(dataDir)",
     "Never carry samples or a live journal across patient boundaries",
     "if (hasActivePatientData)\n        resetSession();",
@@ -80,6 +82,23 @@ for required in (
 ):
     if required not in source and required not in header:
         raise SystemExit(f"Missing realtime/archive invariant: {required}")
+
+if "m_sampleJournal.write(" in source or "m_sampleJournal.flush(" in source:
+    raise SystemExit("Disk I/O must be owned by SampleJournalWriter, not the GUI thread")
+if "m_sampleJournalPendingWrites" in source or "QFile m_sampleJournal" in header:
+    raise SystemExit("Legacy synchronous sample journal state remains in MeasurementTab")
+writer_source = Path("src/tab/SampleJournalWriter.cpp").read_text(encoding="utf-8")
+for required in (
+    "std::thread(&SampleJournalWriter::run, this)",
+    "m_queue.size() >= m_capacity",
+    "m_queue.push_back(line)",
+    "m_changed.wait(lock",
+    "file.write(line)",
+    "flushDurably(file, error)",
+    "::fsync(file.handle())",
+):
+    if required not in writer_source:
+        raise SystemExit(f"Missing background journal writer invariant: {required}")
 
 if 'addDebugMessage(QString("HX711: RAW=' in source:
     raise SystemExit("Per-sample debug logging must not run in the acquisition hot path")

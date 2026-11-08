@@ -1,0 +1,224 @@
+#include "tab/SampleJournalWriter.hpp"
+
+#include <QFile>
+#include <QFileDevice>
+
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
+
+#include <algorithm>
+#include <utility>
+
+namespace tab {
+
+SampleJournalWriter::SampleJournalWriter(std::size_t capacity)
+    : m_capacity(std::max<std::size_t>(1, capacity))
+{
+}
+
+SampleJournalWriter::~SampleJournalWriter()
+{
+    finish();
+}
+
+bool SampleJournalWriter::open(const QString& path, const QByteArray& headerLine,
+                               QString* error)
+{
+    finish();
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_queue.clear();
+        m_path = path;
+        m_headerLine = headerLine;
+        m_error.clear();
+        m_openComplete = false;
+        m_opened = false;
+        m_accepting = false;
+        m_stopRequested = false;
+        m_failed = false;
+    }
+
+    m_thread = std::thread(&SampleJournalWriter::run, this);
+    {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_openCompleted.wait(lock, [this]() { return m_openComplete; });
+        if (error)
+            *error = m_error;
+        if (m_opened)
+            return true;
+    }
+
+    if (m_thread.joinable())
+        m_thread.join();
+    return false;
+}
+
+bool SampleJournalWriter::append(const QByteArray& line)
+{
+    if (line.isEmpty())
+        return false;
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_accepting || m_failed)
+            return false;
+        if (m_queue.size() >= m_capacity) {
+            m_failed = true;
+            m_accepting = false;
+            m_stopRequested = true;
+            m_error = QStringLiteral("Sample journal queue capacity exceeded; acquisition must stop");
+            m_changed.notify_one();
+            return false;
+        }
+        m_queue.push_back(line);
+    }
+    m_changed.notify_one();
+    return true;
+}
+
+bool SampleJournalWriter::finish()
+{
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (!m_thread.joinable())
+            return !m_failed;
+        m_accepting = false;
+        m_stopRequested = true;
+    }
+    m_changed.notify_one();
+    m_thread.join();
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return !m_failed;
+}
+
+bool SampleJournalWriter::isAccepting() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_accepting && !m_failed;
+}
+
+QString SampleJournalWriter::errorString() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    return m_error;
+}
+
+bool SampleJournalWriter::flushDurably(QFile& file, QString& error)
+{
+    if (!file.flush()) {
+        error = file.errorString();
+        return false;
+    }
+#ifdef Q_OS_UNIX
+    if (::fsync(file.handle()) != 0) {
+        error = QStringLiteral("fsync failed for sample journal");
+        return false;
+    }
+#endif
+    return true;
+}
+
+bool SampleJournalWriter::writeDurably(QFile& file, const QByteArray& bytes,
+                                       QString& error)
+{
+    if (file.write(bytes) != bytes.size()) {
+        error = file.errorString();
+        return false;
+    }
+    return flushDurably(file, error);
+}
+
+void SampleJournalWriter::run()
+{
+    QFile file(m_path);
+    const bool newFile = !QFile::exists(m_path);
+    bool opened = file.open(QIODevice::WriteOnly | QIODevice::Append);
+    QString error;
+
+    if (!opened) {
+        error = file.errorString();
+    } else if (newFile && !writeDurably(file, m_headerLine, error)) {
+        opened = false;
+    }
+
+    if (opened) {
+        QFile::setPermissions(m_path,
+                              QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    } else if (file.isOpen()) {
+        file.close();
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_openComplete = true;
+        m_opened = opened;
+        m_accepting = opened;
+        if (!opened) {
+            m_failed = true;
+            m_error = error.isEmpty()
+                ? QStringLiteral("Unable to open sample journal") : error;
+            m_stopRequested = true;
+        }
+    }
+    m_openCompleted.notify_all();
+
+    if (!opened)
+        return;
+
+    unsigned int pendingSinceSync = 0;
+    for (;;) {
+        QByteArray line;
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_changed.wait(lock, [this]() {
+                return m_stopRequested || !m_queue.empty();
+            });
+            if (m_queue.empty() && m_stopRequested)
+                break;
+            if (m_queue.empty())
+                continue;
+            line = std::move(m_queue.front());
+            m_queue.pop_front();
+        }
+
+        if (file.write(line) != line.size()) {
+            error = file.errorString();
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_failed = true;
+            m_accepting = false;
+            m_stopRequested = true;
+            m_error = error;
+            m_queue.clear();
+            break;
+        }
+
+        if (++pendingSinceSync >= 32) {
+            if (!flushDurably(file, error)) {
+                std::lock_guard<std::mutex> lock(m_mutex);
+                m_failed = true;
+                m_accepting = false;
+                m_stopRequested = true;
+                m_error = error;
+                m_queue.clear();
+                break;
+            }
+            pendingSinceSync = 0;
+        }
+    }
+
+    if (!flushDurably(file, error)) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_failed = true;
+        m_error = error;
+    }
+    file.close();
+
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_accepting = false;
+    }
+}
+
+} // namespace tab
