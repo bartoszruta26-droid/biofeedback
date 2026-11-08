@@ -59,7 +59,6 @@ int main(int argc, char** argv)
     assert(reloaded.getString("custom.label") == "calibration station");
     assert(reloaded.getStatistics().loadsSuccessful.load() == 1);
 
-    std::cout << "config_manager_regression: PASS
-";
+    std::cout << "config_manager_regression: PASS\n";
     return 0;
 }
