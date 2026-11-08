@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
         "PUT", ("/api/v1/patients/" + patientId).toUtf8(), updatePayload)) == 409);
 
     const QByteArray missingPatientAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
-        QJsonDocument(QJsonObject{{"id", "missing-patient-session"}, {"patient_id", "patient-does-not-exist"},
+        QJsonDocument(QJsonObject{{"id", "missing-patient-session"}, {"patient_id", "00000000-0000-4000-8000-000000000001"},
                                   {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}}).toJson(QJsonDocument::Compact));
     assert(statusCode(missingPatientAcquisition) == 422);
     const QByteArray missingDeviceAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
