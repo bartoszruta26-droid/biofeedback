@@ -27,7 +27,7 @@ assert 'Odmowa usunięcia ścieżki spoza katalogu instalacji' in uninstaller
 
 assert '"baud_rate": 115200' in example
 assert '"algorithm": "AES-256-GCM"' in example
-assert '"key_derivation": "PBKDF2-HMAC-SHA256"' in example
+assert '"key_derivation": "SHA-256 key normalization (32+ byte external secret)"' in example
 assert '"require_authentication": true' in example
 assert '"actuators_enabled": false' in example
 assert "constexpr bool DEBUG_VERBOSE = false;" in main
