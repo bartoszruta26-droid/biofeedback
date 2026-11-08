@@ -78,10 +78,12 @@ void GameEngine::stop()
         return; // Gra nie jest aktywna
     }
 
-    // Prevent a worker-thread producer from leaving a stale sample queued
-    // across stop/start. The queued callback is still lifetime-guarded.
+    // Invalidate callbacks already queued for this session before clearing
+    // the mailbox. The GUI lambda checks this generation before consuming it.
+    m_sensorDispatchGeneration.fetch_add(1, std::memory_order_acq_rel);
     m_sensorDispatchQueued.store(false, std::memory_order_release);
     m_pendingSensorValue.store(0.0, std::memory_order_relaxed);
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
     // Zatrzymanie timera
     m_gameTimer->stop();
@@ -185,6 +187,12 @@ void GameEngine::resetGameStats()
 
 void GameEngine::reset()
 {
+    // Invalidate queued sensor callbacks from any previous game instance.
+    m_sensorDispatchGeneration.fetch_add(1, std::memory_order_acq_rel);
+    m_sensorDispatchQueued.store(false, std::memory_order_release);
+    m_pendingSensorValue.store(0.0, std::memory_order_relaxed);
+    m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
+
     // Zatrzymanie gry
     m_gameTimer->stop();
     
@@ -256,12 +264,16 @@ void GameEngine::handleSensorInput(double value)
         // Sensor streams can be much faster than the GUI event loop. Keep only
         // the newest valid sample and schedule at most one pending callback.
         m_pendingSensorValue.store(value, std::memory_order_relaxed);
+        const quint64 generation =
+            m_sensorDispatchGeneration.load(std::memory_order_acquire);
         if (m_sensorDispatchQueued.exchange(true, std::memory_order_acq_rel))
             return;
 
         QPointer<GameEngine> guard(this);
-        const bool queued = QMetaObject::invokeMethod(this, [guard] {
+        const bool queued = QMetaObject::invokeMethod(this, [guard, generation] {
             if (!guard)
+                return;
+            if (guard->m_sensorDispatchGeneration.load(std::memory_order_acquire) != generation)
                 return;
 
             // Clear the flag before reading the latest value. A concurrent
