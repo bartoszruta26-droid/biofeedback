@@ -30,6 +30,8 @@ namespace games {
  * - Różne prędkości gry wpływające na dynamikę rozgrywki
  * - Generowanie losowych przeszkód z lukami do przelotu
  */
+class QResizeEvent;
+
 class FlappyBirdGame : public GameEngine {
     Q_OBJECT
 
@@ -115,6 +117,9 @@ private slots:
      * @param message Komunikat o statusie
      */
     void onConnectionStatusChanged(bool connected, const std::string& message);
+
+protected:
+    void resizeEvent(QResizeEvent* event) override;
 
 private:
     // Struktura reprezentująca przeszkodę (gałęzie drzewa)
