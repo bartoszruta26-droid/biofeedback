@@ -39,7 +39,17 @@ bool SampleJournalWriter::open(const QString& path, const QByteArray& headerLine
         m_failed = false;
     }
 
-    m_thread = std::thread(&SampleJournalWriter::run, this);
+    try {
+        m_thread = std::thread(&SampleJournalWriter::run, this);
+    } catch (...) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_openComplete = true;
+        m_failed = true;
+        m_error = QStringLiteral("Unable to start sample journal writer thread");
+        if (error)
+            *error = m_error;
+        return false;
+    }
     {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_openCompleted.wait(lock, [this]() { return m_openComplete; });
@@ -71,7 +81,16 @@ bool SampleJournalWriter::append(const QByteArray& line)
             m_changed.notify_one();
             return false;
         }
-        m_queue.push_back(line);
+        try {
+            m_queue.push_back(line);
+        } catch (...) {
+            m_failed = true;
+            m_accepting = false;
+            m_stopRequested = true;
+            m_error = QStringLiteral("Unable to allocate sample journal queue entry");
+            m_changed.notify_one();
+            return false;
+        }
     }
     m_changed.notify_one();
     return true;
@@ -139,14 +158,18 @@ void SampleJournalWriter::run()
 
     if (!opened) {
         error = file.errorString();
-    } else if (newFile && !writeDurably(file, m_headerLine, error)) {
-        opened = false;
+    } else if (newFile) {
+        // Restrict access before the first patient-linked byte is written.
+        if (!QFile::setPermissions(m_path,
+                                   QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+            error = QStringLiteral("Unable to restrict sample journal file permissions");
+            opened = false;
+        } else if (!writeDurably(file, m_headerLine, error)) {
+            opened = false;
+        }
     }
 
-    if (opened) {
-        QFile::setPermissions(m_path,
-                              QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    } else if (file.isOpen()) {
+    if (!opened && file.isOpen()) {
         file.close();
     }
 
