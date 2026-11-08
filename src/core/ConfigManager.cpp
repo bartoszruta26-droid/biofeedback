@@ -310,7 +310,8 @@ bool ConfigManager::validateConfiguration() const {
     // public getters acquire the same non-recursive mutex and would deadlock.
     bool valid = true;
     const std::vector<std::string> requiredKeys = {
-        "serial.port", "serial.baud_rate", "data.base_path", "encryption.enabled"
+        "serial.port", "serial.baud_rate", "data.base_path",
+        "storage.patient_backend", "encryption.enabled"
     };
 
     for (const auto& key : requiredKeys) {
@@ -345,6 +346,28 @@ bool ConfigManager::validateConfiguration() const {
         if (const auto* value = std::get_if<bool>(&it->second)) return *value;
         return fallback;
     };
+
+    const std::string patientBackend = stringValue("storage.patient_backend", "");
+    if (patientBackend != "files" && patientBackend != "mariadb") {
+        logMessage(ConfigManagerLogLevel::ERROR,
+                   "storage.patient_backend must be either files or mariadb",
+                   "validateConfiguration");
+        valid = false;
+    }
+    if (patientBackend == "mariadb") {
+        const std::string host = stringValue("storage.mariadb.host", "");
+        const std::string database = stringValue("storage.mariadb.database", "");
+        const std::string username = stringValue("storage.mariadb.username", "");
+        const std::string passwordEnv = stringValue("storage.mariadb.password_env", "");
+        const double port = numericValue("storage.mariadb.port", 0);
+        if (host.empty() || database.empty() || username.empty() || passwordEnv.empty() ||
+            !std::isfinite(port) || port < 1 || port > 65535) {
+            logMessage(ConfigManagerLogLevel::ERROR,
+                       "MariaDB backend requires host, valid port, database, username and password_env",
+                       "validateConfiguration");
+            valid = false;
+        }
+    }
 
     const auto profileIt = m_config.find("deployment.profile");
     const std::string deploymentProfile = stringValue("deployment.profile", "development");
@@ -475,6 +498,15 @@ void ConfigManager::setDefaults() {
     m_config["serial.retry_count"] = 3;
     
     // Data settings
+    m_config["storage.patient_backend"] = std::string("files");
+    m_config["storage.mariadb.host"] = std::string("127.0.0.1");
+    m_config["storage.mariadb.port"] = 3306;
+    m_config["storage.mariadb.database"] = std::string("biofeedback");
+    m_config["storage.mariadb.username"] = std::string("biofeedback_app");
+    m_config["storage.mariadb.password_env"] = std::string("BIOFEEDBACK_MARIADB_PASSWORD");
+    m_config["storage.mariadb.tls"] = true;
+    m_config["storage.mariadb.connect_timeout_seconds"] = 5;
+
     m_config["data.base_path"] = std::string("./data/patients");
     m_config["data.backup_enabled"] = true;
     m_config["data.backup_interval_hours"] = 24;
