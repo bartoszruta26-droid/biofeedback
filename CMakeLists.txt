@@ -140,6 +140,7 @@ add_test(NAME biomechanical_parameter_availability_regression
 # Application-facing lifecycle boundary for the shared measurement pipeline.
 add_library(biofeedback_application_services STATIC
     src/application/MeasurementService.cpp
+    src/application/AcquisitionService.cpp
     src/application/DeviceService.cpp
     src/application/ApplicationServices.cpp
 )
@@ -149,6 +150,10 @@ target_link_libraries(biofeedback_application_services PUBLIC biofeedback_measur
 add_executable(measurement_service_regression tests/measurement_service_regression.cpp)
 target_link_libraries(measurement_service_regression PRIVATE biofeedback_application_services)
 add_test(NAME measurement_service_regression COMMAND measurement_service_regression)
+
+add_executable(acquisition_service_regression tests/acquisition_service_regression.cpp)
+target_link_libraries(acquisition_service_regression PRIVATE biofeedback_application_services)
+add_test(NAME acquisition_service_regression COMMAND acquisition_service_regression)
 
 add_executable(device_service_regression tests/device_service_regression.cpp)
 target_link_libraries(device_service_regression PRIVATE biofeedback_application_services)
