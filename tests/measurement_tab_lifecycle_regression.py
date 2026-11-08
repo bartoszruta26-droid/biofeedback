@@ -189,6 +189,9 @@ for required in (
     "m_measurementEngine->setCommitHook",
     "m_journalAdmission.store(true",
     "m_journalAdmission.store(false",
+    "return !m_sampleJournalFailed.load(std::memory_order_acquire)",
+    "m_measurementSessionGeneration.fetch_add(1",
+    "sessionGeneration != m_measurementSessionGeneration.load",
     "m_sampleJournalWriter.appendDurably(line)",
     "m_journalNextSequence.store(sequence + 1",
 ):
