@@ -326,6 +326,102 @@ Edit `config/config.json` to customize:
 - Encryption settings
 - UI preferences
 
+## Wybór miejsca przechowywania danych pacjentów
+
+Sposób przechowywania danych pacjentów wybiera się w pliku `config/config.json`,
+w sekcji `storage`, za pomocą pola `patient_backend`.
+
+### Zapis w plikach — opcja działająca
+
+Aby przechowywać dane pacjentów w plikach na dysku, ustaw:
+
+```json
+"storage": {
+  "patient_backend": "files",
+  "mariadb": {
+    "host": "127.0.0.1",
+    "port": 3306,
+    "database": "biofeedback",
+    "username": "biofeedback_app",
+    "password_env": "BIOFEEDBACK_MARIADB_PASSWORD",
+    "tls": true,
+    "connect_timeout_seconds": 5
+  }
+}
+```
+
+Wartość `"files"` jest ustawieniem domyślnym. Lokalizacja danych wynika z
+ustawienia `data.base_path` (w przykładowej konfiguracji: `./data/patients`).
+Wybór backendu plikowego nie wymaga konfiguracji MariaDB ani hasła do bazy.
+
+### MariaDB — konfiguracja docelowa, adapter jeszcze niedostępny
+
+Aby wskazać MariaDB jako wybrany backend, zmień:
+
+```json
+"patient_backend": "mariadb"
+```
+
+Parametry połączenia znajdują się w `storage.mariadb`:
+
+| Pole | Znaczenie |
+|---|---|
+| `host` | Adres serwera MariaDB, np. `127.0.0.1` |
+| `port` | Port serwera, domyślnie `3306` |
+| `database` | Nazwa bazy danych, domyślnie `biofeedback` |
+| `username` | Użytkownik bazy, domyślnie `biofeedback_app` |
+| `password_env` | Nazwa zmiennej środowiskowej zawierającej hasło |
+| `tls` | Żądanie używania szyfrowanego połączenia TLS |
+| `connect_timeout_seconds` | Limit czasu na połączenie w sekundach |
+
+**Ważny stan implementacji:** bieżąca wersja waliduje wybór `mariadb` i jego
+parametry, ale nie zawiera jeszcze sterownika ani adaptera repozytorium MariaDB.
+Po wybraniu `"mariadb"` aplikacja celowo kończy inicjalizację z czytelnym błędem.
+Nie zapisuje wtedy danych zastępczo do plików. Samo ustawienie hasła i parametrów
+połączenia nie uruchamia jeszcze obsługi bazy. Do czasu wdrożenia adaptera używaj
+`"files"`.
+
+### Ustawianie hasła MariaDB
+
+Hasła **nie wpisuj** do `config.json`, `config.json.example`, kodu źródłowego
+ani repozytorium. Konfiguracja przechowuje wyłącznie nazwę zmiennej środowiskowej:
+`BIOFEEDBACK_MARIADB_PASSWORD`. Nazwa ta musi odpowiadać wartości
+`storage.mariadb.password_env`.
+
+Linux — ustawienie tymczasowe dla bieżącej sesji terminala:
+
+```bash
+read -rsp "Hasło MariaDB: " BIOFEEDBACK_MARIADB_PASSWORD
+echo
+export BIOFEEDBACK_MARIADB_PASSWORD
+```
+
+Zmienna będzie dostępna dla procesów uruchomionych z tego terminala. Po zamknięciu
+sesji ustaw ją ponownie. Nie umieszczaj hasła bezpośrednio w poleceniu, ponieważ
+może ono zostać zapisane w historii powłoki.
+
+Windows PowerShell — ustawienie tymczasowe dla bieżącego okna:
+
+```powershell
+$securePassword = Read-Host "Hasło MariaDB" -AsSecureString
+$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+try {
+    $env:BIOFEEDBACK_MARIADB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
+}
+finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
+}
+```
+
+To ustawienie obowiązuje tylko w bieżącym procesie PowerShell i procesach
+uruchomionych z niego. Zakończenie sesji usuwa zmienną z tego środowiska.
+
+Na serwerze produkcyjnym ustaw zmienną w bezpiecznym menedżerze sekretów lub
+mechanizmie zarządzania usługą, z dostępem ograniczonym do konta uruchamiającego
+Biofeedback. Nie zapisuj jawnego hasła w plikach konfiguracyjnych projektu,
+dziennikach ani systemie kontroli wersji. Używaj odrębnego konta MariaDB
+o minimalnych uprawnieniach wymaganych przez aplikację.
+
 ## Data Storage
 
 Patient data is organized as:
