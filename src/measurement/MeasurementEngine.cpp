@@ -65,6 +65,17 @@ bool MeasurementEngine::normalizeUnit(const std::string& inputUnit,
 }
 
 MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
+    MeasurementSample output;
+    (void)ingest(input, output);
+    return output;
+}
+
+void MeasurementEngine::setCommitHook(CommitHook hook) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_commitHook = std::move(hook);
+}
+
+bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample& output) {
     MeasurementSample sample;
     sample.timestampUnixMs = nowUnixMilliseconds();
     sample.deviceTimestampMs = input.deviceTimestampMs;
@@ -98,7 +109,20 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
     std::vector<std::shared_ptr<CallbackEntry>> callbacks;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
-        sample.sequence = m_nextSequence++;
+        sample.sequence = m_nextSequence;
+        if (m_commitHook) {
+            bool committed = false;
+            try {
+                committed = m_commitHook(sample);
+            } catch (...) {
+                committed = false;
+            }
+            if (!committed) {
+                output = MeasurementSample{};
+                return false;
+            }
+        }
+        ++m_nextSequence;
         m_history.push_back(sample);
         if (m_history.size() > m_config.historyCapacity)
             m_history.erase(m_history.begin(), m_history.begin() +
@@ -121,7 +145,8 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
             if (entry->inFlight == 0) entry->idle.notify_all();
         }
     }
-    return sample;
+    output = sample;
+    return true;
 }
 
 MeasurementEngine::CallbackToken MeasurementEngine::subscribe(SampleCallback callback) {

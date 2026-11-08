@@ -28,8 +28,11 @@ bool MeasurementService::isRunning() const noexcept {
 bool MeasurementService::ingest(const measurement::MeasurementInput& input,
                                 measurement::MeasurementSample& output) {
     if (!isRunning()) return false;
-    output = m_engine->ingest(input);
-    return true;
+    return m_engine->ingest(input, output);
+}
+
+void MeasurementService::setCommitHook(measurement::MeasurementEngine::CommitHook hook) {
+    m_engine->setCommitHook(std::move(hook));
 }
 
 MeasurementService::CallbackToken MeasurementService::subscribe(SampleCallback callback) {
