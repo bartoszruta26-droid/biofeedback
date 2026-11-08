@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'firmware/pico/**'
+      - 'include/sensor/SerialProtocolConfig.hpp'
       - 'tests/pico_firmware_safety_regression.py'
       - '.github/workflows/pico-firmware.yml'
   pull_request:
