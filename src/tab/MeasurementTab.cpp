@@ -472,9 +472,13 @@ MeasurementTab::~MeasurementTab()
     // Reject new acquisitions and subscriber deliveries first. Then wait
     // for any in-flight durable commit before closing the journal worker.
     m_journalAdmission.store(false, std::memory_order_release);
+    m_measurementSessionGeneration.fetch_add(1, std::memory_order_acq_rel);
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         m_measurementQueueAccepting = false;
+        m_measurementQueue.clear();
+        m_measurementDrainScheduled = false;
+        m_droppedMeasurementSamples = 0;
     }
     if (m_measurementEngine)
         m_measurementEngine->setCommitHook({});
@@ -1150,6 +1154,8 @@ void MeasurementTab::startMeasurement()
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        m_measurementQueue.clear();
+        m_measurementDrainScheduled = false;
         m_droppedMeasurementSamples = 0;
         m_totalDroppedMeasurementSamples = 0;
     }
@@ -1161,6 +1167,7 @@ void MeasurementTab::startMeasurement()
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
+    m_measurementSessionGeneration.fetch_add(1, std::memory_order_acq_rel);
     m_journalAdmission.store(true, std::memory_order_release);
     
     std::cout << "[DEBUG] startMeasurement: Locking Raw/Calibrated button" << std::endl;
@@ -1194,6 +1201,13 @@ void MeasurementTab::stopMeasurement()
     }
     
     m_journalAdmission.store(false, std::memory_order_release);
+    m_measurementSessionGeneration.fetch_add(1, std::memory_order_acq_rel);
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        m_measurementQueue.clear();
+        m_measurementDrainScheduled = false;
+        m_droppedMeasurementSamples = 0;
+    }
     // setCommitHook takes the engine mutex, forming a barrier behind any
     // in-flight commit before the writer is drained and closed.
     if (m_measurementEngine) {
@@ -2819,6 +2833,8 @@ void MeasurementTab::enqueueMeasurementSample(
 {
     // The shared engine also feeds TrainingTab while this tab is idle. Do not
     // queue idle frames for this tab's inactive graph/repetition presentation.
+    const quint64 sessionGeneration =
+        m_measurementSessionGeneration.load(std::memory_order_acquire);
     if (!m_journalAdmission.load(std::memory_order_acquire) &&
         !m_sampleJournalFailed.load(std::memory_order_acquire))
         return;
@@ -2827,7 +2843,9 @@ void MeasurementTab::enqueueMeasurementSample(
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         constexpr std::size_t MaximumQueuedSamples = 4096;
-        if (!m_measurementQueueAccepting) return;
+        if (!m_measurementQueueAccepting ||
+            sessionGeneration != m_measurementSessionGeneration.load(std::memory_order_acquire))
+            return;
         // This queue serves only GUI presentation and derived repetition
         // analysis. The durable journal has already committed this sample.
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
