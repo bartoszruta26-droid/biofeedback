@@ -19,6 +19,10 @@ class ScorchedEarthGame final : public GameEngine
 public:
     explicit ScorchedEarthGame(QWidget *parent = nullptr);
     QString gameName() const override;
+    int playerHealth() const { return m_playerHealth; }
+    int enemyHealth() const { return m_enemyHealth; }
+    int currentRound() const { return m_round; }
+    int terrainPointCount() const { return m_terrain.size(); }
 
 protected:
     void initialize() override;
