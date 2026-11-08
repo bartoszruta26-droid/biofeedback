@@ -346,7 +346,20 @@ bool ConfigManager::validateConfiguration() const {
         return fallback;
     };
 
+    const auto profileIt = m_config.find("deployment.profile");
     const std::string deploymentProfile = stringValue("deployment.profile", "development");
+    if (profileIt != m_config.end() && std::get_if<std::string>(&profileIt->second) == nullptr) {
+        logMessage(ConfigManagerLogLevel::ERROR,
+                   "deployment.profile must be a string",
+                   "validateConfiguration");
+        valid = false;
+    }
+    if (deploymentProfile != "development" && deploymentProfile != "production") {
+        logMessage(ConfigManagerLogLevel::ERROR,
+                   "deployment.profile must be development or production",
+                   "validateConfiguration");
+        valid = false;
+    }
     if (deploymentProfile == "production") {
         if (!boolValue("encryption.enabled", false)) {
             logMessage(ConfigManagerLogLevel::ERROR,
