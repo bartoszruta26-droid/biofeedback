@@ -9,6 +9,7 @@
 #include <memory>
 #include "data/JsonResourceRepository.hpp"
 #include "application/AcquisitionService.hpp"
+#include "application/DeviceService.hpp"
 
 class QTcpSocket;
 namespace biofeedback { class Authentication; }
@@ -24,6 +25,7 @@ public:
                   const QString& authenticationEncryptionKey = QString(),
                   QObject* parent = nullptr);
     void setAcquisitionService(std::shared_ptr<biofeedback::application::AcquisitionService> acquisition);
+    void setDeviceService(std::shared_ptr<biofeedback::application::DeviceService> devices);
     bool listen(const QHostAddress& address = QHostAddress::LocalHost, quint16 port = 8765);
     void close();
     bool isListening() const;
@@ -45,6 +47,7 @@ private:
     QString m_usersFilePath;
     std::shared_ptr<biofeedback::data::JsonResourceRepository> m_resources;
     std::shared_ptr<biofeedback::application::AcquisitionService> m_acquisition;
+    std::shared_ptr<biofeedback::application::DeviceService> m_devices;
     QString m_authenticationEncryptionKey;
     QTcpServer m_server;
 };
