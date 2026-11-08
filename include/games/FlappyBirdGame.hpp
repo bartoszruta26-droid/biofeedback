@@ -175,6 +175,7 @@ private:
     int m_obstaclesPassed;
     
     // Pomocnicze
+    void adaptToSize(const QSize& oldSize, const QSize& newSize);
     void resetBird();
     void spawnObstacle();
     void normalizeForceValue(double rawValue);
