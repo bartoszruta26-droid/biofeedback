@@ -121,6 +121,13 @@ int main() {
     concurrentEngine.ingest(concurrentInput);
     assert(concurrentEngine.history().size() == 2);
 
+    // A recovered journal resumes sequence assignment without reusing old IDs.
+    MeasurementEngineConfig recoveredConfig;
+    recoveredConfig.initialSequence = 301;
+    MeasurementEngine recoveredEngine(recoveredConfig);
+    const auto recoveredSample = recoveredEngine.ingest(concurrentInput);
+    assert(recoveredSample.sequence == 301);
+
     // Persistence is a pre-publication gate: failed commits consume no sequence,
     // enter no in-memory history and are never delivered to subscribers.
     MeasurementEngine commitEngine;
