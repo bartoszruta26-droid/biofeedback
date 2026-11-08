@@ -25,6 +25,10 @@
 #include <QDateTime>
 #include <QScrollBar>
 
+#include <deque>
+#include <mutex>
+#include <cstddef>
+
 #include "GraphWidget.hpp"
 #include "tab/OutlineTab.hpp"
 #include "sensor/SerialCommunication.hpp"
