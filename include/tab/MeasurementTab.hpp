@@ -74,8 +74,6 @@ public:
     void addSample(double force, double time);
     void clearData();
     void setTargetForce(double force);
-    void setEngineRepetitionsPerSeries(int repetitions);
-    void setMeasurementPaused(bool paused);
     void setMaxTimeWindow(double seconds);
     void setUnit(ForceUnit unit);
     
@@ -183,6 +181,8 @@ public:
      * @brief Ustawia siłę docelową (np. 80% MVC)
      */
     void setTargetForce(double force);
+    void setEngineRepetitionsPerSeries(int repetitions);
+    void setMeasurementPaused(bool paused);
     
     /**
      * @brief Sprawdza czy pomiar jest aktywny
