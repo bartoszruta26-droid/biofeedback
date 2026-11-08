@@ -17,6 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check installer, udev and production security defaults
+        run: python3 tests/installer_safety_regression.py
+      - name: Check shared serial configuration
+        run: python3 tests/serial_configuration_regression.py
       - name: Check serial diagnostics defaults
         run: python3 tests/serial_diagnostics_policy_regression.py
       - name: Check measurement tab lifecycle
