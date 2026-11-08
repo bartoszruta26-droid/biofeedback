@@ -99,11 +99,18 @@ np. `{"code":"DEVICE_BUSY","message":"Urządzenie jest zajęte"}`.
 ## Stan implementacji
 
 Klient JavaScript jest zaimplementowany w `api-client.js` i pokryty testami
-Node.js. Serwer `biofeedback_api` udostępnia `GET /healthz`,
+Node.js. Aplikacja Desktop uruchamia serwer loopback w swoim procesie;
+`biofeedback_api` pozostaje samodzielnym wariantem uruchomieniowym.
+Serwer udostępnia `GET /healthz`,
 `GET /api/v1/status`, `POST /api/v1/auth/login`,
 `GET /api/v1/auth/me` oraz `POST /api/v1/auth/logout`.
 Sesje są przechowywane w pamięci procesu i wygasają po 30 minutach.
 Domyślnie serwer nasłuchuje wyłącznie na `127.0.0.1:8765`.
+CORS dopuszcza wyłącznie źródła localhost/127.0.0.1/::1; WebUI powinno
+być serwowane z lokalnego serwera HTTP. TUI i Desktop GUI korzystają z tego
+samego magazynu kont. Klient Android wymaga HTTPS i nie łączy się bezpośrednio
+z tym lokalnym serwerem HTTP — do połączenia zdalnego potrzebna jest osobna
+brama TLS.
 
 Endpointy urządzeń, pacjentów i sesji oraz kanały WebSocket są nadal
 zarezerwowane, lecz niewdrożone. Samo zwrócenie roli przez endpoint
