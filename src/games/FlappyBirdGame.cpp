@@ -301,8 +301,12 @@ void FlappyBirdGame::checkCollisions() {
 }
 
 void FlappyBirdGame::update(double deltaTime) {
-    if (!isRunning()) return;
-    
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+
+    // Ochrona wywołań bezpośrednich: nie wykonuj nieograniczonego skoku czasu.
+    deltaTime = qMin(deltaTime, 0.1);
+
     // Aktualizacja ptaka
     updateBird(deltaTime);
     if (!isRunning()) return;
