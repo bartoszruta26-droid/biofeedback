@@ -149,6 +149,22 @@ void ArkanoidGame::advanceLevel()
 
 void ArkanoidGame::update(double deltaTime)
 {
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0 ||
+        width() <= 0 || height() <= 0)
+        return;
+
+    // Match the engine's bounded catch-up policy for defensive direct calls.
+    // At most twelve 1/120 s physics steps are executed per update.
+    deltaTime = qMin(deltaTime, 0.1);
+    constexpr double maxPhysicsStep = 1.0 / 120.0;
+    const int steps = qBound(1, static_cast<int>(std::ceil(deltaTime / maxPhysicsStep)), 12);
+    const double stepTime = deltaTime / static_cast<double>(steps);
+    for (int step = 0; step < steps && isRunning(); ++step)
+        updatePhysicsStep(stepTime);
+}
+
+void ArkanoidGame::updatePhysicsStep(double deltaTime)
+{
     if (!isRunning() || width() <= 0 || height() <= 0)
         return;
 
