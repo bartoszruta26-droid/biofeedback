@@ -7,6 +7,7 @@
 
 #include <condition_variable>
 #include <cstddef>
+#include <cstdint>
 #include <deque>
 #include <mutex>
 #include <thread>
@@ -33,12 +34,20 @@ public:
               QString* error = nullptr);
     // Non-blocking bounded enqueue. false means the journal is no longer accepting.
     bool append(const QByteArray& line);
+    // Blocks the acquisition producer until this record has been fsynced.
+    bool appendDurably(const QByteArray& line);
     // Stops admission, drains accepted records, flushes/fsyncs and joins the worker.
     bool finish();
     bool isAccepting() const;
     QString errorString() const;
 
 private:
+    struct PendingRecord {
+        QByteArray line;
+        std::uint64_t ticket{0};
+        bool durable{false};
+    };
+    bool enqueue(const QByteArray& line, bool durable);
     void run();
     static bool writeDurably(QFile& file, const QByteArray& bytes,
                              QString& error);
@@ -48,7 +57,8 @@ private:
     mutable std::mutex m_mutex;
     std::condition_variable m_changed;
     std::condition_variable m_openCompleted;
-    std::deque<QByteArray> m_queue;
+    std::condition_variable m_completed;
+    std::deque<PendingRecord> m_queue;
     QString m_path;
     QByteArray m_headerLine;
     QString m_error;
@@ -58,6 +68,8 @@ private:
     bool m_accepting{false};
     bool m_stopRequested{false};
     bool m_failed{false};
+    std::uint64_t m_nextTicket{0};
+    std::uint64_t m_completedTicket{0};
 };
 
 } // namespace tab
