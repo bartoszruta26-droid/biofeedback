@@ -513,9 +513,11 @@ bool MeasurementTab::openSampleJournal()
         // Preserve the failed segment for recovery and begin a fresh journal.
         m_sampleJournalPath.clear();
         m_activeSessionId.clear();
-    m_journalNextSequence.store(1, std::memory_order_release);
-    m_journalAdmission.store(false, std::memory_order_release);
-    m_sampleJournalFailed = false;
+        m_journalNextSequence.store(
+            static_cast<quint64>(m_recordedSamples.size()) + 1,
+            std::memory_order_release);
+        m_journalAdmission.store(false, std::memory_order_release);
+        m_sampleJournalFailed = false;
     }
     if (m_sampleJournalPath.isEmpty()) {
         const QString dataDir = biofeedback::runtime::patientDirectory(m_patientId);
@@ -707,7 +709,9 @@ bool MeasurementTab::restoreSampleJournalIntoSession()
         ++expectedSequence;
     }
     file.close();
-    if (!headerSeen) return false;
+    if (!headerSeen ||
+        expectedSequence != m_journalNextSequence.load(std::memory_order_acquire))
+        return false;
 
     const quint64 prefixCount = firstSequence - 1;
     if (prefixCount > static_cast<quint64>(m_recordedSamples.size()))
