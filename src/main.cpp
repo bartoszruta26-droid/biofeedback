@@ -22,6 +22,11 @@
 
 #include "core/Application.hpp"
 #include "api/HttpApiServer.hpp"
+#include "core/RuntimePaths.hpp"
+#include "data/JsonResourceRepository.hpp"
+#include <QDir>
+#include <memory>
+#include <cstdlib>
 #include <iostream>
 #include <csignal>
 #include <exception>
@@ -265,13 +270,31 @@ int main(int argc, char* argv[]) {
         printDebugState();
 #endif
         
-        // Create application with RAII semantics
+        // Create and initialize the application before composing the shared API.
         biofeedback::Application app(argc, argv);
         g_app = &app;
+        if (!app.initialize()) {
+            std::cerr << "[MAIN] Application initialization failed; shared API was not started." << std::endl;
+            return EXIT_FAILURE;
+        }
 
+        const bool encryptionEnabled = app.getConfigManager().getBool("encryption.enabled", false);
+        const QByteArray keyBytes = qgetenv("BIOFEEDBACK_ENCRYPTION_KEY");
+        const QString encryptionKey = QString::fromUtf8(keyBytes);
+        auto sharedResources = std::make_shared<biofeedback::data::JsonResourceRepository>(
+            QDir(biofeedback::runtime::appDataDirectory()).filePath(QStringLiteral("shared-data")),
+            encryptionKey, encryptionEnabled);
+        if (!sharedResources->isReady()) {
+            std::cerr << "[MAIN] Shared resource storage is unavailable: "
+                      << sharedResources->initializationError().toStdString()
+                      << ". Resource API will fail closed." << std::endl;
+        }
+
+        const QString usersPath = biofeedback::runtime::ensureUserConfigFile(QStringLiteral("users.json"));
+        biofeedback::api::HttpApiServer localApiServer(
+            usersPath, sharedResources, encryptionEnabled ? encryptionKey : QString());
         // Host the authenticated local API for local clients. The server binds
         // only to loopback; remote access requires a separate TLS gateway.
-        biofeedback::api::HttpApiServer localApiServer;
         if (!localApiServer.listen(QHostAddress::LocalHost, 8765)) {
             std::cerr << "[MAIN] Loopback API unavailable on 127.0.0.1:8765; desktop mode continues." << std::endl;
         }
