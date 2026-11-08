@@ -333,6 +333,41 @@ bool ConfigManager::validateConfiguration() const {
         return fallback;
     };
 
+    const auto stringValue = [this](const std::string& key, const std::string& fallback) {
+        const auto it = m_config.find(key);
+        if (it == m_config.end()) return fallback;
+        if (const auto* value = std::get_if<std::string>(&it->second)) return *value;
+        return fallback;
+    };
+    const auto boolValue = [this](const std::string& key, bool fallback) {
+        const auto it = m_config.find(key);
+        if (it == m_config.end()) return fallback;
+        if (const auto* value = std::get_if<bool>(&it->second)) return *value;
+        return fallback;
+    };
+
+    const std::string deploymentProfile = stringValue("deployment.profile", "development");
+    if (deploymentProfile == "production") {
+        if (!boolValue("encryption.enabled", false)) {
+            logMessage(ConfigManagerLogLevel::ERROR,
+                       "Production profile requires encryption.enabled=true",
+                       "validateConfiguration");
+            valid = false;
+        }
+        if (!boolValue("medical.require_authentication", false)) {
+            logMessage(ConfigManagerLogLevel::ERROR,
+                       "Production profile requires medical.require_authentication=true",
+                       "validateConfiguration");
+            valid = false;
+        }
+        if (stringValue("encryption.algorithm", "") != "AES-256-GCM") {
+            logMessage(ConfigManagerLogLevel::ERROR,
+                       "Production profile requires AES-256-GCM",
+                       "validateConfiguration");
+            valid = false;
+        }
+    }
+
     const double baudRate = numericValue("serial.baud_rate", 0.0);
     if (!std::isfinite(baudRate) || baudRate <= 0.0 || baudRate > 1000000.0) {
         logMessage(ConfigManagerLogLevel::ERROR,
@@ -458,7 +493,7 @@ void ConfigManager::setDefaults() {
     m_config["games.session_duration_minutes"] = 15;
     
     // Medical settings
-    m_config["medical.require_authentication"] = false;
+    m_config["deployment.profile"] = std::string("development");\n    m_config["medical.require_authentication"] = true;
     m_config["medical.audit_log_enabled"] = true;
     m_config["medical.data_retention_days"] = 2555;
     m_config["medical.export_format"] = std::string("JSON");
