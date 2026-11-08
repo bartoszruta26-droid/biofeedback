@@ -66,19 +66,33 @@ MariaDB connection settings are grouped under `storage.mariadb`: `host`, `port`,
 
 ## 4. API contract
 
-Version all endpoints under `/api/v1`. Initial resource families:
-- `/patients` and `/patients/{id}`
-- `/measurements` and `/measurements/{id}`
-- `/training-plans`, `/training-sessions`, `/training-results`
-- `/game-sessions`, `/game-results`
-- `/events` for live notifications (WebSocket/SSE transport)
+Wersjonowanie endpointów: `/api/v1`. Wdrożone kolekcje CRUD:
+- `patients`
+- `measurements`
+- `training-sessions`
+- `training-results`
+- `game-sessions`
+- `game-results`
 
-All patient and result endpoints require authentication and resource-level authorization. A valid bearer token alone is not proof of permission to read every patient. Mutating requests should support:
-- `If-Match`/ETag or an explicit record version for optimistic concurrency.
-- An idempotency key for retry-safe creation/submission.
-- An audit event with actor, action, resource identifier, timestamp and outcome; do not log patient payloads or credentials.
+Każda kolekcja udostępnia `GET /{collection}` i `POST /{collection}`;
+rekord udostępnia `GET /{collection}/{id}`, `PUT /{collection}/{id}`
+i `DELETE /{collection}/{id}`. Identyfikatory tworzy serwer jako UUID.
+Rekord zawiera `id`, `version`, `created_at` i `updated_at`.
+Aktualizacja/usunięcie wymagają `expected_version`; niezgodna wersja zwraca
+HTTP 409. Ciało rekordu jest ograniczone do 1 MiB.
 
-Use bounded pagination and filtering. Validate request size, types, units, timestamps and patient/session relationships. Return stable machine-readable error codes.
+Do czasu wdrożenia zakresów RBAC wszystkie operacje na kolekcjach wymagają
+aktywnej sesji użytkownika z rolą `administrator`. Nie jest to docelowy model
+uprawnień klinicznych. Wymagane są dalsze zakresy per rola, pacjent i relacja
+terapeuta-pacjent, rejestr audytowy z aktorem i wynikiem operacji oraz klucze
+idempotencji. Nie logować danych pacjenta ani sekretów.
+
+Lista kolekcji jest ograniczona do jawnej listy dozwolonych nazw; identyfikatory
+nie są ścieżkami ani numerami PESEL. Repozytorium sprawdza format JSON, limit
+rozmiaru, wersję rekordu i integralność identyfikatora. Walidacja domenowa
+jednostek, timestampów i relacji pacjent/sesja musi być rozszerzana wraz
+z integracją producentów danych. WebSocket/SSE dla zdarzeń pozostaje
+niezaimplementowany.
 
 ## 5. Migration sequence
 
@@ -104,8 +118,28 @@ Use bounded pagination and filtering. Validate request size, types, units, times
 - Backup restoration reproduces patient and result records and preserves identifiers/relationships.
 - CI reports each platform independently; unbuilt or untested platforms are never described as passing.
 
-## 7. Current implementation status (baseline)
+## 7. Current implementation status
 
-The existing repository has a local `DataManager` with patient JSON serialization and encrypted-file support, plus a `RuntimePaths::patientDirectory` helper that uses a SHA-256-derived directory name. The current HTTP API has authentication/status/health routes but does not yet expose patient, measurement, training or game repositories. Existing `ApplicationServices` composes device and measurement services only; it is not yet injected into all clients or the API.
+- Dodano `JsonResourceRepository` dla sześciu kolekcji: patients, measurements,
+  training-sessions, training-results, game-sessions i game-results.
+- Magazyn plikowy używa UUID, atomowego zapisu `QSaveFile`, limitu 1 MiB,
+  kontroli wersji oraz uprawnień owner-only. Gdy `encryption.enabled=true`,
+  rekordy są szyfrowane AES-256-GCM; brak klucza powoduje odmowę inicjalizacji.
+- Desktop i wbudowany serwer HTTP współdzielą tę samą instancję repozytorium.
+  Zakładka Pacjenci zapisuje i odczytuje karty przez repozytorium. Przy starcie
+  stare pliki pacjentów są migrowane bez usuwania źródeł migracji.
+- API ma CRUD kolekcji, sesje Bearer, kontrolę wersji i tymczasową blokadę
+  dostępu do roli administratora. Pełne RBAC, audyt operacji i WebSocket/SSE
+  pozostają do wdrożenia.
+- WebUI ma klienta CRUD dla wszystkich kolekcji. Android ma klienta CRUD,
+  a ekran Pacjenci obsługuje podstawowe operacje na kartach.
+- TUI nadal nie korzysta z API. Producenci pomiarów, sesji treningowych i gier
+  w Desktop/TUI nie są jeszcze w pełni przepięci na trwałe kolekcje serwera.
+- MariaDB pozostaje niewdrożona; wybranie jej jako backendu pacjentów nie
+  powoduje fallbacku do plików.
 
-This document records the target architecture and staged migration. It does not claim that the Data Server, MariaDB adapter, or cross-client synchronization is already implemented.
+Ten stan nie oznacza jeszcze pełnej synchronizacji pięciu interfejsów.
+Wymagane są migracja pozostałych producentów danych, klient TUI, testy
+wieloklientowe i testy backup/restore. Wyniki CI należy przypisywać wyłącznie
+do konkretnego SHA; sam kod repozytorium nie stanowi dowodu poprawności
+klinicznej ani kompletności bezpieczeństwa.
