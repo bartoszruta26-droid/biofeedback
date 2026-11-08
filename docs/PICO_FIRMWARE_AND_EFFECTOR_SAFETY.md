@@ -1,4 +1,4 @@
-# Pico firmware and effector safety status
+# Pico firmware v0.2.0 and effector safety status
 
 ## Status as of 2026-11-08
 
@@ -20,10 +20,12 @@ Before implementing an output driver, record the exact board revision, schematic
 ## Host/Pico protocol boundary
 - UART: 115200 baud, 8 data bits, no parity, 1 stop bit.
 - Commands are bounded printable ASCII lines terminated by CR or LF.
-- PING returns OK,PONG,FW=0.1.0.
-- STATUS returns OK,STATUS,SAFE=1,ACTUATORS=LOCKED.
+- PING returns OK,PONG,FW=0.2.0,PROTO=1.
+- STATUS returns OK,STATUS,SAFE=1,ACTUATORS=LOCKED,PROTO=1.
 - SAFE returns OK,SAFE,ACTUATORS=LOCKED.
-- ACTUATOR and EFFECTOR requests return ERR,ACTUATORS_LOCKED.
+- ACTUATOR, EFFECTOR, IR, ELECTRODE and ANTENNA requests return ERR,ACTUATORS_LOCKED.
+- Pico UART0 uses GP0 TX and GP1 RX; the HX711 Nano sketch uses DT=2 and SCK=3.
+- The host, configuration and Pico firmware share the versioned protocol constants in SerialProtocolConfig.hpp.
 - Unknown or malformed commands are rejected.
 
-This control protocol is separate from the existing HX711 binary measurement frame (little-endian timestamp, signed raw value, CRC-8, trailer 0xAA 0x55). The two protocols must not be conflated. A later versioned envelope should multiplex sensor telemetry and control messages explicitly.
+This control protocol is separate from the existing HX711 binary measurement frame (little-endian timestamp, signed raw value, CRC-8, trailer 0xAA 0x55). The two protocols must not be conflated. The control protocol is versioned independently from the HX711 measurement frame; no effector driver is exposed by protocol version 1.
