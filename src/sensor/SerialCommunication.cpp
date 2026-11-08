@@ -846,13 +846,13 @@ std::vector<SensorData> SerialCommunication::readDataBatch(int timeout) {
         // A text-only response still carries its raw value and device timestamp.
         // Parse those fields before creating the calibrated sample; otherwise
         // emplacing the sample for FORCE would skip the fallback RAW/TS parser.
-        SensorData textSample;
+        SensorData fallback;
         const std::size_t rawPos = response.find("RAW:", forcePos);
         if (rawPos != std::string::npos) {
             const std::size_t rawEnd = response.find(",", rawPos + 4);
             if (rawEnd != std::string::npos) {
                 try {
-                    textSample.value = std::stoi(
+                    fallback.value = std::stoi(
                         response.substr(rawPos + 4, rawEnd - rawPos - 4));
                 } catch (...) {}
             }
@@ -861,18 +861,18 @@ std::vector<SensorData> SerialCommunication::readDataBatch(int timeout) {
                 const std::size_t timestampEnd = response.find("ms", timestampPos);
                 if (timestampEnd != std::string::npos) {
                     try {
-                        textSample.timestamp = static_cast<uint32_t>(std::stoul(
+                        fallback.timestamp = static_cast<uint32_t>(std::stoul(
                             response.substr(timestampPos + 3,
                                 timestampEnd - timestampPos - 3)));
-                        textSample.hasTimestamp = true;
+                        fallback.hasTimestamp = true;
                     } catch (...) {}
                 }
             }
         }
 
         if (samples.empty()) {
-            textSample.hasFrame = !rawData.empty();
-            samples.push_back(textSample);
+            fallback.hasFrame = !rawData.empty();
+            samples.push_back(fallback);
         }
 
         if (gramsEnd != std::string::npos) {
