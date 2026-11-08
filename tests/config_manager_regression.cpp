@@ -37,6 +37,7 @@ int main(int argc, char** argv)
     assert(!production.load(path, true)); // production must fail closed without encryption
 
 
+    reader.setValue("deployment.profile", std::string("development"));
     reader.setValue("custom.label", std::string("calibration station"));
     assert(reader.save(path, false));
 
