@@ -79,7 +79,7 @@ rekord udostępnia `GET /{collection}/{id}`, `PUT /{collection}/{id}`
 i `DELETE /{collection}/{id}`. Identyfikatory tworzy serwer jako UUID.
 Rekord zawiera `id`, `version`, `created_at` i `updated_at`.
 Aktualizacja/usunięcie wymagają `expected_version`; niezgodna wersja zwraca
-HTTP 409. Ciało rekordu jest ograniczone do 1 MiB.
+HTTP 409. Ciało rekordu jest ograniczone do 16 MiB.
 
 Do czasu wdrożenia zakresów RBAC wszystkie operacje na kolekcjach wymagają
 aktywnej sesji użytkownika z rolą `administrator`. Nie jest to docelowy model
