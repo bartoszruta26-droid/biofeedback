@@ -67,7 +67,8 @@ quint16 HttpApiServer::serverPort() const { return m_server.serverPort(); }
 
 QString HttpApiServer::bearerToken(const QByteArray& authorization) const {
     const QByteArray prefix("Bearer ");
-    if (!authorization.startsWith(prefix, Qt::CaseInsensitive)) return {};
+    if (authorization.size() < prefix.size() ||
+        authorization.left(prefix.size()).compare(prefix, Qt::CaseInsensitive) != 0) return {};
     const QByteArray value = authorization.mid(prefix.size()).trimmed();
     if (value.size() != 64) return {};
     for (char c : value) {
@@ -221,7 +222,9 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
         }
 
         if (method == "POST" && path == "/api/v1/auth/login") {
-            if (!contentType.startsWith("application/json", Qt::CaseInsensitive)) {
+            const QByteArray jsonContentType("application/json");
+            if (contentType.size() < jsonContentType.size() ||
+                contentType.left(jsonContentType.size()).compare(jsonContentType, Qt::CaseInsensitive) != 0) {
                 sendJson(socket, 400, errorBody("JSON_REQUIRED", "Wymagany jest Content-Type application/json."));
                 return;
             }
