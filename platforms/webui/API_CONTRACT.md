@@ -117,7 +117,7 @@ bez usuwania źródeł migracji.
 
 Serwer udostępnia `GET /healthz`, `GET /api/v1/status`, logowanie,
 wylogowanie i CRUD kolekcji. Repozytorium plikowe używa identyfikatorów UUID,
-atomowego zapisu `QSaveFile`, limitu 1 MiB na rekord i uprawnień tylko dla
+atomowego zapisu `QSaveFile`, limitu 16 MiB na rekord i uprawnień tylko dla
 właściciela. Przy `encryption.enabled=true` rekordy są szyfrowane AES-256-GCM;
 brak klucza powoduje niedostępność repozytorium, a nie zapis jawny.
 Do czasu wdrożenia zakresów RBAC endpointy danych są ograniczone do roli
