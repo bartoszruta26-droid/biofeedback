@@ -83,6 +83,7 @@ np. `{"code":"DEVICE_BUSY","message":"Urządzenie jest zajęte"}`.
 
 - Logowanie API korzysta z tego samego magazynu kont i weryfikacji haseł co aplikacja Qt.
 - Token Bearer ma 256 bitów losowości, jest przechowywany wyłącznie w pamięci serwera i wygasa po 30 minutach.
+- Serwer ogranicza próby logowania: po pięciu błędnych próbach z adresu klienta blokuje kolejne próby na 60 sekund.
 - WebUI przechowuje token wyłącznie w pamięci klienta; nie zapisuje go w localStorage ani w adresie URL.
 - Endpoint /api/v1/status i /healthz są publiczne i nie zwracają danych pacjentów.
 - Endpointy danych, sesji i sterowania urządzeniami pozostają wyłączone do czasu wdrożenia kontroli ról i integracji usług.
