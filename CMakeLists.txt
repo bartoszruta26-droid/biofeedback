@@ -211,6 +211,7 @@ if(Qt5_FOUND)
         src/games/MarioGame.cpp
         src/games/GalagaGame.cpp
         src/games/ArcherGame.cpp
+        src/games/CarRaceGame.cpp
         src/formulas.cpp
     )
 
@@ -241,12 +242,14 @@ if(Qt5_FOUND)
         include/games/ArkanoidGame.hpp
         include/games/GalagaGame.hpp
         include/games/ArcherGame.hpp
+        include/games/CarRaceGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
         include/games/GalagaGame.hpp
         include/games/ArcherGame.hpp
+        include/games/CarRaceGame.hpp
         include/formulas.hpp
     )
 
@@ -279,6 +282,7 @@ if(Qt5_FOUND)
         src/games/MarioGame.cpp
         src/games/GalagaGame.cpp
         src/games/ArcherGame.cpp
+        src/games/CarRaceGame.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
         include/games/GameEngine.hpp
@@ -290,6 +294,7 @@ if(Qt5_FOUND)
         include/games/MarioGame.hpp
         include/games/GalagaGame.hpp
         include/games/ArcherGame.hpp
+        include/games/CarRaceGame.hpp
         include/sensor/SerialCommunication.hpp
         include/core/DebugManager.hpp
     )
@@ -338,6 +343,7 @@ if(Qt5_FOUND)
         src/games/ArkanoidGame.cpp
         src/games/GalagaGame.cpp
         src/games/ArcherGame.cpp
+        src/games/CarRaceGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
