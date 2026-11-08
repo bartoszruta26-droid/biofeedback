@@ -129,6 +129,7 @@ add_executable(config_manager_regression
 target_include_directories(config_manager_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(config_manager_regression PRIVATE Qt5::Core nlohmann_json::nlohmann_json)
 add_test(NAME config_manager_regression COMMAND config_manager_regression)
+set_tests_properties(config_manager_regression PROPERTIES TIMEOUT 10)
 
 # Shared terminal-interface model is independent of ncurses and is always testable.
 add_library(biofeedback_tui_model STATIC src/tui/TuiModel.cpp)
