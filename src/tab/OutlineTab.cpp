@@ -416,6 +416,8 @@ bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline)
         exercise.imagePath = exerciseObj["imagePath"].toString();
         exercise.videoPath = exerciseObj["videoPath"].toString();
         exercise.gameId = exerciseObj["gameId"].toString();
+        if (exercise.gameId == QStringLiteral("scored_earth"))
+            exercise.gameId = QStringLiteral("scorched_earth");
         exercise.durationSeconds = exerciseObj["durationSeconds"].toInt(0);
         exercise.targetRepetitions = exerciseObj["targetRepetitions"].toInt(0);
         exercise.difficulty = exerciseObj["difficulty"].toString("medium");
