@@ -21,7 +21,8 @@
       baseUrl: "",
       fetchImpl: root.fetch ? root.fetch.bind(root) : null,
       WebSocketImpl: root.WebSocket || null,
-      requestTimeoutMs: 8000
+      requestTimeoutMs: 8000,
+      accessToken: null
     }, options || {});
 
     function url(path) {
@@ -32,7 +33,11 @@
       if (!config.fetchImpl) throw new ApiError("Fetch API is unavailable", 0);
       const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
       const timeout = controller ? setTimeout(() => controller.abort(), config.requestTimeoutMs) : null;
-      const requestInit = Object.assign({ headers: { Accept: "application/json" } }, init || {});
+      const requestInit = Object.assign({}, init || {});
+      requestInit.headers = Object.assign({ Accept: "application/json" }, requestInit.headers || {});
+      if (config.accessToken && path !== "/api/v1/auth/login") {
+        requestInit.headers.Authorization = "Bearer " + config.accessToken;
+      }
       if (controller) requestInit.signal = controller.signal;
       try {
         const response = await config.fetchImpl(url(path), requestInit);
@@ -82,6 +87,19 @@
 
     return Object.freeze({
       request,
+      login: async (username, password) => {
+        const result = await request("/api/v1/auth/login", jsonRequest("POST", { username, password }));
+        if (!result || typeof result.access_token !== "string" || !result.access_token) {
+          throw new ApiError("API login response did not contain an access token", 0, result);
+        }
+        config.accessToken = result.access_token;
+        return result;
+      },
+      logout: async () => {
+        try { return await request("/api/v1/auth/logout", jsonRequest("POST")); }
+        finally { config.accessToken = null; }
+      },
+      getCurrentUser: () => request("/api/v1/auth/me"),
       getStatus: () => request("/api/v1/status"),
       getDevices: () => request("/api/v1/devices"),
       connectDevice: (id) => request("/api/v1/devices/" + encodeURIComponent(id) + "/connect", jsonRequest("POST")),
