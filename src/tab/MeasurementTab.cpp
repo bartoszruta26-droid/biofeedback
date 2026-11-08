@@ -2190,7 +2190,6 @@ bool MeasurementTab::importFromJSON(const QString& filename)
         m_patientId = session.patientId;
         m_sampleJournalPath.clear();
         m_activeSessionId.clear();
-        m_sampleJournalPendingWrites = 0;
         m_sampleJournalFailed = false;
         m_completedSeriesStats = session.series;
         m_recordedSamples = session.samples;
