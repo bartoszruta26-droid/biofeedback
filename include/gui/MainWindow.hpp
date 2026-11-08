@@ -241,6 +241,7 @@ private:
     void onGameFinished(int score);
     void onSensorDataForGame(double value);
     void enqueueGameSensorInput(double value);
+    void drainGameSensorInputs();
 
     // Widgety główne
     GraphWidget* m_graphWidget;
@@ -311,8 +312,9 @@ private:
     sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
     sensor::SerialCommunication::CallbackToken m_serialDataCallbackToken = 0;
     std::mutex m_gameInputQueueMutex;
-    double m_latestGameSensorInput{0.0};
+    std::deque<double> m_gameSensorInputQueue;
     bool m_gameInputDrainScheduled{false};
+    std::size_t m_droppedGameSensorInputs{0};
 };
 
 } // namespace gui
