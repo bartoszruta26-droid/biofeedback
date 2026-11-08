@@ -825,34 +825,34 @@ std::string DataManager::readFile(const std::string& filename) const {
                    "DataManager::readFile");
 #endif
         
-        // Check file size first to prevent memory issues
-        struct stat buffer;
-        if (stat(filename.c_str(), &buffer) == 0) {
-            if (static_cast<size_t>(buffer.st_size) > MAX_FILE_SIZE_BYTES) {
-                logMessage(DataManagerLogLevel::WARNING, 
-                           "File too large (>10MB): " + filename, 
-                           "DataManager::readFile");
-                return "";
-            }
-        }
-        
-        std::ifstream file(filename);
-        if (!file.is_open()) {
-            logMessage(DataManagerLogLevel::WARNING, 
-                       "Cannot open file for reading: " + filename, 
+        // Use Qt file metadata and bounded reads for portable Linux/Windows behavior.
+        const QString path = QString::fromStdString(filename);
+        const QFileInfo info(path);
+        if (!info.exists() || !info.isFile() || info.size() < 0 ||
+            static_cast<quint64>(info.size()) > MAX_FILE_SIZE_BYTES) {
+            logMessage(DataManagerLogLevel::WARNING,
+                       "File is missing, not regular, or too large: " + filename,
                        "DataManager::readFile");
             return "";
         }
-        
-        std::ostringstream content;
-        content << file.rdbuf();
-        
-        if (file.bad()) {
-            logMessage(DataManagerLogLevel::ERROR, 
-                       "Error reading file: " + filename, 
+
+        QFile file(path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            logMessage(DataManagerLogLevel::WARNING,
+                       "Cannot open file for reading: " + filename,
                        "DataManager::readFile");
             return "";
         }
+
+        const QByteArray bytes = file.read(static_cast<qint64>(MAX_FILE_SIZE_BYTES) + 1);
+        if (file.error() != QFileDevice::NoError ||
+            static_cast<size_t>(bytes.size()) > MAX_FILE_SIZE_BYTES) {
+            logMessage(DataManagerLogLevel::ERROR,
+                       "Error or size limit exceeded while reading file: " + filename,
+                       "DataManager::readFile");
+            return "";
+        }
+        const std::string content(bytes.constData(), static_cast<size_t>(bytes.size()));
         
 #if DEBUG_FILE_IO
         logMessage(DataManagerLogLevel::VERBOSE, 
@@ -861,7 +861,7 @@ std::string DataManager::readFile(const std::string& filename) const {
                    "DataManager::readFile");
 #endif
         
-        return content.str();
+        return content;
         
     } catch (const std::exception& e) {
         logMessage(DataManagerLogLevel::ERROR, 
