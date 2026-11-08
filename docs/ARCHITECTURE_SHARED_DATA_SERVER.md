@@ -142,14 +142,14 @@ niezaimplementowany.
   akwizycji ani tworzenia rzeczywistych sesji z czujnika, treningu i gry.
 - TUI loguje się przez API, odczytuje listę pacjentów, zapisuje sesje pomiarowe
   przy rozłączeniu czujnika lub zamknięciu aplikacji oraz zapisuje sesje i wyniki
-  treningowe. Sesje i wyniki treningowe zawierają patient_id. TUI nie implementuje
+  treningowe. Sesje i wyniki treningowe zawierają patient_id, a operator wybiera pacjenta
+  na ekranie Pacjenci klawiszami [ i ]. TUI nie implementuje
   obecnie silnika gier ani zapisu wyników gier.
 - MariaDB pozostaje niewdrożona; wybranie jej jako backendu pacjentów nie
   powoduje fallbacku do plików.
 
 Ten stan nie oznacza jeszcze pełnej synchronizacji pięciu interfejsów.
 Wymagane są dalsze integracje WebUI i Androida dla pomiarów/treningów/gier,
-wybór pacjenta w TUI zamiast ustawiania pierwszego rekordu, archiwizacja gier
-z TUI, pełne RBAC, testy wieloklientowe i testy backup/restore. Wyniki CI należy
+archiwizacja gier z TUI, pełne RBAC, testy wieloklientowe i testy backup/restore. Wyniki CI należy
 przypisywać wyłącznie do konkretnego SHA; sam kod repozytorium nie stanowi
 dowodu poprawności klinicznej ani kompletności bezpieczeństwa.
