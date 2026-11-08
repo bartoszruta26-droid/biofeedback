@@ -4,10 +4,14 @@ on:
   push:
     branches:
       - integration/all-work
+      - main
     paths:
       - "platforms/webui/**"
       - ".github/workflows/webui-api-client.yml"
   pull_request:
+    branches:
+      - main
+      - integration/all-work
     paths:
       - "platforms/webui/**"
       - ".github/workflows/webui-api-client.yml"
