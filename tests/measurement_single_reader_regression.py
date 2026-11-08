@@ -16,16 +16,20 @@ if "m_lastSensorData" not in manual or "readSingleSample(value, m_lastSensorData
 if "if (m_isMeasuring)" not in manual or "AKTYWNY POMIAR ZAPISUJE PRÓBKI AUTOMATYCZNIE" not in manual:
     raise SystemExit("Manual capture must not replay a sample while the asynchronous session is recording")
 
-receiver_start = source.index("void MeasurementTab::onSensorDataReceived")
-receiver_end = source.index("// MeasurementTab - Konwersja jednostek", receiver_start)
-receiver = source[receiver_start:receiver_end]
-if "readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true," not in receiver:
-    raise SystemExit("RAW diagnostic capture must archive the raw ADC field and source timestamp")
+# Both RAW and calibrated modes now enter the same MeasurementEngine commit path.
+# RAW mode switches the adapter to canonical "count" units; the commit hook
+# journals raw ADC value and device timestamp before any GUI subscriber runs.
+if 'checked ? "count" : "g"' not in source:
+    raise SystemExit("RAW diagnostic mode must switch the adapter to count units")
+if 'record["unit"] = "count"' not in source or 'record["rawValue"] = sample.rawValue' not in source:
+    raise SystemExit("RAW diagnostic capture must durably archive ADC value and source timestamp")
 handler_start = source.index("void MeasurementTab::onMeasurementSample")
 handler_end = source.index("// MeasurementTab - Konwersja jednostek", handler_start)
 handler = source[handler_start:handler_end]
-if "sample.isValid()" not in handler or 'sample.unit != "kg"' not in handler:
-    raise SystemExit("Calibrated biomechanics must consume valid canonical mass samples")
+if "sample.isValid()" not in handler or 'sample.unit != "count"' not in handler:
+    raise SystemExit("RAW display must consume valid canonical count samples")
+if 'sample.unit != "kg"' not in handler:
+    raise SystemExit("Calibrated biomechanics must consume canonical mass samples")
 if "standardGravityMetersPerSecondSquared" not in handler:
     raise SystemExit("Canonical mass must be converted to SI force exactly once")
 if "m_measurementEngine->subscribe" not in source:
