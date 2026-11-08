@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     assert(reader.getString("serial.port").size() > 0);
     assert(!reader.isEncryptionEnabled());
     assert(reader.getString("encryption.algorithm") == "AES-256-GCM");
-    assert(reader.getString("encryption.key_derivation") == "SHA-256 key normalization (32+ byte external secret)");
+    assert(reader.getString("encryption.key_derivation") == "SHA-256 key normalization (32+ byte external secret)");\n    assert(reader.getString("deployment.profile") == "development");\n    assert(reader.getBool("medical.require_authentication", false));\n    assert(reader.getInt("encryption.iterations", -1) == -1);
     assert(reader.getInt("sensor.sample_rate_hz", 0) == static_cast<int>(sensor::protocol::DefaultSampleRateHz));
 
     reader.setValue("custom.label", std::string("calibration station"));
