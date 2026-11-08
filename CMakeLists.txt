@@ -145,7 +145,7 @@ add_executable(biofeedback_api
 )
 set_target_properties(biofeedback_api PROPERTIES AUTOMOC ON)
 target_include_directories(biofeedback_api PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core)
+target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core biofeedback_data_repository)
 
 # HTTP API authentication and bearer-session lifecycle regression.
 add_executable(api_auth_regression
@@ -155,7 +155,7 @@ add_executable(api_auth_regression
 )
 set_target_properties(api_auth_regression PROPERTIES AUTOMOC ON)
 target_include_directories(api_auth_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(api_auth_regression PRIVATE biofeedback_core Qt5::Core Qt5::Network)
+target_link_libraries(api_auth_regression PRIVATE biofeedback_core biofeedback_data_repository Qt5::Core Qt5::Network)
 add_test(NAME api_auth_regression COMMAND api_auth_regression)
 set_tests_properties(api_auth_regression PROPERTIES TIMEOUT 20)
 
@@ -251,6 +251,7 @@ if(Qt5_FOUND)
     set(SOURCES
         src/main.cpp
         src/api/HttpApiServer.cpp
+        src/data/JsonResourceRepository.cpp
         src/core/Application.cpp
         src/core/Logger.cpp
         src/core/DebugManager.cpp
@@ -288,6 +289,7 @@ if(Qt5_FOUND)
     set(HEADERS
         include/core/Application.hpp
         include/api/HttpApiServer.hpp
+        include/data/JsonResourceRepository.hpp
         include/core/Logger.hpp
         include/core/DebugManager.hpp
         include/core/ConfigManager.hpp
@@ -445,6 +447,7 @@ if(Qt5_FOUND)
         biofeedback_training
         biofeedback_measurement
         biofeedback_sensor_protocol
+        biofeedback_data_repository
         Qt5::Core Qt5::Widgets Qt5::Charts
         ${LIBSERIALPORT_LIBRARIES}
         OpenSSL::SSL OpenSSL::Crypto pthread
