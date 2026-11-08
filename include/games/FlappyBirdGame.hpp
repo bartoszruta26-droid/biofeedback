@@ -139,6 +139,9 @@ private:
     const double m_minForce = 0.0;
     const double m_maxForce = 100.0; ///< Zakres siły w jednostkach umownych
 
+    // Ostatni znany rozmiar logicznego widoku (działa także dla ukrytych widgetów).
+    QSize m_lastKnownSize;
+
     // Stan gry - Ptak
     QPointF m_birdPos;            ///< Pozycja ptaka
     QPointF m_birdVelocity;       ///< Prędkość ptaka
