@@ -2,6 +2,10 @@
 #include "api/HttpApiServer.hpp"
 #include "core/Authentication.hpp"
 #include "data/JsonResourceRepository.hpp"
+#include "application/AcquisitionService.hpp"
+#include "application/DeviceService.hpp"
+#include "application/MeasurementService.hpp"
+#include "measurement/MeasurementEngine.hpp"
 
 #include <QCoreApplication>
 #include <QTemporaryDir>
@@ -26,6 +30,12 @@ int main(int argc, char** argv) {
     assert(repository->isReady());
 
     biofeedback::api::HttpApiServer server(usersPath, repository);
+    auto measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
+    auto measurementService = std::make_shared<biofeedback::application::MeasurementService>(measurementEngine);
+    auto acquisitionService = std::make_shared<biofeedback::application::AcquisitionService>(measurementService);
+    auto deviceService = std::make_shared<biofeedback::application::DeviceService>();
+    server.setAcquisitionService(acquisitionService);
+    server.setDeviceService(deviceService);
     assert(server.listen(QHostAddress::LocalHost, 0));
 
     biofeedback::api::HttpApiClient client(
@@ -34,6 +44,24 @@ int main(int argc, char** argv) {
     assert(client.login(QStringLiteral("api-client-test"),
                         QStringLiteral("client-password-123"), &error));
     assert(client.isAuthenticated());
+
+    // Device discovery and acquisition control are exposed through the same
+    // authenticated client used for shared resources.
+    QJsonArray devices;
+    assert(client.listDevices(devices, &error));
+    assert(devices.isEmpty());
+
+    QJsonObject activeSession;
+    assert(client.getAcquisitionSession(activeSession, &error));
+    assert(!activeSession.value(QStringLiteral("active")).toBool());
+
+    QJsonArray acquisitionSamples;
+    assert(client.listAcquisitionSamples(acquisitionSamples, &error));
+    assert(acquisitionSamples.isEmpty());
+
+    assert(!client.startAcquisitionSession(QString(), QStringLiteral("patient"),
+                                            QStringLiteral("device"), QStringLiteral("protocol"), &error));
+    assert(error == QStringLiteral("INVALID_ACQUISITION_SESSION"));
 
     QJsonObject created;
     assert(client.createResource(QStringLiteral("patients"), QJsonObject{
