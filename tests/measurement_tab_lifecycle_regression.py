@@ -180,8 +180,10 @@ for required in (
 enqueue_start = source.index("void MeasurementTab::enqueueMeasurementSample(")
 enqueue_end = source.index("void MeasurementTab::drainMeasurementSamples(", enqueue_start)
 enqueue_body = source[enqueue_start:enqueue_end]
-if "m_measurementQueue.clear()" in enqueue_body or "m_droppedMeasurementSamples +=" in enqueue_body:
+if "m_droppedMeasurementSamples += m_measurementQueue.size() + 1" in enqueue_body:
     raise SystemExit("A full training queue must apply backpressure, not discard acquired samples")
+if "if (m_measurementQueue.size() >= MaximumQueuedSamples)" in enqueue_body:
+    raise SystemExit("Queue-capacity handling must wait for space instead of entering a drop branch")
 destructor_start = source.index("MeasurementTab::~MeasurementTab()")
 destructor_end = source.index("void MeasurementTab::ensureCurrentSeriesInitialized", destructor_start)
 destructor_body = source[destructor_start:destructor_end]
