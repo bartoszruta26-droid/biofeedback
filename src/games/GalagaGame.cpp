@@ -232,15 +232,19 @@ void GalagaGame::update(double deltaTime)
         }
     }
 
-    for (Projectile& shot : m_projectiles)
-        shot.rect.translate(0.0, shot.velocityY * deltaTime);
-
     for (Projectile& shot : m_projectiles) {
         if (shot.rect.isEmpty())
             continue;
+
+        // Test the complete swept rectangle, not only the end position. A
+        // fast shot can travel farther than an enemy's height in one frame.
+        const QRectF previousRect = shot.rect;
+        shot.rect.translate(0.0, shot.velocityY * deltaTime);
+        const QRectF sweptRect = previousRect.united(shot.rect);
+
         if (shot.fromPlayer) {
             for (Enemy& enemy : m_enemies) {
-                if (!enemy.active || !shot.rect.intersects(enemy.rect))
+                if (!enemy.active || !sweptRect.intersects(enemy.rect))
                     continue;
                 shot.rect = QRectF();
                 --enemy.hitPoints;
@@ -252,7 +256,7 @@ void GalagaGame::update(double deltaTime)
                 }
                 break;
             }
-        } else if (shot.rect.intersects(m_player)) {
+        } else if (sweptRect.intersects(m_player)) {
             shot.rect = QRectF();
             loseLife();
             if (!isRunning())
