@@ -46,8 +46,8 @@ void MarioGame::initialize()
     m_clouds.clear();
     for (int i = 0; i < 5; ++i) {
         Cloud cloud;
-        cloud.pos.setX(QRandomGenerator::global()->bounded(width()));
-        cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+        cloud.pos.setX(QRandomGenerator::global()->bounded(qMax(1, width())));
+        cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         cloud.speed = 20.0 + QRandomGenerator::global()->bounded(30);
         cloud.size = 20 + QRandomGenerator::global()->bounded(30);
         m_clouds.append(cloud);
@@ -108,7 +108,7 @@ void MarioGame::update(double deltaTime)
         cloud.pos.setX(cloud.pos.x() - cloud.speed * deltaTime);
         if (cloud.pos.x() + cloud.size < 0) {
             cloud.pos.setX(width() + cloud.size);
-            cloud.pos.setY(QRandomGenerator::global()->bounded(height() / 3));
+            cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
         }
     }
     
