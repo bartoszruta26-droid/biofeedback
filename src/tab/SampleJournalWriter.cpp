@@ -37,6 +37,8 @@ bool SampleJournalWriter::open(const QString& path, const QByteArray& headerLine
         m_accepting = false;
         m_stopRequested = false;
         m_failed = false;
+        m_nextTicket = 0;
+        m_completedTicket = 0;
     }
 
     try {
@@ -66,34 +68,53 @@ bool SampleJournalWriter::open(const QString& path, const QByteArray& headerLine
 
 bool SampleJournalWriter::append(const QByteArray& line)
 {
+    return enqueue(line, false);
+}
+
+bool SampleJournalWriter::appendDurably(const QByteArray& line)
+{
+    return enqueue(line, true);
+}
+
+bool SampleJournalWriter::enqueue(const QByteArray& line, bool durable)
+{
     if (line.isEmpty())
         return false;
 
-    {
-        std::lock_guard<std::mutex> lock(m_mutex);
-        if (!m_accepting || m_failed)
-            return false;
-        if (m_queue.size() >= m_capacity) {
-            m_failed = true;
-            m_accepting = false;
-            m_stopRequested = true;
-            m_error = QStringLiteral("Sample journal queue capacity exceeded; acquisition must stop");
-            m_changed.notify_one();
-            return false;
-        }
-        try {
-            m_queue.push_back(line);
-        } catch (...) {
-            m_failed = true;
-            m_accepting = false;
-            m_stopRequested = true;
-            m_error = QStringLiteral("Unable to allocate sample journal queue entry");
-            m_changed.notify_one();
-            return false;
-        }
+    std::unique_lock<std::mutex> lock(m_mutex);
+    if (!m_accepting || m_failed)
+        return false;
+    if (m_queue.size() >= m_capacity) {
+        m_failed = true;
+        m_accepting = false;
+        m_stopRequested = true;
+        m_error = QStringLiteral("Sample journal queue capacity exceeded; acquisition must stop");
+        m_changed.notify_one();
+        m_completed.notify_all();
+        return false;
+    }
+
+    const std::uint64_t ticket = ++m_nextTicket;
+    try {
+        m_queue.push_back(PendingRecord{line, ticket, durable});
+    } catch (...) {
+        m_failed = true;
+        m_accepting = false;
+        m_stopRequested = true;
+        m_error = QStringLiteral("Unable to allocate sample journal queue entry");
+        m_changed.notify_one();
+        m_completed.notify_all();
+        return false;
     }
     m_changed.notify_one();
-    return true;
+
+    if (!durable)
+        return true;
+
+    m_completed.wait(lock, [this, ticket] {
+        return m_completedTicket >= ticket || m_failed;
+    });
+    return m_completedTicket >= ticket && !m_failed;
 }
 
 bool SampleJournalWriter::finish()
@@ -192,7 +213,7 @@ void SampleJournalWriter::run()
 
     unsigned int pendingSinceSync = 0;
     for (;;) {
-        QByteArray line;
+        PendingRecord record;
         {
             std::unique_lock<std::mutex> lock(m_mutex);
             m_changed.wait(lock, [this]() {
@@ -202,11 +223,11 @@ void SampleJournalWriter::run()
                 break;
             if (m_queue.empty())
                 continue;
-            line = std::move(m_queue.front());
+            record = std::move(m_queue.front());
             m_queue.pop_front();
         }
 
-        if (file.write(line) != line.size()) {
+        if (file.write(record.line) != record.line.size()) {
             error = file.errorString();
             std::lock_guard<std::mutex> lock(m_mutex);
             m_failed = true;
@@ -214,10 +235,12 @@ void SampleJournalWriter::run()
             m_stopRequested = true;
             m_error = error;
             m_queue.clear();
+            m_completed.notify_all();
             break;
         }
 
-        if (++pendingSinceSync >= 32) {
+        const bool syncRequired = record.durable || ++pendingSinceSync >= 32;
+        if (syncRequired) {
             if (!flushDurably(file, error)) {
                 std::lock_guard<std::mutex> lock(m_mutex);
                 m_failed = true;
@@ -225,9 +248,15 @@ void SampleJournalWriter::run()
                 m_stopRequested = true;
                 m_error = error;
                 m_queue.clear();
+                m_completed.notify_all();
                 break;
             }
             pendingSinceSync = 0;
+        }
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            m_completedTicket = std::max(m_completedTicket, record.ticket);
+            m_completed.notify_all();
         }
     }
 
@@ -241,6 +270,7 @@ void SampleJournalWriter::run()
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_accepting = false;
+        m_completed.notify_all();
     }
 }
 
