@@ -190,6 +190,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
     int targetReps = 0;
     int completedSeries = 0;
     int completedReps = 0;
+    QString patientId;
     {
         std::lock_guard<std::mutex> lock(live.mutex);
         if (!live.sessionNeedsSave || live.sessionSaved || live.sessionSaveAttempted ||
@@ -203,6 +204,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
         targetReps = live.targetRepsPerSeries;
         completedSeries = live.completedSeries;
         completedReps = live.completedReps;
+        patientId = live.selectedPatientId;
     }
 
     QJsonArray repetitionRecords;
@@ -226,7 +228,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
         {QStringLiteral("started_at"), startedAt},
         {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
         {QStringLiteral("exercise_name"), exercise},
-        {QStringLiteral("patient_id"), live.selectedPatientId},
+        {QStringLiteral("patient_id"), patientId},
 
         {QStringLiteral("target_force_n"), targetForce},
         {QStringLiteral("target_series_count"), targetSeries},
