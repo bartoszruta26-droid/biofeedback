@@ -224,6 +224,7 @@
         container.append(card);
       });
       setMessage("patientMessage", "Pobrano kart: " + items.length);
+      populatePatientSelectors();
     } catch (error) {
       setMessage("patientMessage", error.message || "Nie można pobrać kart pacjentów.");
     }
@@ -280,6 +281,7 @@
   function refreshSharedData() {
     if (!api) return;
     refreshPatients();
+    populatePatientSelectors();
     refreshMeasurements();
     refreshTraining();
   }
@@ -307,6 +309,101 @@
       }
     });
   }
+
+  async function populatePatientSelectors() {
+    const selectors = ["trainingPatient", "gamePatient"]
+      .map((id) => document.getElementById(id)).filter(Boolean);
+    if (!selectors.length || !api) return;
+    try {
+      const response = await api.getPatients();
+      const patients = Array.isArray(response.items) ? response.items : [];
+      selectors.forEach((select) => {
+        const selected = select.value;
+        select.replaceChildren(new Option("Wybierz pacjenta", ""));
+        patients.forEach((patient) => {
+          const label = [patient.firstName, patient.lastName].filter(Boolean).join(" ") || "Pacjent";
+          select.add(new Option(label + " · " + patient.id, patient.id));
+        });
+        if (patients.some((patient) => patient.id === selected)) select.value = selected;
+      });
+    } catch (error) {
+      setMessage("trainingMessage", error.message || "Nie można pobrać listy pacjentów.");
+    }
+  }
+
+  const trainingEntryForm = document.getElementById("trainingEntryForm");
+  trainingEntryForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = document.getElementById("saveTrainingEntry");
+    button.disabled = true;
+    try {
+      const patientId = document.getElementById("trainingPatient").value;
+      const exercise = document.getElementById("trainingExercise").value.trim();
+      const series = Number(document.getElementById("trainingSeries").value);
+      const repetitions = Number(document.getElementById("trainingRepetitions").value);
+      const targetRaw = document.getElementById("trainingTargetForce").value;
+      const targetForce = targetRaw === "" ? null : Number(targetRaw);
+      if (!patientId || !exercise || !Number.isInteger(series) || !Number.isInteger(repetitions) ||
+          series < 0 || repetitions < 0 || (targetForce !== null && (!Number.isFinite(targetForce) || targetForce < 0))) {
+        throw new Error("Sprawdź pacjenta oraz wartości treningu.");
+      }
+      const startedAt = new Date().toISOString();
+      const session = await api.createTrainingSession({
+        patient_id: patientId, started_at: startedAt, status: "completed",
+        source_client: "webui", source_mode: "manual_entry",
+        exercise_results: [{ exercise_name: exercise, completed_series: series,
+          completed_repetitions: repetitions, target_force_n: targetForce }]
+      });
+      await api.createTrainingResult({
+        training_session_id: session.id, patient_id: patientId,
+        exercise_name: exercise, completed_series: series,
+        completed_repetitions: repetitions, target_force_n: targetForce,
+        source_client: "webui", source_mode: "manual_entry"
+      });
+      trainingEntryForm.reset();
+      await refreshTraining();
+      setMessage("trainingMessage", "Sesja i wynik treningu zostały zapisane na serwerze.");
+    } catch (error) {
+      setMessage("trainingMessage", error.message || "Nie udało się zapisać treningu.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  const gameEntryForm = document.getElementById("gameEntryForm");
+  gameEntryForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = document.getElementById("saveGameEntry");
+    button.disabled = true;
+    try {
+      const patientId = document.getElementById("gamePatient").value;
+      const gameId = document.getElementById("gameIdentifier").value.trim();
+      const exerciseName = document.getElementById("gameExerciseName").value.trim();
+      const score = Number(document.getElementById("gameScore").value);
+      if (!patientId || !gameId || !Number.isSafeInteger(score) || score < 0) {
+        throw new Error("Sprawdź pacjenta, identyfikator gry i wynik.");
+      }
+      const session = await api.createGameSession({
+        game_id: gameId, patient_id: patientId, score,
+        status: "completed", started_at: new Date().toISOString(),
+        source_client: "webui", source_mode: "manual_entry"
+      });
+      await api.createGameResult({
+        game_id: gameId, patient_id: patientId,
+        game_session_id: session.id, score,
+        exercise_name: exerciseName || gameId,
+        source_client: "webui", source_mode: "manual_entry"
+      });
+      gameEntryForm.reset();
+      await refreshTraining();
+      setMessage("trainingMessage", "Sesja i wynik gry zostały zapisane na serwerze.");
+    } catch (error) {
+      setMessage("trainingMessage", error.message || "Nie udało się zapisać wyniku gry.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   document.getElementById("refreshPatients")?.addEventListener("click", refreshPatients);
   document.getElementById("refreshMeasurements")?.addEventListener("click", refreshMeasurements);
   document.getElementById("refreshTraining")?.addEventListener("click", refreshTraining);
