@@ -21,9 +21,9 @@
 #include <QHeaderView>
 #include <QTextEdit>
 #include <memory>
+#include <atomic>
 #include <deque>
 #include <mutex>
-#include <condition_variable>
 #include <utility>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -350,6 +350,7 @@ private:
     void enqueueMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void drainMeasurementSamples();
     void onMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
+    bool commitMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void ensureCurrentSeriesInitialized();
     void ensureSessionClockStarted();
     void setupUI();
@@ -487,11 +488,12 @@ private:
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
     sensor::SensorData m_lastSensorData;
     std::mutex m_measurementQueueMutex;
-    std::condition_variable m_measurementQueueSpaceAvailable;
     std::deque<biofeedback::measurement::MeasurementSample> m_measurementQueue;
     bool m_measurementQueueAccepting{true};
     bool m_measurementDrainScheduled{false};
     std::size_t m_droppedMeasurementSamples{0};
+    std::atomic<bool> m_journalAdmission{false};
+    std::atomic<quint64> m_journalNextSequence{1};
 };
 
 } // namespace tab
