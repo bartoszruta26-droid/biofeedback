@@ -784,7 +784,6 @@ int main(int argc, char** argv)
                         live.lastSeries = {};
                         live.trainingResting = false;
                         live.restRemaining = 0;
-                        live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
                         live.sessionNeedsSave = false;
                         live.sessionSaved = false;
                         live.sessionSaveAttempted = false;
