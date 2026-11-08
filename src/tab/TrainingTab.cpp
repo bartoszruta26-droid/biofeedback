@@ -865,6 +865,8 @@ bool TrainingTab::importTrainingPlan(const QString& filename)
             ex.restTime = parts[4].toDouble();
             if (parts.size() > 5) {
                 ex.gameType = parts[5];
+                if (ex.gameType == QStringLiteral("scored_earth"))
+                    ex.gameType = QStringLiteral("scorched_earth");
             }
             addExercise(ex);
         }
@@ -1496,6 +1498,8 @@ bool TrainingTab::restoreExecutionCheckpoint(const QJsonObject& checkpoint)
         exercise.targetForce = item.value("target_force_n").toDouble(-1.0);
         exercise.restTime = item.value("rest_seconds").toDouble(-1.0);
         exercise.gameType = item.value("game_type").toString();
+        if (exercise.gameType == QStringLiteral("scored_earth"))
+            exercise.gameType = QStringLiteral("scorched_earth");
         if (exercise.name.trimmed().isEmpty() || exercise.seriesCount < 1 ||
             exercise.seriesCount > 100 || exercise.repsPerSeries < 1 ||
             exercise.repsPerSeries > 1000 ||
