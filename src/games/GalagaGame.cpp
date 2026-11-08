@@ -28,6 +28,21 @@ QString GalagaGame::gameName() const
     return QStringLiteral("Galaga Force Trainer");
 }
 
+void GalagaGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
+{
+    m_serialPort = std::move(serial);
+}
+
+void GalagaGame::disconnectSerial()
+{
+    m_serialPort.reset();
+}
+
+bool GalagaGame::isSerialConnected() const
+{
+    return m_serialPort && m_serialPort->isConnected();
+}
+
 int GalagaGame::activeEnemyCount() const
 {
     return static_cast<int>(std::count_if(m_enemies.cbegin(), m_enemies.cend(),
