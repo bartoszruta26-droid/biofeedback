@@ -27,7 +27,7 @@ class ApiClient(baseUrl: String) {
             .put("password", password)
         val response = request("POST", "/api/v1/auth/login", payload, authenticated = false)
         val token = response.optString("access_token")
-        if (token.length != 64) throw ApiException(502, "API returned an invalid access token.")
+        if (!token.matches(Regex("[0-9a-fA-F]{64}"))) throw ApiException(502, "API returned an invalid access token.")
         accessToken = token
         return response
     }
@@ -77,6 +77,7 @@ class ApiClient(baseUrl: String) {
             val raw = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
             val payload = if (raw.isBlank()) JSONObject() else JSONObject(raw)
             if (status !in 200..299) {
+                if (status == 401 && authenticated) accessToken = null
                 throw ApiException(status, payload.optString("message", "API request failed."))
             }
             return payload
