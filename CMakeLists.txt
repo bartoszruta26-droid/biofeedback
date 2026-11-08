@@ -53,6 +53,15 @@ target_link_libraries(biofeedback_core
         Qt5::Core
 )
 
+# Shared encrypted JSON resource repository for patients, measurements, training and games.
+add_library(biofeedback_data_repository STATIC src/data/JsonResourceRepository.cpp)
+target_include_directories(biofeedback_data_repository PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_data_repository PUBLIC biofeedback_core Qt5::Core)
+
+add_executable(json_resource_repository_regression tests/json_resource_repository_regression.cpp)
+target_link_libraries(json_resource_repository_regression PRIVATE biofeedback_data_repository Qt5::Core)
+add_test(NAME json_resource_repository_regression COMMAND json_resource_repository_regression)
+
 # Shared measurement pipeline: validation, canonical units, quality and bounded history.
 add_library(biofeedback_measurement STATIC src/measurement/MeasurementEngine.cpp)
 target_include_directories(biofeedback_measurement PUBLIC ${CMAKE_SOURCE_DIR}/include)
