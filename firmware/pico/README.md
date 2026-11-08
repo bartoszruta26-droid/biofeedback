@@ -1,6 +1,6 @@
 # Biofeedback — Raspberry Pi Pico firmware foundation
 
-This is a fail-closed firmware foundation, not a release-ready actuator controller.
+This is a fail-closed firmware foundation, not a release-ready actuator controller. CI builds this target against the pinned Raspberry Pi Pico SDK 2.1.1.
 
 ## Implemented
 - UART0 control channel: GP0 TX / GP1 RX, 115200 baud, 8N1.
