@@ -1,5 +1,6 @@
 #include "games/ArcherGame.hpp"
 #include <QKeyEvent>
+#include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
 #include <algorithm>
@@ -34,6 +35,20 @@ void ArcherGame::initialize()
     m_gravity = 520.0;
     m_fireCooldown = 0.0;
     repositionTarget();
+}
+
+void ArcherGame::resizeEvent(QResizeEvent* event)
+{
+    GameEngine::resizeEvent(event);
+    if (width() > 0 && height() > 0) {
+        repositionTarget();
+        for (Arrow& arrow : m_arrows) {
+            if (arrow.position.x() > width() || arrow.position.y() > height())
+                arrow.active = false;
+        }
+        m_arrows.erase(std::remove_if(m_arrows.begin(), m_arrows.end(),
+            [](const Arrow& arrow) { return !arrow.active; }), m_arrows.end());
+    }
 }
 
 void ArcherGame::repositionTarget()
