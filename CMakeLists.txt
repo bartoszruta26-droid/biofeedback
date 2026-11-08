@@ -314,6 +314,7 @@ if(Qt5_FOUND)
         src/gui/GraphWidget.cpp
         src/tab/PatientTab.cpp
         src/tab/MeasurementTab.cpp
+        src/tab/SampleJournalWriter.cpp
         src/tab/OutlineTab.cpp
         src/tab/TrainingTab.cpp
         src/tab/TrainingAnalyticsWidget.cpp
@@ -350,6 +351,7 @@ if(Qt5_FOUND)
         include/gui/GraphWidget.hpp
         include/tab/PatientTab.hpp
         include/tab/MeasurementTab.hpp
+        include/tab/SampleJournalWriter.hpp
         include/tab/OutlineTab.hpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
@@ -376,6 +378,17 @@ if(Qt5_FOUND)
 
     # Create executable
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+    # Durable asynchronous desktop measurement journal regression.
+    add_executable(sample_journal_writer_regression
+        tests/sample_journal_writer_regression.cpp
+        src/tab/SampleJournalWriter.cpp
+        include/tab/SampleJournalWriter.hpp
+    )
+    target_include_directories(sample_journal_writer_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(sample_journal_writer_regression PRIVATE Qt5::Core Threads::Threads)
+    add_test(NAME sample_journal_writer_regression COMMAND sample_journal_writer_regression)
+    set_tests_properties(sample_journal_writer_regression PROPERTIES TIMEOUT 20)
 
     # GameEngine lifecycle, monotonic timing, fixed-step simulation and
     # cross-thread sensor input regression.
