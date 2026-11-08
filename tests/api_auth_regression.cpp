@@ -200,8 +200,8 @@ int main(int argc, char** argv) {
                .value("id").toString() == "api-session-1");
     assert(statusCode(resourceRequest("POST", "/api/v1/acquisition/session",
         QJsonDocument(QJsonObject{
-            {"id", "api-session-2"}, {"patient_id", "patient-api-1"},
-            {"device_id", "sensor-api-1"}
+            {"id", "api-session-2"}, {"patient_id", patientId},
+            {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}
         }).toJson(QJsonDocument::Compact))) == 409);
     const QByteArray sampleHistory = resourceRequest("GET", "/api/v1/acquisition/samples");
     assert(statusCode(sampleHistory) == 200);
