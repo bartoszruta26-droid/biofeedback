@@ -1314,11 +1314,8 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
-    if (m_sampleJournalWriter && !m_sampleJournalFailed) {
-        const bool wasFailed = m_sampleJournalFailed;
-        if (!appendSampleJournal(recorded) && !wasFailed && m_lblStatus)
-            m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA"));
-    }
+    if (m_sampleJournalWriter && !m_sampleJournalFailed)
+        appendSampleJournal(recorded);
 
     if (m_rawBox)
         m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
