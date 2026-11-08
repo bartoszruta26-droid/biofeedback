@@ -122,24 +122,29 @@ niezaimplementowany.
 
 - Dodano `JsonResourceRepository` dla sześciu kolekcji: patients, measurements,
   training-sessions, training-results, game-sessions i game-results.
-- Magazyn plikowy używa UUID, atomowego zapisu `QSaveFile`, limitu 1 MiB,
+- Magazyn plikowy używa UUID, atomowego zapisu `QSaveFile`, limitu 16 MiB,
   kontroli wersji oraz uprawnień owner-only. Gdy `encryption.enabled=true`,
   rekordy są szyfrowane AES-256-GCM; brak klucza powoduje odmowę inicjalizacji.
 - Desktop i wbudowany serwer HTTP współdzielą tę samą instancję repozytorium.
-  Zakładka Pacjenci zapisuje i odczytuje karty przez repozytorium. Przy starcie
-  stare pliki pacjentów są migrowane bez usuwania źródeł migracji.
+  Zakładka Pacjenci zapisuje i odczytuje karty; sesje pomiarowe są archiwizowane
+  wraz z próbkami, sesje treningowe wraz z wynikami ćwiczeń, a wyniki gier
+  trafiają do kolekcji game-sessions i game-results. Stare pliki pacjentów są
+  migrowane bez usuwania źródeł migracji.
 - API ma CRUD kolekcji, sesje Bearer, kontrolę wersji i tymczasową blokadę
   dostępu do roli administratora. Pełne RBAC, audyt operacji i WebSocket/SSE
   pozostają do wdrożenia.
 - WebUI ma klienta CRUD dla wszystkich kolekcji. Android ma klienta CRUD,
-  a ekran Pacjenci obsługuje podstawowe operacje na kartach.
-- TUI nadal nie korzysta z API. Producenci pomiarów, sesji treningowych i gier
-  w Desktop/TUI nie są jeszcze w pełni przepięci na trwałe kolekcje serwera.
+  a ekran Pacjenci obsługuje podstawowe operacje na kartach; pozostałe ekrany
+  Androida nie zapisują jeszcze pomiarów i treningów.
+- TUI loguje się przez API, odczytuje listę pacjentów i zapisuje sesje treningowe.
+  Nie dołącza jeszcze identyfikatora pacjenta do treningu ani nie zapisuje
+  pomiarów i wyników gier.
 - MariaDB pozostaje niewdrożona; wybranie jej jako backendu pacjentów nie
   powoduje fallbacku do plików.
 
 Ten stan nie oznacza jeszcze pełnej synchronizacji pięciu interfejsów.
-Wymagane są migracja pozostałych producentów danych, klient TUI, testy
-wieloklientowe i testy backup/restore. Wyniki CI należy przypisywać wyłącznie
+Wymagane są dalsze integracje WebUI i Androida dla pomiarów/treningów/gier,
+powiązanie sesji TUI z pacjentem, archiwizacja gier z TUI, pełne RBAC,
+testy wieloklientowe i testy backup/restore. Wyniki CI należy przypisywać wyłącznie
 do konkretnego SHA; sam kod repozytorium nie stanowi dowodu poprawności
 klinicznej ani kompletności bezpieczeństwa.
