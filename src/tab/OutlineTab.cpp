@@ -489,7 +489,7 @@ void OutlineTab::populateGameCombo()
     m_gameCombo->addItem(tr("Mario"), "mario");
     m_gameCombo->addItem(tr("Galaga"), "galaga");
     m_gameCombo->addItem(tr("Archer"), "archer");
-    m_gameCombo->addItem(tr("Scored Earth"), "scored_earth");
+    m_gameCombo->addItem(tr("Scorched Earth"), "scorched_earth");
     m_gameCombo->addItem(tr("Car Race"), "car_race");
 
     // Nie pokazuj jako dostępnych gier, których implementacje nie są jeszcze
