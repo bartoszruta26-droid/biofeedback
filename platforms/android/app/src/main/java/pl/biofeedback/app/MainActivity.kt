@@ -16,6 +16,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
@@ -31,6 +34,10 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.ui.Alignment
@@ -66,6 +73,52 @@ private val sections = listOf(
 
 @Composable
 private fun BiofeedbackApp() {
+    var apiEndpoint by remember { mutableStateOf("") }
+    var loginUsername by remember { mutableStateOf("") }
+    var loginPassword by remember { mutableStateOf("") }
+    var loginError by remember { mutableStateOf("") }
+    var isLoggingIn by remember { mutableStateOf(false) }
+    var authenticatedUser by remember { mutableStateOf<String?>(null) }
+    var apiClient by remember { mutableStateOf<ApiClient?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    if (authenticatedUser == null) {
+        LoginScreen(
+            endpoint = apiEndpoint,
+            onEndpointChange = { apiEndpoint = it },
+            username = loginUsername,
+            onUsernameChange = { loginUsername = it },
+            password = loginPassword,
+            onPasswordChange = { loginPassword = it },
+            error = loginError,
+            loading = isLoggingIn,
+            onLogin = {
+                isLoggingIn = true
+                loginError = ""
+                coroutineScope.launch {
+                    try {
+                        val result = withContext(Dispatchers.IO) {
+                            val client = ApiClient(apiEndpoint.trim())
+                            client.login(loginUsername.trim(), loginPassword)
+                            val user = client.currentUser()
+                            client to user
+                        }
+                        apiClient = result.first
+                        authenticatedUser = result.second.optString("username") +
+                            " · " + result.second.optString("role")
+                        loginPassword = ""
+                    } catch (error: Exception) {
+                        loginError = error.message ?: "Logowanie nie powiodło się."
+                        loginPassword = ""
+                    } finally {
+                        isLoggingIn = false
+                    }
+                }
+            }
+        )
+        return
+    }
+
     var selected by remember { mutableIntStateOf(0) }
     var moreMenuExpanded by remember { mutableStateOf(false) }
     Scaffold(
@@ -103,7 +156,7 @@ private fun BiofeedbackApp() {
                             },
                             color = Navy, fontSize = 28.sp, fontWeight = FontWeight.Bold
                         )
-                        Text("Mobilny panel systemu terapeutycznego", color = Muted, fontSize = 13.sp)
+                        Text(authenticatedUser ?: "Sesja API aktywna", color = Muted, fontSize = 12.sp)
                     }
                     Box {
                         Text("⋮", modifier = Modifier.clickable { moreMenuExpanded = true }.padding(12.dp), color = Navy, fontSize = 24.sp)
@@ -115,6 +168,17 @@ private fun BiofeedbackApp() {
                             DropdownMenuItem(text = { Text("Ustawienia") }, onClick = {
                                 selected = 6
                                 moreMenuExpanded = false
+                            })
+                            DropdownMenuItem(text = { Text("Wyloguj") }, onClick = {
+                                moreMenuExpanded = false
+                                coroutineScope.launch {
+                                    withContext(Dispatchers.IO) {
+                                        try { apiClient?.logout() } catch (_: Exception) { }
+                                    }
+                                    apiClient = null
+                                    authenticatedUser = null
+                                    selected = 0
+                                }
                             })
                         }
                     }
@@ -145,6 +209,70 @@ private fun BiofeedbackApp() {
             }
             item { Spacer(Modifier.height(8.dp)) }
         }
+    }
+}
+
+@Composable
+private fun LoginScreen(
+    endpoint: String,
+    onEndpointChange: (String) -> Unit,
+    username: String,
+    onUsernameChange: (String) -> Unit,
+    password: String,
+    onPasswordChange: (String) -> Unit,
+    error: String,
+    loading: Boolean,
+    onLogin: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().background(Canvas).padding(24.dp),
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("BIOFEEDBACK", color = Teal, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Spacer(Modifier.height(10.dp))
+        Text("Logowanie", color = Navy, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text("Połącz się z serwerem API przez szyfrowane HTTPS.", color = Muted, fontSize = 13.sp)
+        Spacer(Modifier.height(22.dp))
+        OutlinedTextField(
+            value = endpoint,
+            onValueChange = onEndpointChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Adres HTTPS API") },
+            placeholder = { Text("https://serwer.example") },
+            singleLine = true
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = username,
+            onValueChange = onUsernameChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Użytkownik") },
+            singleLine = true
+        )
+        Spacer(Modifier.height(10.dp))
+        OutlinedTextField(
+            value = password,
+            onValueChange = onPasswordChange,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Hasło") },
+            singleLine = true
+        )
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = onLogin,
+            enabled = !loading && endpoint.startsWith("https://") && username.isNotBlank() && password.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (loading) CircularProgressIndicator()
+            else Text("Zaloguj")
+        }
+        if (error.isNotBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text(error, color = Color(0xFFB42318), fontSize = 12.sp)
+        }
+        Spacer(Modifier.height(12.dp))
+        Text("Token sesji pozostaje w pamięci aplikacji i znika po wylogowaniu lub zamknięciu procesu.", color = Muted, fontSize = 11.sp)
     }
 }
 
