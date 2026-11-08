@@ -1,6 +1,7 @@
 #include "games/MarioGame.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QPaintEvent>
+#include <QResizeEvent>
 #include <cmath>
 
 namespace games {
@@ -52,6 +53,52 @@ void MarioGame::initialize()
         cloud.size = 20 + QRandomGenerator::global()->bounded(30);
         m_clouds.append(cloud);
     }
+}
+
+void MarioGame::resizeEvent(QResizeEvent* event)
+{
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        const double scaleDecor = qMin(scaleX, scaleY);
+
+        m_player.body = QRectF(m_player.body.x() * scaleX,
+                               m_player.body.y() * scaleY,
+                               m_player.body.width() * scaleX,
+                               m_player.body.height() * scaleY);
+        m_player.velocityY *= scaleY;
+
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.rect = QRectF(obstacle.rect.x() * scaleX,
+                                   obstacle.rect.y() * scaleY,
+                                   obstacle.rect.width() * scaleX,
+                                   obstacle.rect.height() * scaleY);
+        }
+
+        for (Cloud& cloud : m_clouds) {
+            cloud.pos.setX(cloud.pos.x() * scaleX);
+            cloud.pos.setY(cloud.pos.y() * scaleY);
+            cloud.size = qMax(1, static_cast<int>(std::lround(cloud.size * scaleDecor)));
+        }
+
+        const double groundY = newSize.height() * GROUND_Y_RATIO;
+        const double maxPlayerY = qMax(0.0, static_cast<double>(newSize.height()) -
+                                             m_player.body.height());
+        m_player.body.moveTop(qBound(0.0, m_player.body.top(), maxPlayerY));
+        if (m_player.isOnGround && m_obstacles.isEmpty())
+            m_player.body.moveBottom(groundY);
+        for (Cloud& cloud : m_clouds) {
+            cloud.pos.setX(qBound(-static_cast<double>(cloud.size),
+                                  cloud.pos.x(),
+                                  static_cast<double>(newSize.width() + cloud.size)));
+            cloud.pos.setY(qBound(0.0, cloud.pos.y(),
+                                  static_cast<double>(newSize.height() / 3)));
+        }
+    }
+    GameEngine::resizeEvent(event);
 }
 
 void MarioGame::initPlayer()
