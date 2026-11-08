@@ -13,6 +13,7 @@
 #include <QElapsedTimer>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QUuid>
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -527,6 +528,8 @@ void TrainingTab::startTraining()
     m_lastCheckpointSeconds = -1;
     m_trainingClock.reset();
     m_sessionClock.start();
+    m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    m_sessionStartedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
     m_trainingClock.update(0, true);
     m_currentExerciseIndex = 0;
     m_currentSeriesIndex = 0;
@@ -793,6 +796,103 @@ void TrainingTab::configureGameForExercise()
 QVector<ExerciseStats> TrainingTab::getTrainingStats() const
 {
     return m_exerciseStats;
+}
+
+QJsonObject TrainingTab::buildSharedTrainingRecord(const QString& patientUuid) const
+{
+    if (patientUuid.isEmpty() || m_activeSessionId.isEmpty() || m_exercisePlan.isEmpty())
+        return {};
+
+    QJsonArray plan;
+    for (const TrainingExercise& exercise : m_exercisePlan) {
+        plan.append(QJsonObject{
+            {QStringLiteral("name"), exercise.name},
+            {QStringLiteral("series_count"), exercise.seriesCount},
+            {QStringLiteral("repetitions_per_series"), exercise.repsPerSeries},
+            {QStringLiteral("target_force_n"), exercise.targetForce},
+            {QStringLiteral("rest_seconds"), exercise.restTime},
+            {QStringLiteral("game_id"), exercise.gameType}
+        });
+    }
+
+    QJsonArray exerciseResults;
+    QJsonArray gameRecords;
+    const int count = qMin(m_exerciseStats.size(), m_exercisePlan.size());
+    for (int index = 0; index < count; ++index) {
+        const ExerciseStats& stats = m_exerciseStats.at(index);
+        const TrainingExercise& exercise = m_exercisePlan.at(index);
+        QJsonArray repetitions;
+        for (const TrainingRepetitionRecord& repetition : stats.repetitions) {
+            const auto& measured = repetition.measurement;
+            repetitions.append(QJsonObject{
+                {QStringLiteral("series_index"), repetition.seriesIndex},
+                {QStringLiteral("repetition_index"), repetition.repetitionIndex},
+                {QStringLiteral("start_timestamp_ms"), static_cast<qint64>(measured.startTimestampMs)},
+                {QStringLiteral("end_timestamp_ms"), static_cast<qint64>(measured.endTimestampMs)},
+                {QStringLiteral("duration_ms"), static_cast<qint64>(measured.durationMs)},
+                {QStringLiteral("time_to_peak_ms"), static_cast<qint64>(measured.timeToPeakMs)},
+                {QStringLiteral("peak_force_n"), measured.peakForceN},
+                {QStringLiteral("mean_force_n"), measured.meanForceN},
+                {QStringLiteral("sample_count"), static_cast<qint64>(measured.sampleCount)}
+            });
+        }
+
+        QJsonArray series;
+        for (const biofeedback::training::SeriesSummary& summary : stats.series) {
+            series.append(QJsonObject{
+                {QStringLiteral("repetition_count"), static_cast<qint64>(summary.repetitionCount)},
+                {QStringLiteral("average_peak_force_n"), summary.averagePeakForceN},
+                {QStringLiteral("maximum_peak_force_n"), summary.maximumPeakForceN},
+                {QStringLiteral("average_duration_ms"), summary.averageDurationMs},
+                {QStringLiteral("average_time_to_peak_ms"), summary.averageTimeToPeakMs},
+                {QStringLiteral("peak_force_cv_percent"), summary.peakForceCoefficientOfVariationPercent},
+                {QStringLiteral("target_achievement_percent"), summary.targetAchievementPercent}
+            });
+        }
+
+        exerciseResults.append(QJsonObject{
+            {QStringLiteral("exercise_index"), index},
+            {QStringLiteral("exercise_name"), stats.exerciseName},
+            {QStringLiteral("completed_series"), stats.completedSeries},
+            {QStringLiteral("completed_repetitions"), stats.completedReps},
+            {QStringLiteral("average_peak_force_n"), stats.avgPeakForce},
+            {QStringLiteral("maximum_peak_force_n"), stats.maxPeakForce},
+            {QStringLiteral("average_reaction_time_ms"), stats.avgReactionTime},
+            {QStringLiteral("consistency_score_percent"), stats.consistencyScore},
+            {QStringLiteral("completed"), stats.isCompleted},
+            {QStringLiteral("game_id"), exercise.gameType},
+            {QStringLiteral("game_score"), stats.gameScore},
+            {QStringLiteral("repetitions"), repetitions},
+            {QStringLiteral("series"), series}
+        });
+
+        if (!exercise.gameType.isEmpty() && exercise.gameType != QStringLiteral("none") &&
+            stats.gameScore > 0) {
+            gameRecords.append(QJsonObject{
+                {QStringLiteral("exercise_index"), index},
+                {QStringLiteral("game_id"), exercise.gameType},
+                {QStringLiteral("score"), stats.gameScore},
+                {QStringLiteral("exercise_name"), stats.exerciseName}
+            });
+        }
+    }
+
+    const qint64 elapsedMs = m_sessionElapsedOffsetMs +
+        (m_sessionClock.isValid() ? m_sessionClock.elapsed() : 0);
+    const bool completed = m_stateMachine.state() == biofeedback::training::SessionState::Completed;
+    return QJsonObject{
+        {QStringLiteral("session_id"), m_activeSessionId},
+        {QStringLiteral("patient_id"), patientUuid},
+        {QStringLiteral("started_at"), m_sessionStartedAtUtc},
+        {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("status"), completed ? QStringLiteral("completed") : QStringLiteral("interrupted")},
+        {QStringLiteral("elapsed_ms"), elapsedMs},
+        {QStringLiteral("active_training_seconds"), m_trainingClock.activeSeconds()},
+        {QStringLiteral("plan"), plan},
+        {QStringLiteral("exercise_results"), exerciseResults},
+        {QStringLiteral("game_results"), gameRecords},
+        {QStringLiteral("source_client"), QStringLiteral("desktop")}
+    };
 }
 
 void TrainingTab::refreshAnalytics()
