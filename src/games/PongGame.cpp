@@ -207,8 +207,9 @@ void PongGame::checkCollisions() {
         // Odbicie piłki z lekkim przyspieszeniem
         // Zachowaj ograniczoną prędkość całkowitą i wyznacz oba składniki
         // wektora z jednego kąta odbicia (bez niekontrolowanego przyspieszania).
-        const float hitPos = qBound(0.0f,
-            (m_ballPos.y() - m_leftPaddle.top()) / qMax(1.0f, m_paddleHeight), 1.0f);
+        const double hitPos = qBound(0.0,
+            (m_ballPos.y() - m_leftPaddle.top()) /
+                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
         const float angle = (hitPos - 0.5f) * 1.5f;
         const double speed = qMin(
             std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
@@ -226,8 +227,9 @@ void PongGame::checkCollisions() {
         m_ballPos.y() + m_ballRadius >= m_rightPaddle.top() &&
         m_ballPos.y() - m_ballRadius <= m_rightPaddle.bottom()) {
         
-        const float hitPos = qBound(0.0f,
-            (m_ballPos.y() - m_rightPaddle.top()) / qMax(1.0f, m_paddleHeight), 1.0f);
+        const double hitPos = qBound(0.0,
+            (m_ballPos.y() - m_rightPaddle.top()) /
+                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
         const float angle = (hitPos - 0.5f) * 1.5f;
         const double speed = qMin(
             std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
