@@ -1,5 +1,6 @@
 #include "api/HttpApiServer.hpp"
 #include "core/Authentication.hpp"
+#include "data/JsonResourceRepository.hpp"
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -69,7 +70,11 @@ int main(int argc, char** argv) {
     biofeedback::Authentication bootstrap(usersPath.toStdString());
     assert(bootstrap.createInitialAdministrator("api-test", "test-password-123"));
 
-    biofeedback::api::HttpApiServer server(usersPath);
+    const QString encryptionKey = QStringLiteral("0123456789abcdef0123456789abcdef");
+    auto repository = std::make_shared<biofeedback::data::JsonResourceRepository>(
+        directory.filePath("shared-data"), encryptionKey, true);
+    assert(repository->isReady());
+    biofeedback::api::HttpApiServer server(usersPath, repository);
     assert(server.listen(QHostAddress::LocalHost, 0));
     const quint16 port = server.serverPort();
 
@@ -98,6 +103,67 @@ int main(int argc, char** argv) {
     const QByteArray meRequest =
         "GET /api/v1/auth/me HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer " +
         token.toLatin1() + "\r\nConnection: close\r\n\r\n";
+
+    const auto resourceRequest = [&](const QByteArray& method, const QByteArray& path,
+                                     const QByteArray& jsonBody = QByteArray()) {
+        QByteArray request = method + " " + path + " HTTP/1.1\r\nHost: localhost\r\n";
+        request += "Authorization: Bearer " + token.toLatin1() + "\r\n";
+        if (!jsonBody.isNull()) {
+            request += "Content-Type: application/json\r\nContent-Length: " +
+                QByteArray::number(jsonBody.size()) + "\r\n";
+        }
+        request += "Connection: close\r\n\r\n";
+        request += jsonBody;
+        return transact(port, request);
+    };
+
+    const QByteArray unauthenticatedPatients = transact(
+        port, "GET /api/v1/patients HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+    assert(statusCode(unauthenticatedPatients) == 401);
+
+    const QByteArray patientPayload = QJsonDocument(QJsonObject{
+        {"firstName", QStringLiteral("API")},
+        {"lastName", QStringLiteral("Patient")},
+        {"patient_reference", QStringLiteral("test-patient-001")}
+    }).toJson(QJsonDocument::Compact);
+    const QByteArray createPatient = resourceRequest("POST", "/api/v1/patients", patientPayload);
+    assert(statusCode(createPatient) == 201);
+    const QJsonObject createdPatient = QJsonDocument::fromJson(responseBody(createPatient)).object();
+    const QString patientId = createdPatient.value("id").toString();
+    assert(!patientId.isEmpty());
+    assert(createdPatient.value("version").toInt() == 1);
+
+    const QByteArray listPatients = resourceRequest("GET", "/api/v1/patients");
+    assert(statusCode(listPatients) == 200);
+    const QJsonObject patientList = QJsonDocument::fromJson(responseBody(listPatients)).object();
+    assert(patientList.value("count").toInt() == 1);
+
+    const QByteArray getPatient = resourceRequest(
+        "GET", ("/api/v1/patients/" + patientId).toUtf8());
+    assert(statusCode(getPatient) == 200);
+    assert(QJsonDocument::fromJson(responseBody(getPatient)).object()
+               .value("patient_reference").toString() == "test-patient-001");
+
+    const QByteArray updatePayload = QJsonDocument(QJsonObject{
+        {"expected_version", 1},
+        {"record", QJsonObject{
+            {"firstName", QStringLiteral("Changed")},
+            {"lastName", QStringLiteral("Patient")}
+        }}
+    }).toJson(QJsonDocument::Compact);
+    const QByteArray updatePatient = resourceRequest(
+        "PUT", ("/api/v1/patients/" + patientId).toUtf8(), updatePayload);
+    assert(statusCode(updatePatient) == 200);
+    assert(QJsonDocument::fromJson(responseBody(updatePatient)).object()
+               .value("version").toInt() == 2);
+    assert(statusCode(resourceRequest(
+        "PUT", ("/api/v1/patients/" + patientId).toUtf8(), updatePayload)) == 409);
+
+    const QByteArray deletePayload = QJsonDocument(QJsonObject{
+        {"expected_version", 2}
+    }).toJson(QJsonDocument::Compact);
+    assert(statusCode(resourceRequest(
+        "DELETE", ("/api/v1/patients/" + patientId).toUtf8(), deletePayload)) == 200);
     const QByteArray meResponse = transact(port, meRequest);
     assert(statusCode(meResponse) == 200);
     const QJsonObject me = QJsonDocument::fromJson(responseBody(meResponse)).object();
