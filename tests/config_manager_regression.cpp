@@ -36,6 +36,10 @@ int main(int argc, char** argv)
     biofeedback::ConfigManager production;
     assert(!production.load(path, true)); // production must fail closed without encryption
 
+    reader.setValue("deployment.profile", std::string("produciton"));
+    assert(reader.save(path, false));
+    biofeedback::ConfigManager invalidProfile;
+    assert(!invalidProfile.load(path, true));
 
     reader.setValue("deployment.profile", std::string("development"));
     reader.setValue("custom.label", std::string("calibration station"));
