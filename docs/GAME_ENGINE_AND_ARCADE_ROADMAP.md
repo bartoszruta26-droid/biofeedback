@@ -83,6 +83,9 @@
 - [ ] Poprawka granic losowania chmurek Mario w `d156a81`; nie uruchamiano kompilacji ani testów zgodnie z bieżącym zakresem prac.
 - [ ] Obsługa zmiany rozmiaru Flappy Bird i test regresyjny w commitach `6434ac0`, `780467c`, `8c3cb57`; zmiany nie były kompilowane ani testowane.
 - [ ] Obsługa zmiany rozmiaru Mario i test regresyjny w commitach `715b736`, `813d82d`, `0343bac`; zmiany nie były kompilowane ani testowane.
+- [x] Pong: kolizja z paletkami uwzględnia cały obrys piłki oraz kierunek jej ruchu, dzięki czemu kontakt przy krawędzi paletki nie zależy wyłącznie od położenia środka piłki. Commit: `fb32a1a7b1fc97ddc9ceac5949457389ac3587f8`; oczekuje na kompilację i testy.
+- [x] Flappy Bird: po zmianie rozmiaru ograniczono promień ptaka i geometrię luk istniejących przeszkód do nowego widoku, także dla małych i wąskich okien. Commit: `1a6da0998e24e6886971e241a25b2e4d2cca0370`; oczekuje na kompilację i testy.
+- [ ] Statyczny przegląd poprawek Pong i Flappy Bird zakończony; zachowanie kolizji i resize wymaga potwierdzenia testami po wznowieniu walidacji.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
