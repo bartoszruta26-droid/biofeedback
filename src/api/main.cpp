@@ -1,14 +1,15 @@
 #include "api/HttpApiServer.hpp"
-#include "core/ConfigManager.hpp"
 #include "core/RuntimePaths.hpp"
 #include "data/JsonResourceRepository.hpp"
 
 #include <QCoreApplication>
 #include <QCommandLineParser>
 #include <QDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTextStream>
 
-#include <cstdlib>
 #include <memory>
 
 int main(int argc, char* argv[]) {
@@ -32,19 +33,31 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    biofeedback::ConfigManager config;
     const QString configPath = biofeedback::runtime::ensureUserConfigFile(QStringLiteral("config.json"));
-    if (configPath.isEmpty() || !config.load(configPath.toStdString())) {
-        config.setDefaults();
+    bool configReady = false;
+    bool encryptionEnabled = true;
+    QString patientBackend = QStringLiteral("unavailable");
+    QFile configFile(configPath);
+    if (!configPath.isEmpty() && configFile.open(QIODevice::ReadOnly)) {
+        QJsonParseError parseError;
+        const QJsonDocument configDocument = QJsonDocument::fromJson(configFile.readAll(), &parseError);
+        if (parseError.error == QJsonParseError::NoError && configDocument.isObject()) {
+            const QJsonObject root = configDocument.object();
+            const QJsonObject encryption = root.value(QStringLiteral("encryption")).toObject();
+            const QJsonObject storage = root.value(QStringLiteral("storage")).toObject();
+            if (root.contains(QStringLiteral("encryption")) && root.contains(QStringLiteral("storage")) &&
+                encryption.value(QStringLiteral("enabled")).isBool() &&
+                storage.value(QStringLiteral("patient_backend")).isString()) {
+                configReady = true;
+                encryptionEnabled = encryption.value(QStringLiteral("enabled")).toBool();
+                patientBackend = storage.value(QStringLiteral("patient_backend")).toString();
+            }
+        }
     }
-
-    const bool encryptionEnabled = config.getBool("encryption.enabled", false);
     const QString encryptionKey = QString::fromUtf8(qgetenv("BIOFEEDBACK_ENCRYPTION_KEY"));
-    const QString patientBackend = QString::fromStdString(
-        config.getString("storage.patient_backend", "files"));
 
     std::shared_ptr<biofeedback::data::JsonResourceRepository> resources;
-    if (patientBackend == QStringLiteral("files")) {
+    if (configReady && patientBackend == QStringLiteral("files")) {
         resources = std::make_shared<biofeedback::data::JsonResourceRepository>(
             QDir(biofeedback::runtime::appDataDirectory()).filePath(QStringLiteral("shared-data")),
             encryptionKey, encryptionEnabled);
