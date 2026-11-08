@@ -77,6 +77,11 @@ void GameEngine::stop()
     if (!m_isRunning) {
         return; // Gra nie jest aktywna
     }
+
+    // Prevent a worker-thread producer from leaving a stale sample queued
+    // across stop/start. The queued callback is still lifetime-guarded.
+    m_sensorDispatchQueued.store(false, std::memory_order_release);
+    m_pendingSensorValue.store(0.0, std::memory_order_relaxed);
     
     // Zatrzymanie timera
     m_gameTimer->stop();
