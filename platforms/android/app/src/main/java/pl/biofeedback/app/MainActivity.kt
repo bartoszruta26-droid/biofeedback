@@ -372,6 +372,19 @@ private fun PatientsModule(client: ApiClient?) {
             .put("lastName", lastName.trim())
             .put("pesel", patientReference.trim())
             .put("medicalHistory", medicalHistory)
+        if (editingId != null) {
+            val existingItems = patients?.optJSONArray("items")
+            if (existingItems != null) {
+                for (index in 0 until existingItems.length()) {
+                    val existing = existingItems.optJSONObject(index) ?: continue
+                    if (existing.optString("id") == editingId) {
+                        payload.put("birthDate", existing.optString("birthDate"))
+                        payload.put("gender", existing.optString("gender"))
+                        break
+                    }
+                }
+            }
+        }
         scope.launch {
             busy = true
             errorMessage = ""
