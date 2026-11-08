@@ -12,6 +12,7 @@ int main() {
 
     measurement::MeasurementInput input;
     input.deviceTimestampMs = 42;
+    input.hasTimestamp = true;
     input.rawValue = 125;
     input.value = 1.25;
     input.sensorValid = true;
