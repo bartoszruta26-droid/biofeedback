@@ -62,12 +62,12 @@ void ProtocolParser::feed(const uint8_t* data, std::size_t length) {
         }
 
         const auto markerIndex = static_cast<std::size_t>(marker - m_buffer.begin());
-        if (markerIndex < 9) {
+        if (markerIndex < kPayloadSize) {
             m_buffer.erase(m_buffer.begin());
             ++m_discardedBytes;
             continue;
         }
-        const auto packetStart = markerIndex - 9;
+        const auto packetStart = markerIndex - kPayloadSize;
         const auto* packet = m_buffer.data() + packetStart;
         if (calculateCrc8(packet, kPayloadSize - 1) != packet[kPayloadSize - 1]) {
             m_buffer.erase(m_buffer.begin(), m_buffer.begin() + static_cast<std::ptrdiff_t>(packetStart + 1));
