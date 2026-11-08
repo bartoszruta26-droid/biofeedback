@@ -1236,6 +1236,15 @@ void MeasurementTab::stopMeasurement()
         m_lblStatus->setText(journalError.isEmpty()
             ? tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku")
             : tr("Status: BŁĄD ZAPISU DZIENNIKA — %1").arg(journalError));
+    } else {
+        quint64 totalDropped = 0;
+        {
+            std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+            totalDropped = m_totalDroppedMeasurementSamples;
+        }
+        if (totalDropped != 0)
+            m_lblStatus->setText(tr("Status: ZATRZYMANO — pominięto %1 klatek GUI; pełny strumień zapisano w dzienniku")
+                                     .arg(static_cast<qulonglong>(totalDropped)));
     }
     
     std::cout << "[DEBUG] stopMeasurement: emit measurementStopped" << std::endl;
@@ -1264,8 +1273,11 @@ void MeasurementTab::resetSession()
     m_journalNextSequence.store(1, std::memory_order_release);
     m_journalAdmission.store(false, std::memory_order_release);
     m_sampleJournalFailed = false;
-    m_totalDroppedMeasurementSamples = 0;
-    m_droppedMeasurementSamples = 0;
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        m_totalDroppedMeasurementSamples = 0;
+        m_droppedMeasurementSamples = 0;
+    }
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
@@ -2811,12 +2823,6 @@ void MeasurementTab::enqueueMeasurementSample(
         !m_sampleJournalFailed.load(std::memory_order_acquire))
         return;
 
-    // The shared engine also feeds TrainingTab while this tab is idle. Do not
-    // queue idle frames for this tab's inactive graph/repetition presentation.
-    if (!m_journalAdmission.load(std::memory_order_acquire) &&
-        !m_sampleJournalFailed.load(std::memory_order_acquire))
-        return;
-
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
@@ -2890,6 +2896,7 @@ void MeasurementTab::drainMeasurementSamples()
         if (!queued) {
             std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
             m_droppedMeasurementSamples += m_measurementQueue.size();
+            m_totalDroppedMeasurementSamples += m_measurementQueue.size();
             m_measurementQueue.clear();
             m_measurementDrainScheduled = false;
         }
