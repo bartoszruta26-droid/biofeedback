@@ -469,16 +469,15 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
-    // Reject new acquisitions and wait for any in-flight durable commit
-    // before closing the journal worker.
+    // Reject new acquisitions and subscriber deliveries first. Then wait
+    // for any in-flight durable commit before closing the journal worker.
     m_journalAdmission.store(false, std::memory_order_release);
-    if (m_measurementEngine)
-        m_measurementEngine->setCommitHook({});
-
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         m_measurementQueueAccepting = false;
     }
+    if (m_measurementEngine)
+        m_measurementEngine->setCommitHook({});
 
     if (m_measurementEngine && m_measurementCallbackToken) {
         m_measurementEngine->unsubscribe(m_measurementCallbackToken);
