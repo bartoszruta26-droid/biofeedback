@@ -23,8 +23,8 @@ if "setPatientId(pesel);" not in measurement_tab:
 
 if "bool hasTimestamp;" not in serial_header or "hasTimestamp(false)" not in serial_header:
     raise SystemExit("SensorData must distinguish a missing timestamp from timestamp value zero")
-if serial_source.count("data.hasTimestamp = true;") < 2:
-    raise SystemExit("Both binary and text sensor frames must mark an explicitly parsed timestamp")
+if "sample.hasTimestamp = true;" not in serial_source or "fallback.hasTimestamp = true;" not in serial_source:
+    raise SystemExit("Both binary batch frames and text fallback frames must mark an explicitly parsed timestamp")
 if adapter.count("input.hasTimestamp = data.hasTimestamp;") < 2:
     raise SystemExit("MeasurementSerialAdapter must preserve timestamp validity in both ingest paths")
 if "bool hasTimestamp{false};" not in engine_header:
