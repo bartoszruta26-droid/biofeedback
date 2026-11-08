@@ -236,11 +236,27 @@ void GameEngine::handleSensorInput(double value)
     // Sensor callbacks may originate on the serial worker thread. QWidget and
     // every derived game state must only be touched on the GUI thread.
     if (QThread::currentThread() != thread()) {
+        // Sensor streams can be much faster than the GUI event loop. Keep only
+        // the newest sample and schedule at most one pending GUI-thread callback.
+        m_pendingSensorValue.store(value, std::memory_order_relaxed);
+        if (m_sensorDispatchQueued.exchange(true, std::memory_order_acq_rel))
+            return;
+
         QPointer<GameEngine> guard(this);
-        QMetaObject::invokeMethod(this, [guard, value] {
-            if (guard)
-                guard->handleSensorInput(value);
+        const bool queued = QMetaObject::invokeMethod(this, [guard] {
+            if (!guard)
+                return;
+
+            // Clear the flag before reading the latest value. A concurrent
+            // producer either gets included in this read or schedules another
+            // dispatch, so the newest sample cannot be stranded.
+            guard->m_sensorDispatchQueued.store(false, std::memory_order_release);
+            const double pending = guard->m_pendingSensorValue.load(std::memory_order_acquire);
+            guard->handleSensorInput(pending);
         }, Qt::QueuedConnection);
+
+        if (!queued)
+            m_sensorDispatchQueued.store(false, std::memory_order_release);
         return;
     }
     if (!std::isfinite(value)) {
