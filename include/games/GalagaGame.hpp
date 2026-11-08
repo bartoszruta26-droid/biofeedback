@@ -21,6 +21,7 @@ public:
     int livesRemaining() const { return m_lives; }
     int currentWave() const { return m_wave; }
     int activeEnemyCount() const;
+    double hitProtectionRemaining() const { return m_hitCooldown; }
 
 protected:
     void initialize() override;
