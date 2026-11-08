@@ -35,8 +35,6 @@
 #include <openssl/crypto.h>
 #include <algorithm>
 #include <cctype>
-#include <dirent.h>
-#include <sys/stat.h>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -44,14 +42,15 @@
 #include <sstream>
 #include <stdexcept>
 #include <cstring>
-#include <cerrno>
+#include <QByteArray>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QSaveFile>
 #include <chrono>
 #include <iomanip>
 #include <ctime>
 #include <thread>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <cerrno>
 
 
@@ -244,32 +243,31 @@ std::vector<std::string> splitJsonObjectsFromArray(const std::string& arrayJson)
 
 bool writeFileAtomically(const std::string& path, const std::string& data)
 {
-    if (path.empty()) return false;
-    std::string pattern = path + ".tmp.XXXXXX";
-    std::vector<char> temp(pattern.begin(), pattern.end());
-    temp.push_back('\0');
-    const int fd = ::mkstemp(temp.data());
-    if (fd < 0) return false;
-    const std::string tempPath(temp.data());
-    bool ok = (::fchmod(fd, S_IRUSR | S_IWUSR) == 0);
-    std::size_t offset = 0;
-    while (ok && offset < data.size()) {
-        const ssize_t written = ::write(fd, data.data() + offset, data.size() - offset);
-        if (written < 0 && errno == EINTR) continue;
-        if (written <= 0) { ok = false; break; }
-        offset += static_cast<std::size_t>(written);
+    if (path.empty() || data.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        return false;
+
+    const QString target = QString::fromUtf8(path.data(), static_cast<int>(path.size()));
+    QSaveFile file(target);
+    file.setDirectWriteFallback(false);
+    if (!file.open(QIODevice::WriteOnly))
+        return false;
+
+    if (!file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+        file.cancelWriting();
+        return false;
     }
-    if (ok && ::fsync(fd) != 0) ok = false;
-    if (::close(fd) != 0) ok = false;
-    if (ok && ::rename(tempPath.c_str(), path.c_str()) != 0) ok = false;
-    if (ok) {
-        const auto slash = path.find_last_of('/');
-        const std::string directory = slash == std::string::npos ? "." : (slash == 0 ? "/" : path.substr(0, slash));
-        const int dirfd = ::open(directory.c_str(), O_RDONLY | O_DIRECTORY);
-        if (dirfd >= 0) { if (::fsync(dirfd) != 0) ok = false; ::close(dirfd); }
+
+    const QByteArray payload(data.data(), static_cast<int>(data.size()));
+    if (file.write(payload) != payload.size()) {
+        file.cancelWriting();
+        return false;
     }
-    if (!ok) ::unlink(tempPath.c_str());
-    return ok;
+
+    if (!file.commit())
+        return false;
+
+    return QFile::setPermissions(target,
+        QFileDevice::ReadOwner | QFileDevice::WriteOwner);
 }
 
 } // anonymous namespace
@@ -784,29 +782,20 @@ TrainingPlan DataManager::loadTrainingPlan(const std::string& filename, bool dec
 }
 
 bool DataManager::fileExists(const std::string& filename) const {
-    struct stat buffer;
-    return (stat(filename.c_str(), &buffer) == 0);
+    return QFileInfo::exists(QString::fromUtf8(filename.data(), static_cast<int>(filename.size())));
 }
 
 bool DataManager::deleteFile(const std::string& filename) {
-    return (std::remove(filename.c_str()) == 0);
+    return QFile::remove(QString::fromUtf8(filename.data(), static_cast<int>(filename.size())));
 }
 
 std::vector<std::string> DataManager::listFiles(const std::string& directory) const {
     std::vector<std::string> files;
-    DIR* dir = opendir(directory.c_str());
-    
-    if (dir != nullptr) {
-        struct dirent* entry;
-        while ((entry = readdir(dir)) != nullptr) {
-            std::string name = entry->d_name;
-            if (name != "." && name != "..") {
-                files.push_back(name);
-            }
-        }
-        closedir(dir);
-    }
-    
+    const QDir dir(QString::fromUtf8(directory.data(), static_cast<int>(directory.size())));
+    const QStringList entries = dir.entryList(QDir::Files | QDir::NoDotAndDotDot, QDir::Name);
+    files.reserve(static_cast<std::size_t>(entries.size()));
+    for (const QString& entry : entries)
+        files.push_back(entry.toUtf8().toStdString());
     return files;
 }
 
