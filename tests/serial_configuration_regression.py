@@ -35,33 +35,26 @@ assert "ControlStatus[] = \"STATUS\"" in protocol
 assert "ControlSafe[] = \"SAFE\"" in protocol
 assert "DefaultControlBaudRate = DefaultBaudRate" in protocol
 assert "sensor::protocol::DefaultControlBaudRate" in pico
-assert 'ActuatorLockedReply[] = "ERR,ACTUATORS_LOCKED"' in protocol
 assert "gpio_set_function(kUartTxPin, GPIO_FUNC_UART);" in pico
 assert "gpio_set_function(kUartRxPin, GPIO_FUNC_UART);" in pico
 
 assert config == example, "config.json and config.json.example must remain identical"
+for legacy in ("ir_pwm", "electrodes", "antenna", "actuators_enabled", "effectors"):
+    assert legacy not in json.dumps(config).lower(), f"legacy setting remains: {legacy}"
 assert config["deployment"]["profile"] == "development"
 assert config["encryption"]["enabled"] is False
 assert config["encryption"]["algorithm"] == "AES-256-GCM"
 assert config["encryption"]["key_derivation"] == "SHA-256 key normalization (32+ byte external secret)"
 assert "iterations" not in config["encryption"]
 assert config["medical"]["require_authentication"] is True
-assert config["devices"]["pico"]["actuators_enabled"] is False
 assert config["devices"]["pico"]["baud_rate"] == baud
 assert config["devices"]["pico"]["uart_tx_pin"] == 0
 assert config["devices"]["pico"]["uart_rx_pin"] == 1
-assert config["devices"]["pico"]["effectors"]["ir_pwm"]["enabled"] is False
-assert config["devices"]["pico"]["effectors"]["electrodes"]["enabled"] is False
-assert config["devices"]["pico"]["effectors"]["antenna"]["enabled"] is False
-assert config["devices"]["arduino_nano"]["actuators_enabled"] is False
 assert config["devices"]["arduino_nano"]["baud_rate"] == baud
 assert config["devices"]["arduino_nano"]["hx711_data_pin"] == 2
 assert config["devices"]["arduino_nano"]["hx711_clock_pin"] == 3
 assert config["logging"]["console_output"] is False
 assert config["logging"]["diagnostics_enabled"] is False
-assert 'm_config["devices.pico.effectors.ir_pwm.enabled"] = false;' in config_source
-assert 'm_config["devices.pico.effectors.electrodes.enabled"] = false;' in config_source
-assert 'm_config["devices.pico.effectors.antenna.enabled"] = false;' in config_source
 assert "PicoUartTxPin = 0" in protocol
 assert "PicoUartRxPin = 1" in protocol
 assert "NanoHx711DataPin = 2" in protocol
