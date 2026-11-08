@@ -162,4 +162,32 @@ add_sample_body = plot_source[add_sample_start:add_sample_end]
 if "removeFirst()" in add_sample_body or "for (double sample : m_forces)" in add_sample_body:
     raise SystemExit("ForcePlotWidget must not shift or rescan the full visible trace per sample")
 
+
+# The ordered training stream must never be truncated merely because the GUI
+# is temporarily behind. A full bounded queue applies producer backpressure;
+# teardown releases a blocked producer before waiting for subscriber callbacks.
+for required in (
+    "#include <condition_variable>",
+    "std::condition_variable m_measurementQueueSpaceAvailable",
+    "bool m_measurementQueueAccepting{true}",
+    "m_measurementQueueSpaceAvailable.wait(lock",
+    "m_measurementQueue.size() < 4096",
+    "m_measurementQueueSpaceAvailable.notify_all()",
+    "m_measurementQueueAccepting = false",
+):
+    if required not in source and required not in header:
+        raise SystemExit(f"Missing lossless sample backpressure invariant: {required}")
+enqueue_start = source.index("void MeasurementTab::enqueueMeasurementSample(")
+enqueue_end = source.index("void MeasurementTab::drainMeasurementSamples(", enqueue_start)
+enqueue_body = source[enqueue_start:enqueue_end]
+if "m_droppedMeasurementSamples += m_measurementQueue.size() + 1" in enqueue_body:
+    raise SystemExit("A full training queue must apply backpressure, not discard acquired samples")
+if "if (m_measurementQueue.size() >= MaximumQueuedSamples)" in enqueue_body:
+    raise SystemExit("Queue-capacity handling must wait for space instead of entering a drop branch")
+destructor_start = source.index("MeasurementTab::~MeasurementTab()")
+destructor_end = source.index("void MeasurementTab::ensureCurrentSeriesInitialized", destructor_start)
+destructor_body = source[destructor_start:destructor_end]
+if destructor_body.index("m_measurementQueueAccepting = false") > destructor_body.index("m_measurementEngine->unsubscribe"):
+    raise SystemExit("Teardown must release blocked acquisition callbacks before unsubscribe")
+
 print("Measurement, training and game realtime dispatch regression passed")

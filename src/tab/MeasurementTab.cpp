@@ -464,12 +464,20 @@ MeasurementTab::MeasurementTab(QWidget *parent)
 
 MeasurementTab::~MeasurementTab()
 {
-    closeSampleJournal();
+    // Wake a serial-reader callback if it is applying bounded-queue
+    // backpressure. Stop admission before waiting for in-flight subscribers.
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        m_measurementQueueAccepting = false;
+    }
+    m_measurementQueueSpaceAvailable.notify_all();
+
     if (m_measurementEngine && m_measurementCallbackToken) {
         m_measurementEngine->unsubscribe(m_measurementCallbackToken);
         m_measurementCallbackToken = 0;
     }
     m_measurementAdapter.reset();
+    closeSampleJournal();
     if (m_serialPort && m_dataCallbackToken) {
         m_serialPort->removeDataCallback(m_dataCallbackToken);
         m_dataCallbackToken = 0;
@@ -2734,12 +2742,15 @@ void MeasurementTab::enqueueMeasurementSample(
 {
     bool scheduleDrain = false;
     {
-        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        std::unique_lock<std::mutex> lock(m_measurementQueueMutex);
         constexpr std::size_t MaximumQueuedSamples = 4096;
-        if (m_measurementQueue.size() >= MaximumQueuedSamples) {
-            m_droppedMeasurementSamples += m_measurementQueue.size() + 1;
-            m_measurementQueue.clear();
-        }
+        // Training/repetition detection consumes an ordered full-rate stream.
+        // Apply backpressure to the serial reader instead of discarding a
+        // backlog that would corrupt repetition boundaries and sample counts.
+        m_measurementQueueSpaceAvailable.wait(lock, [this]() {
+            return !m_measurementQueueAccepting || m_measurementQueue.size() < 4096;
+        });
+        if (!m_measurementQueueAccepting) return;
         m_measurementQueue.push_back(sample);
         if (!m_measurementDrainScheduled) {
             m_measurementDrainScheduled = true;
@@ -2774,6 +2785,7 @@ void MeasurementTab::drainMeasurementSamples()
             batch.push_back(std::move(m_measurementQueue.front()));
             m_measurementQueue.pop_front();
         }
+        if (count != 0) m_measurementQueueSpaceAvailable.notify_all();
         if (m_measurementQueue.empty()) {
             m_measurementDrainScheduled = false;
         } else {

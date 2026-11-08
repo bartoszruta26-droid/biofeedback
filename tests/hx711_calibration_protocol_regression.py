@@ -40,7 +40,7 @@ assert "*end_ptr == '\\t'" in firmware, "calibration parser must use a single es
 assert "*end_ptr == '\\0'" in firmware, "calibration parser must use a single escaped NUL terminator"
 
 assert "hasCalibratedValue" in header
-assert "data.hasCalibratedValue = calibrationConfirmed;" in serial
+assert "samples.front().hasCalibratedValue = calibrationConfirmed;" in serial
 assert "protocol::Crc8InitialValue" in parser
 assert "protocol::Crc8Polynomial" in parser
 assert "protocol::MeasurementPayloadSize" in parser

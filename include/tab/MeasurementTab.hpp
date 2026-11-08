@@ -23,6 +23,7 @@
 #include <memory>
 #include <deque>
 #include <mutex>
+#include <condition_variable>
 #include <utility>
 #include <QComboBox>
 #include <QDoubleSpinBox>
@@ -487,7 +488,9 @@ private:
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
     sensor::SensorData m_lastSensorData;
     std::mutex m_measurementQueueMutex;
+    std::condition_variable m_measurementQueueSpaceAvailable;
     std::deque<biofeedback::measurement::MeasurementSample> m_measurementQueue;
+    bool m_measurementQueueAccepting{true};
     bool m_measurementDrainScheduled{false};
     std::size_t m_droppedMeasurementSamples{0};
 };

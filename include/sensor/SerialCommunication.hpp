@@ -161,6 +161,8 @@ public:
      * @return Dane z czujnika
      */
     SensorData readData(int timeout = 1000);
+    // Returns all complete CRC-valid frames from one transaction in wire order.
+    std::vector<SensorData> readDataBatch(int timeout = 1000);
     
     /**
      * @brief Odczytuje dane z czujnika (nieblokujące)
