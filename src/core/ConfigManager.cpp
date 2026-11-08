@@ -1,4 +1,5 @@
 #include "core/ConfigManager.hpp"
+#include "sensor/SerialProtocolConfig.hpp"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <sstream>
@@ -414,8 +415,8 @@ void ConfigManager::setDefaults() {
     
     // Serial settings
     m_config["serial.port"] = std::string("/dev/ttyUSB0");
-    m_config["serial.baud_rate"] = 9600;
-    m_config["serial.timeout_ms"] = 1000;
+    m_config["serial.baud_rate"] = sensor::protocol::DefaultBaudRate;
+    m_config["serial.timeout_ms"] = sensor::protocol::DefaultTimeoutMs;
     m_config["serial.retry_count"] = 3;
     
     // Data settings
@@ -425,9 +426,9 @@ void ConfigManager::setDefaults() {
     m_config["data.max_backups"] = 7;
     
     // Encryption settings
-    m_config["encryption.enabled"] = true;
-    m_config["encryption.algorithm"] = std::string("AES-256-CBC");
-    m_config["encryption.key_derivation"] = std::string("PBKDF2");
+    m_config["encryption.enabled"] = false; // Development default; production must explicitly provision encryption.
+    m_config["encryption.algorithm"] = std::string("AES-256-GCM");
+    m_config["encryption.key_derivation"] = std::string("SHA-256 key normalization (32+ byte external secret)");
     m_config["encryption.iterations"] = 100000;
     
     // UI settings
@@ -439,8 +440,8 @@ void ConfigManager::setDefaults() {
     
     // Sensor settings
     m_config["sensor.type"] = std::string("HX711");
-    m_config["sensor.sample_rate_hz"] = 80;
-    m_config["sensor.gain"] = 128;
+    m_config["sensor.sample_rate_hz"] = static_cast<int>(sensor::protocol::DefaultSampleRateHz);
+    m_config["sensor.gain"] = static_cast<int>(sensor::protocol::Hx711Gain);
     m_config["sensor.calibration_enabled"] = true;
     m_config["sensor.zero_threshold"] = 0.5;
     
