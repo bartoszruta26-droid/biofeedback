@@ -1,4 +1,6 @@
 #include "tab/TrainingTab.hpp"
+#include <algorithm>
+#include <vector>
 #include "tab/TrainingAnalyticsWidget.hpp"
 #include "measurement/Units.hpp"
 #include <QFileDialog>
@@ -671,14 +673,17 @@ void TrainingTab::setMeasurementEngine(
         m_measurementEngine->unsubscribe(m_measurementCallbackToken);
         m_measurementCallbackToken = 0;
     }
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        m_measurementQueue.clear();
+        m_droppedMeasurementSamples = 0;
+    }
     m_measurementEngine = std::move(engine);
     if (!m_measurementEngine) return;
 
     m_measurementCallbackToken = m_measurementEngine->subscribe(
         [this](const biofeedback::measurement::MeasurementSample& sample) {
-            QMetaObject::invokeMethod(this, [this, sample]() {
-                onMeasurementSample(sample);
-            }, Qt::QueuedConnection);
+            enqueueMeasurementSample(sample);
         });
 }
 
@@ -1113,6 +1118,65 @@ void TrainingTab::updateSessionClocks()
     const qint64 elapsedMs = m_sessionClock.elapsed();
     m_trainingClock.update(m_sessionElapsedOffsetMs + elapsedMs, !m_stateMachine.paused() && !m_stateMachine.resting());
     m_sessionTime = static_cast<int>(m_trainingClock.sessionSeconds());
+}
+
+void TrainingTab::enqueueMeasurementSample(
+    const biofeedback::measurement::MeasurementSample& sample)
+{
+    bool scheduleDrain = false;
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        constexpr std::size_t MaximumQueuedSamples = 4096;
+        if (m_measurementQueue.size() >= MaximumQueuedSamples) {
+            m_droppedMeasurementSamples += m_measurementQueue.size() + 1;
+            m_measurementQueue.clear();
+        }
+        m_measurementQueue.push_back(sample);
+        if (!m_measurementDrainScheduled) {
+            m_measurementDrainScheduled = true;
+            scheduleDrain = true;
+        }
+    }
+    if (scheduleDrain) {
+        QMetaObject::invokeMethod(this, [this]() {
+            drainMeasurementSamples();
+        }, Qt::QueuedConnection);
+    }
+}
+
+void TrainingTab::drainMeasurementSamples()
+{
+    constexpr std::size_t MaximumBatch = 128;
+    std::vector<biofeedback::measurement::MeasurementSample> batch;
+    std::size_t dropped = 0;
+    bool scheduleAgain = false;
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        dropped = std::exchange(m_droppedMeasurementSamples, 0);
+        const std::size_t count = std::min(MaximumBatch, m_measurementQueue.size());
+        batch.reserve(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            batch.push_back(std::move(m_measurementQueue.front()));
+            m_measurementQueue.pop_front();
+        }
+        if (m_measurementQueue.empty()) {
+            m_measurementDrainScheduled = false;
+        } else {
+            scheduleAgain = true;
+        }
+    }
+    if (dropped != 0) {
+        m_repetitionDetector.reset();
+        addDebugMessage(QString("Przepełnienie kolejki treningowej: pominięto %1 próbek; detektor powtórzeń zresetowany.")
+                            .arg(static_cast<qulonglong>(dropped)), "WARNING");
+    }
+    for (const auto& sample : batch)
+        onMeasurementSample(sample);
+    if (scheduleAgain) {
+        QMetaObject::invokeMethod(this, [this]() {
+            drainMeasurementSamples();
+        }, Qt::QueuedConnection);
+    }
 }
 
 void TrainingTab::onMeasurementSample(

@@ -16,8 +16,10 @@ for path in games:
 
 main = Path("src/gui/MainWindow.cpp").read_text(encoding="utf-8")
 training = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
-if "addDataCallback(" not in main or "forwardSensorToGame(normalizedGameInput)" not in main:
-    raise SystemExit("MainWindow must own and route the global game input")
+if "addDataCallback(" not in main or "enqueueGameSensorInput(normalizedGameInput)" not in main:
+    raise SystemExit("MainWindow must own and enqueue the global game input")
+if "m_gameSensorInputQueue" not in main or "forwardSensorToGame(value)" not in main:
+    raise SystemExit("MainWindow must drain ordered game inputs through the game router")
 if "gramsToNewtons(data.calibratedValue)" not in main:
     raise SystemExit("Global game input must convert calibrated grams to SI force")
 if "setMeasurementEngine" not in training or "m_measurementEngine->subscribe" not in training:

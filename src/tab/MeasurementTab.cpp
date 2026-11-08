@@ -1,4 +1,6 @@
 #include "tab/MeasurementTab.hpp"
+#include <utility>
+#include <vector>
 #include "measurement/Units.hpp"
 #include "core/RuntimePaths.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -432,9 +434,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
         *m_serialPort, m_measurementEngine, "desktop-hx711", "g");
     m_measurementCallbackToken = m_measurementEngine->subscribe(
         [this](const biofeedback::measurement::MeasurementSample& sample) {
-            QMetaObject::invokeMethod(this, [this, sample]() {
-                onMeasurementSample(sample);
-            }, Qt::QueuedConnection);
+            enqueueMeasurementSample(sample);
         });
     m_lastSensorData = sensor::SensorData();
     m_repetitionDetector.setTargetForce(m_targetForce);
@@ -2672,6 +2672,65 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     if (m_isMeasuring && m_showRawValues)
         readSingleSample(static_cast<double>(data.value), data.timestamp, data.value, true,
                          data.calibratedValue, data.hasCalibratedValue);
+}
+
+void MeasurementTab::enqueueMeasurementSample(
+    const biofeedback::measurement::MeasurementSample& sample)
+{
+    bool scheduleDrain = false;
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        constexpr std::size_t MaximumQueuedSamples = 4096;
+        if (m_measurementQueue.size() >= MaximumQueuedSamples) {
+            m_droppedMeasurementSamples += m_measurementQueue.size() + 1;
+            m_measurementQueue.clear();
+        }
+        m_measurementQueue.push_back(sample);
+        if (!m_measurementDrainScheduled) {
+            m_measurementDrainScheduled = true;
+            scheduleDrain = true;
+        }
+    }
+    if (scheduleDrain) {
+        QMetaObject::invokeMethod(this, [this]() {
+            drainMeasurementSamples();
+        }, Qt::QueuedConnection);
+    }
+}
+
+void MeasurementTab::drainMeasurementSamples()
+{
+    constexpr std::size_t MaximumBatch = 128;
+    std::vector<biofeedback::measurement::MeasurementSample> batch;
+    std::size_t dropped = 0;
+    bool scheduleAgain = false;
+    {
+        std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+        dropped = std::exchange(m_droppedMeasurementSamples, 0);
+        const std::size_t count = std::min(MaximumBatch, m_measurementQueue.size());
+        batch.reserve(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            batch.push_back(std::move(m_measurementQueue.front()));
+            m_measurementQueue.pop_front();
+        }
+        if (m_measurementQueue.empty()) {
+            m_measurementDrainScheduled = false;
+        } else {
+            scheduleAgain = true;
+        }
+    }
+    if (dropped != 0) {
+        m_repetitionDetector.reset();
+        addDebugMessage(QString("Przepełnienie kolejki pomiarowej: pominięto %1 próbek; detektor powtórzeń zresetowany.")
+                            .arg(static_cast<qulonglong>(dropped)), "WARNING");
+    }
+    for (const auto& sample : batch)
+        onMeasurementSample(sample);
+    if (scheduleAgain) {
+        QMetaObject::invokeMethod(this, [this]() {
+            drainMeasurementSamples();
+        }, Qt::QueuedConnection);
+    }
 }
 
 void MeasurementTab::onMeasurementSample(

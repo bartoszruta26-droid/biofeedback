@@ -25,6 +25,10 @@
 #include <QDateTime>
 #include <QScrollBar>
 
+#include <deque>
+#include <mutex>
+#include <cstddef>
+
 #include "GraphWidget.hpp"
 #include "tab/OutlineTab.hpp"
 #include "sensor/SerialCommunication.hpp"
@@ -240,6 +244,8 @@ private:
     void loadGame(const QString& gameId);
     void onGameFinished(int score);
     void onSensorDataForGame(double value);
+    void enqueueGameSensorInput(double value);
+    void drainGameSensorInputs();
 
     // Widgety główne
     GraphWidget* m_graphWidget;
@@ -309,6 +315,10 @@ private:
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
     sensor::SerialCommunication::CallbackToken m_serialDataCallbackToken = 0;
+    std::mutex m_gameInputQueueMutex;
+    std::deque<double> m_gameSensorInputQueue;
+    bool m_gameInputDrainScheduled{false};
+    std::size_t m_droppedGameSensorInputs{0};
 };
 
 } // namespace gui

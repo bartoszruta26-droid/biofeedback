@@ -2,6 +2,7 @@
 #define TAB_MEASUREMENTTAB_HPP
 
 #include <QWidget>
+#include <vector>
 #include <QElapsedTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -20,6 +21,8 @@
 #include <QHeaderView>
 #include <QTextEdit>
 #include <memory>
+#include <deque>
+#include <mutex>
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFile>
@@ -338,6 +341,8 @@ private slots:
     void onSelectionChanged();
 
 private:
+    void enqueueMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
+    void drainMeasurementSamples();
     void onMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void ensureCurrentSeriesInitialized();
     void ensureSessionClockStarted();
@@ -473,6 +478,10 @@ private:
     biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken = 0;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
     sensor::SensorData m_lastSensorData;
+    std::mutex m_measurementQueueMutex;
+    std::deque<biofeedback::measurement::MeasurementSample> m_measurementQueue;
+    bool m_measurementDrainScheduled{false};
+    std::size_t m_droppedMeasurementSamples{0};
 };
 
 } // namespace tab

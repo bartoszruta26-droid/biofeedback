@@ -27,6 +27,9 @@
 #include <QMetaObject>
 #include <cmath>
 #include <memory>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace gui {
 
@@ -89,9 +92,7 @@ MainWindow::MainWindow(QWidget *parent)
         if (!std::isfinite(forceNewtons) || forceNewtons < 0.0) return;
         constexpr double gameReferenceForceN = 50.0;
         const double normalizedGameInput = qBound(0.0, forceNewtons / gameReferenceForceN * 100.0, 100.0);
-        QMetaObject::invokeMethod(this, [this, normalizedGameInput]() {
-            forwardSensorToGame(normalizedGameInput);
-        }, Qt::QueuedConnection);
+        enqueueGameSensorInput(normalizedGameInput);
     });
 
     setupUI();
@@ -846,6 +847,66 @@ void MainWindow::stopGame()
     game->deleteLater();
     m_gameStack->hide();
     qDebug() << "Game stopped";
+}
+
+void MainWindow::enqueueGameSensorInput(double value)
+{
+    bool scheduleDrain = false;
+    {
+        std::lock_guard<std::mutex> lock(m_gameInputQueueMutex);
+        constexpr std::size_t MaximumQueuedInputs = 4096;
+        if (m_gameSensorInputQueue.size() >= MaximumQueuedInputs) {
+            m_droppedGameSensorInputs += m_gameSensorInputQueue.size() + 1;
+            m_gameSensorInputQueue.clear();
+        }
+        m_gameSensorInputQueue.push_back(value);
+        if (!m_gameInputDrainScheduled) {
+            m_gameInputDrainScheduled = true;
+            scheduleDrain = true;
+        }
+    }
+    if (!scheduleDrain) return;
+    const bool queued = QMetaObject::invokeMethod(this, [this]() {
+        drainGameSensorInputs();
+    }, Qt::QueuedConnection);
+    if (!queued) {
+        std::lock_guard<std::mutex> lock(m_gameInputQueueMutex);
+        m_gameInputDrainScheduled = false;
+    }
+}
+
+void MainWindow::drainGameSensorInputs()
+{
+    constexpr std::size_t MaximumBatch = 128;
+    std::vector<double> batch;
+    std::size_t dropped = 0;
+    bool scheduleAgain = false;
+    {
+        std::lock_guard<std::mutex> lock(m_gameInputQueueMutex);
+        dropped = std::exchange(m_droppedGameSensorInputs, 0);
+        const std::size_t count = std::min(MaximumBatch, m_gameSensorInputQueue.size());
+        batch.reserve(count);
+        for (std::size_t i = 0; i < count; ++i) {
+            batch.push_back(m_gameSensorInputQueue.front());
+            m_gameSensorInputQueue.pop_front();
+        }
+        if (m_gameSensorInputQueue.empty()) {
+            m_gameInputDrainScheduled = false;
+        } else {
+            scheduleAgain = true;
+        }
+    }
+    if (dropped != 0) {
+        addDebugMessage(QString("Przepełnienie kolejki sterowania grą: pominięto %1 próbek wejściowych.")
+                            .arg(static_cast<qulonglong>(dropped)), "WARNING");
+    }
+    for (double value : batch)
+        forwardSensorToGame(value);
+    if (scheduleAgain) {
+        QMetaObject::invokeMethod(this, [this]() {
+            drainGameSensorInputs();
+        }, Qt::QueuedConnection);
+    }
 }
 
 void MainWindow::forwardSensorToGame(double value)
