@@ -23,6 +23,7 @@ QByteArray reasonPhrase(int status) {
     case 400: return "Bad Request";
     case 401: return "Unauthorized";
     case 403: return "Forbidden";
+    case 429: return "Too Many Requests";
     case 404: return "Not Found";
     case 405: return "Method Not Allowed";
     case 413: return "Payload Too Large";
@@ -238,6 +239,14 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 return;
             }
 
+            const QString clientAddress = socket->peerAddress().toString();
+            const QDateTime nowUtc = QDateTime::currentDateTimeUtc();
+            const auto throttle = m_loginAttempts.value(clientAddress);
+            if (throttle.blockedUntilUtc.isValid() && throttle.blockedUntilUtc > nowUtc) {
+                sendJson(socket, 429, errorBody("LOGIN_RATE_LIMITED", "Zbyt wiele prób logowania. Spróbuj ponownie za minutę."));
+                return;
+            }
+
             QString usersPath = m_usersFilePath;
             if (usersPath.isEmpty()) usersPath = biofeedback::runtime::ensureUserConfigFile(QStringLiteral("users.json"));
             if (usersPath.isEmpty()) {
@@ -251,9 +260,16 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 return;
             }
             if (!authentication->login(username.toStdString(), password.toStdString())) {
+                auto& attempt = m_loginAttempts[clientAddress];
+                ++attempt.failures;
+                if (attempt.failures >= 5) {
+                    attempt.failures = 0;
+                    attempt.blockedUntilUtc = nowUtc.addSecs(60);
+                }
                 sendJson(socket, 401, errorBody("INVALID_LOGIN", "Nieprawidłowy login lub hasło."));
                 return;
             }
+            m_loginAttempts.remove(clientAddress);
             if (authentication->requiresPasswordChange()) {
                 authentication->logout();
                 sendJson(socket, 403, errorBody("PASSWORD_CHANGE_REQUIRED", "Wymagana jest zmiana hasła przed uzyskaniem dostępu API."));
