@@ -35,7 +35,7 @@ assert "ControlStatus[] = \"STATUS\"" in protocol
 assert "ControlSafe[] = \"SAFE\"" in protocol
 assert "DefaultControlBaudRate = DefaultBaudRate" in protocol
 assert "sensor::protocol::DefaultControlBaudRate" in pico
-assert "ACTUATORS_LOCKED" in pico
+assert 'ActuatorLockedReply[] = "ERR,ACTUATORS_LOCKED"' in protocol
 assert "gpio_set_function(kUartTxPin, GPIO_FUNC_UART);" in pico
 assert "gpio_set_function(kUartRxPin, GPIO_FUNC_UART);" in pico
 
