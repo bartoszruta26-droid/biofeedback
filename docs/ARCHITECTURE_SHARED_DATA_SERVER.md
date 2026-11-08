@@ -1,0 +1,111 @@
+# Shared Data Server — architecture and migration plan
+
+## 1. Decisions
+
+- Patient records are persisted either as files on disk or in MariaDB. PostgreSQL is not a project requirement.
+- The selected patient backend is configured by the server, not independently by each client.
+- The file backend is a supported production option, not a temporary cache. Patient records must be encrypted at rest, written atomically, protected by restrictive filesystem permissions, and addressed by opaque identifiers rather than PESEL or names.
+- MariaDB is an alternative backend. Its implementation must use parameterized statements, transactions, schema migrations, least-privilege credentials, encrypted transport where remote, and explicit backup/restore procedures.
+- Measurements, training sessions/results, and game sessions/results are owned by the shared data service. Device acquisition remains a separate responsibility.
+- Linux Desktop, Windows Desktop, WebUI, TUI, and Android are peers. They use the same versioned API and must not access the server's storage files or database directly.
+- No antenna, electrode, or IR-PWM feature belongs to this application. Those are unrelated legacy artifacts and must not be added to the Biofeedback roadmap.
+
+## 2. Process boundaries
+
+### Data Server
+
+Owns:
+- Patient repository and patient identity mapping.
+- Measurement result repository and metadata.
+- Training plans, sessions, checkpoints, and results.
+- Game sessions, scores, and result history.
+- Authentication/authorization at resource boundaries.
+- Audit events, concurrency/version checks, idempotent writes, backup/restore and data export.
+
+Exposes:
+- REST/HTTPS API for CRUD and history queries.
+- WebSocket (or Server-Sent Events where simpler) for live status and result notifications.
+- A health/status endpoint that reports configured storage backend and readiness without exposing secrets or patient data.
+
+### Device/measurement acquisition
+
+Owns:
+- Serial/network communication with Arduino Nano, Raspberry Pi Pico and supported sensors.
+- Protocol parsing, calibration, timestamp normalization, validation and signal quality.
+- Live sample delivery to the application/data service.
+
+It does not own the patient master record or the durable cross-client result history. A validated sample is associated with a patient/session by the application layer and persisted through the Data Server.
+
+### Clients
+
+Desktop Linux, Desktop Windows, WebUI, TUI and Android:
+- Read and write patient, measurement, training and game data through the API.
+- Maintain only transient presentation state and explicitly bounded offline queues.
+- Display conflict/offline states; never silently overwrite newer records.
+- Do not embed database credentials or connect directly to MariaDB.
+
+## 3. Storage strategy
+
+### Patient files backend
+
+Use one opaque patient key per record under the application data directory. Do not put PESEL, name, date of birth or other direct identifiers in filenames or directory names. Encrypt each record with authenticated encryption (AES-256-GCM or an equivalently reviewed AEAD construction); keep keys outside the repository and outside patient files. Write to a permission-restricted temporary file, flush, then atomically replace the target. Validate JSON/schema and record identity on read. Keep audit metadata separate from clinical content.
+
+### MariaDB backend
+
+Implement behind the same repository interface as the file backend. Use migrations and explicit schema versioning. Required logical entities include patients, measurements, training_plans, training_sessions, training_results, game_sessions, game_results, users/roles, audit_events, and idempotency_keys. Store patient identifiers separately from clinical payloads where practical. Enforce foreign keys, indexes, unique constraints and transactions.
+
+### Configuration
+
+The server selects one backend at startup, for example:
+- `storage.patient_backend = "files"`
+- `storage.patient_backend = "mariadb"`
+
+The file backend requires a configured data directory and encryption key source. The MariaDB backend requires host, port, database, username and secret supplied through a protected secret mechanism. Never commit credentials. A failed backend initialization must fail closed; do not silently fall back to plaintext files or another database.
+
+The first implementation milestone should retain the existing encrypted file persistence and formalize it behind a repository interface. MariaDB is added as a second adapter after repository contracts and migration tests are stable.
+
+## 4. API contract
+
+Version all endpoints under `/api/v1`. Initial resource families:
+- `/patients` and `/patients/{id}`
+- `/measurements` and `/measurements/{id}`
+- `/training-plans`, `/training-sessions`, `/training-results`
+- `/game-sessions`, `/game-results`
+- `/events` for live notifications (WebSocket/SSE transport)
+
+All patient and result endpoints require authentication and resource-level authorization. A valid bearer token alone is not proof of permission to read every patient. Mutating requests should support:
+- `If-Match`/ETag or an explicit record version for optimistic concurrency.
+- An idempotency key for retry-safe creation/submission.
+- An audit event with actor, action, resource identifier, timestamp and outcome; do not log patient payloads or credentials.
+
+Use bounded pagination and filtering. Validate request size, types, units, timestamps and patient/session relationships. Return stable machine-readable error codes.
+
+## 5. Migration sequence
+
+1. Repair and stabilize the current main branch regression suite. Preserve the existing patient files and CSV import/export behavior.
+2. Define repository interfaces and shared domain DTOs for patient, measurement, training and game data. Add contract tests independent of the storage backend.
+3. Implement the file-backed patient repository using the existing encrypted file policy; add safe list/get/create/update/delete, atomic writes, version checks and migration/import tests.
+4. Implement the Data Server process and inject repositories into the HTTP API. Keep the API loopback-only by default; remote access requires HTTPS/reverse-proxy deployment guidance and explicit configuration.
+5. Add measurement, training and game repositories and API routes. Keep device acquisition separate and route validated session results through the application service.
+6. Add MariaDB adapter and schema migrations. Run the same repository contract suite against file and MariaDB backends.
+7. Migrate Linux Desktop and TUI first, then WebUI and Android, then Windows Desktop. Do not remove local legacy paths until data parity and rollback have been demonstrated.
+8. Add multi-client integration tests: create patient on Desktop, edit on Android, read on WebUI; save a measurement in TUI and read on Desktop; save training in Android and read on WebUI; save game result on Desktop and read on TUI.
+9. Add Windows CI (MSVC build/test/package), Android instrumentation tests, WebUI-to-server integration tests, backup/restore tests, concurrency tests and security regression tests.
+
+## 6. Acceptance criteria
+
+- One canonical patient record is visible consistently to all authorized clients.
+- File and MariaDB patient backends pass identical repository contract tests.
+- Patient records are encrypted at rest in file mode; secrets are absent from source, logs and API responses.
+- A failed write cannot leave a truncated/corrupt patient record.
+- Concurrent edits produce a detectable conflict rather than silent data loss.
+- Measurement, training and game results are associated with the correct patient/session and survive server restart.
+- Client authorization is tested for allowed and denied resource access.
+- Backup restoration reproduces patient and result records and preserves identifiers/relationships.
+- CI reports each platform independently; unbuilt or untested platforms are never described as passing.
+
+## 7. Current implementation status (baseline)
+
+The existing repository has a local `DataManager` with patient JSON serialization and encrypted-file support, plus a `RuntimePaths::patientDirectory` helper that uses a SHA-256-derived directory name. The current HTTP API has authentication/status/health routes but does not yet expose patient, measurement, training or game repositories. Existing `ApplicationServices` composes device and measurement services only; it is not yet injected into all clients or the API.
+
+This document records the target architecture and staged migration. It does not claim that the Data Server, MariaDB adapter, or cross-client synchronization is already implemented.
