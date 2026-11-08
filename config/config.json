@@ -11,11 +11,13 @@
         "backup_interval_hours": 24,
         "max_backups": 7
     },
+    "deployment": {
+        "profile": "development"
+    },
     "encryption": {
         "enabled": false,
         "algorithm": "AES-256-GCM",
         "key_derivation": "SHA-256 key normalization (32+ byte external secret)",
-        "iterations": 100000
     },
     "ui": {
         "theme": "default",
@@ -44,7 +46,7 @@
         "session_duration_minutes": 15
     },
     "medical": {
-        "require_authentication": false,
+        "require_authentication": true,
         "audit_log_enabled": true,
         "data_retention_days": 2555,
         "export_format": "JSON"
