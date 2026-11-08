@@ -46,6 +46,7 @@
 - [x] Scalanie PR #208 do `integration/all-work`.
 - [x] Ograniczenie liczby oczekujących zdarzeń wejścia czujnika przez scalanie próbek do najnowszej wartości.
 - [x] `GameEngine::reset()` odtwarza również stan gry pochodnej; `start()` korzysta z tej samej ścieżki, bez podwójnego wywołania inicjalizacji. Test regresyjny sprawdza dokładną liczbę inicjalizacji po starcie, pauzie, resecie i ponownym uruchomieniu.
+- [x] Mario: inicjalizacja chmurek zabezpieczona dla widoku o zerowym rozmiarze; test resetu przed ustawieniem rozmiaru widgetu oraz podczas sesji.
 - [x] Regresja dla serii 1000 próbek wysłanych z wątku roboczego.
 - [ ] Audyt i poprawki mechaniki istniejących gier (w pierwszej kolejności Arkanoid, Pong, Flappy Bird i Mario).
 - [x] Zabezpieczenia wejściowego deltaTime w Arkanoidzie, Flappy Bird, Mario, Sinus Force Trainer i Tan Force Trainer; normalizacja wektora odbicia piłki w Pongu.
