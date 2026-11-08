@@ -6,6 +6,8 @@
 #include <QRectF>
 #include <QVector>
 
+class QKeyEvent;
+
 namespace games {
 
 class GalagaGame final : public GameEngine
