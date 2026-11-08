@@ -11,6 +11,7 @@
 #include <QTimer>
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
+#include <utility>
 
 namespace biofeedback::api {
 namespace {
