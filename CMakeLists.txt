@@ -314,6 +314,7 @@ if(Qt5_FOUND)
         src/gui/GraphWidget.cpp
         src/tab/PatientTab.cpp
         src/tab/MeasurementTab.cpp
+        src/tab/SampleJournalWriter.cpp
         src/tab/OutlineTab.cpp
         src/tab/TrainingTab.cpp
         src/tab/TrainingAnalyticsWidget.cpp
@@ -350,6 +351,7 @@ if(Qt5_FOUND)
         include/gui/GraphWidget.hpp
         include/tab/PatientTab.hpp
         include/tab/MeasurementTab.hpp
+        include/tab/SampleJournalWriter.hpp
         include/tab/OutlineTab.hpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
