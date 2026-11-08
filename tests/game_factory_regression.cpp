@@ -4,6 +4,7 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/PongGame.hpp"
 #include "games/GalagaGame.hpp"
+#include "games/ArcherGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -39,7 +40,8 @@ int main(int argc, char **argv)
         QStringLiteral("arkanoid"),
         QStringLiteral("flappy_bird"),
         QStringLiteral("mario"),
-        QStringLiteral("galaga")
+        QStringLiteral("galaga"),
+        QStringLiteral("archer")
     };
 
     for (const QString& id : ids) {
@@ -112,6 +114,16 @@ int main(int argc, char **argv)
     waitForEvents(80);
     REQUIRE(galagaGame->isRunning());
     galagaGame->stop();
+
+    std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
+    auto* archerGame = dynamic_cast<games::ArcherGame*>(archer.get());
+    REQUIRE(archerGame != nullptr);
+    archerGame->resize(640, 480);
+    archerGame->start();
+    archerGame->handleSensorInput(80.0);
+    waitForEvents(80);
+    REQUIRE(archerGame->isRunning());
+    archerGame->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
