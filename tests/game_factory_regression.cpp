@@ -122,8 +122,8 @@ int main(int argc, char **argv)
     QKeyEvent galagaFireDown(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QKeyEvent galagaFireUp(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(galagaGame, &galagaFireDown);
+    waitForEvents(900); // Space is held so the repeat-fire mechanic can shoot.
     QApplication::sendEvent(galagaGame, &galagaFireUp);
-    waitForEvents(900);
     REQUIRE(galagaGame->isRunning());
     REQUIRE(galagaGame->getScore() > 0); // A player shot must hit an enemy.
     galagaGame->stop();
