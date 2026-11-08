@@ -22,15 +22,17 @@ public:
     double lastInput() const { return m_sensorValue; }
     double lastDelta() const { return m_lastDelta; }
     int inputCount() const { return m_inputCount; }
+    int initializeCount() const { return m_initializeCount; }
     void award(int points) { addScore(points); }
 protected:
-    void initialize() override { m_lastDelta = 0.0; }
+    void initialize() override { m_lastDelta = 0.0; ++m_initializeCount; }
     void update(double deltaTime) override { m_lastDelta = deltaTime; }
     void render(QPainter&) override {}
     bool handleInput(double) override { ++m_inputCount; return true; }
 private:
     double m_lastDelta = 0.0;
     int m_inputCount = 0;
+    int m_initializeCount = 0;
 };
 
 static void waitForEvents(int milliseconds)
@@ -48,6 +50,7 @@ int main(int argc, char **argv)
 
     game.start();
     REQUIRE(game.isRunning() && !game.isPaused());
+    REQUIRE(game.initializeCount() == 1);
     waitForEvents(70);
     REQUIRE(game.getGameStats().contains(QStringLiteral("state=running")));
     game.award(5);
@@ -59,6 +62,7 @@ int main(int argc, char **argv)
     REQUIRE(game.getGameStats().contains(QStringLiteral("state=paused")));
     game.start(); // start() while paused resumes instead of resetting.
     REQUIRE(game.isRunning() && !game.isPaused());
+    REQUIRE(game.initializeCount() == 1);
 
     game.pause();
     game.resume();
@@ -103,7 +107,10 @@ int main(int argc, char **argv)
     std::thread resetWorker([&game]() { game.handleSensorInput(23456.0); });
     resetWorker.join();
     game.reset();
+    REQUIRE(!game.isRunning() && !game.isPaused());
+    REQUIRE(game.initializeCount() == 3); // Explicit reset rebuilds derived state once.
     game.start();
+    REQUIRE(game.initializeCount() == 4); // Starting after reset initializes a fresh session once.
     const int inputsAfterReset = game.inputCount();
     waitForEvents(20);
     REQUIRE(game.inputCount() == inputsAfterReset);
