@@ -18,8 +18,10 @@ main = Path("src/gui/MainWindow.cpp").read_text(encoding="utf-8")
 training = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
 if "addDataCallback(" not in main or "enqueueGameSensorInput(normalizedGameInput)" not in main:
     raise SystemExit("MainWindow must own and enqueue the global game input")
-if "m_gameSensorInputQueue" not in main or "forwardSensorToGame(value)" not in main:
-    raise SystemExit("MainWindow must drain ordered game inputs through the game router")
+if ("m_pendingGameSensorInput = value" not in main or
+        "m_gameSensorInputAvailable = true" not in main or
+        "forwardSensorToGame(latestValue)" not in main):
+    raise SystemExit("MainWindow must coalesce game control to the newest valid sensor value")
 if "gramsToNewtons(data.calibratedValue)" not in main:
     raise SystemExit("Global game input must convert calibrated grams to SI force")
 if "setMeasurementEngine" not in training or "m_measurementEngine->subscribe" not in training:
