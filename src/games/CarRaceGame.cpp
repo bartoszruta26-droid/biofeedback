@@ -44,9 +44,14 @@ void CarRaceGame::initialize()
 void CarRaceGame::setLane(int lane)
 {
     m_lane = qBound(0, lane, 2);
-    const double roadWidth = width() * 0.72;
+    const double roadWidth = qMax(0.0, width() * 0.72);
     const double roadLeft = (width() - roadWidth) / 2.0;
     const double laneWidth = roadWidth / 3.0;
+    const double playerWidth = qMin(38.0, qMax(1.0, laneWidth - 8.0));
+    const double playerHeight = qMin(66.0, qMax(1.0, height() - 8.0));
+    m_player.setSize(QSizeF(playerWidth, playerHeight));
+    m_player.moveTop(qBound(0.0, static_cast<double>(height()) - playerHeight - 24.0,
+                            qMax(0.0, static_cast<double>(height()) - playerHeight)));
     m_player.moveLeft(roadLeft + laneWidth * m_lane + (laneWidth - m_player.width()) / 2.0);
 }
 
