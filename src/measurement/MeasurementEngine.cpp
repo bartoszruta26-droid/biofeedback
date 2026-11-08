@@ -4,6 +4,8 @@
 #include <chrono>
 #include <cmath>
 #include <utility>
+#include <stdexcept>
+#include <limits>
 
 namespace biofeedback::measurement {
 namespace {
@@ -34,7 +36,10 @@ const char* qualityName(Quality quality) noexcept {
 }
 
 MeasurementEngine::MeasurementEngine(MeasurementEngineConfig config)
-    : m_config(config) {
+    : m_config(config), m_nextSequence(config.initialSequence) {
+    if (m_nextSequence == 0 || m_nextSequence > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+        throw std::invalid_argument("MeasurementEngine initial sequence is outside the supported range");
+    }
     if (m_config.historyCapacity == 0) m_config.historyCapacity = 1;
     if (!std::isfinite(m_config.minimumValue) ||
         !std::isfinite(m_config.maximumValue) ||
@@ -109,6 +114,11 @@ bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample&
     std::vector<std::shared_ptr<CallbackEntry>> callbacks;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_nextSequence == 0 ||
+            m_nextSequence > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+            output = MeasurementSample{};
+            return false;
+        }
         sample.sequence = m_nextSequence;
         if (m_commitHook) {
             bool committed = false;

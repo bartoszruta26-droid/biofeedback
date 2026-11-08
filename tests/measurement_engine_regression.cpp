@@ -8,6 +8,7 @@
 #include <limits>
 #include <mutex>
 #include <thread>
+#include <stdexcept>
 
 using namespace biofeedback::measurement;
 
@@ -120,6 +121,36 @@ int main() {
     assert(unsubscribeReturned.load(std::memory_order_acquire));
     concurrentEngine.ingest(concurrentInput);
     assert(concurrentEngine.history().size() == 2);
+
+    // A recovered journal resumes sequence assignment without reusing old IDs.
+    MeasurementEngineConfig recoveredConfig;
+    recoveredConfig.initialSequence = 301;
+    MeasurementEngine recoveredEngine(recoveredConfig);
+    const auto recoveredSample = recoveredEngine.ingest(concurrentInput);
+    assert(recoveredSample.sequence == 301);
+
+    // The JSON/API sequence domain is signed 64-bit; exhaustion must fail closed.
+    MeasurementEngineConfig finalSequenceConfig;
+    finalSequenceConfig.initialSequence =
+        static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+    MeasurementEngine finalSequenceEngine(finalSequenceConfig);
+    const auto finalSequenceSample = finalSequenceEngine.ingest(concurrentInput);
+    assert(finalSequenceSample.sequence ==
+           static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max()));
+    MeasurementSample exhaustedOutput;
+    assert(!finalSequenceEngine.ingest(concurrentInput, exhaustedOutput));
+    assert(exhaustedOutput.sequence == 0);
+    assert(finalSequenceEngine.history().size() == 1);
+
+    bool invalidInitialSequenceRejected = false;
+    try {
+        MeasurementEngineConfig invalidConfig;
+        invalidConfig.initialSequence = 0;
+        MeasurementEngine invalidEngine(invalidConfig);
+    } catch (const std::invalid_argument&) {
+        invalidInitialSequenceRejected = true;
+    }
+    assert(invalidInitialSequenceRejected);
 
     // Persistence is a pre-publication gate: failed commits consume no sequence,
     // enter no in-memory history and are never delivered to subscribers.
