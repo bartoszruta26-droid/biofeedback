@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <QFileDevice>
+#include <algorithm>
 #include <cerrno>
 #ifdef Q_OS_UNIX
 #include <unistd.h>
