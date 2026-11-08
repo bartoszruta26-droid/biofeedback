@@ -47,7 +47,7 @@ void ProtocolParser::feed(const uint8_t* data, std::size_t length) {
 
     while (m_buffer.size() >= kFrameSize) {
         auto marker = m_buffer.end();
-        for (auto it = m_buffer.begin() + 9; it + 1 < m_buffer.end(); ++it) {
+        for (auto it = m_buffer.begin() + static_cast<std::ptrdiff_t>(kPayloadSize); it + 1 < m_buffer.end(); ++it) {
             if (*it == protocol::FrameTrailerFirst && *(it + 1) == protocol::FrameTrailerSecond) {
                 marker = it;
                 break;
@@ -69,7 +69,7 @@ void ProtocolParser::feed(const uint8_t* data, std::size_t length) {
         }
         const auto packetStart = markerIndex - 9;
         const auto* packet = m_buffer.data() + packetStart;
-        if (calculateCrc8(packet, 8) != packet[8]) {
+        if (calculateCrc8(packet, kPayloadSize - 1) != packet[kPayloadSize - 1]) {
             m_buffer.erase(m_buffer.begin(), m_buffer.begin() + static_cast<std::ptrdiff_t>(packetStart + 1));
             ++m_crcErrors;
             m_discardedBytes += packetStart + 1;
@@ -86,7 +86,7 @@ void ProtocolParser::feed(const uint8_t* data, std::size_t length) {
         } else {
             frame.rawValue = static_cast<int32_t>(static_cast<int64_t>(rawBits) - 0x100000000LL);
         }
-        frame.crc = packet[8];
+        frame.crc = packet[kPayloadSize - 1];
         m_frames.push_back(frame);
         m_buffer.erase(m_buffer.begin(), m_buffer.begin() + static_cast<std::ptrdiff_t>(markerIndex + 2));
     }
