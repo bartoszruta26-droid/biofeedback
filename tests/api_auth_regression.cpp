@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
     };
 
     const QByteArray unauthenticatedDevices = transact(
-        port, "GET /api/v1/devices HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n");
+        port, "GET /api/v1/devices HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     assert(statusCode(unauthenticatedDevices) == 401);
 
     const QByteArray unauthenticatedAcquisition = transact(
