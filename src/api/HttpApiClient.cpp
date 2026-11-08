@@ -223,4 +223,67 @@ bool HttpApiClient::deleteResource(const QString& collection, const QString& id,
                    QString::fromLatin1(QUrl::toPercentEncoding(id)), &body, true, response, error);
 }
 
+
+bool HttpApiClient::listDevices(QJsonArray& devices, QString* error) {
+    QJsonObject response;
+    if (!request("GET", QStringLiteral("/api/v1/devices"), nullptr, true, response, error))
+        return false;
+    if (!response.value(QStringLiteral("items")).isArray()) {
+        setError(error, QStringLiteral("INVALID_DEVICE_LIST_RESPONSE"));
+        return false;
+    }
+    devices = response.value(QStringLiteral("items")).toArray();
+    return true;
+}
+
+bool HttpApiClient::getAcquisitionSession(QJsonObject& session, QString* error) {
+    return request("GET", QStringLiteral("/api/v1/acquisition/session"),
+                   nullptr, true, session, error);
+}
+
+bool HttpApiClient::startAcquisitionSession(const QString& sessionId,
+                                            const QString& patientId,
+                                            const QString& deviceId,
+                                            const QString& protocolId,
+                                            QString* error) {
+    if (sessionId.trimmed().isEmpty() || patientId.trimmed().isEmpty() ||
+        deviceId.trimmed().isEmpty() || protocolId.trimmed().isEmpty()) {
+        setError(error, QStringLiteral("INVALID_ACQUISITION_SESSION"));
+        return false;
+    }
+    const QJsonObject body{
+        {QStringLiteral("id"), sessionId},
+        {QStringLiteral("patient_id"), patientId},
+        {QStringLiteral("device_id"), deviceId},
+        {QStringLiteral("protocol_id"), protocolId}
+    };
+    QJsonObject response;
+    return request("POST", QStringLiteral("/api/v1/acquisition/session"),
+                   &body, true, response, error);
+}
+
+bool HttpApiClient::stopAcquisitionSession(const QString& sessionId, QString* error) {
+    if (sessionId.trimmed().isEmpty()) {
+        setError(error, QStringLiteral("INVALID_ACQUISITION_SESSION_ID"));
+        return false;
+    }
+    const QJsonObject body{{QStringLiteral("id"), sessionId}};
+    QJsonObject response;
+    return request("DELETE", QStringLiteral("/api/v1/acquisition/session"),
+                   &body, true, response, error);
+}
+
+bool HttpApiClient::listAcquisitionSamples(QJsonArray& samples, QString* error) {
+    QJsonObject response;
+    if (!request("GET", QStringLiteral("/api/v1/acquisition/samples"),
+                 nullptr, true, response, error))
+        return false;
+    if (!response.value(QStringLiteral("items")).isArray()) {
+        setError(error, QStringLiteral("INVALID_ACQUISITION_SAMPLES_RESPONSE"));
+        return false;
+    }
+    samples = response.value(QStringLiteral("items")).toArray();
+    return true;
+}
+
 } // namespace biofeedback::api
