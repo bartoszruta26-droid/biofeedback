@@ -3,6 +3,7 @@ name: Linux desktop GUI build
 on:
   push:
     branches:
+      - main
       - integration/all-work
       - 'sync/**'
       - fix/desktop-gui-full-build-2026-11-07
