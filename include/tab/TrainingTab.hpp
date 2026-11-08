@@ -202,6 +202,8 @@ public:
      * @brief Pobiera aktualny wynik treningu
      */
     QVector<ExerciseStats> getTrainingStats() const;
+    QString currentPatientPesel() const { return m_currentPatientPesel; }
+    QJsonObject buildSharedTrainingRecord(const QString& patientUuid) const;
     
     /**
      * @brief Eksportuje wyniki treningu do CSV
@@ -314,6 +316,8 @@ private:
     games::GameEngine* m_currentGame;
     QString m_activeGameType;
     QString m_currentPatientPesel;
+    QString m_activeSessionId;
+    QString m_sessionStartedAtUtc;
     QString m_currentPatientDataPath;
     
     // Tabela statystyk
