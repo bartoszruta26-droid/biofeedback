@@ -851,6 +851,7 @@ std::vector<SensorData> SerialCommunication::readDataBatch(int timeout) {
                     if (samples.empty()) samples.emplace_back();
                     samples.front().calibratedValue = grams;
                     samples.front().hasCalibratedValue = calibrationConfirmed;
+                    samples.front().hasFrame = !rawData.empty();
                     samples.front().isValid = true;
                 }
             } catch (...) {}
