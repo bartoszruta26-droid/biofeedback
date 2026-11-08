@@ -56,6 +56,8 @@
 - [x] Pierwsza grywalna implementacja Car Race: trzy pasy, sterowanie czujnikiem/klawiaturą, przeszkody, kolizje, życia, dystans, wynik i rosnąca prędkość. Pozostaje rozszerzyć testy scenariuszowe i dopracować rozgrywkę.
 - [x] Rejestracja nowych gier w GameFactory oraz udostępnienie ich w selektorach TrainingTab i OutlineTab.
 - [x] Archer, Car Race i Scorched Earth: obsługa zmiany rozmiaru aktywnego widoku; zachowanie/ponowne dopasowanie celu, przeszkód, terenu, czołgów i pocisków.
+- [x] Galaga: skalowanie statku, przeciwników i pocisków podczas zmiany rozmiaru; ograniczenie pozycji aktorów do nowego widoku.
+- [x] Testy zmiany rozmiaru Galaga i Car Race z aktywnymi aktorami/przeszkodami.
 - [x] Testy regresyjne zmiany rozmiaru podczas aktywnej rozgrywki Archer i Scorched Earth; Car Race ma już test małego widoku podczas gry.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier.
 
