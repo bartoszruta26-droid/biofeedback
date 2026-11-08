@@ -135,6 +135,10 @@ int main(int argc, char** argv) {
         return transact(port, request);
     };
 
+    const QByteArray unauthenticatedDevices = transact(
+        port, "GET /api/v1/devices HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+    assert(statusCode(unauthenticatedDevices) == 401);
+
     const QByteArray unauthenticatedAcquisition = transact(
         port, "GET /api/v1/acquisition/session HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     assert(statusCode(unauthenticatedAcquisition) == 401);
@@ -142,6 +146,14 @@ int main(int argc, char** argv) {
     const QByteArray unauthenticatedPatients = transact(
         port, "GET /api/v1/patients HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     assert(statusCode(unauthenticatedPatients) == 401);
+
+    const QByteArray listDevices = resourceRequest("GET", "/api/v1/devices");
+    assert(statusCode(listDevices) == 200);
+    const QJsonObject deviceList = QJsonDocument::fromJson(responseBody(listDevices)).object();
+    assert(deviceList.value("count").toInt() == 1);
+    const QJsonObject listedDevice = deviceList.value("items").toArray().first().toObject();
+    assert(listedDevice.value("id").toString() == "sensor-api-1");
+    assert(listedDevice.value("state").toString() == "connected");
 
     const QByteArray patientPayload = QJsonDocument(QJsonObject{
         {"firstName", QStringLiteral("API")},

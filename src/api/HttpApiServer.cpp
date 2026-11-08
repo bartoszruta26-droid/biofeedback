@@ -450,6 +450,48 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             return;
         }
 
+        // Device discovery is read-only; physical control remains behind DeviceService.
+        if (path == "/api/v1/devices") {
+            if (!sessionValid) {
+                if (sessionIt != m_sessions.end()) m_sessions.erase(sessionIt);
+                sendJson(socket, 401, errorBody("AUTHENTICATION_REQUIRED", "Wymagane jest zalogowanie."));
+                return;
+            }
+            if (sessionIt->authentication->getCurrentUserRole() != "administrator") {
+                sendJson(socket, 403, errorBody("DEVICE_REGISTRY_FORBIDDEN", "Brak uprawnień do rejestru urządzeń."));
+                return;
+            }
+            if (method != "GET") {
+                sendJson(socket, 405, errorBody("METHOD_NOT_ALLOWED", "Dozwolony jest wyłącznie GET."));
+                return;
+            }
+            if (!m_devices) {
+                sendJson(socket, 503, errorBody("DEVICE_REGISTRY_UNAVAILABLE", "Rejestr urządzeń nie jest skonfigurowany."));
+                return;
+            }
+            QJsonArray items;
+            for (const auto& device : m_devices->devices()) {
+                const char* state = "disconnected";
+                switch (device.state) {
+                case biofeedback::application::DeviceState::Disconnected: state = "disconnected"; break;
+                case biofeedback::application::DeviceState::Connecting: state = "connecting"; break;
+                case biofeedback::application::DeviceState::Connected: state = "connected"; break;
+                case biofeedback::application::DeviceState::Error: state = "error"; break;
+                }
+                items.append(QJsonObject{
+                    {"id", QString::fromStdString(device.id)},
+                    {"name", QString::fromStdString(device.name)},
+                    {"transport", QString::fromStdString(device.transport)},
+                    {"state", QString::fromLatin1(state)},
+                    {"last_error", QString::fromStdString(device.lastError)}
+                });
+            }
+            sendJson(socket, 200, QJsonDocument(QJsonObject{
+                {"items", items}, {"count", items.size()}
+            }).toJson(QJsonDocument::Compact));
+            return;
+        }
+
         // Central acquisition session control. Only administrators may start/stop
         // acquisition until patient-scoped authorization is implemented.
         if (path == "/api/v1/acquisition/session" ||
