@@ -438,6 +438,7 @@ void draw(std::size_t selected,
 int main(int argc, char** argv)
 {
     QCoreApplication::setOrganizationName("Biofeedback");
+    QCoreApplication::setOrganizationName("Biofeedback");
     QCoreApplication::setApplicationName("Biofeedback");
     if (argc > 1) {
         const std::string option(argv[1]);
