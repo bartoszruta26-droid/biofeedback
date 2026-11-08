@@ -25,6 +25,12 @@ QString ArcherGame::gameName() const
     return QStringLiteral("Archer Force Trainer");
 }
 
+int ArcherGame::activeArrowCount() const
+{
+    return static_cast<int>(std::count_if(m_arrows.cbegin(), m_arrows.cend(),
+        [](const Arrow& arrow) { return arrow.active; }));
+}
+
 void ArcherGame::initialize()
 {
     m_arrows.clear();
