@@ -14,10 +14,18 @@ Przeglądarka nie implementuje parsera czujnika, kalibracji ani logiki sesji.
 | GET | /api/v1/devices | Lista urządzeń i stan adapterów |
 | POST | /api/v1/devices/{id}/connect | Żądanie połączenia |
 | POST | /api/v1/devices/{id}/disconnect | Żądanie rozłączenia |
-| GET | /api/v1/measurements/sessions | Historia sesji według uprawnień |
-| POST | /api/v1/measurements/sessions | Utworzenie sesji |
-| GET | /api/v1/patients | Lista pacjentów według uprawnień |
-| GET | /api/v1/patients/{id} | Szczegóły karty według uprawnień |
+| GET | /api/v1/{collection} | Lista rekordów kolekcji |
+| POST | /api/v1/{collection} | Utworzenie rekordu |
+| GET | /api/v1/{collection}/{id} | Odczyt rekordu |
+| PUT | /api/v1/{collection}/{id} | Aktualizacja z kontrolą wersji |
+| DELETE | /api/v1/{collection}/{id} | Usunięcie z kontrolą wersji |
+
+Dozwolone kolekcje: `patients`, `measurements`, `training-sessions`,
+`training-results`, `game-sessions`, `game-results`.
+
+Aktualizacja wymaga treści `{"expected_version": 1, "record": {...}}`.
+Usunięcie wymaga `{"expected_version": 1}`. Serwer zwraca `409 VERSION_CONFLICT`,
+gdy klient próbuje zmienić wersję, która nie jest już aktualna.
 
 ### Przykładowe odpowiedzi
 
@@ -99,27 +107,35 @@ np. `{"code":"DEVICE_BUSY","message":"Urządzenie jest zajęte"}`.
 ## Stan implementacji
 
 Klient JavaScript jest zaimplementowany w `api-client.js` i pokryty testami
-Node.js. Aplikacja Desktop uruchamia serwer loopback w swoim procesie;
-`biofeedback_api` pozostaje samodzielnym wariantem uruchomieniowym.
-Serwer udostępnia `GET /healthz`,
-`GET /api/v1/status`, `POST /api/v1/auth/login`,
-`GET /api/v1/auth/me` oraz `POST /api/v1/auth/logout`.
-Sesje są przechowywane w pamięci procesu i wygasają po 30 minutach.
-Domyślnie serwer nasłuchuje wyłącznie na `127.0.0.1:8765`.
-CORS dopuszcza wyłącznie źródła localhost/127.0.0.1/::1; WebUI powinno
-być serwowane z lokalnego serwera HTTP. TUI i Desktop GUI korzystają z tego
-samego magazynu kont. Klient Android wymaga HTTPS i nie łączy się bezpośrednio
-z tym lokalnym serwerem HTTP — do połączenia zdalnego potrzebna jest osobna
-brama TLS.
+Node.js. Udostępnia metody CRUD dla sześciu kolekcji danych. Klient Android
+ma metody CRUD dla tych samych kolekcji; ekran Pacjenci korzysta z odczytu,
+dodawania, edycji i usuwania kart. Desktop uruchamia serwer loopback po
+inicjalizacji aplikacji i współdzieli z nim tę samą instancję repozytorium
+plikowego. Zakładka Pacjenci odczytuje i zapisuje karty przez to repozytorium.
+Przy pierwszym uruchomieniu aplikacja migruje istniejące pliki pacjentów
+bez usuwania źródeł migracji.
 
-Endpointy urządzeń, pacjentów i sesji oraz kanały WebSocket są nadal
-zarezerwowane, lecz niewdrożone. Samo zwrócenie roli przez endpoint
-tożsamości nie oznacza jeszcze kompletnej autoryzacji zasobów. Desktop GUI
-używa lokalnego okna logowania; integracja jego sesji z API, a także
-integracja TUI i Androida z tokenem API, pozostają kolejnymi etapami.
-Nie wystawiać serwera poza loopback bez HTTPS, kontroli pochodzenia,
-ochrony CSRF/CORS i pełnej autoryzacji ról. Nie traktować go jako gotowego
-interfejsu klinicznego.
+Serwer udostępnia `GET /healthz`, `GET /api/v1/status`, logowanie,
+wylogowanie i CRUD kolekcji. Repozytorium plikowe używa identyfikatorów UUID,
+atomowego zapisu `QSaveFile`, limitu 1 MiB na rekord i uprawnień tylko dla
+właściciela. Przy `encryption.enabled=true` rekordy są szyfrowane AES-256-GCM;
+brak klucza powoduje niedostępność repozytorium, a nie zapis jawny.
+Do czasu wdrożenia zakresów RBAC endpointy danych są ograniczone do roli
+`administrator`. To ograniczenie jest celowe i tymczasowe.
+
+`biofeedback_api` jest samodzielnym wariantem serwera; Desktop uruchamia
+serwer w swoim procesie. Domyślnie nasłuch odbywa się na
+`127.0.0.1:8765`. CORS dopuszcza wyłącznie źródła localhost/127.0.0.1/::1.
+Android wymaga HTTPS, więc połączenie zdalne wymaga bramy TLS/reverse proxy.
+Nie wystawiać surowego serwera HTTP poza loopback.
+
+**Ograniczenia pozostałe:** MariaDB adapter nie jest zaimplementowany;
+wybranie `storage.patient_backend=mariadb` powoduje fail-closed.
+Kolekcje pomiarów, treningów i gier mają już wspólny kontrakt CRUD i magazyn
+plikowy, ale producenci danych w Desktop/TUI nie są jeszcze w pełni przepięci
+na zapis serwerowy. TUI nie jest jeszcze klientem API. WebSocket/SSE i
+strumień próbek czasu rzeczywistego pozostają do wdrożenia. Nie należy
+traktować tego API jako gotowego systemu dokumentacji klinicznej.
 
 Uruchomienie:
 
