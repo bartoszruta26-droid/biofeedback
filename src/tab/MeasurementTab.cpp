@@ -1143,7 +1143,7 @@ void MeasurementTab::stopMeasurement()
     
     m_isMeasuring = false;
     updateRawTableBatch(true);
-    const bool journalFlushed = flushSampleJournal();
+    const bool journalFlushed = !m_sampleJournalFailed && flushSampleJournal();
     closeSampleJournal();
     
     // An unfinished contraction is discarded; it must not be stored as a
@@ -1170,7 +1170,7 @@ void MeasurementTab::stopMeasurement()
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     m_lblStatus->setText("Status: ZATRZYMANO");
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
-    if (!journalFlushed)
+    if (!journalFlushed || m_sampleJournalFailed)
         m_lblStatus->setText(tr("Status: BŁĄD ZAPISU DZIENNIKA — sprawdź miejsce na dysku"));
     
     std::cout << "[DEBUG] stopMeasurement: emit measurementStopped" << std::endl;
