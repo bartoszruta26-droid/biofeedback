@@ -171,6 +171,20 @@ int main(int argc, char **argv)
     REQUIRE(galagaGame->currentWave() == 1);
     REQUIRE(galagaGame->activeEnemyCount() == 24);
 
+    // The first deterministic hostile shot is aligned with the far-right
+    // sensor position. It must remove exactly one life and leave the session
+    // active; the post-hit protection then recentres the player.
+    std::unique_ptr<games::GameEngine> galagaHit(games::createGame(QStringLiteral("galaga")));
+    auto* galagaHitGame = dynamic_cast<games::GalagaGame*>(galagaHit.get());
+    REQUIRE(galagaHitGame != nullptr);
+    galagaHitGame->resize(640, 480);
+    galagaHitGame->start();
+    galagaHitGame->handleSensorInput(100.0);
+    waitForEvents(3200);
+    REQUIRE(galagaHitGame->livesRemaining() == 2);
+    REQUIRE(galagaHitGame->isRunning());
+    galagaHitGame->stop();
+
     std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
     auto* archerGame = dynamic_cast<games::ArcherGame*>(archer.get());
     REQUIRE(archerGame != nullptr);
