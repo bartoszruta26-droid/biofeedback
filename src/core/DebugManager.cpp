@@ -11,7 +11,7 @@ namespace core {
 // ============================================================================
 
 /// Enable detailed debug logging for internal operations
-constexpr bool DEBUG_DEBUGMANAGER = true;
+constexpr bool DEBUG_DEBUGMANAGER = false;
 
 /// Maximum number of messages to track in statistics (prevents overflow)
 constexpr int MAX_MESSAGE_COUNT = INT32_MAX;
@@ -24,8 +24,8 @@ DebugManager& DebugManager::instance()
 
 DebugManager::DebugManager()
     : m_debugCallback(nullptr)
-    , m_minimumLogLevel(DebugLevel::DEBUG)
-    , m_consoleOutputEnabled(true)
+    , m_minimumLogLevel(DebugLevel::INFO)
+    , m_consoleOutputEnabled(false)
     , m_totalMessageCount(0)
     , m_criticalCount(0)
 {
