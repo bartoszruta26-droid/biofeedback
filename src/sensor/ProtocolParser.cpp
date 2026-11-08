@@ -1,12 +1,13 @@
 #include "sensor/ProtocolParser.hpp"
+#include "sensor/SerialProtocolConfig.hpp"
 
 #include <algorithm>
 #include <limits>
 
 namespace sensor {
 namespace {
-constexpr std::size_t kPayloadSize = 9;
-constexpr std::size_t kFrameSize = 11;
+constexpr std::size_t kPayloadSize = protocol::MeasurementPayloadSize;
+constexpr std::size_t kFrameSize = protocol::MeasurementFrameSize;
 constexpr std::size_t kMaximumBufferedBytes = 4096;
 
 uint32_t readU32Le(const uint8_t* p) noexcept {
@@ -19,11 +20,11 @@ uint32_t readU32Le(const uint8_t* p) noexcept {
 
 uint8_t ProtocolParser::calculateCrc8(const uint8_t* data, std::size_t length) noexcept {
     if (data == nullptr && length != 0) return 0xFF;
-    uint8_t crc = 0xFF;
+    uint8_t crc = protocol::Crc8InitialValue;
     for (std::size_t i = 0; i < length; ++i) {
         crc ^= data[i];
         for (unsigned bit = 0; bit < 8; ++bit) {
-            crc = (crc & 0x80) ? static_cast<uint8_t>((crc << 1) ^ 0x07)
+            crc = (crc & 0x80) ? static_cast<uint8_t>((crc << 1) ^ protocol::Crc8Polynomial)
                               : static_cast<uint8_t>(crc << 1);
         }
     }
@@ -47,7 +48,7 @@ void ProtocolParser::feed(const uint8_t* data, std::size_t length) {
     while (m_buffer.size() >= kFrameSize) {
         auto marker = m_buffer.end();
         for (auto it = m_buffer.begin() + 9; it + 1 < m_buffer.end(); ++it) {
-            if (*it == 0xAA && *(it + 1) == 0x55) {
+            if (*it == protocol::FrameTrailerFirst && *(it + 1) == protocol::FrameTrailerSecond) {
                 marker = it;
                 break;
             }
