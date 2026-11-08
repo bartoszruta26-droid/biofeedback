@@ -464,7 +464,6 @@ void ConfigManager::setDefaults() {
     m_config["encryption.enabled"] = false; // Development default; production must explicitly provision encryption.
     m_config["encryption.algorithm"] = std::string("AES-256-GCM");
     m_config["encryption.key_derivation"] = std::string("SHA-256 key normalization (32+ byte external secret)");
-    m_config["encryption.iterations"] = 100000;
     
     // UI settings
     m_config["ui.theme"] = std::string("default");
@@ -493,7 +492,8 @@ void ConfigManager::setDefaults() {
     m_config["games.session_duration_minutes"] = 15;
     
     // Medical settings
-    m_config["deployment.profile"] = std::string("development");\n    m_config["medical.require_authentication"] = true;
+    m_config["deployment.profile"] = std::string("development");
+    m_config["medical.require_authentication"] = true;
     m_config["medical.audit_log_enabled"] = true;
     m_config["medical.data_retention_days"] = 2555;
     m_config["medical.export_format"] = std::string("JSON");
