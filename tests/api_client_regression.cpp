@@ -143,11 +143,11 @@ int main(int argc, char** argv) {
     };
     removeShared(QStringLiteral("game-results"), gameResult);
     removeShared(QStringLiteral("game-sessions"), gameSession);
-    removeShared(QStringLiteral("training-results"), trainingResult);
     assert(!client.deleteResource(QStringLiteral("training-sessions"),
                                   trainingSession.value(QStringLiteral("id")).toString(),
                                   trainingSession.value(QStringLiteral("version")).toInt(), &error));
     assert(error.contains(QStringLiteral("TRAINING_SESSION_HAS_RESULTS")));
+    removeShared(QStringLiteral("training-results"), trainingResult);
     removeShared(QStringLiteral("training-sessions"), trainingSession);
     removeShared(QStringLiteral("measurements"), measurement);
 
