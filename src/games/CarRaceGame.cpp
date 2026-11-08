@@ -1,5 +1,6 @@
 #include "games/CarRaceGame.hpp"
 #include <QKeyEvent>
+#include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
 #include <algorithm>
@@ -39,6 +40,26 @@ void CarRaceGame::initialize()
     m_spawnCount = 0;
     m_player = QRectF(0.0, height() - 105.0, 38.0, 66.0);
     setLane(m_lane);
+}
+
+void CarRaceGame::resizeEvent(QResizeEvent* event)
+{
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        for (Obstacle& obstacle : m_obstacles) {
+            obstacle.rect = QRectF(obstacle.rect.x() * scaleX,
+                                   obstacle.rect.y() * scaleY,
+                                   obstacle.rect.width() * scaleX,
+                                   obstacle.rect.height() * scaleY);
+        }
+    }
+    GameEngine::resizeEvent(event);
+    if (width() > 0 && height() > 0)
+        setLane(m_lane);
 }
 
 void CarRaceGame::setLane(int lane)
