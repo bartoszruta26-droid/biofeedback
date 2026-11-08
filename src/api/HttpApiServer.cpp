@@ -95,6 +95,10 @@ void HttpApiServer::setAcquisitionService(
     m_acquisition = std::move(acquisition);
 }
 
+void HttpApiServer::setDeviceService(std::shared_ptr<biofeedback::application::DeviceService> devices) {
+    m_devices = std::move(devices);
+}
+
 bool HttpApiServer::listen(const QHostAddress& address, quint16 port) {
     return m_server.listen(address, port);
 }
@@ -516,6 +520,39 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 requested.patientId = request.value(QStringLiteral("patient_id")).toString().toStdString();
                 requested.deviceId = request.value(QStringLiteral("device_id")).toString().toStdString();
                 requested.protocolId = request.value(QStringLiteral("protocol_id")).toString().toStdString();
+                if (!m_resources || !m_resources->isReady()) {
+                    sendJson(socket, 503, errorBody("RESOURCE_STORE_UNAVAILABLE",
+                        "Repozytorium pacjentów nie jest dostępne; akwizycja została zablokowana."));
+                    return;
+                }
+                QJsonObject patientRecord;
+                QString patientError;
+                if (!m_resources->get(QStringLiteral("patients"),
+                                      QString::fromStdString(requested.patientId),
+                                      patientRecord, &patientError)) {
+                    const bool missing = patientError == "RESOURCE_NOT_FOUND";
+                    sendJson(socket, missing ? 422 : 503,
+                        errorBody(missing ? "PATIENT_NOT_FOUND" : "PATIENT_VALIDATION_UNAVAILABLE",
+                                  missing ? "Pacjent wskazany dla sesji akwizycji nie istnieje." :
+                                            "Nie można zweryfikować pacjenta; akwizycja została zablokowana."));
+                    return;
+                }
+                if (!m_devices) {
+                    sendJson(socket, 503, errorBody("DEVICE_REGISTRY_UNAVAILABLE",
+                        "Rejestr urządzeń nie jest skonfigurowany; akwizycja została zablokowana."));
+                    return;
+                }
+                biofeedback::application::DeviceDescriptor device;
+                if (!m_devices->device(requested.deviceId, device)) {
+                    sendJson(socket, 422, errorBody("DEVICE_NOT_FOUND",
+                        "Urządzenie wskazane dla sesji akwizycji nie jest zarejestrowane."));
+                    return;
+                }
+                if (device.state != biofeedback::application::DeviceState::Connected) {
+                    sendJson(socket, 409, errorBody("DEVICE_NOT_CONNECTED",
+                        "Urządzenie wskazane dla sesji akwizycji nie jest połączone."));
+                    return;
+                }
                 std::string acquisitionError;
                 if (!m_acquisition->startSession(std::move(requested), acquisitionError)) {
                     const bool conflict = acquisitionError == "ACQUISITION_ALREADY_ACTIVE";
