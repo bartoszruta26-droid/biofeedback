@@ -5,6 +5,7 @@
 #include "training/RepetitionDetector.hpp"
 #include "core/DebugManager.hpp"
 #include "core/RuntimePaths.hpp"
+#include "core/Authentication.hpp"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -19,6 +20,8 @@
 #include <clocale>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <unistd.h>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -31,6 +34,63 @@
 namespace {
 constexpr int kMinimumColumns = 72;
 constexpr int kMinimumRows = 20;
+
+std::unique_ptr<biofeedback::Authentication> authenticateTuiUser() {
+    const QString usersPath = biofeedback::runtime::ensureUserConfigFile(QStringLiteral("users.json"));
+    if (usersPath.isEmpty()) {
+        std::cerr << "Nie można przygotować magazynu kont.\n";
+        return {};
+    }
+
+    auto authentication = std::make_unique<biofeedback::Authentication>(usersPath.toStdString());
+    if (!authentication->loadUsers()) {
+        std::cerr << "Nie można odczytać magazynu kont.\n";
+        return {};
+    }
+
+    if (!authentication->hasUsers()) {
+        std::cout << "Pierwsze uruchomienie TUI — utworzenie administratora.\n";
+        std::string username;
+        std::cout << "Nazwa administratora: ";
+        if (!std::getline(std::cin, username) || username.empty()) return {};
+        char* first = getpass("Nowe hasło (minimum 12 znaków): ");
+        if (!first) return {};
+        std::string password(first);
+        std::memset(first, 0, std::strlen(first));
+        char* second = getpass("Powtórz hasło: ");
+        if (!second) {
+            std::fill(password.begin(), password.end(), '\0');
+            return {};
+        }
+        const bool matches = password == second;
+        std::memset(second, 0, std::strlen(second));
+        if (!matches || !authentication->createInitialAdministrator(username, password)) {
+            std::fill(password.begin(), password.end(), '\0');
+            std::cerr << "Nie udało się utworzyć administratora.\n";
+            return {};
+        }
+        std::fill(password.begin(), password.end(), '\0');
+        std::cout << "Konto administratora utworzone.\n";
+    }
+
+    std::string username;
+    std::cout << "Użytkownik: ";
+    if (!std::getline(std::cin, username) || username.empty()) return {};
+    char* input = getpass("Hasło: ");
+    if (!input) return {};
+    std::string password(input);
+    std::memset(input, 0, std::strlen(input));
+
+    const bool loggedIn = authentication->login(username, password);
+    std::fill(password.begin(), password.end(), '\0');
+    if (!loggedIn || authentication->requiresPasswordChange()) {
+        authentication->logout();
+        std::cerr << "Logowanie nie powiodło się lub wymagane jest ustawienie nowego hasła.\n";
+        return {};
+    }
+    std::cout << "Zalogowano. Rola: " << authentication->getCurrentUserRole() << "\n";
+    return authentication;
+}
 
 struct LiveData {
     mutable std::mutex mutex;
@@ -404,6 +464,9 @@ int main(int argc, char** argv)
         }
     }
 
+    auto authentication = authenticateTuiUser();
+    if (!authentication) return EXIT_FAILURE;
+
     std::setlocale(LC_ALL, "");
     core::DebugManager::instance().setConsoleOutputEnabled(false);
     sensor::SerialCommunication serial;
@@ -679,5 +742,6 @@ int main(int argc, char** argv)
     endwin();
     serial.disconnect();
     measurementEngine->unsubscribe(measurementToken);
+    authentication->logout();
     return EXIT_SUCCESS;
 }
