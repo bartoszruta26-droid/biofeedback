@@ -41,20 +41,13 @@
       "uart_rx_pin": 1,
       "protocol": "biofeedback-control",
       "protocol_version": 1,
-      "actuators_enabled": false,
-      "effectors": {
-        "ir_pwm": { "enabled": false },
-        "electrodes": { "enabled": false },
-        "antenna": { "enabled": false }
-      }
     },
     "arduino_nano": {
       "transport": "serial",
       "baud_rate": 115200,
       "hx711_data_pin": 2,
       "hx711_clock_pin": 3,
-      "protocol": "hx711-frame-v1",
-      "actuators_enabled": false
+      "protocol": "hx711-frame-v1"
     }
   },
   "logging": {
