@@ -494,6 +494,7 @@ private:
     quint64 m_totalDroppedMeasurementSamples{0};
     std::atomic<bool> m_journalAdmission{false};
     std::atomic<quint64> m_journalNextSequence{1};
+    std::atomic<quint64> m_measurementSessionGeneration{0};
 };
 
 } // namespace tab
