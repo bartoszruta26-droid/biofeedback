@@ -35,6 +35,8 @@ private:
     QString recordPath(const QString& collection, const QString& id) const;
     bool readRecord(const QString& collection, const QString& id,
                     QJsonObject& record, QString* error) const;
+    bool validatePayload(const QString& collection, const QString& idToExclude,
+                         const QJsonObject& payload, QString* error) const;
     bool writeRecord(const QString& collection, const QString& id,
                      const QJsonObject& record, QString* error) const;
     static bool validId(const QString& id);
