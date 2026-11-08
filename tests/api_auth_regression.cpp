@@ -125,7 +125,7 @@ int main(int argc, char** argv) {
     };
 
     const QByteArray unauthenticatedAcquisition = transact(
-        port, "GET /api/v1/acquisition/session HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n");
+        port, "GET /api/v1/acquisition/session HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
     assert(statusCode(unauthenticatedAcquisition) == 401);
 
     const QByteArray unauthenticatedPatients = transact(
