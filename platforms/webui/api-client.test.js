@@ -119,3 +119,44 @@ test("login rejects a successful response without an access token", async () => 
   await assert.rejects(api.login("operator", "example-password"), (error) =>
     error instanceof ApiError && error.message === "API login response did not contain an access token");
 });
+
+
+test("shared resource CRUD methods use versioned collection routes", async () => {
+  const calls = [];
+  const api = createApiClient({
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return response(200, { ok: true });
+    }
+  });
+
+  await api.getPatients();
+  await api.createPatient({ display_name: "Test" });
+  await api.updatePatient("record id", 2, { display_name: "Changed" });
+  await api.deletePatient("record id", 3);
+  await api.createTrainingSession({ patient_id: "patient-1" });
+  await api.createTrainingResult({ session_id: "training-1" });
+  await api.createGameSession({ game_id: "pong" });
+  await api.createGameResult({ game_id: "pong", score: 10 });
+
+  assert.equal(calls[0].url, "/api/v1/patients");
+  assert.equal(calls[1].url, "/api/v1/patients");
+  assert.equal(calls[1].init.method, "POST");
+  assert.equal(calls[2].url, "/api/v1/patients/record%20id");
+  assert.equal(calls[2].init.method, "PUT");
+  assert.deepEqual(JSON.parse(calls[2].init.body), {
+    expected_version: 2, record: { display_name: "Changed" }
+  });
+  assert.equal(calls[3].init.method, "DELETE");
+  assert.deepEqual(JSON.parse(calls[3].init.body), { expected_version: 3 });
+  assert.equal(calls[4].url, "/api/v1/training-sessions");
+  assert.equal(calls[5].url, "/api/v1/training-results");
+  assert.equal(calls[6].url, "/api/v1/game-sessions");
+  assert.equal(calls[7].url, "/api/v1/game-results");
+});
+
+test("resource client rejects unsupported collection names", async () => {
+  const api = createApiClient({ fetchImpl: async () => response(200, {}) });
+  await assert.rejects(api.listResources("../users"), (error) =>
+    error instanceof ApiError && error.status === 400);
+});
