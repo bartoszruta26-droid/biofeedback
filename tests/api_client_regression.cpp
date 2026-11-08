@@ -37,8 +37,9 @@ int main(int argc, char** argv) {
 
     QJsonObject created;
     assert(client.createResource(QStringLiteral("patients"), QJsonObject{
-        {QStringLiteral("reference"), QStringLiteral("synthetic-patient")},
-        {QStringLiteral("display_name"), QStringLiteral("Test Patient")}
+        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-002")},
+        {QStringLiteral("firstName"), QStringLiteral("Test")},
+        {QStringLiteral("lastName"), QStringLiteral("Patient")}
     }, created, &error));
     const QString id = created.value(QStringLiteral("id")).toString();
     assert(!id.isEmpty());
@@ -50,12 +51,16 @@ int main(int argc, char** argv) {
 
     QJsonObject updated;
     assert(client.updateResource(QStringLiteral("patients"), id, 1, QJsonObject{
-        {QStringLiteral("display_name"), QStringLiteral("Updated Patient")}
+        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-002")},
+        {QStringLiteral("firstName"), QStringLiteral("Updated")},
+        {QStringLiteral("lastName"), QStringLiteral("Patient")}
     }, updated, &error));
     assert(updated.value(QStringLiteral("version")).toInt() == 2);
 
     assert(!client.updateResource(QStringLiteral("patients"), id, 1, QJsonObject{
-        {QStringLiteral("display_name"), QStringLiteral("Stale Update")}
+        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-002")},
+        {QStringLiteral("firstName"), QStringLiteral("Stale")},
+        {QStringLiteral("lastName"), QStringLiteral("Update")}
     }, updated, &error));
     assert(error.contains(QStringLiteral("VERSION_CONFLICT")));
 
