@@ -7,6 +7,7 @@
 #include <QTcpServer>
 #include <QString>
 #include <memory>
+#include "data/JsonResourceRepository.hpp"
 
 class QTcpSocket;
 namespace biofeedback { class Authentication; }
@@ -17,6 +18,9 @@ class HttpApiServer final : public QObject {
 public:
     explicit HttpApiServer(const QString& usersFilePath = QString(),
                            QObject* parent = nullptr);
+    HttpApiServer(const QString& usersFilePath,
+                  std::shared_ptr<biofeedback::data::JsonResourceRepository> resources,
+                  QObject* parent = nullptr);
     bool listen(const QHostAddress& address = QHostAddress::LocalHost, quint16 port = 8765);
     void close();
     bool isListening() const;
@@ -36,6 +40,7 @@ private:
     QHash<QString, ApiSession> m_sessions;
     QHash<QString, LoginThrottle> m_loginAttempts;
     QString m_usersFilePath;
+    std::shared_ptr<biofeedback::data::JsonResourceRepository> m_resources;
     QTcpServer m_server;
 };
 }
