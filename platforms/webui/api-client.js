@@ -48,6 +48,7 @@
           catch (_) { throw new ApiError("API returned invalid JSON", response.status); }
         }
         if (!response.ok) {
+          if (response.status === 401 && path !== "/api/v1/auth/login") config.accessToken = null;
           const message = payload && payload.message ? payload.message : "API request failed";
           throw new ApiError(message, response.status, payload);
         }
@@ -88,6 +89,7 @@
     return Object.freeze({
       request,
       login: async (username, password) => {
+        config.accessToken = null;
         const result = await request("/api/v1/auth/login", jsonRequest("POST", { username, password }));
         if (!result || typeof result.access_token !== "string" || !result.access_token) {
           throw new ApiError("API login response did not contain an access token", 0, result);
