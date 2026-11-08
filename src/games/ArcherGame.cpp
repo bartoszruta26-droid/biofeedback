@@ -38,10 +38,16 @@ void ArcherGame::initialize()
 
 void ArcherGame::repositionTarget()
 {
-    const double targetWidth = qMax(24.0, width() * 0.055);
-    const double targetHeight = qMax(54.0, height() * 0.18);
-    m_target = QRectF(width() * 0.76, height() * 0.42,
-                      targetWidth, targetHeight);
+    const double targetWidth = qMin(qMax(24.0, width() * 0.055),
+                                    qMax(24.0, width() * 0.18));
+    const double targetHeight = qMin(qMax(54.0, height() * 0.18),
+                                     qMax(24.0, height() * 0.30));
+    const double left = qBound(24.0, width() * 0.76,
+                               qMax(24.0, width() - targetWidth - 12.0));
+    const double top = qBound(height() * 0.18, height() * 0.42,
+                              qMax(height() * 0.18,
+                                   height() * 0.78 - targetHeight));
+    m_target = QRectF(left, top, targetWidth, targetHeight);
 }
 
 bool ArcherGame::handleInput(double value)
