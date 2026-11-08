@@ -47,7 +47,7 @@
 - [x] Ograniczenie liczby oczekujących zdarzeń wejścia czujnika przez scalanie próbek do najnowszej wartości.
 - [x] Regresja dla serii 1000 próbek wysłanych z wątku roboczego.
 - [ ] Audyt i poprawki mechaniki istniejących gier (w pierwszej kolejności Arkanoid, Pong, Flappy Bird i Mario).
-- [ ] Implementacja Galaga.
+- [x] Pierwsza grywalna implementacja Galaga: statek, sterowanie czujnikiem/klawiaturą, pociski obu stron, kolizje, życia, fale i punktacja. Pozostaje rozszerzyć testy scenariuszowe i zbalansować rozgrywkę.
 - [ ] Implementacja Archer.
 - [ ] Implementacja Scorched Earth.
 - [ ] Implementacja Car Race.
