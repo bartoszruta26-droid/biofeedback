@@ -1,31 +1,36 @@
-# Pico firmware v0.2.0 and effector safety status
+# Raspberry Pi Pico firmware — measurement communication status
 
-## Status as of 2026-11-08
+## Current implementation
 
-The repository contains a Raspberry Pi Pico SDK build target and a fail-closed UART command loop. This establishes a reproducible firmware boundary.
+The repository contains a Raspberry Pi Pico SDK build target and a bounded UART command loop.
 
-| Function | Firmware command | Driver | Independent hardware safety | Status |
-|---|---|---|---|---|
-| IR PWM | Locked | Absent | Not verified | NOT IMPLEMENTED |
-| Electrodes | Locked | Absent | Not verified | NOT IMPLEMENTED |
-| Antenna | Locked | Absent | Not verified | NOT IMPLEMENTED |
-| Pico watchdog | N/A | Implemented | MCU watchdog only | PARTIAL |
-| Pico control UART | PING/STATUS/SAFE | Implemented | Wiring not verified | SOFTWARE ONLY |
+| Function | Current state |
+|---|---|
+| UART0 communication | Implemented: GP0 TX / GP1 RX, 115200 baud, 8N1 |
+| Hardware watchdog | Implemented: 2-second timeout |
+| Bounded command parser | Implemented |
+| PING / STATUS / SAFE diagnostics | Implemented |
+| Unknown command handling | Rejected |
+| Sensor acquisition and measurement frames | Not yet implemented in this Pico firmware target |
+| Calibration against physical sensors | Not verified |
 
-A UI control, API route, serial command or successful firmware build is not evidence of safe electrical actuation.
+## Host/Pico diagnostic protocol
 
-## Required hardware evidence
-Before implementing an output driver, record the exact board revision, schematic, pin assignment, driver component numbers, supply rails, load impedance across operating conditions, maximum current and voltage, thermal limits, isolation, fuse/current limiting, emergency stop topology and measured fault response. Values must come from the actual design and bench measurements; firmware must not invent them.
-
-## Host/Pico protocol boundary
 - UART: 115200 baud, 8 data bits, no parity, 1 stop bit.
 - Commands are bounded printable ASCII lines terminated by CR or LF.
-- PING returns OK,PONG,FW=0.2.0,PROTO=1.
-- STATUS returns OK,STATUS,SAFE=1,ACTUATORS=LOCKED,PROTO=1.
-- SAFE returns OK,SAFE,ACTUATORS=LOCKED.
-- ACTUATOR, EFFECTOR, IR, ELECTRODE and ANTENNA requests return ERR,ACTUATORS_LOCKED.
-- Pico UART0 uses GP0 TX and GP1 RX; the HX711 Nano sketch uses DT=2 and SCK=3.
-- The host, configuration and Pico firmware share the versioned protocol constants in SerialProtocolConfig.hpp.
+- PING returns `OK,PONG,FW=0.2.0,PROTO=1`.
+- STATUS returns `OK,STATUS,READY=1,PROTO=1`.
+- SAFE returns `OK,SAFE`.
 - Unknown or malformed commands are rejected.
 
-This control protocol is separate from the existing HX711 binary measurement frame (little-endian timestamp, signed raw value, CRC-8, trailer 0xAA 0x55). The two protocols must not be conflated. The control protocol is versioned independently from the HX711 measurement frame; no effector driver is exposed by protocol version 1.
+This diagnostic channel is separate from the existing HX711 binary measurement frame (little-endian timestamp, signed raw value, CRC-8, trailer 0xAA 0x55). The host parser and firmware must not conflate diagnostic commands with measurement frames.
+
+## Next engineering work
+
+1. Confirm the exact sensor models and electrical interfaces connected to the Pico.
+2. Implement bounded sensor acquisition with explicit sample validity and fault states.
+3. Apply calibrated units and timestamp semantics shared with the host measurement pipeline.
+4. Add firmware-side protocol tests and host/Pico integration tests.
+5. Verify on physical hardware with reference loads and recorded calibration evidence.
+
+A successful firmware build is not proof of physical sensor accuracy or clinical validity.
