@@ -113,13 +113,19 @@ add_test(NAME biomechanical_parameter_availability_regression
 # Application-facing lifecycle boundary for the shared measurement pipeline.
 add_library(biofeedback_application_services STATIC
     src/application/MeasurementService.cpp
+    src/application/DeviceService.cpp
+    src/application/ApplicationServices.cpp
 )
 target_include_directories(biofeedback_application_services PUBLIC ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(biofeedback_application_services PUBLIC biofeedback_measurement)
+target_link_libraries(biofeedback_application_services PUBLIC biofeedback_measurement Threads::Threads)
 
 add_executable(measurement_service_regression tests/measurement_service_regression.cpp)
 target_link_libraries(measurement_service_regression PRIVATE biofeedback_application_services)
 add_test(NAME measurement_service_regression COMMAND measurement_service_regression)
+
+add_executable(device_service_regression tests/device_service_regression.cpp)
+target_link_libraries(device_service_regression PRIVATE biofeedback_application_services)
+add_test(NAME device_service_regression COMMAND device_service_regression)
 
 # Local loopback HTTP API. Sensitive and hardware operations remain disabled
 # until authentication, authorization and measurement services are integrated.
