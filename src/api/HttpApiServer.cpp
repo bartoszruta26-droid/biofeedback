@@ -10,6 +10,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QTimer>
+#include <limits>
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
 #include <utility>
@@ -522,7 +523,8 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 if (!afterSequenceText.isEmpty()) {
                     bool sequenceOk = false;
                     afterSequence = afterSequenceText.toULongLong(&sequenceOk);
-                    if (!sequenceOk || afterSequenceText.startsWith(QLatin1Char('-'))) {
+                    if (!sequenceOk || afterSequenceText.startsWith(QLatin1Char('-')) ||
+                        afterSequence > static_cast<quint64>(std::numeric_limits<qint64>::max())) {
                         sendJson(socket, 400, errorBody("INVALID_SEQUENCE",
                             "Parametr after_sequence musi być nieujemną liczbą całkowitą."));
                         return;
