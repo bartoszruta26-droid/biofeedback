@@ -133,12 +133,12 @@ int main(int argc, char **argv)
     REQUIRE(archerGame != nullptr);
     archerGame->resize(640, 480);
     archerGame->start();
-    archerGame->handleSensorInput(85.0);
+    archerGame->handleSensorInput(80.0);
     QKeyEvent archerFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(archerGame, &archerFire);
     waitForEvents(900);
     REQUIRE(archerGame->isRunning());
-    REQUIRE(archerGame->getScore() >= 0);
+    REQUIRE(archerGame->getScore() >= 10); // The aimed arrow must hit the target.
     archerGame->stop();
 
     std::unique_ptr<games::GameEngine> carRace(games::createGame(QStringLiteral("car_race")));
