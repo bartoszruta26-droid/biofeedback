@@ -177,39 +177,61 @@ void ScorchedEarthGame::update(double deltaTime)
             fireProjectile(false);
     }
 
+    constexpr double maxSegmentLength = 4.0;
     for (Projectile& projectile : m_projectiles) {
         if (!projectile.active)
             continue;
+
+        // Integrate a bounded number of micro-steps and test the whole swept
+        // segment so fast shells cannot tunnel through tanks or terrain.
+        const double frameStart = 0.0;
+        Q_UNUSED(frameStart);
+        const QPointF oldPosition = projectile.position;
         projectile.velocity.ry() += m_gravity * deltaTime;
         projectile.velocity.rx() += m_wind * 0.08 * deltaTime;
-        projectile.position += projectile.velocity * deltaTime;
+        const QPointF displacement = projectile.velocity * deltaTime;
+        const int samples = qBound(1, static_cast<int>(std::ceil(
+            std::hypot(displacement.x(), displacement.y()) / maxSegmentLength)), 256);
+        QPointF previous = oldPosition;
+        bool impacted = false;
 
-        if (projectile.position.x() < 0.0 || projectile.position.x() > width() ||
-            projectile.position.y() > height() || projectile.position.y() < -height()) {
-            projectile.active = false;
-            if (projectile.playerOwned)
-                m_enemyDelay = 0.75;
-            else
-                m_playerTurn = true;
-            continue;
+        for (int sample = 1; sample <= samples; ++sample) {
+            const QPointF current = oldPosition + displacement *
+                (static_cast<double>(sample) / samples);
+            const bool outside = current.x() < 0.0 || current.x() > width() ||
+                current.y() > height() || current.y() < -height();
+            const bool hitTerrain = !outside &&
+                current.y() >= terrainY(current.x());
+            const bool hitTank = !outside &&
+                ((projectile.playerOwned &&
+                  m_enemyTank.adjusted(-5, -5, 5, 5).contains(current)) ||
+                 (!projectile.playerOwned &&
+                  m_playerTank.adjusted(-5, -5, 5, 5).contains(current)));
+
+            if (outside) {
+                projectile.active = false;
+                if (projectile.playerOwned)
+                    m_enemyDelay = 0.75;
+                else
+                    m_playerTurn = true;
+                impacted = true;
+                break;
+            }
+            if (hitTerrain || hitTank) {
+                projectile.position = current;
+                projectile.active = false;
+                resolveImpact(current, projectile.playerOwned);
+                if (!isRunning())
+                    return;
+                impacted = true;
+                break;
+            }
+            previous = current;
         }
 
-        if (projectile.position.y() >= terrainY(projectile.position.x())) {
-            const QPointF impact = projectile.position;
-            projectile.active = false;
-            resolveImpact(impact, projectile.playerOwned);
-            if (!isRunning())
-                return;
-        } else if ((projectile.playerOwned &&
-                    m_enemyTank.adjusted(-5, -5, 5, 5).contains(projectile.position)) ||
-                   (!projectile.playerOwned &&
-                    m_playerTank.adjusted(-5, -5, 5, 5).contains(projectile.position))) {
-            const QPointF impact = projectile.position;
-            projectile.active = false;
-            resolveImpact(impact, projectile.playerOwned);
-            if (!isRunning())
-                return;
-        }
+        if (!impacted)
+            projectile.position = oldPosition + displacement;
+        Q_UNUSED(previous);
     }
 
     m_projectiles.erase(std::remove_if(m_projectiles.begin(), m_projectiles.end(),
