@@ -87,7 +87,11 @@ test("login stores bearer token in memory and protected calls attach it", async 
     fetchImpl: async (url, init) => {
       calls.push({ url, init });
       if (url === "/api/v1/auth/login") return response(200, { access_token: "a".repeat(64), token_type: "Bearer" });
-      if (url === "/api/v1/auth/me") return response(200, { username: "operator", role: "clinician" });
+      if (url === "/api/v1/auth/me") {
+        return init.headers.Authorization
+          ? response(200, { username: "operator", role: "clinician" })
+          : response(401, { message: "authentication required" });
+      }
       if (url === "/api/v1/auth/logout") return response(200, { ok: true });
       return response(404, { message: "not found" });
     }
