@@ -114,6 +114,26 @@ int main(int argc, char** argv) {
     assertVisibleToFirstClient(QStringLiteral("game-sessions"), gameSession);
     assertVisibleToFirstClient(QStringLiteral("game-results"), gameResult);
 
+    // Collection listings must expose the same server-side records too.
+    const auto assertListedToFirstClient = [&](const QString& collection, const QJsonObject& created) {
+        QJsonArray listed;
+        assert(client.listResources(collection, listed, &error));
+        const QString createdId = created.value(QStringLiteral("id")).toString();
+        bool found = false;
+        for (const QJsonValue& value : listed) {
+            if (value.toObject().value(QStringLiteral("id")).toString() == createdId) {
+                found = true;
+                break;
+            }
+        }
+        assert(found);
+    };
+    assertListedToFirstClient(QStringLiteral("measurements"), measurement);
+    assertListedToFirstClient(QStringLiteral("training-sessions"), trainingSession);
+    assertListedToFirstClient(QStringLiteral("training-results"), trainingResult);
+    assertListedToFirstClient(QStringLiteral("game-sessions"), gameSession);
+    assertListedToFirstClient(QStringLiteral("game-results"), gameResult);
+
     assert(!client.deleteResource(QStringLiteral("patients"), id, 2, &error));
     assert(error.contains(QStringLiteral("PATIENT_HAS_REFERENCES")));
 
