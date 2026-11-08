@@ -69,11 +69,6 @@ int main(int argc, char **argv)
     arkanoidGame->setDifficultyLevel(0);
     REQUIRE(arkanoidGame->getDifficultyLevel() == 1);
     arkanoidGame->start();
-    arkanoidGame->update(std::numeric_limits<double>::max());
-    REQUIRE(arkanoidGame->isRunning()); // Direct callers cannot trigger unbounded catch-up.
-    arkanoidGame->update(std::numeric_limits<double>::quiet_NaN());
-    arkanoidGame->update(std::numeric_limits<double>::infinity());
-    REQUIRE(arkanoidGame->isRunning()); // Invalid deltas are ignored.
     waitForEvents(1800);
     REQUIRE(arkanoidGame->getScore() > 0); // Ball must hit at least one brick.
     arkanoidGame->stop();
@@ -90,6 +85,14 @@ int main(int argc, char **argv)
     auto* flappyGame = dynamic_cast<games::FlappyBirdGame*>(flappy.get());
     REQUIRE(flappyGame != nullptr);
     const float defaultSpeed = flappyGame->getGameSpeed();
+    flappyGame->resize(640, 480);
+    flappyGame->start();
+    flappyGame->update(std::numeric_limits<double>::max());
+    REQUIRE(flappyGame->isRunning());
+    flappyGame->update(std::numeric_limits<double>::quiet_NaN());
+    flappyGame->update(std::numeric_limits<double>::infinity());
+    REQUIRE(flappyGame->isRunning());
+    flappyGame->stop();
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
 
