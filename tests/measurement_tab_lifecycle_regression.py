@@ -187,9 +187,9 @@ if "removeFirst()" in add_sample_body or "for (double sample : m_forces)" in add
 engine_source = Path("src/measurement/MeasurementEngine.cpp").read_text(encoding="utf-8")
 for required in (
     "m_measurementEngine->setCommitHook",
+    "m_measurementEngine->setCommitHook({})",
     "m_journalAdmission.store(true",
     "m_journalAdmission.store(false",
-    "return !m_sampleJournalFailed.load(std::memory_order_acquire)",
     "m_measurementSessionGeneration.fetch_add(1",
     "sessionGeneration != m_measurementSessionGeneration.load",
     "m_sampleJournalWriter.appendDurably(line)",
