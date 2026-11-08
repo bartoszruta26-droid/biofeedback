@@ -84,4 +84,34 @@ for required in (
 if 'addDebugMessage(QString("HX711: RAW=' in source:
     raise SystemExit("Per-sample debug logging must not run in the acquisition hot path")
 
-print("MeasurementTab lifecycle, monotonic timing and sample archive regression passed")
+
+# Sensor-to-game control is a state input, so the GUI mailbox must coalesce
+# stale values instead of replaying a long FIFO backlog.
+game_source = Path("src/gui/MainWindow.cpp").read_text(encoding="utf-8")
+game_header = Path("include/gui/MainWindow.hpp").read_text(encoding="utf-8")
+training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
+for required in (
+    "m_pendingGameSensorInput = value",
+    "m_gameSensorInputAvailable = true",
+    "const bool queued = QMetaObject::invokeMethod",
+    "m_gameInputDrainScheduled = false",
+    "forwardSensorToGame(latestValue)",
+):
+    if required not in game_source:
+        raise SystemExit(f"Missing low-latency game input invariant: {required}")
+if "std::deque<double> m_gameSensorInputQueue" in game_header:
+    raise SystemExit("MainWindow must not replay stale game-control samples from a FIFO queue")
+if "MaximumQueuedInputs" in game_source or "scheduleAgain" in game_source:
+    raise SystemExit("Game control must not drain a stale multi-batch input backlog")
+
+# Failed Qt event scheduling must release the scheduled flag and account for
+# the discarded UI backlog, both on initial enqueue and on batch rescheduling.
+for label, content in (("MeasurementTab", source), ("TrainingTab", training_source)):
+    if content.count("const bool queued = QMetaObject::invokeMethod") < 2:
+        raise SystemExit(f"{label}: initial and follow-up drain scheduling must check invokeMethod")
+    if content.count("m_measurementQueue.clear();") < 2:
+        raise SystemExit(f"{label}: failed scheduling must clear stranded UI backlog")
+    if content.count("m_measurementDrainScheduled = false;") < 2:
+        raise SystemExit(f"{label}: failed scheduling must release the drain flag")
+
+print("Measurement, training and game realtime dispatch regression passed")
