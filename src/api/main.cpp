@@ -5,9 +5,9 @@
 int main(int argc, char* argv[]) {
     QCoreApplication app(argc, argv);
     QCoreApplication::setApplicationName("biofeedback_api");
-    QCoreApplication::setApplicationVersion("0.1.0");
+    QCoreApplication::setApplicationVersion("0.2.0");
     QCommandLineParser parser;
-    parser.setApplicationDescription("Loopback HTTP status API for Biofeedback");
+    parser.setApplicationDescription("Loopback HTTP API with authentication for Biofeedback");
     parser.addHelpOption(); parser.addVersionOption();
     QCommandLineOption portOption({"p", "port"}, "TCP port (default: 8765)", "port", "8765");
     parser.addOption(portOption); parser.process(app);
