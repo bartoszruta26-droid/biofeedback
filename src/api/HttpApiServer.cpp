@@ -8,7 +8,9 @@
 #include <QJsonObject>
 #include <QTcpSocket>
 #include <QUrl>
+#include <QUrlQuery>
 #include <QTimer>
+#include <limits>
 #include <openssl/rand.h>
 #include <openssl/crypto.h>
 #include <utility>
@@ -242,7 +244,9 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
         if (buffer.size() - headerEnd - 4 < contentLength) return;
 
         const QByteArray method = requestLine.at(0);
-        const QByteArray path = requestLine.at(1).split('?').first();
+        const QUrl requestUrl = QUrl::fromEncoded(requestLine.at(1));
+        const QByteArray path = requestUrl.path(QUrl::FullyEncoded).toUtf8();
+        const QUrlQuery requestQuery(requestUrl);
         QByteArray body = buffer.mid(headerEnd + 4, static_cast<int>(contentLength));
         ByteArrayWiper bodyWiper{body};
 
@@ -514,9 +518,25 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                     sendJson(socket, 405, errorBody("METHOD_NOT_ALLOWED", "Dozwolony jest wyłącznie GET."));
                     return;
                 }
+                quint64 afterSequence = 0;
+                const QString afterSequenceText = requestQuery.queryItemValue(QStringLiteral("after_sequence"));
+                if (!afterSequenceText.isEmpty()) {
+                    bool sequenceOk = false;
+                    afterSequence = afterSequenceText.toULongLong(&sequenceOk);
+                    if (!sequenceOk || afterSequenceText.startsWith(QLatin1Char('-')) ||
+                        afterSequence > static_cast<quint64>(std::numeric_limits<qint64>::max())) {
+                        sendJson(socket, 400, errorBody("INVALID_SEQUENCE",
+                            "Parametr after_sequence musi być nieujemną liczbą całkowitą."));
+                        return;
+                    }
+                }
+
                 QJsonArray samples;
+                quint64 nextSequence = afterSequence;
                 const auto history = m_acquisition->measurementService()->history();
                 for (const auto& sample : history) {
+                    const quint64 sequence = static_cast<quint64>(sample.sequence);
+                    if (sequence <= afterSequence) continue;
                     samples.append(QJsonObject{
                         {"sequence", static_cast<qint64>(sample.sequence)},
                         {"timestamp_unix_ms", QJsonValue(static_cast<qint64>(sample.timestampUnixMs))},
@@ -527,11 +547,22 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                         {"source", QString::fromStdString(sample.source)},
                         {"quality", QString::fromLatin1(biofeedback::measurement::qualityName(sample.quality))}
                     });
+                    if (sequence > nextSequence) nextSequence = sequence;
                 }
-                sendJson(socket, 200, QJsonDocument(QJsonObject{
-                    {"items", samples}, {"count", samples.size()},
+                biofeedback::application::AcquisitionSession active;
+                const bool sessionActive = m_acquisition->activeSession(active);
+                QJsonObject response{
+                    {"items", samples},
+                    {"count", samples.size()},
+                    {"after_sequence", static_cast<qint64>(afterSequence)},
+                    {"next_sequence", static_cast<qint64>(nextSequence)},
                     {"retention", QStringLiteral("bounded_in_memory")}
-                }).toJson(QJsonDocument::Compact));
+                };
+                if (sessionActive) {
+                    response.insert(QStringLiteral("session_id"), QString::fromStdString(active.id));
+                    response.insert(QStringLiteral("device_id"), QString::fromStdString(active.deviceId));
+                }
+                sendJson(socket, 200, QJsonDocument(response).toJson(QJsonDocument::Compact));
                 return;
             }
             if (method == "GET") {

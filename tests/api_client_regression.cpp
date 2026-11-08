@@ -68,6 +68,8 @@ int main(int argc, char** argv) {
     QJsonArray acquisitionSamples;
     assert(client.listAcquisitionSamples(acquisitionSamples, &error));
     assert(acquisitionSamples.isEmpty());
+    assert(client.listAcquisitionSamples(acquisitionSamples, &error, 17));
+    assert(acquisitionSamples.isEmpty());
 
     assert(!client.startAcquisitionSession(QString(), QStringLiteral("patient"),
                                             QStringLiteral("device"), QStringLiteral("protocol"), &error));
