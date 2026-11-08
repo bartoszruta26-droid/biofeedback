@@ -16,7 +16,9 @@
 #include <QTextStream>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QUrl>
+#include <QStringList>
 
 #include <ncurses.h>
 
@@ -162,6 +164,9 @@ struct LiveData {
     bool sessionSaved = false;
     bool sessionSaveAttempted = false;
     QString sessionStartedAt;
+    QString measurementStartedAt;
+    QString selectedPatientId;
+    QJsonArray measurementSamples;
     std::uint64_t validSampleCount = 0;
     std::uint64_t invalidSampleCount = 0;
     QString lastSampleQuality = "brak probki";
@@ -179,6 +184,39 @@ std::vector<std::string> scanSerialPortCandidates()
 }
 
 
+void saveMeasurementSession(LiveData& live, biofeedback::api::HttpApiClient& apiClient)
+{
+    QJsonArray samples;
+    QString startedAt;
+    QString patientId;
+    {
+        std::lock_guard<std::mutex> lock(live.mutex);
+        if (live.measurementSamples.isEmpty()) return;
+        samples = live.measurementSamples;
+        startedAt = live.measurementStartedAt;
+        patientId = live.selectedPatientId;
+        live.measurementSamples = QJsonArray();
+        live.measurementStartedAt.clear();
+    }
+    const QJsonObject payload{
+        {QStringLiteral("started_at"), startedAt.isEmpty()
+            ? QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs) : startedAt},
+        {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("patient_id"), patientId},
+        {QStringLiteral("sample_count"), samples.size()},
+        {QStringLiteral("samples"), samples},
+        {QStringLiteral("source_client"), QStringLiteral("tui")},
+        {QStringLiteral("status"), QStringLiteral("completed")}
+    };
+    QJsonObject stored;
+    QString error;
+    if (!apiClient.createResource(QStringLiteral("measurements"), payload, stored, &error)) {
+        std::lock_guard<std::mutex> lock(live.mutex);
+        live.measurementSamples = samples;
+        live.trainingMessage = "Blad archiwizacji pomiaru: " + error.toStdString();
+    }
+}
+
 void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiClient)
 {
     std::vector<LiveData::SessionRep> repetitions;
@@ -189,6 +227,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
     int targetReps = 0;
     int completedSeries = 0;
     int completedReps = 0;
+    QString patientId;
     {
         std::lock_guard<std::mutex> lock(live.mutex);
         if (!live.sessionNeedsSave || live.sessionSaved || live.sessionSaveAttempted ||
@@ -202,6 +241,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
         targetReps = live.targetRepsPerSeries;
         completedSeries = live.completedSeries;
         completedReps = live.completedReps;
+        patientId = live.selectedPatientId;
     }
 
     QJsonArray repetitionRecords;
@@ -225,6 +265,8 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
         {QStringLiteral("started_at"), startedAt},
         {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
         {QStringLiteral("exercise_name"), exercise},
+        {QStringLiteral("patient_id"), patientId},
+
         {QStringLiteral("target_force_n"), targetForce},
         {QStringLiteral("target_series_count"), targetSeries},
         {QStringLiteral("target_reps_per_series"), targetReps},
@@ -242,6 +284,7 @@ void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiCli
     if (saved) {
         const QJsonObject resultPayload{
             {QStringLiteral("training_session_id"), created.value(QStringLiteral("id")).toString()},
+            {QStringLiteral("patient_id"), patientId},
             {QStringLiteral("exercise_name"), exercise},
             {QStringLiteral("completed_series"), completedSeries},
             {QStringLiteral("completed_repetitions"), completedReps},
@@ -376,20 +419,31 @@ void drawModule(tui::Screen screen,
         }
         break;
     }
-    case tui::Screen::Patients:
+    case tui::Screen::Patients: {
+        QString selectedPatientId;
+        {
+            std::lock_guard<std::mutex> lock(live.mutex);
+            selectedPatientId = live.selectedPatientId;
+        }
         drawText(8, x + 2, "Karty pobrane z tego samego repozytorium co Desktop i WebUI.");
         if (patientSummaries.empty()) {
             drawText(10, x + 2, "Brak kart pacjentow lub brak uprawnien do ich odczytu.");
         } else {
             const int visible = std::min<int>(static_cast<int>(patientSummaries.size()), LINES - 14);
-            for (int i = 0; i < visible; ++i)
-                drawText(10 + i, x + 2, patientSummaries[static_cast<std::size_t>(i)], width - 4);
+            for (int i = 0; i < visible; ++i) {
+                const std::string& summary = patientSummaries[static_cast<std::size_t>(i)];
+                const bool selected = !selectedPatientId.isEmpty() &&
+                    summary.find(selectedPatientId.toStdString()) != std::string::npos;
+                drawText(10 + i, x + 2,
+                         std::string(selected ? "[WYBRANY] " : "          ") + summary, width - 4);
+            }
             if (static_cast<int>(patientSummaries.size()) > visible)
                 drawText(11 + visible, x + 2, "... pozostale rekordy: " +
                          std::to_string(patientSummaries.size() - static_cast<std::size_t>(visible)));
         }
-        drawText(LINES - 6, x + 2, "Odczyt odbywa sie przez uwierzytelnione API serwera.");
+        drawText(LINES - 6, x + 2, "Wybierz pacjenta: strzalki lewo/prawo   Brak wyboru = zapis bez przypisania.");
         break;
+    }
     case tui::Screen::Training: {
         bool active = false, paused = false;
         double target = 0.0;
@@ -568,6 +622,7 @@ int main(int argc, char** argv)
     if (!apiClient) return EXIT_FAILURE;
 
     std::vector<std::string> patientSummaries;
+    QStringList patientIds;
     QJsonArray sharedPatients;
     QString patientLoadError;
     if (apiClient->listResources(QStringLiteral("patients"), sharedPatients, &patientLoadError)) {
@@ -576,7 +631,9 @@ int main(int argc, char** argv)
             const QJsonObject patient = value.toObject();
             const QString label = patient.value(QStringLiteral("firstName")).toString() +
                 QStringLiteral(" ") + patient.value(QStringLiteral("lastName")).toString();
-            patientSummaries.push_back(label.toStdString());
+            const QString id = patient.value(QStringLiteral("id")).toString();
+            patientSummaries.push_back((label + QStringLiteral(" [") + id + QStringLiteral("]")).toStdString());
+            patientIds.push_back(id);
         }
     } else {
         patientSummaries.push_back("Blad odczytu repozytorium: " + patientLoadError.toStdString());
@@ -587,6 +644,7 @@ int main(int argc, char** argv)
     sensor::SerialCommunication serial;
     serial.setVerbose(false);
     LiveData live;
+    int selectedPatientIndex = -1;
     auto measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
     // Firmware calibration is reported in grams. The shared engine normalizes
     // it to kilograms; presentation and training convert kg to SI force (N).
@@ -603,6 +661,13 @@ int main(int argc, char** argv)
         ++live.validSampleCount;
         const double forceN = sample.value * 9.80665;
         if (!std::isfinite(forceN) || forceN < 0.0) return;
+        if (live.measurementSamples.size() < 100000) {
+            live.measurementSamples.append(QJsonObject{
+                {QStringLiteral("timestamp_ms"), static_cast<qint64>(sample.deviceTimestampMs)},
+                {QStringLiteral("force_n"), forceN},
+                {QStringLiteral("quality"), QString::fromLatin1(biofeedback::measurement::qualityName(sample.quality))}
+            });
+        }
         live.recentForceN.push_back(forceN);
         if (live.recentForceN.size() > 120) live.recentForceN.erase(live.recentForceN.begin());
         if (!live.trainingActive || live.trainingPaused || live.trainingResting) return;
@@ -679,10 +744,23 @@ int main(int argc, char** argv)
         case 10:
         case 13: active = selected; break;
         case KEY_LEFT:
-            if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort > 0) --selectedPort;
+            if (active == static_cast<std::size_t>(tui::Screen::Patients) && !patientIds.isEmpty()) {
+                selectedPatientIndex = selectedPatientIndex <= 0
+                    ? patientIds.size() - 1 : selectedPatientIndex - 1;
+                std::lock_guard<std::mutex> lock(live.mutex);
+                live.selectedPatientId = patientIds.at(selectedPatientIndex);
+            } else if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort > 0) {
+                --selectedPort;
+            }
             break;
         case KEY_RIGHT:
-            if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort + 1 < ports.size()) ++selectedPort;
+            if (active == static_cast<std::size_t>(tui::Screen::Patients) && !patientIds.isEmpty()) {
+                selectedPatientIndex = (selectedPatientIndex + 1) % patientIds.size();
+                std::lock_guard<std::mutex> lock(live.mutex);
+                live.selectedPatientId = patientIds.at(selectedPatientIndex);
+            } else if (active == static_cast<std::size_t>(tui::Screen::Devices) && selectedPort + 1 < ports.size()) {
+                ++selectedPort;
+            }
             break;
         case 'r':
         case 'R':
@@ -695,12 +773,22 @@ int main(int argc, char** argv)
         case 'C':
             if (active == static_cast<std::size_t>(tui::Screen::Devices) &&
                 !serial.isConnected() && selectedPort < ports.size()) {
-                if (serial.connect(ports[selectedPort], sensor::protocol::DefaultBaudRate)) serial.startAsyncReading();
+                if (serial.connect(ports[selectedPort], sensor::protocol::DefaultBaudRate)) {
+                    {
+                        std::lock_guard<std::mutex> lock(live.mutex);
+                        if (live.measurementSamples.isEmpty())
+                            live.measurementStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+                    }
+                    serial.startAsyncReading();
+                }
             }
             break;
         case 'd':
         case 'D':
-            if (active == static_cast<std::size_t>(tui::Screen::Devices) && serial.isConnected()) serial.disconnect();
+            if (active == static_cast<std::size_t>(tui::Screen::Devices) && serial.isConnected()) {
+                serial.disconnect();
+                saveMeasurementSession(live, *apiClient);
+            }
             break;
         case 's':
         case 'S':
@@ -716,10 +804,10 @@ int main(int argc, char** argv)
                         live.completedReps = 0;
                         live.currentSeries.clear();
                         live.sessionRepetitions.clear();
+                        live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
                         live.lastSeries = {};
                         live.trainingResting = false;
                         live.restRemaining = 0;
-                        live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
                         live.sessionNeedsSave = false;
                         live.sessionSaved = false;
                         live.sessionSaveAttempted = false;
@@ -854,9 +942,10 @@ int main(int argc, char** argv)
             live.sessionNeedsSave = !live.sessionRepetitions.empty();
         }
     }
+    serial.disconnect();
+    saveMeasurementSession(live, *apiClient);
     saveTrainingSession(live, *apiClient);
     endwin();
-    serial.disconnect();
     measurementEngine->unsubscribe(measurementToken);
     apiClient->logout();
     return EXIT_SUCCESS;

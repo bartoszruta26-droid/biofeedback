@@ -495,6 +495,11 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                         repositoryError == "RESOURCE_TOO_LARGE" ||
                         repositoryError == "INVALID_PATIENT_RECORD" ||
                         repositoryError == "DUPLICATE_PATIENT_REFERENCE" ||
+                        repositoryError == "INVALID_PATIENT_REFERENCE" ||
+                        repositoryError == "PATIENT_NOT_FOUND" ||
+                        repositoryError == "INVALID_TRAINING_SESSION_REFERENCE" ||
+                        repositoryError == "TRAINING_SESSION_NOT_FOUND" ||
+                        repositoryError == "PATIENT_TRAINING_SESSION_MISMATCH" ||
                         repositoryError == "UNSUPPORTED_COLLECTION";
                     sendJson(socket, invalid ? 400 : 503,
                         errorBody(invalid ? "INVALID_RESOURCE" : "RESOURCE_CREATE_FAILED",
@@ -556,13 +561,21 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 }
                 if (!m_resources->remove(collection, resourceId, expectedVersion, &repositoryError)) {
                     const bool missing = repositoryError == "RESOURCE_NOT_FOUND";
-                    const bool conflict = repositoryError == "VERSION_CONFLICT";
+                    const bool patientReferenced = repositoryError == "PATIENT_HAS_REFERENCES";
+                    const bool trainingSessionReferenced =
+                        repositoryError == "TRAINING_SESSION_HAS_RESULTS";
+                    const bool referenceConflict = patientReferenced || trainingSessionReferenced;
+                    const bool conflict = repositoryError == "VERSION_CONFLICT" || referenceConflict;
                     sendJson(socket, missing ? 404 : (conflict ? 409 : 400),
                         errorBody(missing ? "RESOURCE_NOT_FOUND" :
-                                  (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED"),
+                                  (patientReferenced ? "PATIENT_HAS_REFERENCES" :
+                                   (trainingSessionReferenced ? "TRAINING_SESSION_HAS_RESULTS" :
+                                    (conflict ? "VERSION_CONFLICT" : "RESOURCE_DELETE_FAILED"))),
                                   missing ? "Rekord nie istnieje." :
-                                  (conflict ? "Rekord został zmieniony przez innego klienta." :
-                                              "Nie można usunąć rekordu.")));
+                                  (patientReferenced ? "Pacjent ma powiązane rekordy kliniczne." :
+                                   (trainingSessionReferenced ? "Sesja treningowa ma powiązane wyniki." :
+                                    (conflict ? "Rekord został zmieniony przez innego klienta." :
+                                                "Nie można usunąć rekordu.")))));
                     return;
                 }
                 sendJson(socket, 200, R"({"ok":true})");

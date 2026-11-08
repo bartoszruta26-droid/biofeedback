@@ -274,6 +274,7 @@ private fun ResourceListModule(client: ApiClient?, title: String, collection: St
 private fun TrainingAndGamesModule(client: ApiClient?) {
     var trainingSessions by remember { mutableStateOf<org.json.JSONArray?>(null) }
     var trainingResults by remember { mutableStateOf<org.json.JSONArray?>(null) }
+    var gameSessions by remember { mutableStateOf<org.json.JSONArray?>(null) }
     var gameResults by remember { mutableStateOf<org.json.JSONArray?>(null) }
     var errorMessage by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
@@ -289,11 +290,15 @@ private fun TrainingAndGamesModule(client: ApiClient?) {
             errorMessage = ""
             try {
                 val loaded = withContext(Dispatchers.IO) {
-                    Triple(client.getTrainingSessions(), client.getTrainingResults(), client.getGameResults())
+                    listOf(
+                        client.getTrainingSessions(), client.getTrainingResults(),
+                        client.getGameSessions(), client.getGameResults()
+                    )
                 }
-                trainingSessions = loaded.first.optJSONArray("items")
-                trainingResults = loaded.second.optJSONArray("items")
-                gameResults = loaded.third.optJSONArray("items")
+                trainingSessions = loaded[0].optJSONArray("items")
+                trainingResults = loaded[1].optJSONArray("items")
+                gameSessions = loaded[2].optJSONArray("items")
+                gameResults = loaded[3].optJSONArray("items")
             } catch (error: Exception) {
                 errorMessage = error.message ?: "Nie można pobrać historii treningu."
             } finally {
@@ -327,6 +332,7 @@ private fun TrainingAndGamesModule(client: ApiClient?) {
         if (errorMessage.isNotBlank()) Text(errorMessage, color = Color(0xFFB42318), fontSize = 12.sp)
         section("Sesje treningowe", trainingSessions)
         section("Wyniki treningów", trainingResults)
+        section("Sesje gier", gameSessions)
         section("Wyniki gier", gameResults)
     }
 }

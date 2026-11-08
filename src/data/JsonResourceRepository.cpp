@@ -187,6 +187,55 @@ bool JsonResourceRepository::remove(const QString& collection, const QString& id
         setError(error, QStringLiteral("VERSION_CONFLICT"));
         return false;
     }
+    if (collection == QStringLiteral("training-sessions")) {
+        const QDir directory(collectionPath(QStringLiteral("training-results")));
+        if (directory.exists()) {
+            const QFileInfoList files = directory.entryInfoList(
+                QStringList{QStringLiteral("*.json")}, QDir::Files | QDir::Readable, QDir::Name);
+            for (const QFileInfo& fileInfo : files) {
+                const QString dependentId = fileInfo.completeBaseName();
+                if (!validId(dependentId)) continue;
+                QJsonObject dependent;
+                QString readError;
+                if (!readRecord(QStringLiteral("training-results"), dependentId,
+                                dependent, &readError)) {
+                    setError(error, readError);
+                    return false;
+                }
+                if (dependent.value(QStringLiteral("training_session_id")).toString().compare(
+                        id, Qt::CaseInsensitive) == 0) {
+                    setError(error, QStringLiteral("TRAINING_SESSION_HAS_RESULTS"));
+                    return false;
+                }
+            }
+        }
+    }
+    if (collection == QStringLiteral("patients")) {
+        for (const QString& dependentCollection : {
+                 QStringLiteral("measurements"), QStringLiteral("training-sessions"),
+                 QStringLiteral("training-results"), QStringLiteral("game-sessions"),
+                 QStringLiteral("game-results")}) {
+            const QDir directory(collectionPath(dependentCollection));
+            if (!directory.exists()) continue;
+            const QFileInfoList files = directory.entryInfoList(
+                QStringList{QStringLiteral("*.json")}, QDir::Files | QDir::Readable, QDir::Name);
+            for (const QFileInfo& fileInfo : files) {
+                const QString dependentId = fileInfo.completeBaseName();
+                if (!validId(dependentId)) continue;
+                QJsonObject dependent;
+                QString readError;
+                if (!readRecord(dependentCollection, dependentId, dependent, &readError)) {
+                    setError(error, readError);
+                    return false;
+                }
+                if (dependent.value(QStringLiteral("patient_id")).toString().compare(
+                        id, Qt::CaseInsensitive) == 0) {
+                    setError(error, QStringLiteral("PATIENT_HAS_REFERENCES"));
+                    return false;
+                }
+            }
+        }
+    }
     if (!QFile::remove(recordPath(collection, id))) {
         setError(error, QStringLiteral("RESOURCE_DELETE_FAILED"));
         return false;
@@ -198,34 +247,77 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
                                                      const QString& idToExclude,
                                                      const QJsonObject& payload,
                                                      QString* error) const {
-    if (collection != QStringLiteral("patients")) return true;
-    const QString reference = payload.value(QStringLiteral("pesel")).toString().trimmed();
-    const QString firstName = payload.value(QStringLiteral("firstName")).toString().trimmed();
-    const QString lastName = payload.value(QStringLiteral("lastName")).toString().trimmed();
-    if (reference.isEmpty() || reference.size() > 32 ||
-        firstName.isEmpty() || firstName.size() > 100 ||
-        lastName.isEmpty() || lastName.size() > 100) {
-        setError(error, QStringLiteral("INVALID_PATIENT_RECORD"));
-        return false;
-    }
-
-    const QDir directory(collectionPath(collection));
-    if (!directory.exists()) return true;
-    const QFileInfoList files = directory.entryInfoList(QStringList{QStringLiteral("*.json")},
-                                                         QDir::Files | QDir::Readable, QDir::Name);
-    for (const QFileInfo& fileInfo : files) {
-        const QString existingId = fileInfo.completeBaseName();
-        if (!validId(existingId) || existingId.compare(idToExclude, Qt::CaseInsensitive) == 0)
-            continue;
-        QJsonObject existing;
-        QString readError;
-        if (!readRecord(collection, existingId, existing, &readError)) {
-            setError(error, readError);
+    if (collection == QStringLiteral("patients")) {
+        const QString reference = payload.value(QStringLiteral("pesel")).toString().trimmed();
+        const QString firstName = payload.value(QStringLiteral("firstName")).toString().trimmed();
+        const QString lastName = payload.value(QStringLiteral("lastName")).toString().trimmed();
+        if (reference.isEmpty() || reference.size() > 32 ||
+            firstName.isEmpty() || firstName.size() > 100 ||
+            lastName.isEmpty() || lastName.size() > 100) {
+            setError(error, QStringLiteral("INVALID_PATIENT_RECORD"));
             return false;
         }
-        if (existing.value(QStringLiteral("pesel")).toString().trimmed() == reference) {
-            setError(error, QStringLiteral("DUPLICATE_PATIENT_REFERENCE"));
+
+        const QDir directory(collectionPath(collection));
+        if (!directory.exists()) return true;
+        const QFileInfoList files = directory.entryInfoList(QStringList{QStringLiteral("*.json")},
+                                                             QDir::Files | QDir::Readable, QDir::Name);
+        for (const QFileInfo& fileInfo : files) {
+            const QString existingId = fileInfo.completeBaseName();
+            if (!validId(existingId) || existingId.compare(idToExclude, Qt::CaseInsensitive) == 0)
+                continue;
+            QJsonObject existing;
+            QString readError;
+            if (!readRecord(collection, existingId, existing, &readError)) {
+                setError(error, readError);
+                return false;
+            }
+            if (existing.value(QStringLiteral("pesel")).toString().trimmed() == reference) {
+                setError(error, QStringLiteral("DUPLICATE_PATIENT_REFERENCE"));
+                return false;
+            }
+        }
+        return true;
+    }
+
+    const QString patientId = payload.value(QStringLiteral("patient_id")).toString().trimmed();
+    if (!patientId.isEmpty()) {
+        if (!validId(patientId)) {
+            setError(error, QStringLiteral("INVALID_PATIENT_REFERENCE"));
             return false;
+        }
+        QJsonObject patient;
+        QString patientError;
+        if (!readRecord(QStringLiteral("patients"), patientId, patient, &patientError)) {
+            setError(error, patientError == QStringLiteral("RESOURCE_NOT_FOUND")
+                ? QStringLiteral("PATIENT_NOT_FOUND") : patientError);
+            return false;
+        }
+    }
+
+    if (collection == QStringLiteral("training-results")) {
+        const QString trainingSessionId =
+            payload.value(QStringLiteral("training_session_id")).toString().trimmed();
+        if (!trainingSessionId.isEmpty()) {
+            if (!validId(trainingSessionId)) {
+                setError(error, QStringLiteral("INVALID_TRAINING_SESSION_REFERENCE"));
+                return false;
+            }
+            QJsonObject trainingSession;
+            QString sessionError;
+            if (!readRecord(QStringLiteral("training-sessions"), trainingSessionId,
+                            trainingSession, &sessionError)) {
+                setError(error, sessionError == QStringLiteral("RESOURCE_NOT_FOUND")
+                    ? QStringLiteral("TRAINING_SESSION_NOT_FOUND") : sessionError);
+                return false;
+            }
+            const QString sessionPatientId =
+                trainingSession.value(QStringLiteral("patient_id")).toString();
+            if (!patientId.isEmpty() && !sessionPatientId.isEmpty() &&
+                patientId.compare(sessionPatientId, Qt::CaseInsensitive) != 0) {
+                setError(error, QStringLiteral("PATIENT_TRAINING_SESSION_MISMATCH"));
+                return false;
+            }
         }
     }
     return true;

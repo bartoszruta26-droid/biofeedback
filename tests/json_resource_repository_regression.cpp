@@ -29,7 +29,42 @@ int main(int argc, char** argv) {
     const QString id = created.value(QStringLiteral("id")).toString();
     assert(!id.isEmpty());
     assert(created.value(QStringLiteral("version")).toInt() == 1);
-    assert(created.value(QStringLiteral("pesel")).toString() == QStringLiteral("90010112345"));
+    assert(created.value(QStringLiteral("pesel")).toString() == QStringLiteral("TEST-PATIENT-001"));
+
+    QJsonObject validMeasurement{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("sample_count"), 1},
+        {QStringLiteral("source_client"), QStringLiteral("contract-test")}
+    };
+    QJsonObject measurement;
+    assert(repository.create(QStringLiteral("measurements"), validMeasurement, measurement, &error));
+    assert(measurement.value(QStringLiteral("patient_id")).toString() == id);
+
+    QJsonObject trainingSessionPayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("exercise_name"), QStringLiteral("Contract test")}
+    };
+    QJsonObject trainingSession;
+    assert(repository.create(QStringLiteral("training-sessions"), trainingSessionPayload,
+                             trainingSession, &error));
+    const QString trainingSessionId = trainingSession.value(QStringLiteral("id")).toString();
+
+    QJsonObject validResult{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("training_session_id"), trainingSessionId},
+        {QStringLiteral("completed_repetitions"), 1}
+    };
+    QJsonObject storedResult;
+    assert(repository.create(QStringLiteral("training-results"), validResult, storedResult, &error));
+    assert(storedResult.value(QStringLiteral("training_session_id")).toString() == trainingSessionId);
+
+
+    QJsonObject orphanMeasurement{{QStringLiteral("patient_id"),
+        QStringLiteral("00000000-0000-4000-8000-000000000001")}};
+    QJsonObject rejectedMeasurement;
+    assert(!repository.create(QStringLiteral("measurements"), orphanMeasurement,
+                              rejectedMeasurement, &error));
+    assert(error == QStringLiteral("PATIENT_NOT_FOUND"));
 
     const QString recordPath = QDir(root).filePath(
         QStringLiteral("patients/") + id + QStringLiteral(".json"));
@@ -66,6 +101,16 @@ int main(int argc, char** argv) {
     assert(updated.value(QStringLiteral("version")).toInt() == 2);
     assert(!restarted.update(QStringLiteral("patients"), id, 1, updatePayload, updated, &error));
     assert(error == QStringLiteral("VERSION_CONFLICT"));
+
+    assert(!restarted.remove(QStringLiteral("patients"), id, 2, &error));
+    assert(error == QStringLiteral("PATIENT_HAS_REFERENCES"));
+    assert(!restarted.remove(QStringLiteral("training-sessions"), trainingSessionId, 1, &error));
+    assert(error == QStringLiteral("TRAINING_SESSION_HAS_RESULTS"));
+    assert(restarted.remove(QStringLiteral("training-results"),
+                            storedResult.value(QStringLiteral("id")).toString(), 1, &error));
+    assert(restarted.remove(QStringLiteral("training-sessions"), trainingSessionId, 1, &error));
+    assert(restarted.remove(QStringLiteral("measurements"),
+                            measurement.value(QStringLiteral("id")).toString(), 1, &error));
 
     assert(!restarted.get(QStringLiteral("../patients"), id, loaded, &error));
     assert(error == QStringLiteral("UNSUPPORTED_COLLECTION"));
