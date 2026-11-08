@@ -23,6 +23,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QFile>
+#include <QJsonObject>
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
@@ -199,6 +200,8 @@ public:
      * @brief Ustawia ID pacjenta dla bieżącej sesji
      */
     void setPatientId(const QString& id);
+    QString currentPatientPesel() const { return m_patientId; }
+    QJsonObject buildSharedSessionRecord(const QString& patientUuid) const;
     
     /**
      * @brief Ustawia siłę docelową (np. 80% MVC)
