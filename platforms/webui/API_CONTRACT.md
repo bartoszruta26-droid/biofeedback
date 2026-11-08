@@ -131,10 +131,13 @@ Nie wystawiać surowego serwera HTTP poza loopback.
 
 **Ograniczenia pozostałe:** MariaDB adapter nie jest zaimplementowany;
 wybranie `storage.patient_backend=mariadb` powoduje fail-closed.
-Kolekcje pomiarów, treningów i gier mają już wspólny kontrakt CRUD i magazyn
-plikowy, ale producenci danych w Desktop/TUI nie są jeszcze w pełni przepięci
-na zapis serwerowy. TUI nie jest jeszcze klientem API. WebSocket/SSE i
-strumień próbek czasu rzeczywistego pozostają do wdrożenia. Nie należy
+Desktop zapisuje do repozytorium sesje pomiarowe z próbkami, sesje treningowe,
+wyniki ćwiczeń i wyniki gier. TUI loguje się przez API, odczytuje pacjentów
+i zapisuje sesje treningowe, ale nie wiąże ich jeszcze z pacjentem oraz nie
+archiwizuje pomiarów i gier. WebUI ma klienta CRUD, lecz jego ekrany nie są
+jeszcze pełnym panelem pracy na tych zasobach. Android obsługuje CRUD kart
+pacjentów; pozostałe ekrany pozostają podglądowe. WebSocket/SSE i strumień
+próbek czasu rzeczywistego pozostają do wdrożenia. Nie należy
 traktować tego API jako gotowego systemu dokumentacji klinicznej.
 
 Uruchomienie:
