@@ -75,7 +75,7 @@ add_executable(api_client_regression
 set_target_properties(api_client_regression PROPERTIES AUTOMOC ON)
 target_include_directories(api_client_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(api_client_regression PRIVATE
-    biofeedback_api_client biofeedback_data_repository biofeedback_core Qt5::Core Qt5::Network
+    biofeedback_api_client biofeedback_data_repository biofeedback_core biofeedback_application_services Qt5::Core Qt5::Network
 )
 add_test(NAME api_client_regression COMMAND api_client_regression)
 set_tests_properties(api_client_regression PROPERTIES TIMEOUT 20)
@@ -140,6 +140,7 @@ add_test(NAME biomechanical_parameter_availability_regression
 # Application-facing lifecycle boundary for the shared measurement pipeline.
 add_library(biofeedback_application_services STATIC
     src/application/MeasurementService.cpp
+    src/application/AcquisitionService.cpp
     src/application/DeviceService.cpp
     src/application/ApplicationServices.cpp
 )
@@ -149,6 +150,10 @@ target_link_libraries(biofeedback_application_services PUBLIC biofeedback_measur
 add_executable(measurement_service_regression tests/measurement_service_regression.cpp)
 target_link_libraries(measurement_service_regression PRIVATE biofeedback_application_services)
 add_test(NAME measurement_service_regression COMMAND measurement_service_regression)
+
+add_executable(acquisition_service_regression tests/acquisition_service_regression.cpp)
+target_link_libraries(acquisition_service_regression PRIVATE biofeedback_application_services)
+add_test(NAME acquisition_service_regression COMMAND acquisition_service_regression)
 
 add_executable(device_service_regression tests/device_service_regression.cpp)
 target_link_libraries(device_service_regression PRIVATE biofeedback_application_services)
@@ -163,7 +168,7 @@ add_executable(biofeedback_api
 )
 set_target_properties(biofeedback_api PROPERTIES AUTOMOC ON)
 target_include_directories(biofeedback_api PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core biofeedback_data_repository)
+target_link_libraries(biofeedback_api PRIVATE Qt5::Core Qt5::Network biofeedback_core biofeedback_data_repository biofeedback_application_services)
 
 # HTTP API authentication and bearer-session lifecycle regression.
 add_executable(api_auth_regression
@@ -173,7 +178,7 @@ add_executable(api_auth_regression
 )
 set_target_properties(api_auth_regression PROPERTIES AUTOMOC ON)
 target_include_directories(api_auth_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(api_auth_regression PRIVATE biofeedback_core biofeedback_data_repository Qt5::Core Qt5::Network)
+target_link_libraries(api_auth_regression PRIVATE biofeedback_core biofeedback_data_repository biofeedback_application_services Qt5::Core Qt5::Network)
 add_test(NAME api_auth_regression COMMAND api_auth_regression)
 set_tests_properties(api_auth_regression PROPERTIES TIMEOUT 20)
 
@@ -497,6 +502,7 @@ if(Qt5_FOUND)
         biofeedback_measurement
         biofeedback_training
         biofeedback_sensor_protocol
+        biofeedback_application_services
         Qt5::Core
         Qt5::Network
         Qt5::Widgets

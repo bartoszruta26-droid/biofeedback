@@ -1,4 +1,8 @@
 #include "api/HttpApiServer.hpp"
+#include "application/AcquisitionService.hpp"
+#include "application/DeviceService.hpp"
+#include "application/MeasurementService.hpp"
+#include "measurement/MeasurementEngine.hpp"
 #include "core/Authentication.hpp"
 #include "data/JsonResourceRepository.hpp"
 
@@ -14,6 +18,13 @@
 #include <iostream>
 
 namespace {
+class ConnectedTestDevice final : public biofeedback::application::DeviceAdapter {
+public:
+    bool connect(std::string&) override { connected = true; return true; }
+    void disconnect() noexcept override { connected = false; }
+    bool isConnected() const noexcept override { return connected; }
+    bool connected{true};
+};
 QByteArray transact(quint16 port, const QByteArray& request) {
     QTcpSocket socket;
     socket.connectToHost(QHostAddress::LocalHost, port);
@@ -75,6 +86,13 @@ int main(int argc, char** argv) {
         directory.filePath("shared-data"), encryptionKey, true);
     assert(repository->isReady());
     biofeedback::api::HttpApiServer server(usersPath, repository);
+    auto measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
+    auto measurementService = std::make_shared<biofeedback::application::MeasurementService>(measurementEngine);
+    auto acquisitionService = std::make_shared<biofeedback::application::AcquisitionService>(measurementService);
+    server.setAcquisitionService(acquisitionService);
+    auto deviceService = std::make_shared<biofeedback::application::DeviceService>();
+    assert(deviceService->registerDevice(biofeedback::application::DeviceDescriptor{"sensor-api-1", "API test sensor", "test"}, std::make_shared<ConnectedTestDevice>()));
+    server.setDeviceService(deviceService);
     assert(server.listen(QHostAddress::LocalHost, 0));
     const quint16 port = server.serverPort();
 
@@ -116,6 +134,10 @@ int main(int argc, char** argv) {
         request += jsonBody;
         return transact(port, request);
     };
+
+    const QByteArray unauthenticatedAcquisition = transact(
+        port, "GET /api/v1/acquisition/session HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
+    assert(statusCode(unauthenticatedAcquisition) == 401);
 
     const QByteArray unauthenticatedPatients = transact(
         port, "GET /api/v1/patients HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
@@ -160,11 +182,40 @@ int main(int argc, char** argv) {
     assert(statusCode(resourceRequest(
         "PUT", ("/api/v1/patients/" + patientId).toUtf8(), updatePayload)) == 409);
 
-    const QByteArray deletePayload = QJsonDocument(QJsonObject{
-        {"expected_version", 2}
-    }).toJson(QJsonDocument::Compact);
-    assert(statusCode(resourceRequest(
-        "DELETE", ("/api/v1/patients/" + patientId).toUtf8(), deletePayload)) == 200);
+    const QByteArray missingPatientAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
+        QJsonDocument(QJsonObject{{"id", "missing-patient-session"}, {"patient_id", "00000000-0000-4000-8000-000000000001"},
+                                  {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}}).toJson(QJsonDocument::Compact));
+    assert(statusCode(missingPatientAcquisition) == 422);
+    const QByteArray missingDeviceAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
+        QJsonDocument(QJsonObject{{"id", "missing-device-session"}, {"patient_id", patientId},
+                                  {"device_id", "sensor-does-not-exist"}, {"protocol_id", "strength"}}).toJson(QJsonDocument::Compact));
+    assert(statusCode(missingDeviceAcquisition) == 422);
+    const QByteArray startAcquisition = resourceRequest("POST", "/api/v1/acquisition/session",
+        QJsonDocument(QJsonObject{{"id", "api-session-1"}, {"patient_id", patientId},
+                                  {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}}).toJson(QJsonDocument::Compact));
+    assert(statusCode(startAcquisition) == 201);
+    const QByteArray activeAcquisition = resourceRequest("GET", "/api/v1/acquisition/session");
+    assert(statusCode(activeAcquisition) == 200);
+    assert(QJsonDocument::fromJson(responseBody(activeAcquisition)).object()
+               .value("id").toString() == "api-session-1");
+    assert(statusCode(resourceRequest("POST", "/api/v1/acquisition/session",
+        QJsonDocument(QJsonObject{
+            {"id", "api-session-2"}, {"patient_id", patientId},
+            {"device_id", "sensor-api-1"}, {"protocol_id", "strength"}
+        }).toJson(QJsonDocument::Compact))) == 409);
+    const QByteArray sampleHistory = resourceRequest("GET", "/api/v1/acquisition/samples");
+    assert(statusCode(sampleHistory) == 200);
+    assert(QJsonDocument::fromJson(responseBody(sampleHistory)).object()
+               .value("count").toInt() == 0);
+    assert(statusCode(resourceRequest("DELETE", "/api/v1/acquisition/session",
+        QJsonDocument(QJsonObject{{"id", "api-session-1"}}).toJson(QJsonDocument::Compact))) == 200);
+    const QByteArray inactiveAcquisition = resourceRequest("GET", "/api/v1/acquisition/session");
+    assert(statusCode(inactiveAcquisition) == 200);
+    assert(!QJsonDocument::fromJson(responseBody(inactiveAcquisition)).object()
+                .value("active").toBool());
+    const QByteArray deletePayload = QJsonDocument(QJsonObject{{"expected_version", 2}}).toJson(QJsonDocument::Compact);
+    assert(statusCode(resourceRequest("DELETE", ("/api/v1/patients/" + patientId).toUtf8(), deletePayload)) == 200);
+
     const QByteArray meResponse = transact(port, meRequest);
     assert(statusCode(meResponse) == 200);
     const QJsonObject me = QJsonDocument::fromJson(responseBody(meResponse)).object();

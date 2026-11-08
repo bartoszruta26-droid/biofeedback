@@ -1,6 +1,10 @@
 #include "api/HttpApiServer.hpp"
 #include "core/RuntimePaths.hpp"
 #include "data/JsonResourceRepository.hpp"
+#include "application/AcquisitionService.hpp"
+#include "application/MeasurementService.hpp"
+#include "application/DeviceService.hpp"
+#include "measurement/MeasurementEngine.hpp"
 
 #include <QCoreApplication>
 #include <QCommandLineParser>
@@ -75,6 +79,12 @@ int main(int argc, char* argv[]) {
         biofeedback::runtime::ensureUserConfigFile(QStringLiteral("users.json")),
         resources,
         encryptionEnabled ? encryptionKey : QString());
+    auto measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
+    auto measurementService = std::make_shared<biofeedback::application::MeasurementService>(measurementEngine);
+    auto acquisitionService = std::make_shared<biofeedback::application::AcquisitionService>(measurementService);
+    server.setAcquisitionService(acquisitionService);
+    server.setDeviceService(std::make_shared<biofeedback::application::DeviceService>());
+
     if (!server.listen(QHostAddress::LocalHost, static_cast<quint16>(portValue))) {
         QTextStream(stderr) << "Cannot listen on loopback TCP port " << portValue << ".\n";
         return 1;
