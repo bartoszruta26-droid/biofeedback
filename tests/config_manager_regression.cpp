@@ -33,10 +33,6 @@ int main(int argc, char** argv)
     assert(reader.getInt("devices.pico.uart_tx_pin", -1) == sensor::protocol::PicoUartTxPin);
     assert(reader.getInt("devices.pico.uart_rx_pin", -1) == sensor::protocol::PicoUartRxPin);
     assert(reader.getInt("devices.pico.protocol_version", 0) == sensor::protocol::ControlProtocolVersion);
-    assert(!reader.getBool("devices.pico.actuators_enabled", true));
-    assert(!reader.getBool("devices.pico.effectors.ir_pwm.enabled", true));
-    assert(!reader.getBool("devices.pico.effectors.electrodes.enabled", true));
-    assert(!reader.getBool("devices.pico.effectors.antenna.enabled", true));
     assert(!reader.getBool("logging.console_output", true));
     assert(!reader.getBool("logging.diagnostics_enabled", true));
     assert(reader.getInt("encryption.iterations", -1) == -1);
