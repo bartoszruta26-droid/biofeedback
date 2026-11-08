@@ -473,7 +473,7 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
                 for (const auto& sample : history) {
                     samples.append(QJsonObject{
                         {"sequence", static_cast<qint64>(sample.sequence)},
-                        {"timestamp_unix_ms", sample.timestampUnixMs},
+                        {"timestamp_unix_ms", QJsonValue::fromVariant(QVariant::fromValue<qint64>(static_cast<qint64>(sample.timestampUnixMs)))},
                         {"device_timestamp_ms", static_cast<qint64>(sample.deviceTimestampMs)},
                         {"raw_value", sample.rawValue},
                         {"value", sample.value},
