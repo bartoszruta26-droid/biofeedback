@@ -18,6 +18,8 @@ class ArcherGame final : public GameEngine
 public:
     explicit ArcherGame(QWidget *parent = nullptr);
     QString gameName() const override;
+    double targetSpeed() const { return m_targetSpeed; }
+    int activeArrowCount() const;
 
 protected:
     void initialize() override;
