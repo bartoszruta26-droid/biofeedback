@@ -53,6 +53,7 @@ bool HttpApiClient::supportedCollection(const QString& collection) {
 bool HttpApiClient::request(const QByteArray& method, const QString& path,
                             const QJsonObject* body, bool authenticated,
                             QJsonObject& response, QString* error) {
+    if (error) error->clear();
     if (authenticated && m_accessToken.isEmpty()) {
         setError(error, QStringLiteral("AUTHENTICATION_REQUIRED"));
         return false;
@@ -130,6 +131,7 @@ bool HttpApiClient::request(const QByteArray& method, const QString& path,
 }
 
 bool HttpApiClient::login(const QString& username, const QString& password, QString* error) {
+    if (error) error->clear();
     m_accessToken.fill(QChar(0));
     m_accessToken.clear();
     QJsonObject response;
@@ -165,6 +167,7 @@ void HttpApiClient::logout() {
 }
 
 bool HttpApiClient::listResources(const QString& collection, QJsonArray& items, QString* error) {
+    if (error) error->clear();
     if (!supportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return false; }
     QJsonObject response;
     if (!request("GET", QStringLiteral("/api/v1/") + collection, nullptr, true, response, error)) return false;
@@ -178,6 +181,7 @@ bool HttpApiClient::listResources(const QString& collection, QJsonArray& items, 
 
 bool HttpApiClient::getResource(const QString& collection, const QString& id,
                                 QJsonObject& record, QString* error) {
+    if (error) error->clear();
     if (!supportedCollection(collection) || id.isEmpty()) {
         setError(error, QStringLiteral("INVALID_RESOURCE_PATH")); return false;
     }
@@ -187,6 +191,7 @@ bool HttpApiClient::getResource(const QString& collection, const QString& id,
 
 bool HttpApiClient::createResource(const QString& collection, const QJsonObject& payload,
                                    QJsonObject& created, QString* error) {
+    if (error) error->clear();
     if (!supportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return false; }
     return request("POST", QStringLiteral("/api/v1/") + collection, &payload, true, created, error);
 }
@@ -194,6 +199,7 @@ bool HttpApiClient::createResource(const QString& collection, const QJsonObject&
 bool HttpApiClient::updateResource(const QString& collection, const QString& id,
                                    int expectedVersion, const QJsonObject& payload,
                                    QJsonObject& updated, QString* error) {
+    if (error) error->clear();
     if (!supportedCollection(collection) || id.isEmpty() || expectedVersion < 1) {
         setError(error, QStringLiteral("INVALID_RESOURCE_UPDATE")); return false;
     }
@@ -207,6 +213,7 @@ bool HttpApiClient::updateResource(const QString& collection, const QString& id,
 
 bool HttpApiClient::deleteResource(const QString& collection, const QString& id,
                                    int expectedVersion, QString* error) {
+    if (error) error->clear();
     if (!supportedCollection(collection) || id.isEmpty() || expectedVersion < 1) {
         setError(error, QStringLiteral("INVALID_RESOURCE_DELETE")); return false;
     }
