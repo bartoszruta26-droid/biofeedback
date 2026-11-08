@@ -1,7 +1,12 @@
 #include "application/AcquisitionService.hpp"
 
 #include <cassert>
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
+#include <thread>
 #include <string>
 
 int main() {
@@ -47,9 +52,44 @@ int main() {
     assert(acquisition.ingest("hx711-1", input, sample));
     assert(sample.isValid());
 
-    assert(!acquisition.stopSession("wrong-session", error));
-    assert(error == "ACTIVE_SESSION_NOT_FOUND");
-    assert(acquisition.stopSession("session-1", error));
+    // stopSession must wait for an ingest already admitted to the pipeline.
+    std::mutex callbackMutex;
+    std::condition_variable callbackCondition;
+    bool callbackEntered = false;
+    bool releaseCallback = false;
+    measurementService->subscribe([&](const measurement::MeasurementSample&) {
+        std::unique_lock<std::mutex> lock(callbackMutex);
+        callbackEntered = true;
+        callbackCondition.notify_all();
+        callbackCondition.wait(lock, [&]() { return releaseCallback; });
+    });
+    std::thread ingestThread([&]() {
+        measurement::MeasurementSample concurrentSample;
+        assert(acquisition.ingest("hx711-1", input, concurrentSample));
+    });
+    {
+        std::unique_lock<std::mutex> lock(callbackMutex);
+        callbackCondition.wait(lock, [&]() { return callbackEntered; });
+    }
+    std::atomic<bool> stopReturned{false};
+    std::thread stopThread([&]() {
+        std::string stopError;
+        assert(acquisition.stopSession("session-1", stopError));
+        stopReturned.store(true, std::memory_order_release);
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    assert(!stopReturned.load(std::memory_order_acquire));
+    {
+        std::lock_guard<std::mutex> lock(callbackMutex);
+        releaseCallback = true;
+    }
+    callbackCondition.notify_all();
+    ingestThread.join();
+    stopThread.join();
+    assert(stopReturned.load(std::memory_order_acquire));
+
+    assert(acquisition.startSession(competing, error)); // session can be restarted after stop
+    assert(acquisition.stopSession("session-2", error));
     assert(!measurementService->isRunning());
     assert(!acquisition.activeSession(active));
     assert(!acquisition.ingest("hx711-1", input, sample));
