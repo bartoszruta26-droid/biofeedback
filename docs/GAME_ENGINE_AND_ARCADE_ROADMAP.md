@@ -63,11 +63,15 @@
 - [x] Galaga: kolizje pocisków sprawdzają cały przebyty prostokąt (swept collision), aby szybkie pociski nie przenikały przez przeciwników ani statek między klatkami.
 - [x] Testy zmiany rozmiaru Galaga i Car Race z aktywnymi aktorami/przeszkodami.
 - [x] Car Race: test scenariuszowy potwierdza utratę życia po kolizji z pierwszą przeszkodą na deterministycznie wybranym pasie oraz odtworzenie trzech żyć i pustej listy przeszkód przez reset; klasa udostępnia wyłącznie do odczytu liczbę pozostałych żyć i przeszkód na potrzeby diagnostyki/testów.
-- [ ] Car Race: dodano scenariusz trzech kolejnych kolizji na pasach środkowym, lewym i prawym, który ma potwierdzić zakończenie gry po utracie trzeciego życia; oczekuje na CI.
+- [x] Car Race: scenariusz trzech kolejnych kolizji na pasach środkowym, lewym i prawym potwierdza utratę trzech żyć i zatrzymanie gry po trzeciej kolizji; CI dla `98595bd8a3dd55ad0a4f2a267bac49f403cf044a` zakończyło się powodzeniem.
 - [x] Galaga: testuje początkową liczbę żyć, pierwszą falę (24 przeciwników), zachowanie gry po aktywnej rozgrywce i odtworzenie stanu początkowego przez reset.
 - [x] Archer: test potwierdza trafienie i wzrost prędkości celu (narastanie trudności), a osobny scenariusz pudła sprawdza usunięcie nieaktywnej strzały bez naliczenia punktów.
-- [ ] Scorched Earth: test stanu początkowego i resetu jest obecny; scenariusz trafienia czołgu wymaga ponownej walidacji CI. Poprzedni przebieg wykazał, że tor 38,5° mijał rozszerzony obszar kolizji, a zmiana rozmiaru w trakcie lotu zmieniała warunki fizyki. Test skorygowano do 40° i przeniesiono zmianę rozmiaru za rozstrzygnięcie strzału. Bezpośrednie testy przejścia rundy po zniszczeniu czołgu i regeneracji pozostają do dopisania.
+- [x] Scorched Earth: test stanu początkowego, resetu i rzeczywistego trafienia czołgu; CI dla `98595bd8a3dd55ad0a4f2a267bac49f403cf044a` zakończyło się powodzeniem. Poprzedni przebieg wykazał, że tor 38,5° mijał rozszerzony obszar kolizji, a zmiana rozmiaru w trakcie lotu zmieniała warunki fizyki. Test skorygowano do 40° i przeniesiono zmianę rozmiaru za rozstrzygnięcie strzału. Bezpośrednie testy przejścia rundy po zniszczeniu czołgu i regeneracji pozostają do dopisania.
 - [x] Testy regresyjne zmiany rozmiaru podczas aktywnej rozgrywki Archer i Scorched Earth; Car Race ma już test małego widoku podczas gry.
-- [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier.
+- [ ] Galaga: deterministyczny test utraty życia od pocisku wroga, ochrony po trafieniu i blokady wielokrotnej utraty życia w oknie ochronnym.
+- [ ] Scorched Earth: bezpośrednie testy przejścia rundy po zniszczeniu czołgu, przywrócenia zdrowia przeciwnika i leczenia gracza.
+- [ ] Dalszy audyt mechaniki istniejących gier (Arkanoid, Pong, Flappy Bird i Mario), w tym kolizji i zachowania przy zmianie rozmiaru.
+- [x] CI dla commitu `98595bd8a3dd55ad0a4f2a267bac49f403cf044a`: 6/6 workflow zakończonych powodzeniem (Linux desktop GUI build, security regression i cztery polityki serial).
+- [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
