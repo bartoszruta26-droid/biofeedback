@@ -312,9 +312,9 @@ void processSerialCommand() {
                     // Parse the entire numeric field and reject NaN/Inf/trailing text.
                     char *end_ptr = nullptr;
                     const double parsed_weight = strtod(buffer + 4, &end_ptr);
-                    while (end_ptr && (*end_ptr == ' ' || *end_ptr == '\\t')) ++end_ptr;
+                    while (end_ptr && (*end_ptr == ' ' || *end_ptr == '\t')) ++end_ptr;
                     const float known_weight = static_cast<float>(parsed_weight);
-                    if (end_ptr != buffer + 4 && end_ptr && *end_ptr == '\\0' &&
+                    if (end_ptr != buffer + 4 && end_ptr && *end_ptr == '\0' &&
                         isfinite(parsed_weight) && parsed_weight > 0.0 &&
                         isfinite(known_weight) && known_weight > 0.0f) {
                         const int32_t raw_value = current_weight - tare_offset;
