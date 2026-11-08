@@ -4,7 +4,8 @@
 #include <QTextStream>
 int main(int argc, char* argv[]) {
     QCoreApplication app(argc, argv);
-    QCoreApplication::setApplicationName("biofeedback_api");
+    QCoreApplication::setOrganizationName("Biofeedback");
+    QCoreApplication::setApplicationName("Biofeedback");
     QCoreApplication::setApplicationVersion("0.2.0");
     QCommandLineParser parser;
     parser.setApplicationDescription("Loopback HTTP API with authentication for Biofeedback");
