@@ -1,0 +1,57 @@
+name: pico-firmware-build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firmware/pico/**'
+      - 'tests/pico_firmware_safety_regression.py'
+      - '.github/workflows/pico-firmware.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'firmware/pico/**'
+      - 'tests/pico_firmware_safety_regression.py'
+      - '.github/workflows/pico-firmware.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pico-firmware:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout application
+        uses: actions/checkout@v4
+      - name: Checkout Raspberry Pi Pico SDK
+        uses: actions/checkout@v4
+        with:
+          repository: raspberrypi/pico-sdk
+          ref: 2.1.1
+          path: pico-sdk
+          submodules: recursive
+      - name: Install ARM toolchain and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+      - name: Check fail-closed firmware invariants
+        run: python3 tests/pico_firmware_safety_regression.py
+      - name: Configure Pico firmware
+        env:
+          PICO_SDK_PATH: ${{ github.workspace }}/pico-sdk
+        run: cmake -S firmware/pico -B build/pico -G Ninja -DPICO_BOARD=pico
+      - name: Build Pico firmware
+        run: cmake --build build/pico --parallel 2
+      - name: Verify firmware artifacts
+        run: |
+          test -s build/pico/biofeedback_pico.elf
+          test -s build/pico/biofeedback_pico.uf2
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: biofeedback-pico-firmware
+          path: |
+            build/pico/biofeedback_pico.elf
+            build/pico/biofeedback_pico.uf2
+          if-no-files-found: error
