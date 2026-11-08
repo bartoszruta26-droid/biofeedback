@@ -30,8 +30,8 @@
 #include <math.h>
 
 // Pin definitions
-#define HX711_DT_PIN  2   // Data pin
-#define HX711_SCK_PIN 3   // Clock pin
+#define HX711_DT_PIN  2   // Data pin (canonical Nano pin map)
+#define HX711_SCK_PIN 3   // Clock pin (canonical Nano pin map)
 
 // Number of samples for averaging (1 sample for 80Hz output)
 #define HX711_SAMPLES 1
