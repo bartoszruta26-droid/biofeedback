@@ -71,13 +71,15 @@ bool isTokenCharacter(char c) {
 HttpApiServer::HttpApiServer(const QString& usersFilePath, QObject* parent)
     : HttpApiServer(usersFilePath,
                     std::shared_ptr<biofeedback::data::JsonResourceRepository>(),
-                    parent) {}
+                    QString(), parent) {}
 
 HttpApiServer::HttpApiServer(
     const QString& usersFilePath,
     std::shared_ptr<biofeedback::data::JsonResourceRepository> resources,
+    const QString& authenticationEncryptionKey,
     QObject* parent)
-    : QObject(parent), m_usersFilePath(usersFilePath), m_resources(std::move(resources)) {
+    : QObject(parent), m_usersFilePath(usersFilePath), m_resources(std::move(resources)),
+      m_authenticationEncryptionKey(authenticationEncryptionKey) {
     connect(&m_server, &QTcpServer::newConnection, this, [this]() {
         while (m_server.hasPendingConnections()) {
             QTcpSocket* socket = m_server.nextPendingConnection();
@@ -320,6 +322,9 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             }
 
             auto authentication = std::make_shared<biofeedback::Authentication>(usersPath.toStdString());
+            if (!m_authenticationEncryptionKey.isEmpty()) {
+                authentication->setFileEncryption(true, m_authenticationEncryptionKey.toStdString());
+            }
             if (!authentication->loadUsers()) {
                 sendJson(socket, 503, errorBody("AUTH_STORE_UNAVAILABLE", "Nie można odczytać magazynu kont."));
                 return;
