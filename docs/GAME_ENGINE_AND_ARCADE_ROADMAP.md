@@ -62,6 +62,9 @@
 - [x] Galaga: czasowa ochrona po trafieniu, czyszczenie wrogich pocisków bez unieważniania iteracji oraz pojedyncza utrata życia przy zejściu formacji; fala jest odtwarzana dopiero po rzeczywistej utracie życia.
 - [x] Testy zmiany rozmiaru Galaga i Car Race z aktywnymi aktorami/przeszkodami.
 - [x] Car Race: test scenariuszowy potwierdza utratę życia po kolizji z pierwszą przeszkodą na deterministycznie wybranym pasie; klasa udostępnia wyłącznie do odczytu liczbę pozostałych żyć i przeszkód na potrzeby diagnostyki/testów.
+- [x] Galaga: testuje początkową liczbę żyć, pierwszą falę (24 przeciwników), zachowanie gry po aktywnej rozgrywce i odtworzenie stanu początkowego przez reset.
+- [x] Archer: test potwierdza, że trafienie zwiększa prędkość celu, a więc uruchamia mechanizm narastania trudności.
+- [x] Scorched Earth: test potwierdza stan początkowy zdrowia/rundy, istnienie terenu, ciągłość sesji po strzale oraz odtworzenie zdrowia i rundy przez reset. Bezpośrednie testy trafień czołgów, zmiany rund i regeneracji pozostają do dopisania.
 - [x] Testy regresyjne zmiany rozmiaru podczas aktywnej rozgrywki Archer i Scorched Earth; Car Race ma już test małego widoku podczas gry.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier.
 
