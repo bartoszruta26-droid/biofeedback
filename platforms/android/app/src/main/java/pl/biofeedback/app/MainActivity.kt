@@ -201,15 +201,133 @@ private fun BiofeedbackApp() {
                     item { MetricCard("Ostatni odczyt", "— N", "Oczekiwanie na próbkę") }
                     item { EmptyChartCard() }
                 }
-                1 -> item { EmptyModule("Pomiary", "Sesje i wykresy pojawią się po integracji z MeasurementEngine.") }
+                1 -> item { ResourceListModule(apiClient, "Sesje pomiarowe", "measurements") }
                 2 -> item { PatientsModule(apiClient) }
-                3 -> item { EmptyModule("Trening", "Moduł oczekuje na wspólne usługi treningowe i sesyjne.") }
+                3 -> item { TrainingAndGamesModule(apiClient) }
                 4 -> item { EmptyModule("Urządzenia", "Brak połączenia. Aplikacja nie wysyła komend sprzętowych w trybie podglądu.") }
                 5 -> item { DiagnosticsModule() }
                 6 -> item { SettingsModule() }
             }
             item { Spacer(Modifier.height(8.dp)) }
         }
+    }
+}
+
+@Composable
+private fun ResourceListModule(client: ApiClient?, title: String, collection: String) {
+    var items by remember { mutableStateOf<org.json.JSONArray?>(null) }
+    var errorMessage by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun refresh() {
+        if (client == null) {
+            errorMessage = "Brak klienta API."
+            return
+        }
+        scope.launch {
+            busy = true
+            errorMessage = ""
+            try {
+                val response = withContext(Dispatchers.IO) { client.listResources(collection) }
+                items = response.optJSONArray("items")
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "Nie można pobrać danych z serwera."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, color = Navy, fontWeight = FontWeight.Bold)
+        Text("Dane odczytywane ze wspólnego repozytorium serwera.", color = Muted, fontSize = 12.sp)
+        Button(onClick = { refresh() }, enabled = !busy && client != null) { Text("Odśwież") }
+        if (busy) CircularProgressIndicator()
+        if (errorMessage.isNotBlank()) Text(errorMessage, color = Color(0xFFB42318), fontSize = 12.sp)
+        Text("Rekordy: ${items?.length() ?: 0}", color = Navy, fontWeight = FontWeight.SemiBold)
+        val records = items
+        if (records != null) {
+            for (index in 0 until records.length()) {
+                val record = records.optJSONObject(index) ?: continue
+                val label = listOf("exercise_name", "game_id", "display_name", "status")
+                    .firstNotNullOfOrNull { key -> record.optString(key).takeIf { it.isNotBlank() } }
+                    ?: record.optString("id")
+                val detail = buildList {
+                    if (record.has("started_at")) add("Start: ${record.optString("started_at")}")
+                    if (record.has("sample_count")) add("Próbki: ${record.optInt("sample_count")}")
+                    if (record.has("score")) add("Wynik: ${record.optInt("score")}")
+                    add("Wersja: ${record.optInt("version")}")
+                }.joinToString(" • ")
+                Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(label, color = Navy, fontWeight = FontWeight.Bold)
+                        Text(detail, color = Muted, fontSize = 11.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrainingAndGamesModule(client: ApiClient?) {
+    var trainingSessions by remember { mutableStateOf<org.json.JSONArray?>(null) }
+    var trainingResults by remember { mutableStateOf<org.json.JSONArray?>(null) }
+    var gameResults by remember { mutableStateOf<org.json.JSONArray?>(null) }
+    var errorMessage by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun refresh() {
+        if (client == null) {
+            errorMessage = "Brak klienta API."
+            return
+        }
+        scope.launch {
+            busy = true
+            errorMessage = ""
+            try {
+                val loaded = withContext(Dispatchers.IO) {
+                    Triple(client.getTrainingSessions(), client.getTrainingResults(), client.getGameResults())
+                }
+                trainingSessions = loaded.first.optJSONArray("items")
+                trainingResults = loaded.second.optJSONArray("items")
+                gameResults = loaded.third.optJSONArray("items")
+            } catch (error: Exception) {
+                errorMessage = error.message ?: "Nie można pobrać historii treningu."
+            } finally {
+                busy = false
+            }
+        }
+    }
+
+    @Composable
+    fun section(label: String, records: org.json.JSONArray?) {
+        Text("$label: ${records?.length() ?: 0}", color = Navy, fontWeight = FontWeight.SemiBold)
+        if (records != null) {
+            for (index in 0 until records.length()) {
+                val record = records.optJSONObject(index) ?: continue
+                val title = record.optString("exercise_name").ifBlank {
+                    record.optString("game_id").ifBlank { record.optString("id") }
+                }
+                val score = if (record.has("score")) " • wynik: ${record.optInt("score")}" else ""
+                Card(colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Text(title + score, Modifier.fillMaxWidth().padding(12.dp), color = Navy)
+                }
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("Trening i gry", color = Navy, fontWeight = FontWeight.Bold)
+        Text("Historia pobierana z repozytorium wspólnego dla klientów.", color = Muted, fontSize = 12.sp)
+        Button(onClick = { refresh() }, enabled = !busy && client != null) { Text("Odśwież historię") }
+        if (busy) CircularProgressIndicator()
+        if (errorMessage.isNotBlank()) Text(errorMessage, color = Color(0xFFB42318), fontSize = 12.sp)
+        section("Sesje treningowe", trainingSessions)
+        section("Wyniki treningów", trainingResults)
+        section("Wyniki gier", gameResults)
     }
 }
 
