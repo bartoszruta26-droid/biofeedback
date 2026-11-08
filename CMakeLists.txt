@@ -178,7 +178,7 @@ add_executable(api_auth_regression
 )
 set_target_properties(api_auth_regression PROPERTIES AUTOMOC ON)
 target_include_directories(api_auth_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(api_auth_regression PRIVATE biofeedback_core biofeedback_data_repository Qt5::Core Qt5::Network)
+target_link_libraries(api_auth_regression PRIVATE biofeedback_core biofeedback_data_repository biofeedback_application_services Qt5::Core Qt5::Network)
 add_test(NAME api_auth_regression COMMAND api_auth_regression)
 set_tests_properties(api_auth_regression PROPERTIES TIMEOUT 20)
 
