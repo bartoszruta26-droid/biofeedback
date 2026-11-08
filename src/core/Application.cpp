@@ -17,6 +17,9 @@
 #include <QMessageBox>
 #include <QTimer>
 #include <QDebug>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QSet>
 #include <iostream>
 #include <sstream>
 
@@ -123,6 +126,7 @@ void Application::shutdown()
     m_measurementTab = nullptr;
     m_patientTab = nullptr;
     m_dataManager.reset();
+    m_sharedResources.reset();
     m_authentication.reset();
     m_logger.reset();
     m_configManager.reset();
@@ -196,6 +200,16 @@ bool Application::initialize()
         m_dataManager = std::make_unique<DataManager>();
         if (!encryptionKey.empty()) m_dataManager->setEncryptionKey(encryptionKey);
         m_dataManager->setEncryptionEnabled(encryptionEnabled);
+
+        // One repository instance is shared by Desktop and the in-process API.
+        m_sharedResources = std::make_shared<data::JsonResourceRepository>(
+            QDir(runtime::appDataDirectory()).filePath(QStringLiteral("shared-data")),
+            QString::fromStdString(encryptionKey), encryptionEnabled);
+        if (!m_sharedResources->isReady()) {
+            throw std::runtime_error(
+                "Shared data repository initialization failed: " +
+                m_sharedResources->initializationError().toStdString());
+        }
         
         // Store debug manager pointer for later use (we don't own it)
         // m_debugManager is not used as unique_ptr anymore since DebugManager is a singleton
@@ -383,69 +397,145 @@ void Application::setupConnections()
                 }
             });
     
-    // Persist patient charts through DataManager so the configured AES-256-GCM policy applies.
+    // Persist and load patient charts through the same repository used by the API.
     connect(m_patientTab, &tab::PatientTab::patientAdded,
             this, [this](const QString&, const QString&, const QString&) {
                 if (m_logger) m_logger->info("Patient chart added [personal fields redacted]");
             });
+
+    const auto findPatientByPesel = [this](const QString& pesel, QJsonObject& found) {
+        if (!m_sharedResources || pesel.isEmpty()) return false;
+        QString error;
+        const QJsonArray records = m_sharedResources->list(QStringLiteral("patients"), &error);
+        if (!error.isEmpty()) return false;
+        for (const QJsonValue& value : records) {
+            if (!value.isObject()) continue;
+            const QJsonObject record = value.toObject();
+            if (record.value(QStringLiteral("pesel")).toString() == pesel) {
+                found = record;
+                return true;
+            }
+        }
+        return false;
+    };
+
     connect(m_patientTab, &tab::PatientTab::patientRecordChanged,
-            this, [this](const QString& pesel, const QString& firstName,
+            this, [this, findPatientByPesel](const QString& pesel, const QString& firstName,
                          const QString& lastName, const QDate& birthDate,
                          const QString& gender, const QString& notes) {
-                if (!m_dataManager || pesel.isEmpty()) return;
-                PatientData patient;
-                patient.id = pesel.toStdString();
-                patient.pesel = pesel.toStdString();
-                patient.firstName = firstName.toStdString();
-                patient.lastName = lastName.toStdString();
-                patient.birthDate = birthDate.toString(Qt::ISODate).toStdString();
-                patient.gender = gender.toStdString();
-                patient.medicalHistory = notes.toStdString();
-                const QString filePath = QDir(runtime::patientDirectory(pesel))
-                    .filePath(QStringLiteral("patient.json"));
-                if (!m_dataManager->savePatientData(patient, filePath.toStdString())) {
-                    if (m_logger) m_logger->error("Failed to persist patient chart [identifier redacted]");
-                    if (m_mainWindow && m_mainWindow->debugTerminal())
-                        m_mainWindow->addDebugMessage("Nie udało się zapisać kartoteki pacjenta.", "ERROR");
-                    return;
+                if (!m_sharedResources || pesel.isEmpty()) return;
+                const QJsonObject payload{
+                    {QStringLiteral("pesel"), pesel},
+                    {QStringLiteral("firstName"), firstName},
+                    {QStringLiteral("lastName"), lastName},
+                    {QStringLiteral("birthDate"), birthDate.toString(Qt::ISODate)},
+                    {QStringLiteral("gender"), gender},
+                    {QStringLiteral("medicalHistory"), notes}
+                };
+                QJsonObject existing;
+                QString error;
+                bool saved = false;
+                if (findPatientByPesel(pesel, existing)) {
+                    QJsonObject updated;
+                    saved = m_sharedResources->update(
+                        QStringLiteral("patients"),
+                        existing.value(QStringLiteral("id")).toString(),
+                        existing.value(QStringLiteral("version")).toInt(),
+                        payload, updated, &error);
+                } else {
+                    QJsonObject created;
+                    saved = m_sharedResources->create(
+                        QStringLiteral("patients"), payload, created, &error);
                 }
-                QFile::setPermissions(filePath, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-            });
-    connect(m_patientTab, &tab::PatientTab::patientRecordDeleted,
-            this, [this](const QString& pesel) {
-                if (pesel.isEmpty()) return;
-                const QString filePath = QDir(runtime::patientDirectory(pesel))
-                    .filePath(QStringLiteral("patient.json"));
-                if (QFile::exists(filePath) && !QFile::remove(filePath) && m_logger)
-                    m_logger->warning("Could not remove patient chart file [identifier redacted]");
-                // The training-history directory is intentionally retained for audit/retention.
+                if (!saved) {
+                    if (m_logger) m_logger->error("Shared patient repository write failed: " + error.toStdString());
+                    if (m_mainWindow && m_mainWindow->debugTerminal())
+                        m_mainWindow->addDebugMessage("Nie udało się zapisać kartoteki pacjenta w serwerze danych.", "ERROR");
+                }
             });
 
-    // Reload saved patient charts after lifecycle handlers are connected.
-    const QString patientRootPath = QDir(runtime::appDataDirectory()).filePath(QStringLiteral("patients"));
-    QDir patientRoot(patientRootPath);
-    const QStringList patientDirectories = patientRoot.entryList(
-        QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
-    for (const QString& directoryName : patientDirectories) {
-        const QString patientFile = QDir(patientRoot.filePath(directoryName))
-            .filePath(QStringLiteral("patient.json"));
-        if (!QFile::exists(patientFile) || !m_dataManager) continue;
-        const PatientData patient = m_dataManager->loadPatientData(patientFile.toStdString());
-        if (patient.id.empty()) continue;
-        const QString pesel = QString::fromStdString(patient.pesel);
+    connect(m_patientTab, &tab::PatientTab::patientRecordDeleted,
+            this, [this, findPatientByPesel](const QString& pesel) {
+                if (!m_sharedResources || pesel.isEmpty()) return;
+                QJsonObject existing;
+                QString error;
+                if (findPatientByPesel(pesel, existing)) {
+                    if (!m_sharedResources->remove(
+                            QStringLiteral("patients"),
+                            existing.value(QStringLiteral("id")).toString(),
+                            existing.value(QStringLiteral("version")).toInt(), &error) && m_logger) {
+                        m_logger->warning("Shared patient repository delete failed: " + error.toStdString());
+                    }
+                }
+                // Retire the legacy local chart after successful repository deletion.
+                const QString legacyFile = QDir(runtime::patientDirectory(pesel))
+                    .filePath(QStringLiteral("patient.json"));
+                if (QFile::exists(legacyFile)) QFile::remove(legacyFile);
+            });
+
+    QSet<QString> loadedPatientIds;
+    QString repositoryError;
+    const QJsonArray sharedPatients = m_sharedResources
+        ? m_sharedResources->list(QStringLiteral("patients"), &repositoryError) : QJsonArray();
+    if (!repositoryError.isEmpty()) {
+        throw std::runtime_error("Cannot load shared patient records: " + repositoryError.toStdString());
+    }
+    for (const QJsonValue& value : sharedPatients) {
+        if (!value.isObject()) continue;
+        const QJsonObject patient = value.toObject();
+        const QString pesel = patient.value(QStringLiteral("pesel")).toString();
+        if (pesel.isEmpty()) continue;
+        loadedPatientIds.insert(pesel);
         m_patientTab->addPatient(
             pesel,
-            QString::fromStdString(patient.firstName),
-            QString::fromStdString(patient.lastName),
-            QDate::fromString(QString::fromStdString(patient.birthDate), Qt::ISODate),
-            QString::fromStdString(patient.gender),
-            QString::fromStdString(patient.medicalHistory));
+            patient.value(QStringLiteral("firstName")).toString(),
+            patient.value(QStringLiteral("lastName")).toString(),
+            QDate::fromString(patient.value(QStringLiteral("birthDate")).toString(), Qt::ISODate),
+            patient.value(QStringLiteral("gender")).toString(),
+            patient.value(QStringLiteral("medicalHistory")).toString());
     }
 
-    // Connect PatientTab to MeasurementTab for automatic data loading when patient changes
+    // One-time, non-destructive migration from the former per-patient files.
+    // Source files are retained until the operator explicitly removes the chart.
+    const QString legacyRootPath = QDir(runtime::appDataDirectory()).filePath(QStringLiteral("patients"));
+    QDir legacyRoot(legacyRootPath);
+    const QStringList legacyDirectories = legacyRoot.entryList(
+        QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for (const QString& directoryName : legacyDirectories) {
+        const QString legacyFile = QDir(legacyRoot.filePath(directoryName))
+            .filePath(QStringLiteral("patient.json"));
+        if (!QFile::exists(legacyFile) || !m_dataManager) continue;
+        const PatientData legacy = m_dataManager->loadPatientData(legacyFile.toStdString());
+        if (legacy.id.empty() || legacy.pesel.empty()) continue;
+        const QString pesel = QString::fromStdString(legacy.pesel);
+        if (loadedPatientIds.contains(pesel)) continue;
+
+        const QJsonObject payload{
+            {QStringLiteral("pesel"), pesel},
+            {QStringLiteral("firstName"), QString::fromStdString(legacy.firstName)},
+            {QStringLiteral("lastName"), QString::fromStdString(legacy.lastName)},
+            {QStringLiteral("birthDate"), QString::fromStdString(legacy.birthDate)},
+            {QStringLiteral("gender"), QString::fromStdString(legacy.gender)},
+            {QStringLiteral("medicalHistory"), QString::fromStdString(legacy.medicalHistory)}
+        };
+        QJsonObject migrated;
+        QString migrationError;
+        if (m_sharedResources->create(QStringLiteral("patients"), payload, migrated, &migrationError)) {
+            loadedPatientIds.insert(pesel);
+            m_patientTab->addPatient(
+                pesel, QString::fromStdString(legacy.firstName),
+                QString::fromStdString(legacy.lastName),
+                QDate::fromString(QString::fromStdString(legacy.birthDate), Qt::ISODate),
+                QString::fromStdString(legacy.gender),
+                QString::fromStdString(legacy.medicalHistory));
+        } else if (m_logger) {
+            m_logger->error("Legacy patient migration failed: " + migrationError.toStdString());
+        }
+    }
+
     connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
             m_measurementTab, &tab::MeasurementTab::onPatientChanged);
-    
+
     // Connect OutlineTab signals
     connect(m_outlineTab, &tab::OutlineTab::sessionStarted,
             this, [this](const QString& outlineId) {
@@ -525,6 +615,11 @@ DataManager& Application::getDataManager()
         throw std::runtime_error("DataManager not initialized");
     }
     return *m_dataManager;
+}
+
+std::shared_ptr<data::JsonResourceRepository> Application::getSharedResources() const
+{
+    return m_sharedResources;
 }
 
 gui::MainWindow* Application::getMainWindow()
