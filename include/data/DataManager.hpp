@@ -19,16 +19,16 @@
 // ============================================================================
 
 /// Enable detailed debug logging for all data operations
-constexpr bool DEBUG_DATA_MANAGER_ENABLED = true;
+constexpr bool DEBUG_DATA_MANAGER_ENABLED = false;
 
 /// Enable verbose JSON parsing debug output
 constexpr bool DEBUG_JSON_PARSING_ENABLED = false;
 
 /// Enable encryption/decryption operation logging
-constexpr bool DEBUG_ENCRYPTION_OPS_ENABLED = true;
+constexpr bool DEBUG_ENCRYPTION_OPS_ENABLED = false;
 
 /// Enable file I/O operation debugging
-constexpr bool DEBUG_FILE_IO_ENABLED = true;
+constexpr bool DEBUG_FILE_IO_ENABLED = false;
 
 /// Maximum number of retry attempts for file operations
 constexpr int MAX_FILE_RETRY_COUNT = 3;
@@ -387,8 +387,8 @@ private:
     // ========================================================================
     // LOGGING & DEBUG CONFIGURATION
     // ========================================================================
-    DataManagerLogLevel minimumLogLevel{DataManagerLogLevel::DEBUG};  ///< Minimalny poziom logowania
-    bool consoleOutputEnabled{true};                                   ///< Czy wyjście na konsolę jest włączone
+    DataManagerLogLevel minimumLogLevel{DataManagerLogLevel::WARNING};  ///< Minimalny poziom logowania
+    bool consoleOutputEnabled{false};                                   ///< Czy wyjście na konsolę jest włączone
     mutable std::mutex logMutex;                                       ///< Mutex dla thread-safe logowania
     DataManagerStatistics statistics;                                  ///< Statystyki operacji
     
