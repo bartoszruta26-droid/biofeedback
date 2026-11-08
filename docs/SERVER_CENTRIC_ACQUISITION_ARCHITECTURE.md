@@ -91,7 +91,11 @@ REST nie może być używany do wysyłania pojedynczych próbek z dużą często
 ## Obecny stan kodu i luki
 
 W repozytorium istnieją `MeasurementEngine`, `MeasurementService`, `MeasurementSerialAdapter` i `DeviceService`. Desktop ma działającą ścieżkę próbek do silnika, a TUI posiada integrację callbackową. Jednak obecna implementacja nie jest jeszcze serwerem akwizycji:
-- `biofeedback_api` tworzy `MeasurementEngine`, `MeasurementService`, `AcquisitionService` i rejestr `DeviceService`, a następnie wstrzykuje je do `HttpApiServer`; rejestr jest na razie pusty, ponieważ fizyczne adaptery i ich rejestracja pozostają do wdrożenia;
+- `biofeedback_api` tworzy `MeasurementEngine`, `MeasurementService`, `AcquisitionService` i `DeviceService`, a następnie wstrzykuje je do `HttpApiServer`;
+- dodano `AcquisitionSerialDeviceAdapter`: odbiera `SensorData` z istniejącego `SerialCommunication`, buduje `MeasurementInput` i przekazuje próbkę wyłącznie przez `AcquisitionService::ingest(deviceId, ...)`; próbka spoza aktywnej sesji lub z innego urządzenia jest odrzucana;
+- serwer może jawnie zarejestrować jeden adapter Nano przez `BIOFEEDBACK_SERIAL_PORT`, opcjonalnie `BIOFEEDBACK_SERIAL_BAUD` i `BIOFEEDBACK_DEVICE_ID`; bez wskazanego portu sprzęt pozostaje wyłączony, a serwer nie skanuje i nie przejmuje przypadkowych portów;
+- `GET /api/v1/devices` prezentuje stan zarejestrowanego urządzenia; start sesji nadal wymaga urządzenia połączonego i istniejącego pacjenta;
+- starszy `MeasurementSerialAdapter` jest nadal używany przez część Desktop/TUI i prowadzi lokalny tor do `MeasurementEngine`; migracja tych klientów na API serwera pozostaje otwarta i do czasu jej zakończenia nie wolno deklarować, że wszystkie klienty używają wyłącznie centralnej akwizycji;
 - `MeasurementService` jest prostą fasadą nad silnikiem i nie zarządza adapterami, sesją ani trwałym dziennikiem;
 - `HttpApiServer` udostępnia uwierzytelnione endpointy `GET/POST/DELETE /api/v1/acquisition/session` i `GET /api/v1/acquisition/samples`; przed startem sprawdza istnienie pacjenta i zarejestrowane, połączone urządzenie. Historia próbek jest ograniczona pamięcią RAM; serwer nie implementuje jeszcze WebSocket/SSE;
 - część desktopowej akwizycji nadal jest inicjowana przez zakładkę UI;
