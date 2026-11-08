@@ -33,8 +33,8 @@ required_firmware = [
 for token in required_firmware:
     assert token in firmware, f"missing Nano firmware invariant: {token}"
 assert "atof(buffer + 4)" not in firmware
-assert r"*end_ptr == '\t'" in firmware, "calibration parser must use a single escaped tab character"
-assert r"*end_ptr == '\0'" in firmware, "calibration parser must use a single escaped NUL terminator"
+assert "*end_ptr == '\\t'" in firmware, "calibration parser must use a single escaped tab character"
+assert "*end_ptr == '\\0'" in firmware, "calibration parser must use a single escaped NUL terminator"
 
 assert "hasCalibratedValue" in header
 assert "data.hasCalibratedValue = calibrationConfirmed;" in serial
