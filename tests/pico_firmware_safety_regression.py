@@ -12,13 +12,9 @@ required = [
     "sensor::protocol::MaxControlCommandBytes + 1",
     "watchdog_enable(kWatchdogTimeoutMs, true);",
     "watchdog_update();",
-    "sensor::protocol::ActuatorLockedReply",
     "std::strcmp(command, sensor::protocol::ControlPing)",
     "std::strcmp(command, sensor::protocol::ControlStatus)",
     "std::strcmp(command, sensor::protocol::ControlSafe)",
-    '"IR,"',
-    '"ELECTRODE,"',
-    '"ANTENNA,"',
     "discardingOversizedLine",
 ]
 for token in required:
@@ -28,6 +24,8 @@ assert "hardware_watchdog" in cmake and "hardware_uart" in cmake
 assert "sensor/SerialProtocolConfig.hpp" in source
 assert "target_include_directories(biofeedback_pico" in cmake
 assert "ControlProtocolVersion = 1" in protocol
+for legacy in ("ACTUATOR", "EFFECTOR", "IR,", "ELECTRODE", "ANTENNA", "ActuatorLockedReply"):
+    assert legacy not in source and legacy not in protocol, f"legacy control remnant: {legacy}"
 
 # Assert there are no output-driving APIs or effector pin initializers.
 for forbidden in ("gpio_put(", "gpio_init(", "pwm_set_enabled(", "pwm_set_gpio_level("):
