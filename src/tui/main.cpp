@@ -289,7 +289,8 @@ void drawModule(tui::Screen screen,
                 const sensor::SerialCommunication& serial,
                 const std::vector<std::string>& ports,
                 std::size_t selectedPort,
-                const LiveData& live)
+                const LiveData& live,
+                const std::vector<std::string>& patientSummaries)
 {
     const auto& info = tui::TuiModel::info(screen);
     const int x = 25;
@@ -330,9 +331,18 @@ void drawModule(tui::Screen screen,
         break;
     }
     case tui::Screen::Patients:
-        drawText(8, x + 2, "Karty pacjentow sa dostepne w aplikacji Desktop Qt.");
-        drawText(10, x + 2, "Wspolne repozytorium pacjentow nie jest jeszcze podlaczone do TUI.");
-        drawText(12, x + 2, "Widok nie wyswietla ani nie tworzy fikcyjnych rekordow.");
+        drawText(8, x + 2, "Karty pobrane z tego samego repozytorium co Desktop i WebUI.");
+        if (patientSummaries.empty()) {
+            drawText(10, x + 2, "Brak kart pacjentow lub brak uprawnien do ich odczytu.");
+        } else {
+            const int visible = std::min<int>(static_cast<int>(patientSummaries.size()), LINES - 14);
+            for (int i = 0; i < visible; ++i)
+                drawText(10 + i, x + 2, patientSummaries[static_cast<std::size_t>(i)], width - 4);
+            if (static_cast<int>(patientSummaries.size()) > visible)
+                drawText(11 + visible, x + 2, "... pozostale rekordy: " +
+                         std::to_string(patientSummaries.size() - static_cast<std::size_t>(visible)));
+        }
+        drawText(LINES - 6, x + 2, "Odczyt odbywa sie przez uwierzytelnione API serwera.");
         break;
     case tui::Screen::Training: {
         bool active = false, paused = false;
@@ -441,7 +451,8 @@ void draw(std::size_t selected,
           const sensor::SerialCommunication& serial,
           const std::vector<std::string>& ports,
           std::size_t selectedPort,
-          const LiveData& live)
+          const LiveData& live,
+          const std::vector<std::string>& patientSummaries)
 {
     erase();
     attron(A_BOLD | COLOR_PAIR(1));
@@ -462,7 +473,7 @@ void draw(std::size_t selected,
             drawText(y, 3, marker + screens[i].title, 18);
         }
     }
-    drawModule(screens[active].id, serial, ports, selectedPort, live);
+    drawModule(screens[active].id, serial, ports, selectedPort, live, patientSummaries);
     attron(COLOR_PAIR(1));
     mvhline(LINES - 3, 0, ' ', COLS);
     if (active == static_cast<std::size_t>(tui::Screen::Devices)) {
@@ -507,8 +518,23 @@ int main(int argc, char** argv)
         }
     }
 
-    auto authentication = authenticateTuiUser();
-    if (!authentication) return EXIT_FAILURE;
+    auto apiClient = authenticateTuiUser();
+    if (!apiClient) return EXIT_FAILURE;
+
+    std::vector<std::string> patientSummaries;
+    QJsonArray sharedPatients;
+    QString patientLoadError;
+    if (apiClient->listResources(QStringLiteral("patients"), sharedPatients, &patientLoadError)) {
+        for (const QJsonValue& value : sharedPatients) {
+            if (!value.isObject()) continue;
+            const QJsonObject patient = value.toObject();
+            const QString label = patient.value(QStringLiteral("firstName")).toString() +
+                QStringLiteral(" ") + patient.value(QStringLiteral("lastName")).toString();
+            patientSummaries.push_back(label.toStdString());
+        }
+    } else {
+        patientSummaries.push_back("Blad odczytu repozytorium: " + patientLoadError.toStdString());
+    }
 
     std::setlocale(LC_ALL, "");
     core::DebugManager::instance().setConsoleOutputEnabled(false);
@@ -592,7 +618,7 @@ int main(int argc, char** argv)
     std::size_t active = 0;
     bool running = true;
     while (running) {
-        draw(selected, active, serial, ports, selectedPort, live);
+        draw(selected, active, serial, ports, selectedPort, live, patientSummaries);
         const int key = getch();
         switch (key) {
         case KEY_UP:
@@ -785,6 +811,6 @@ int main(int argc, char** argv)
     endwin();
     serial.disconnect();
     measurementEngine->unsubscribe(measurementToken);
-    authentication->logout();
+    apiClient->logout();
     return EXIT_SUCCESS;
 }
