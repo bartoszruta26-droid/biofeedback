@@ -196,6 +196,11 @@ for required in (
     "sessionGeneration != m_measurementSessionGeneration.load",
     "m_sampleJournalWriter.appendDurably(line)",
     "m_journalNextSequence.store(sequence + 1",
+    "bool MeasurementTab::restoreSampleJournalIntoSession()",
+    "expectedSequence != m_journalNextSequence.load",
+    "if (m_isMeasuring)",
+    "if (m_sampleJournalFailed)",
+    "QFile::remove(m_sampleJournalPath)",
 ):
     if required not in source:
         raise SystemExit(f"Missing durable acquisition commit invariant: {required}")
