@@ -150,8 +150,11 @@ bool GalagaGame::loseLife()
     // descending formation from consuming several lives in adjacent frames.
     m_hitCooldown = 1.2;
     m_player.moveCenter(QPointF(width() * 0.5, height() - 46.0));
-    m_projectiles.erase(std::remove_if(m_projectiles.begin(), m_projectiles.end(),
-        [](const Projectile& shot) { return !shot.fromPlayer; }), m_projectiles.end());
+    // Do not erase from the vector here: loseLife() can be called while
+    // update() is iterating it. Mark hostile shots for deferred removal.
+    for (Projectile& shot : m_projectiles)
+        if (!shot.fromPlayer)
+            shot.rect = QRectF();
     return true;
 }
 
