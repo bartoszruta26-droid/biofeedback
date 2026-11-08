@@ -98,10 +98,21 @@ int main(int argc, char **argv)
     REQUIRE(game.inputCount() == inputsAfterRestart);
     REQUIRE(std::abs(game.lastInput()) < 1e-9);
 
+    // Invalid worker samples are counted on the GUI thread and must not
+    // overwrite the most recent valid sample in the coalescing mailbox.
+    std::thread invalidWorker([&game]() {
+        game.handleSensorInput(42.5);
+        game.handleSensorInput(std::numeric_limits<double>::infinity());
+    });
+    invalidWorker.join();
+    waitForEvents(10);
+    REQUIRE(std::abs(game.lastInput() - 42.5) < 1e-9);
+    REQUIRE(game.getGameStats().contains(QStringLiteral("invalid_inputs=1")));
+
     const int inputsBeforeInvalid = game.inputCount();
     game.handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     REQUIRE(game.inputCount() == inputsBeforeInvalid);
-    REQUIRE(game.getGameStats().contains(QStringLiteral("invalid_inputs=1")));
+    REQUIRE(game.getGameStats().contains(QStringLiteral("invalid_inputs=2")));
 
     game.award(std::numeric_limits<int>::max());
     game.award(1);
