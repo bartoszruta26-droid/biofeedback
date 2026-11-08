@@ -226,6 +226,23 @@ int main(int argc, char **argv)
     REQUIRE(carRaceGame->livesRemaining() == 3);
     REQUIRE(carRaceGame->obstacleCount() == 0);
 
+    // Three predictable obstacle lanes exercise the complete game-over path.
+    std::unique_ptr<games::GameEngine> carRaceGameOver(games::createGame(QStringLiteral("car_race")));
+    auto* carRaceGameOverInstance = dynamic_cast<games::CarRaceGame*>(carRaceGameOver.get());
+    REQUIRE(carRaceGameOverInstance != nullptr);
+    carRaceGameOverInstance->resize(640, 480);
+    carRaceGameOverInstance->start();
+    carRaceGameOverInstance->handleSensorInput(50.0); // First obstacle: middle lane.
+    waitForEvents(3600);
+    REQUIRE(carRaceGameOverInstance->livesRemaining() == 2);
+    carRaceGameOverInstance->handleSensorInput(0.0); // Second obstacle: left lane.
+    waitForEvents(1100);
+    REQUIRE(carRaceGameOverInstance->livesRemaining() == 1);
+    carRaceGameOverInstance->handleSensorInput(99.0); // Third obstacle: right lane.
+    waitForEvents(1500);
+    REQUIRE(carRaceGameOverInstance->livesRemaining() == 0);
+    REQUIRE(!carRaceGameOverInstance->isRunning());
+
     std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
     auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
     REQUIRE(scorchedGame != nullptr);
