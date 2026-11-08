@@ -390,6 +390,52 @@ void Application::setupConnections()
                 }
             });
     
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
+            m_mainWindow.get(), [this]() {
+                try {
+                    m_mainWindow->stopDataCollection();
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage("Measurement stopped by MeasurementTab", "INFO");
+                    }
+                } catch (const std::exception& e) {
+                    std::cerr << "[ERROR] Exception stopping measurement: " << e.what() << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage(
+                            QString("ERROR stopping measurement: %1").arg(e.what()), 
+                            "ERROR"
+                        );
+                    }
+                } catch (...) {
+                    std::cerr << "[ERROR] Unknown exception stopping measurement" << std::endl;
+                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
+                        m_mainWindow->addDebugMessage("ERROR: Unknown exception stopping measurement", "ERROR");
+                    }
+                }
+            });
+    
+    const auto findPatientByPesel = [this](const QString& pesel, QJsonObject& found,
+                                               QString* lookupError) {
+        if (!m_sharedResources || pesel.isEmpty()) {
+            if (lookupError) *lookupError = QStringLiteral("PATIENT_REPOSITORY_UNAVAILABLE");
+            return false;
+        }
+        QString error;
+        const QJsonArray records = m_sharedResources->list(QStringLiteral("patients"), &error);
+        if (!error.isEmpty()) {
+            if (lookupError) *lookupError = error;
+            return false;
+        }
+        for (const QJsonValue& value : records) {
+            if (!value.isObject()) continue;
+            const QJsonObject record = value.toObject();
+            if (record.value(QStringLiteral("pesel")).toString() == pesel) {
+                found = record;
+                return true;
+            }
+        }
+        return false;
+    };
+
     if (m_mainWindow && m_mainWindow->trainingTab()) {
         tab::TrainingTab* trainingTab = m_mainWindow->trainingTab();
         connect(trainingTab, &tab::TrainingTab::trainingStopped,
@@ -473,51 +519,6 @@ void Application::setupConnections()
                 });
     }
 
-    connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
-            m_mainWindow.get(), [this]() {
-                try {
-                    m_mainWindow->stopDataCollection();
-                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
-                        m_mainWindow->addDebugMessage("Measurement stopped by MeasurementTab", "INFO");
-                    }
-                } catch (const std::exception& e) {
-                    std::cerr << "[ERROR] Exception stopping measurement: " << e.what() << std::endl;
-                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
-                        m_mainWindow->addDebugMessage(
-                            QString("ERROR stopping measurement: %1").arg(e.what()), 
-                            "ERROR"
-                        );
-                    }
-                } catch (...) {
-                    std::cerr << "[ERROR] Unknown exception stopping measurement" << std::endl;
-                    if (m_mainWindow && m_mainWindow->debugTerminal()) {
-                        m_mainWindow->addDebugMessage("ERROR: Unknown exception stopping measurement", "ERROR");
-                    }
-                }
-            });
-    
-    const auto findPatientByPesel = [this](const QString& pesel, QJsonObject& found,
-                                               QString* lookupError) {
-        if (!m_sharedResources || pesel.isEmpty()) {
-            if (lookupError) *lookupError = QStringLiteral("PATIENT_REPOSITORY_UNAVAILABLE");
-            return false;
-        }
-        QString error;
-        const QJsonArray records = m_sharedResources->list(QStringLiteral("patients"), &error);
-        if (!error.isEmpty()) {
-            if (lookupError) *lookupError = error;
-            return false;
-        }
-        for (const QJsonValue& value : records) {
-            if (!value.isObject()) continue;
-            const QJsonObject record = value.toObject();
-            if (record.value(QStringLiteral("pesel")).toString() == pesel) {
-                found = record;
-                return true;
-            }
-        }
-        return false;
-    };
 
     connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
             this, [this, findPatientByPesel]() {
