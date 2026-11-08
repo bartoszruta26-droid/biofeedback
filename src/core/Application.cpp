@@ -435,6 +435,41 @@ void Application::setupConnections()
         return false;
     };
 
+    connect(m_measurementTab, &tab::MeasurementTab::measurementStopped,
+            this, [this, findPatientByPesel]() {
+                if (!m_measurementTab || !m_sharedResources) return;
+                const QString patientPesel = m_measurementTab->currentPatientPesel();
+                if (patientPesel.isEmpty()) {
+                    if (m_logger) m_logger->warning("Measurement session was not archived: no patient selected.");
+                    return;
+                }
+                QJsonObject patient;
+                QString lookupError;
+                if (!findPatientByPesel(patientPesel, patient, &lookupError)) {
+                    if (m_logger) m_logger->warning(
+                        "Measurement session was not archived: patient lookup failed or patient is missing.");
+                    return;
+                }
+                if (!lookupError.isEmpty()) {
+                    if (m_logger) m_logger->warning("Measurement patient lookup failed.");
+                    return;
+                }
+                const QJsonObject payload = m_measurementTab->buildSharedSessionRecord(
+                    patient.value(QStringLiteral("id")).toString());
+                if (payload.isEmpty()) return;
+
+                QJsonObject created;
+                QString error;
+                if (!m_sharedResources->create(QStringLiteral("measurements"), payload, created, &error)) {
+                    if (m_logger) m_logger->error("Shared measurement session write failed: " + error.toStdString());
+                    if (m_measurementTab)
+                        m_measurementTab->addDebugMessage(
+                            "Nie udało się zapisać sesji pomiarowej w serwerze danych.", "ERROR");
+                } else if (m_logger) {
+                    m_logger->info("Measurement session archived in shared repository [patient fields redacted]");
+                }
+            });
+
     // Persist and load patient charts through the same repository used by the API.
     connect(m_patientTab, &tab::PatientTab::patientAdded,
             this, [this](const QString&, const QString&, const QString&) {
