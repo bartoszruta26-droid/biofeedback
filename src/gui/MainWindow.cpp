@@ -27,6 +27,9 @@
 #include <QMetaObject>
 #include <cmath>
 #include <memory>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace gui {
 
