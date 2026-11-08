@@ -2,11 +2,17 @@ name: serial-command-validation
 
 on:
   push:
-    branches:
-      - integration/all-work
+    branches: [main]
+    paths:
+      - "src/sensor/SerialCommunication.cpp"
+      - "tests/serial_command_validation_regression.py"
+      - ".github/workflows/serial-command-validation.yml"
   pull_request:
-    branches:
-      - integration/all-work
+    branches: [main]
+    paths:
+      - "src/sensor/SerialCommunication.cpp"
+      - "tests/serial_command_validation_regression.py"
+      - ".github/workflows/serial-command-validation.yml"
 
 jobs:
   serial-command-validation:
