@@ -383,7 +383,9 @@ if(Qt5_FOUND)
     add_executable(sample_journal_writer_regression
         tests/sample_journal_writer_regression.cpp
         src/tab/SampleJournalWriter.cpp
+        src/measurement/MeasurementEngine.cpp
         include/tab/SampleJournalWriter.hpp
+        include/measurement/MeasurementEngine.hpp
     )
     target_include_directories(sample_journal_writer_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
     target_link_libraries(sample_journal_writer_regression PRIVATE Qt5::Core Threads::Threads)
