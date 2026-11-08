@@ -8,9 +8,7 @@
 #include <functional>
 #include <memory>
 #include <map>
-
-// Default baud rate for serial communication
-#define DEFAULT_BAUD_RATE 115200
+#include "sensor/SerialProtocolConfig.hpp"
 
 namespace sensor {
 
@@ -48,13 +46,13 @@ struct ArduinoInfo {
  */
 struct SerialConfig {
     std::string portName;        ///< Nazwa portu (np. "/dev/ttyUSB0", "COM3")
-    int baudRate;                ///< Prędkość transmisji (domyślnie 9600)
+    int baudRate;                ///< Prędkość transmisji (domyślnie 115200)
     int dataBits;                ///< Liczba bitów danych (domyślnie 8)
     char parity;                 ///< Parity ('N', 'E', 'O')
     float stopBits;              ///< Bity stopu (1.0, 1.5, 2.0)
     int timeout;                 ///< Timeout w milisekundach
     
-    SerialConfig() : baudRate(9600), dataBits(8), parity('N'), 
+    SerialConfig() : baudRate(protocol::DefaultBaudRate), dataBits(8), parity('N'), 
                      stopBits(1.0f), timeout(1000) {}
 };
 
@@ -107,7 +105,7 @@ public:
      * @param baudRate Prędkość transmisji (domyślnie 115200)
      * @return true jeśli połączenie nawiązane pomyślnie
      */
-    bool connect(const std::string& portName, int baudRate = DEFAULT_BAUD_RATE);
+    bool connect(const std::string& portName, int baudRate = protocol::DefaultBaudRate);
     
     /**
      * @brief Zamyka połączenie szeregowe
