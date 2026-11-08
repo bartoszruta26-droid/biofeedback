@@ -88,6 +88,12 @@ void MarioGame::increaseDifficulty()
 
 void MarioGame::update(double deltaTime)
 {
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
+
+    // Ogranicz bezpośrednie wywołania, tak jak w GameEngine.
+    deltaTime = qMin(deltaTime, 0.1);
+
     // Aktualizacja gracza
     updatePlayer(deltaTime);
     if (!isRunning()) return;
