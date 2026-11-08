@@ -78,6 +78,7 @@ void JsonResourceRepository::setError(QString* error, const QString& value) {
 
 QJsonArray JsonResourceRepository::list(const QString& collection, QString* error) const {
     QMutexLocker lock(&m_mutex);
+    if (error) error->clear();
     QJsonArray records;
     if (!isReady()) { setError(error, m_initializationError); return records; }
     if (!isSupportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return records; }
@@ -103,6 +104,7 @@ QJsonArray JsonResourceRepository::list(const QString& collection, QString* erro
 bool JsonResourceRepository::get(const QString& collection, const QString& id,
                                  QJsonObject& record, QString* error) const {
     QMutexLocker lock(&m_mutex);
+    if (error) error->clear();
     if (!isReady()) { setError(error, m_initializationError); return false; }
     if (!isSupportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return false; }
     if (!validId(id)) { setError(error, QStringLiteral("INVALID_RESOURCE_ID")); return false; }
@@ -112,6 +114,7 @@ bool JsonResourceRepository::get(const QString& collection, const QString& id,
 bool JsonResourceRepository::create(const QString& collection, const QJsonObject& payload,
                                     QJsonObject& created, QString* error) {
     QMutexLocker lock(&m_mutex);
+    if (error) error->clear();
     if (!isReady()) { setError(error, m_initializationError); return false; }
     if (!isSupportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return false; }
     if (payload.isEmpty()) { setError(error, QStringLiteral("EMPTY_RESOURCE")); return false; }
@@ -141,6 +144,7 @@ bool JsonResourceRepository::update(const QString& collection, const QString& id
                                     int expectedVersion, const QJsonObject& payload,
                                     QJsonObject& updated, QString* error) {
     QMutexLocker lock(&m_mutex);
+    if (error) error->clear();
     if (!isReady()) { setError(error, m_initializationError); return false; }
     if (!isSupportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return false; }
     if (!validId(id) || expectedVersion < 1) { setError(error, QStringLiteral("INVALID_UPDATE")); return false; }
@@ -172,6 +176,7 @@ bool JsonResourceRepository::update(const QString& collection, const QString& id
 bool JsonResourceRepository::remove(const QString& collection, const QString& id,
                                     int expectedVersion, QString* error) {
     QMutexLocker lock(&m_mutex);
+    if (error) error->clear();
     if (!isReady()) { setError(error, m_initializationError); return false; }
     if (!isSupportedCollection(collection)) { setError(error, QStringLiteral("UNSUPPORTED_COLLECTION")); return false; }
     if (!validId(id) || expectedVersion < 1) { setError(error, QStringLiteral("INVALID_DELETE")); return false; }
