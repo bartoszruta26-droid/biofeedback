@@ -91,9 +91,9 @@ REST nie może być używany do wysyłania pojedynczych próbek z dużą często
 ## Obecny stan kodu i luki
 
 W repozytorium istnieją `MeasurementEngine`, `MeasurementService`, `MeasurementSerialAdapter` i `DeviceService`. Desktop ma działającą ścieżkę próbek do silnika, a TUI posiada integrację callbackową. Jednak obecna implementacja nie jest jeszcze serwerem akwizycji:
-- `biofeedback_api` uruchamia `HttpApiServer` z repozytorium, ale nie tworzy ani nie posiada adapterów urządzeń i silnika pomiarowego;
+- `biofeedback_api` tworzy `MeasurementEngine`, `MeasurementService`, `AcquisitionService` i rejestr `DeviceService`, a następnie wstrzykuje je do `HttpApiServer`; rejestr jest na razie pusty, ponieważ fizyczne adaptery i ich rejestracja pozostają do wdrożenia;
 - `MeasurementService` jest prostą fasadą nad silnikiem i nie zarządza adapterami, sesją ani trwałym dziennikiem;
-- `HttpApiServer` obsługuje krótkie żądania HTTP i nie implementuje WebSocket/SSE;
+- `HttpApiServer` udostępnia uwierzytelnione endpointy `GET/POST/DELETE /api/v1/acquisition/session` i `GET /api/v1/acquisition/samples`; przed startem sprawdza istnienie pacjenta i zarejestrowane, połączone urządzenie. Historia próbek jest ograniczona pamięcią RAM; serwer nie implementuje jeszcze WebSocket/SSE;
 - część desktopowej akwizycji nadal jest inicjowana przez zakładkę UI;
 - Android i WebUI nie odbierają jeszcze wspólnego strumienia próbek;
 - historia silnika jest ograniczona pamięcią RAM i nie stanowi trwałego archiwum.
@@ -102,11 +102,11 @@ Zatem obecne CRUD współdzieli rekordy, ale nie jest równoznaczny z centralną
 
 ## Etapy wdrożenia i kryteria odbioru
 
-### Etap A — serwis sesji akwizycji
-- Dodać niezależny od GUI `AcquisitionService`, który posiada `MeasurementService`, adaptery i stan sesji.
-- Przenieść inicjowanie i kończenie akwizycji z zakładki Desktop do usługi aplikacyjnej.
-- Zaimplementować wyłączność urządzenia, walidację konfiguracji i wiązanie sesji z pacjentem.
-- Testy: start/stop, podwójny start, nieznane urządzenie, rozłączenie adaptera, zmiana pacjenta, wyścigi wątków.
+### Etap A — serwis sesji akwizycji (częściowo wdrożony)
+- Istnieje niezależny od GUI `AcquisitionService`, który koordynuje stan sesji i przekazuje próbki do `MeasurementService`.
+- HTTP API uruchamia i zatrzymuje sesję, a walidacja pacjenta i rejestru urządzeń działa przed startem.
+- Testy obejmują start/stop, podwójny start, nieznanego pacjenta, nieznane urządzenie i wyścig stop/ingest.
+- Do ukończenia pozostaje rejestracja rzeczywistych adapterów, wiązanie ich cyklu życia z sesją oraz przeniesienie wszystkich ścieżek akwizycji klientów do usługi serwerowej.
 
 ### Etap B — trwały dziennik
 - Dodać przyrostowy zapis próbek z sekwencją i kontrolą integralności.
