@@ -28,23 +28,23 @@
 // FLAGI DEBUGOWANIA - można włączać/wyłączać poszczególne moduły
 // ============================================================================
 #ifndef DEBUG_ENCRYPTION
-    #define DEBUG_ENCRYPTION 1          ///< Główna flaga debugowania enkrypcji
+    #define DEBUG_ENCRYPTION 0          ///< Główna flaga debugowania enkrypcji
 #endif
 
 #ifndef DEBUG_XOR_OPERATIONS
-    #define DEBUG_XOR_OPERATIONS 1      ///< Flag dla operacji XOR
+    #define DEBUG_XOR_OPERATIONS 0      ///< Flag dla operacji XOR
 #endif
 
 #ifndef DEBUG_BASE64_OPERATIONS
-    #define DEBUG_BASE64_OPERATIONS 1   ///< Flag dla operacji Base64
+    #define DEBUG_BASE64_OPERATIONS 0   ///< Flag dla operacji Base64
 #endif
 
 #ifndef DEBUG_KEY_GENERATION
-    #define DEBUG_KEY_GENERATION 1      ///< Flag dla generowania kluczy
+    #define DEBUG_KEY_GENERATION 0      ///< Flag dla generowania kluczy
 #endif
 
 #ifndef DEBUG_ERROR_HANDLING
-    #define DEBUG_ERROR_HANDLING 1      ///< Flag dla obsługi błędów
+    #define DEBUG_ERROR_HANDLING 0      ///< Flag dla obsługi błędów
 #endif
 
 // ============================================================================
@@ -122,7 +122,7 @@ static const std::string base64_chars =
 // ============================================================================
 
 EncryptionTypes::EncryptionLogLevel Encryption::m_minimumLogLevel = EncryptionTypes::EncryptionLogLevel::INFO;
-bool Encryption::m_consoleOutputEnabled = true;
+bool Encryption::m_consoleOutputEnabled = false;
 EncryptionTypes::EncryptionStatistics Encryption::m_statistics;
 std::mutex Encryption::m_logMutex;
 std::function<void(const std::string&)> Encryption::m_errorCallback;
