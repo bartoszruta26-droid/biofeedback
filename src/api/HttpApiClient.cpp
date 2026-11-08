@@ -6,6 +6,9 @@
 #include <QNetworkRequest>
 #include <QTimer>
 
+#include <stdexcept>
+#include <utility>
+
 namespace biofeedback::api {
 namespace {
 const QStringList Collections = {
