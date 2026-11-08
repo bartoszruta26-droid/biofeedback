@@ -126,6 +126,12 @@ int main(int argc, char **argv)
     flappyGame->update(std::numeric_limits<double>::quiet_NaN());
     flappyGame->update(std::numeric_limits<double>::infinity());
     REQUIRE(flappyGame->isRunning());
+    flappyGame->resize(180, 120);
+    waitForEvents(80);
+    REQUIRE(flappyGame->isRunning()); // Active bird and obstacles survive a compact resize.
+    flappyGame->resize(640, 480);
+    waitForEvents(80);
+    REQUIRE(flappyGame->isRunning());
     flappyGame->stop();
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
