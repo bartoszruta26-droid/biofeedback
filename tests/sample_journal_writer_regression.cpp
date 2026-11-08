@@ -85,7 +85,6 @@ int main()
             "commit journal open failed");
 
     biofeedback::measurement::MeasurementEngine engine;
-    int renderedSamples = 0;
     engine.setCommitHook([&](const biofeedback::measurement::MeasurementSample& sample) {
         if (!sample.isValid()) return true;
         const QJsonObject record{
