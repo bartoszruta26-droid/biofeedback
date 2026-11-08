@@ -317,7 +317,11 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             return;
         }
 
-        if (method != "GET" && method != "HEAD" && method != "OPTIONS" && method != "POST") {
+        if (method == "POST") {
+            sendJson(socket, 503, errorBody("CAPABILITY_NOT_AVAILABLE", "Ta operacja API nie jest jeszcze wdrożona."));
+            return;
+        }
+        if (method != "GET" && method != "HEAD" && method != "OPTIONS") {
             sendJson(socket, 405, errorBody("METHOD_NOT_ALLOWED", "Metoda HTTP nie jest obsługiwana."));
             return;
         }
