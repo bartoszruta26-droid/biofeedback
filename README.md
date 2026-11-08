@@ -723,15 +723,28 @@ o minimalnych uprawnieniach wymaganych przez aplikację.
 
 ## Data Storage
 
-Patient data is organized as:
+Bieżący wspólny magazyn plikowy znajduje się w katalogu danych aplikacji
+wyznaczanym przez Qt `QStandardPaths::AppDataLocation`:
+
+```text
+<AppDataLocation>/
+└── shared-data/
+    ├── patients/
+    │   └── <uuid>.json
+    ├── measurements/
+    │   └── <uuid>.json
+    ├── training-sessions/
+    ├── training-results/
+    ├── game-sessions/
+    └── game-results/
 ```
-data/
-└── patients/
-    └── [patient_id]/
-        ├── profile.json
-        ├── measurements/
-        └── exercises/
-```
+
+Każdy rekord ma identyfikator UUID, wersję i znaczniki czasu. Nazwy plików
+nie zawierają PESEL ani nazwisk. Zapis odbywa się atomowo. Przy włączonym
+`encryption.enabled` rekordy są szyfrowane AES-256-GCM. Ustawienie
+`data.base_path` pozostaje ścieżką starszego magazynu plikowego używanego
+do migracji i zgodności wstecznej; nowe wspólne repozytorium korzysta
+z katalogu danych aplikacji.
 
 ## Safety & Compliance
 
