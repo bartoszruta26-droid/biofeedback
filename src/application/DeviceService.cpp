@@ -48,12 +48,12 @@ bool DeviceService::connectDevice(const std::string& id) {
     publish(state);
     return connected;
 }
-bool DeviceService::disconnectDevice(const std::string& id) noexcept {
+bool DeviceService::disconnectDevice(const std::string& id) {
     std::shared_ptr<DeviceAdapter> adapter;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         const auto it = m_devices.find(id);
-        if (it == m_devices.end()) return false;
+        if (it == m_devices.end() || it->second.descriptor.state == DeviceState::Connecting) return false;
         adapter = it->second.adapter;
     }
     adapter->disconnect();
