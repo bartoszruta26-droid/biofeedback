@@ -55,6 +55,8 @@
 - [x] Pierwsza grywalna implementacja Scorched Earth: artyleria turowa, kąt i siła strzału, grawitacja, wiatr, deformacja terenu, zdrowie czołgów i przeciwnik AI. Pozostaje rozszerzyć testy scenariuszowe, dopracować AI i zbalansować fizykę.
 - [x] Pierwsza grywalna implementacja Car Race: trzy pasy, sterowanie czujnikiem/klawiaturą, przeszkody, kolizje, życia, dystans, wynik i rosnąca prędkość. Pozostaje rozszerzyć testy scenariuszowe i dopracować rozgrywkę.
 - [x] Rejestracja nowych gier w GameFactory oraz udostępnienie ich w selektorach TrainingTab i OutlineTab.
+- [x] Archer, Car Race i Scorched Earth: obsługa zmiany rozmiaru aktywnego widoku; zachowanie/ponowne dopasowanie celu, przeszkód, terenu, czołgów i pocisków.
+- [x] Testy regresyjne zmiany rozmiaru podczas aktywnej rozgrywki Archer i Scorched Earth; Car Race ma już test małego widoku podczas gry.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
