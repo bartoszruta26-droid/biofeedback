@@ -223,7 +223,9 @@ bool JsonResourceRepository::readRecord(const QString& collection, const QString
 
 bool JsonResourceRepository::writeRecord(const QString& collection, const QString& id,
                                          const QJsonObject& record, QString* error) const {
-    if (!QDir().mkpath(collectionPath(collection))) {
+    if (!QDir().mkpath(collectionPath(collection)) ||
+        !QFile::setPermissions(collectionPath(collection),
+            QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner)) {
         setError(error, QStringLiteral("STORAGE_DIRECTORY_UNAVAILABLE"));
         return false;
     }
@@ -250,8 +252,12 @@ bool JsonResourceRepository::writeRecord(const QString& collection, const QStrin
         setError(error, QStringLiteral("RESOURCE_WRITE_FAILED"));
         return false;
     }
-    QFile::setPermissions(recordPath(collection, id),
-                          QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+    if (!QFile::setPermissions(recordPath(collection, id),
+            QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
+        QFile::remove(recordPath(collection, id));
+        setError(error, QStringLiteral("RESOURCE_PERMISSION_FAILED"));
+        return false;
+    }
     return true;
 }
 
