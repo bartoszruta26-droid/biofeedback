@@ -370,10 +370,11 @@ D do rozłączenia, R do ponownego skanowania, S do startu/zatrzymania,
 P do pauzy/wznowienia, a także klawisze zmiany celu, serii i powtórzeń.
 Dostępne są również tryby `--status`, `--list-ports`, `--version` i `--help`.
 
-TUI zapisuje historię sesji treningowej do lokalnego pliku CSV w katalogu danych
-użytkownika. Ten zapis jest obecnie lokalny, niezaszyfrowany i nie jest połączony
-z identyfikatorem pacjenta. Nie zastępuje dokumentacji pacjenta w magazynie
-plikowym Desktop ani przyszłego wspólnego repozytorium.
+TUI odczytuje listę pacjentów i zapisuje ukończone sesje treningowe
+przez uwierzytelnione API do wspólnego repozytorium. Sesja zawiera parametry
+ćwiczenia oraz statystyki i metadane powtórzeń. Obecnie TUI nie wybiera jeszcze
+pacjenta, więc rekord treningu nie ma powiązania `patient_id`; pełne powiązanie
+pacjent–sesja oraz osobna kolekcja wyników treningowych pozostają do wdrożenia.
 
 ### 3. WebUI — interfejs przeglądarkowy
 
