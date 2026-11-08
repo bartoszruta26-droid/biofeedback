@@ -114,6 +114,11 @@ bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample&
     std::vector<std::shared_ptr<CallbackEntry>> callbacks;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_nextSequence == 0 ||
+            m_nextSequence > static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max())) {
+            output = MeasurementSample{};
+            return false;
+        }
         sample.sequence = m_nextSequence;
         if (m_commitHook) {
             bool committed = false;
