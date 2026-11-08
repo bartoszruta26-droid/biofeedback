@@ -42,7 +42,7 @@ private:
 
     void createWave();
     void firePlayerShot();
-    void loseLife();
+    bool loseLife();
 
     QRectF m_player;
     QVector<Projectile> m_projectiles;
@@ -52,6 +52,7 @@ private:
     double m_fireCooldown;
     double m_enemyDirection;
     double m_enemyFireCooldown;
+    double m_hitCooldown;
     int m_lives;
     int m_wave;
     bool m_fireHeld;
