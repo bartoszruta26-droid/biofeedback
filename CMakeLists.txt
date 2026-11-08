@@ -74,6 +74,22 @@ add_executable(measurement_engine_regression tests/measurement_engine_regression
 target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement Threads::Threads)
 add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
 
+# Device calibration profiles and incremental binary protocol parsing.
+add_library(biofeedback_sensor_protocol STATIC
+    src/sensor/CalibrationProfile.cpp
+    src/sensor/ProtocolParser.cpp
+)
+target_include_directories(biofeedback_sensor_protocol PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_sensor_protocol PUBLIC nlohmann_json::nlohmann_json)
+
+add_executable(calibration_profile_regression tests/calibration_profile_regression.cpp)
+target_link_libraries(calibration_profile_regression PRIVATE biofeedback_sensor_protocol)
+add_test(NAME calibration_profile_regression COMMAND calibration_profile_regression)
+
+add_executable(protocol_parser_regression tests/protocol_parser_regression.cpp)
+target_link_libraries(protocol_parser_regression PRIVATE biofeedback_sensor_protocol)
+add_test(NAME protocol_parser_regression COMMAND protocol_parser_regression)
+
 add_executable(measurement_training_pipeline_regression tests/measurement_training_pipeline_regression.cpp)
 target_link_libraries(measurement_training_pipeline_regression PRIVATE biofeedback_measurement biofeedback_training)
 add_test(NAME measurement_training_pipeline_regression COMMAND measurement_training_pipeline_regression)
