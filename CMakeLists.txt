@@ -212,6 +212,7 @@ if(Qt5_FOUND)
         src/games/GalagaGame.cpp
         src/games/ArcherGame.cpp
         src/games/CarRaceGame.cpp
+        src/games/ScorchedEarthGame.cpp
         src/formulas.cpp
     )
 
@@ -243,6 +244,7 @@ if(Qt5_FOUND)
         include/games/GalagaGame.hpp
         include/games/ArcherGame.hpp
         include/games/CarRaceGame.hpp
+        include/games/ScorchedEarthGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -250,6 +252,7 @@ if(Qt5_FOUND)
         include/games/GalagaGame.hpp
         include/games/ArcherGame.hpp
         include/games/CarRaceGame.hpp
+        include/games/ScorchedEarthGame.hpp
         include/formulas.hpp
     )
 
@@ -283,6 +286,7 @@ if(Qt5_FOUND)
         src/games/GalagaGame.cpp
         src/games/ArcherGame.cpp
         src/games/CarRaceGame.cpp
+        src/games/ScorchedEarthGame.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
         include/games/GameEngine.hpp
@@ -295,6 +299,7 @@ if(Qt5_FOUND)
         include/games/GalagaGame.hpp
         include/games/ArcherGame.hpp
         include/games/CarRaceGame.hpp
+        include/games/ScorchedEarthGame.hpp
         include/sensor/SerialCommunication.hpp
         include/core/DebugManager.hpp
     )
@@ -344,6 +349,7 @@ if(Qt5_FOUND)
         src/games/GalagaGame.cpp
         src/games/ArcherGame.cpp
         src/games/CarRaceGame.cpp
+        src/games/ScorchedEarthGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
