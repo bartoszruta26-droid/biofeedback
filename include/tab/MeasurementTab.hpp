@@ -30,6 +30,7 @@
 #include <QFile>
 #include <QJsonObject>
 
+#include "tab/SampleJournalWriter.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
 #include "training/RepetitionDetector.hpp"
@@ -444,9 +445,8 @@ private:
     QVector<RecordedMeasurementSample> m_recordedSamples;
     quint64 m_rawTableLastSequence{0};
     qint64 m_lastRawTableRefreshMs{-100};
-    QFile m_sampleJournal;
+    std::unique_ptr<SampleJournalWriter> m_sampleJournalWriter;
     QString m_sampleJournalPath;
-    quint32 m_sampleJournalPendingWrites{0};
     QString m_activeSessionId;
     bool m_sampleJournalFailed{false};
     
