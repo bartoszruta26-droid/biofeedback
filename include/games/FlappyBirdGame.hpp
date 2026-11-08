@@ -8,6 +8,8 @@
 #include <vector>
 #include <memory>
 
+class QResizeEvent;
+
 namespace games {
 
 /**
@@ -30,8 +32,6 @@ namespace games {
  * - Różne prędkości gry wpływające na dynamikę rozgrywki
  * - Generowanie losowych przeszkód z lukami do przelotu
  */
-class QResizeEvent;
-
 class FlappyBirdGame : public GameEngine {
     Q_OBJECT
 
