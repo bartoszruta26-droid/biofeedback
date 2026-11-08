@@ -53,6 +53,15 @@ target_link_libraries(biofeedback_core
         Qt5::Core
 )
 
+# Encrypted acquisition journal: atomically committed batches of up to 256 samples.
+add_library(biofeedback_acquisition_journal STATIC src/data/AcquisitionJournal.cpp)
+target_include_directories(biofeedback_acquisition_journal PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(biofeedback_acquisition_journal PUBLIC biofeedback_core Qt5::Core)
+
+add_executable(acquisition_journal_regression tests/acquisition_journal_regression.cpp)
+target_link_libraries(acquisition_journal_regression PRIVATE biofeedback_acquisition_journal Qt5::Core)
+add_test(NAME acquisition_journal_regression COMMAND acquisition_journal_regression)
+
 # Shared encrypted JSON resource repository for patients, measurements, training and games.
 add_library(biofeedback_data_repository STATIC src/data/JsonResourceRepository.cpp)
 target_include_directories(biofeedback_data_repository PUBLIC ${CMAKE_SOURCE_DIR}/include)
