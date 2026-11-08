@@ -19,14 +19,17 @@ required = (
     "ch < 0x20 || ch > 0x7e",
     'm_impl->setLastError("Rejected invalid serial command")',
 )
-missing = [item for item in required if item not in body]
+positions = {item: body.find(item) for item in required}
+missing = [item for item, position in positions.items() if position < 0]
 if missing:
     raise SystemExit("Missing serial command validation: " + ", ".join(missing))
 
-validation_end = body.find("if (!m_impl->isConnected) return")
 write_position = body.find("writeToPort(")
-if validation_end < 0 or write_position < 0 or validation_end > write_position:
-    raise SystemExit("Command validation must precede connection and serial write")
+if write_position < 0:
+    raise SystemExit("Serial write call not found")
+late_checks = [item for item, position in positions.items() if position >= write_position]
+if late_checks:
+    raise SystemExit("Validation must precede serial write: " + ", ".join(late_checks))
 
 if "MaxResponseBytes = 4096" not in body:
     raise SystemExit("Serial command response must remain bounded")
