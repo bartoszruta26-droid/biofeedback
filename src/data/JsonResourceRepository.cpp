@@ -15,7 +15,7 @@
 
 namespace biofeedback::data {
 namespace {
-constexpr qint64 MaxRecordBytes = 1024 * 1024;
+constexpr qint64 MaxRecordBytes = 16 * 1024 * 1024;
 const QStringList Collections = {
     QStringLiteral("patients"),
     QStringLiteral("measurements"),
