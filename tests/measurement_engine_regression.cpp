@@ -120,5 +120,26 @@ int main() {
     assert(unsubscribeReturned.load(std::memory_order_acquire));
     concurrentEngine.ingest(concurrentInput);
     assert(concurrentEngine.history().size() == 2);
+
+    // Persistence is a pre-publication gate: failed commits consume no sequence,
+    // enter no in-memory history and are never delivered to subscribers.
+    MeasurementEngine commitEngine;
+    int commitPublications = 0;
+    commitEngine.subscribe([&](const MeasurementSample&) { ++commitPublications; });
+    bool allowCommit = false;
+    commitEngine.setCommitHook([&](const MeasurementSample& candidate) {
+        assert(candidate.sequence == 1);
+        return allowCommit;
+    });
+    MeasurementSample committedSample;
+    assert(!commitEngine.ingest(concurrentInput, committedSample));
+    assert(committedSample.sequence == 0);
+    assert(commitEngine.history().empty());
+    assert(commitPublications == 0);
+    allowCommit = true;
+    assert(commitEngine.ingest(concurrentInput, committedSample));
+    assert(committedSample.sequence == 1);
+    assert(commitEngine.history().size() == 1);
+    assert(commitPublications == 1);
     return 0;
 }
