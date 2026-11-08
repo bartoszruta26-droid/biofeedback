@@ -235,7 +235,7 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->enemyHealth() == 100);
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
-    scorchedGame->handleSensorInput(65.0);
+    scorchedGame->handleSensorInput(38.5); // Calibrated trajectory intersects the enemy tank rather than passing above it.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire);
     waitForEvents(180);
