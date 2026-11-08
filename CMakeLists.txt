@@ -192,7 +192,7 @@ if(UNIX)
     )
     set_target_properties(serial_pty_regression PROPERTIES AUTOMOC ON)
     target_include_directories(serial_pty_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    target_link_libraries(serial_pty_regression PRIVATE Qt5::Core pthread)
+    target_link_libraries(serial_pty_regression PRIVATE biofeedback_sensor_protocol Qt5::Core pthread)
     add_test(NAME serial_pty_regression COMMAND serial_pty_regression)
 endif()
 
@@ -208,7 +208,7 @@ if(CURSES_FOUND)
     )
     set_target_properties(biofeedback_tui PROPERTIES AUTOMOC ON)
     target_include_directories(biofeedback_tui PRIVATE ${CMAKE_SOURCE_DIR}/include ${CURSES_INCLUDE_DIRS})
-    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model biofeedback_measurement biofeedback_training Qt5::Core ${CURSES_LIBRARIES})
+    target_link_libraries(biofeedback_tui PRIVATE biofeedback_tui_model biofeedback_measurement biofeedback_training biofeedback_sensor_protocol Qt5::Core ${CURSES_LIBRARIES})
     install(TARGETS biofeedback_tui DESTINATION bin)
 else()
     message(STATUS "ncurses not found - skipping optional biofeedback_tui target")
@@ -358,7 +358,7 @@ if(Qt5_FOUND)
     )
     target_link_directories(game_factory_regression PRIVATE ${LIBSERIALPORT_LIBRARY_DIRS})
     target_link_libraries(game_factory_regression PRIVATE
-        Qt5::Core Qt5::Widgets Threads::Threads ${LIBSERIALPORT_LIBRARIES}
+        Qt5::Core Qt5::Widgets Threads::Threads ${LIBSERIALPORT_LIBRARIES} biofeedback_sensor_protocol
     )
 
     # Process-restart regression for durable analytics and checkpoint history.
@@ -427,6 +427,7 @@ if(Qt5_FOUND)
     target_link_libraries(training_tab_process_restart_regression PRIVATE
         biofeedback_training
         biofeedback_measurement
+        biofeedback_sensor_protocol
         Qt5::Core Qt5::Widgets Qt5::Charts
         ${LIBSERIALPORT_LIBRARIES}
         OpenSSL::SSL OpenSSL::Crypto pthread
@@ -457,6 +458,7 @@ if(Qt5_FOUND)
     target_link_libraries(${PROJECT_NAME}
         biofeedback_measurement
         biofeedback_training
+        biofeedback_sensor_protocol
         Qt5::Core
         Qt5::Widgets
         Qt5::Charts
