@@ -441,7 +441,7 @@ void drawModule(tui::Screen screen,
                 drawText(11 + visible, x + 2, "... pozostale rekordy: " +
                          std::to_string(patientSummaries.size() - static_cast<std::size_t>(visible)));
         }
-        drawText(LINES - 6, x + 2, "Wybierz pacjenta: [ / ]   Brak wyboru = zapis bez przypisania.");
+        drawText(LINES - 6, x + 2, "Wybierz pacjenta: strzalki lewo/prawo   Brak wyboru = zapis bez przypisania.");
         break;
     }
     case tui::Screen::Training: {
