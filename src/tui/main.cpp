@@ -517,7 +517,7 @@ int main(int argc, char** argv)
         case 'C':
             if (active == static_cast<std::size_t>(tui::Screen::Devices) &&
                 !serial.isConnected() && selectedPort < ports.size()) {
-                if (serial.connect(ports[selectedPort], DEFAULT_BAUD_RATE)) serial.startAsyncReading();
+                if (serial.connect(ports[selectedPort], sensor::protocol::DefaultBaudRate)) serial.startAsyncReading();
             }
             break;
         case 'd':
