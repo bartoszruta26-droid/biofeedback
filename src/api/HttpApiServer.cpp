@@ -271,14 +271,28 @@ void HttpApiServer::handleConnection(QTcpSocket* socket) {
             capabilities.append(QStringLiteral("authentication"));
             QJsonArray limitations;
             limitations.append(QStringLiteral("device_control"));
-            limitations.append(QStringLiteral("patient_repository"));
             limitations.append(QStringLiteral("measurement_stream"));
-            limitations.append(QStringLiteral("resource_authorization"));
+            limitations.append(QStringLiteral("role_scoped_authorization"));
+            limitations.append(QStringLiteral("websocket_events"));
+            limitations.append(QStringLiteral("mariadb_adapter"));
+            QJsonArray collections;
+            const QStringList resourceCollections{
+                QStringLiteral("patients"), QStringLiteral("measurements"),
+                QStringLiteral("training-sessions"), QStringLiteral("training-results"),
+                QStringLiteral("game-sessions"), QStringLiteral("game-results")
+            };
+            for (const QString& collection : resourceCollections) collections.append(collection);
+            const bool sharedDataReady = m_resources && m_resources->isReady();
+            if (sharedDataReady) capabilities.append(QStringLiteral("shared_resource_crud"));
+            else limitations.append(QStringLiteral("shared_resource_store_unavailable"));
             const QJsonObject status{
                 {"status", QStringLiteral("ready")},
-                {"version", QStringLiteral("0.2.0")},
-                {"mode", QStringLiteral("desktop-api")},
+                {"version", QStringLiteral("0.3.0")},
+                {"mode", QStringLiteral("shared-data-api")},
                 {"timestamp", QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+                {"shared_data_ready", sharedDataReady},
+                {"storage_backend", sharedDataReady ? QStringLiteral("files") : QStringLiteral("unavailable")},
+                {"resource_collections", collections},
                 {"capabilities", capabilities},
                 {"limitations", limitations}
             };
