@@ -16,6 +16,7 @@
 #include <QTextStream>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QUrl>
 
 #include <ncurses.h>
@@ -163,6 +164,7 @@ struct LiveData {
     bool sessionSaveAttempted = false;
     QString sessionStartedAt;
     QString selectedPatientId;
+    QJsonArray measurementSamples;
     std::uint64_t validSampleCount = 0;
     std::uint64_t invalidSampleCount = 0;
     QString lastSampleQuality = "brak probki";
@@ -179,6 +181,38 @@ std::vector<std::string> scanSerialPortCandidates()
     return ports;
 }
 
+
+void saveMeasurementSession(LiveData& live, biofeedback::api::HttpApiClient& apiClient)
+{
+    QJsonArray samples;
+    QString startedAt;
+    QString patientId;
+    {
+        std::lock_guard<std::mutex> lock(live.mutex);
+        if (live.measurementSamples.isEmpty()) return;
+        samples = live.measurementSamples;
+        startedAt = live.sessionStartedAt;
+        patientId = live.selectedPatientId;
+        live.measurementSamples = QJsonArray();
+    }
+    const QJsonObject payload{
+        {QStringLiteral("started_at"), startedAt.isEmpty()
+            ? QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs) : startedAt},
+        {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("patient_id"), patientId},
+        {QStringLiteral("sample_count"), samples.size()},
+        {QStringLiteral("samples"), samples},
+        {QStringLiteral("source_client"), QStringLiteral("tui")},
+        {QStringLiteral("status"), QStringLiteral("completed")}
+    };
+    QJsonObject stored;
+    QString error;
+    if (!apiClient.createResource(QStringLiteral("measurements"), payload, stored, &error)) {
+        std::lock_guard<std::mutex> lock(live.mutex);
+        live.measurementSamples = samples;
+        live.trainingMessage = "Blad archiwizacji pomiaru: " + error.toStdString();
+    }
+}
 
 void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiClient)
 {
@@ -612,6 +646,13 @@ int main(int argc, char** argv)
         ++live.validSampleCount;
         const double forceN = sample.value * 9.80665;
         if (!std::isfinite(forceN) || forceN < 0.0) return;
+        if (live.measurementSamples.size() < 100000) {
+            live.measurementSamples.append(QJsonObject{
+                {QStringLiteral("timestamp_ms"), static_cast<qint64>(sample.deviceTimestampMs)},
+                {QStringLiteral("force_n"), forceN},
+                {QStringLiteral("quality"), QString::fromLatin1(biofeedback::measurement::qualityName(sample.quality))}
+            });
+        }
         live.recentForceN.push_back(forceN);
         if (live.recentForceN.size() > 120) live.recentForceN.erase(live.recentForceN.begin());
         if (!live.trainingActive || live.trainingPaused || live.trainingResting) return;
@@ -725,6 +766,7 @@ int main(int argc, char** argv)
                         live.completedReps = 0;
                         live.currentSeries.clear();
                         live.sessionRepetitions.clear();
+                        live.measurementSamples = QJsonArray();
                         live.lastSeries = {};
                         live.trainingResting = false;
                         live.restRemaining = 0;
@@ -854,6 +896,7 @@ int main(int argc, char** argv)
                 }
             }
         }
+        saveMeasurementSession(live, *apiClient);
         saveTrainingSession(live, *apiClient);
     }
 
@@ -865,6 +908,7 @@ int main(int argc, char** argv)
             live.sessionNeedsSave = !live.sessionRepetitions.empty();
         }
     }
+    saveMeasurementSession(live, *apiClient);
     saveTrainingSession(live, *apiClient);
     endwin();
     serial.disconnect();
