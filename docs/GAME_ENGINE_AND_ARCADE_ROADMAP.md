@@ -73,10 +73,13 @@
 - [x] Galaga: test odczytuje pozostały czas ochrony po trafieniu, potwierdza jego dodatnią wartość i zmniejszanie się w czasie bez utraty kolejnego życia. Dodano wyłącznie diagnostyczny getter `hitProtectionRemaining()`.
 - [ ] Galaga: osobny test dwóch pocisków trafiających w jednym oknie ochronnym, aby bezpośrednio potwierdzić blokadę wielokrotnej utraty życia.
 - [ ] Scorched Earth: bezpośrednie testy przejścia rundy po zniszczeniu czołgu, przywrócenia zdrowia przeciwnika i leczenia gracza.
+- [x] Flappy Bird: dodano obsługę zmiany rozmiaru aktywnej gry; pozycja i prędkość pionowa ptaka, szerokość przeszkód, geometria luk oraz położenia istniejących przeszkód są przeskalowywane, a pozycja ptaka ograniczana do nowego widoku.
+- [x] Flappy Bird: dodano scenariusz regresyjny zmiany rozmiaru 640×480 → 180×120 → 640×480 podczas aktywnej sesji; oczekuje na kompilację i testy.
 - [ ] Dalszy audyt mechaniki istniejących gier (Arkanoid, Pong, Flappy Bird i Mario), w tym kolizji i zachowania przy zmianie rozmiaru.
 - [x] CI dla commitu `98595bd8a3dd55ad0a4f2a267bac49f403cf044a`: 6/6 workflow zakończonych powodzeniem (Linux desktop GUI build, security regression i cztery polityki serial).
 - [ ] Scenariusz Galaga dodany w `1749b9d`, diagnostyczny getter w `9be675a`, a asercje czasu ochrony w `4367ea0`; wszystkie te zmiany oczekują na CI i nie były kompilowane/testowane.
 - [ ] Poprawka granic losowania chmurek Mario w `d156a81`; nie uruchamiano kompilacji ani testów zgodnie z bieżącym zakresem prac.
+- [ ] Obsługa zmiany rozmiaru Flappy Bird i test regresyjny w commitach `6434ac0`, `780467c`, `8c3cb57`; zmiany nie były kompilowane ani testowane.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
