@@ -22,6 +22,7 @@ public:
     bool isRunning() const noexcept;
     bool ingest(const measurement::MeasurementInput& input,
                 measurement::MeasurementSample& output);
+    void setCommitHook(measurement::MeasurementEngine::CommitHook hook);
     CallbackToken subscribe(SampleCallback callback);
     void unsubscribe(CallbackToken token);
     std::vector<measurement::MeasurementSample> history() const;
