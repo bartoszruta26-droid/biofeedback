@@ -20,6 +20,7 @@ public:
                            QObject* parent = nullptr);
     HttpApiServer(const QString& usersFilePath,
                   std::shared_ptr<biofeedback::data::JsonResourceRepository> resources,
+                  const QString& authenticationEncryptionKey = QString(),
                   QObject* parent = nullptr);
     bool listen(const QHostAddress& address = QHostAddress::LocalHost, quint16 port = 8765);
     void close();
@@ -41,6 +42,7 @@ private:
     QHash<QString, LoginThrottle> m_loginAttempts;
     QString m_usersFilePath;
     std::shared_ptr<biofeedback::data::JsonResourceRepository> m_resources;
+    QString m_authenticationEncryptionKey;
     QTcpServer m_server;
 };
 }
