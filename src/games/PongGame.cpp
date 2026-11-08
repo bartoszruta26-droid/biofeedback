@@ -253,7 +253,10 @@ void PongGame::checkCollisions() {
 void PongGame::update(double deltaTime) {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0) return;
 
-    // Podkroki ograniczają przenikanie piłki przez wąskie paletki.
+    // Match GameEngine's stall policy before converting the step count to int.
+    // The normal GameEngine path already supplies fixed 1/120 s steps; this
+    // subdivision is a defensive guard for direct callers with larger deltas.
+    deltaTime = qMin(deltaTime, 0.1);
     constexpr double maxPhysicsStep = 1.0 / 120.0;
     const int steps = qMax(1, static_cast<int>(std::ceil(deltaTime / maxPhysicsStep)));
     const double stepTime = deltaTime / steps;
