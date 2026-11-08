@@ -28,7 +28,7 @@ public:
     bool registerDevice(DeviceDescriptor descriptor, std::shared_ptr<DeviceAdapter> adapter);
     bool unregisterDevice(const std::string& id);
     bool connectDevice(const std::string& id);
-    bool disconnectDevice(const std::string& id) noexcept;
+    bool disconnectDevice(const std::string& id);
     std::vector<DeviceDescriptor> devices() const;
     bool device(const std::string& id, DeviceDescriptor& output) const;
     CallbackToken subscribe(StateCallback callback);
