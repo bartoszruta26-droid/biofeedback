@@ -1266,7 +1266,9 @@ void MeasurementTab::resetSession()
     closeSampleJournal();
     m_sampleJournalPath.clear();
     m_activeSessionId.clear();
-        m_sampleJournalFailed = false;
+    m_journalNextSequence.store(1, std::memory_order_release);
+    m_journalAdmission.store(false, std::memory_order_release);
+    m_sampleJournalFailed = false;
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
     m_completedSeriesStats.clear();
