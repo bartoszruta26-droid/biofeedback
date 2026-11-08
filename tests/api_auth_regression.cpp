@@ -30,7 +30,8 @@ QByteArray transact(quint16 port, const QByteArray& request) {
             const QList<QByteArray> lines = response.left(headerEnd).split('\n');
             int contentLength = 0;
             for (QByteArray line : lines) {
-                if (line.startsWith("Content-Length:", Qt::CaseInsensitive)) {
+                const QByteArray contentLengthHeader("Content-Length:");
+                if (line.left(contentLengthHeader.size()).compare(contentLengthHeader, Qt::CaseInsensitive) == 0) {
                     contentLength = line.mid(line.indexOf(':') + 1).trimmed().toInt();
                 }
             }
