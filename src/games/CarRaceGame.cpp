@@ -74,16 +74,20 @@ void CarRaceGame::keyPressEvent(QKeyEvent* event)
 
 void CarRaceGame::spawnObstacle()
 {
+    if (width() <= 0 || height() <= 0)
+        return;
     const double roadWidth = width() * 0.72;
     const double roadLeft = (width() - roadWidth) / 2.0;
     const double laneWidth = roadWidth / 3.0;
+    const double obstacleWidth = qMin(42.0, qMax(1.0, laneWidth - 8.0));
+    const double obstacleHeight = qMin(64.0, qMax(1.0, height() * 0.2));
     const int lane = (m_spawnCount * 2 + 1) % 3;
     ++m_spawnCount;
     Obstacle obstacle;
     obstacle.lane = lane;
     obstacle.passed = false;
-    obstacle.rect = QRectF(roadLeft + laneWidth * lane + (laneWidth - 42.0) / 2.0,
-                           -76.0, 42.0, 64.0);
+    obstacle.rect = QRectF(roadLeft + laneWidth * lane + (laneWidth - obstacleWidth) / 2.0,
+                           -obstacleHeight - 4.0, obstacleWidth, obstacleHeight);
     m_obstacles.push_back(obstacle);
 }
 
