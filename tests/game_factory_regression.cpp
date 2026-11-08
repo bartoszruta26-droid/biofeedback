@@ -152,6 +152,10 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->isRunning());
     scorchedGame->stop();
 
+    std::unique_ptr<games::GameEngine> legacyScoredEarth(
+        games::createGame(QStringLiteral("scored_earth")));
+    REQUIRE(dynamic_cast<games::ScorchedEarthGame*>(legacyScoredEarth.get()) != nullptr);
+
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
 }
