@@ -444,10 +444,6 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
-    m_measurementEngine->setCommitHook(
-        [this](const biofeedback::measurement::MeasurementSample& sample) {
-            return commitMeasurementSample(sample);
-        });
     m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
         *m_serialPort, m_measurementEngine, "desktop-hx711", m_showRawValues ? "count" : "g");
     m_measurementCallbackToken = m_measurementEngine->subscribe(
@@ -561,7 +557,7 @@ bool MeasurementTab::commitMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
     if (!m_journalAdmission.load(std::memory_order_acquire))
-        return !m_sampleJournalFailed.load(std::memory_order_acquire);
+        return false;
 
     const quint64 sequence = m_journalNextSequence.load(std::memory_order_acquire);
     if (sequence == 0 ||
@@ -1150,6 +1146,14 @@ void MeasurementTab::startMeasurement()
                               tr("Nie można utworzyć trwałego dziennika próbek. Pomiar nie został rozpoczęty."));
         return;
     }
+    // Install the durable boundary only for an active measurement session.
+    // TrainingTab can consume the shared engine normally while this tab is idle.
+    if (m_measurementEngine) {
+        m_measurementEngine->setCommitHook(
+            [this](const biofeedback::measurement::MeasurementSample& sample) {
+                return commitMeasurementSample(sample);
+            });
+    }
 
     std::cout << "[DEBUG] startMeasurement: Calling ensureCurrentSeriesInitialized" << std::endl;
     {
@@ -1210,12 +1214,8 @@ void MeasurementTab::stopMeasurement()
     }
     // setCommitHook takes the engine mutex, forming a barrier behind any
     // in-flight commit before the writer is drained and closed.
-    if (m_measurementEngine) {
-        m_measurementEngine->setCommitHook(
-            [this](const biofeedback::measurement::MeasurementSample& sample) {
-                return commitMeasurementSample(sample);
-            });
-    }
+    if (m_measurementEngine)
+        m_measurementEngine->setCommitHook({});
     m_isMeasuring = false;
     updateRawTableBatch(true);
     const bool journalFlushed = flushSampleJournal();
