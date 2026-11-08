@@ -98,6 +98,17 @@ int main(int argc, char **argv)
     REQUIRE(game.inputCount() == inputsAfterRestart);
     REQUIRE(std::abs(game.lastInput()) < 1e-9);
 
+    // Public reset() must also discard a queued worker sample and its
+    // availability flag before a subsequent start.
+    std::thread resetWorker([&game]() { game.handleSensorInput(23456.0); });
+    resetWorker.join();
+    game.reset();
+    game.start();
+    const int inputsAfterReset = game.inputCount();
+    waitForEvents(20);
+    REQUIRE(game.inputCount() == inputsAfterReset);
+    REQUIRE(std::abs(game.lastInput()) < 1e-9);
+
     // Invalid worker samples are counted on the GUI thread and must not
     // overwrite the most recent valid sample in the coalescing mailbox.
     std::thread invalidWorker([&game]() {
