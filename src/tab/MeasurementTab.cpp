@@ -2746,7 +2746,8 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
     m_serialPort = serial;
     if (m_serialPort && m_measurementEngine) {
         m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
-            *m_serialPort, m_measurementEngine, "desktop-hx711", "g");
+            *m_serialPort, m_measurementEngine, "desktop-hx711",
+            m_showRawValues ? "count" : "g");
     }
     if (m_serialPort) {
         m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
