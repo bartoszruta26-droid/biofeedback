@@ -5,6 +5,18 @@
     "timeout_ms": 1000,
     "retry_count": 3
   },
+  "storage": {
+    "patient_backend": "files",
+    "mariadb": {
+      "host": "127.0.0.1",
+      "port": 3306,
+      "database": "biofeedback",
+      "username": "biofeedback_app",
+      "password_env": "BIOFEEDBACK_MARIADB_PASSWORD",
+      "tls": true,
+      "connect_timeout_seconds": 5
+    }
+  },
   "data": {
     "base_path": "./data/patients",
     "backup_enabled": true,
