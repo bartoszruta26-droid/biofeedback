@@ -625,7 +625,7 @@ void MainWindow::toggleSerialConnection()
         refreshSerialPorts();
         return;
     }
-    if (!m_serialPort->connect(port.toStdString(), DEFAULT_BAUD_RATE)) {
+    if (!m_serialPort->connect(port.toStdString(), sensor::protocol::DefaultBaudRate)) {
         updateConnectionStatus(false);
         QMessageBox::warning(this, tr("Połączenie"), tr("Nie udało się otworzyć portu %1.").arg(port));
         addDebugMessage(tr("Nie udało się połączyć z %1").arg(port), "ERROR");
@@ -634,7 +634,7 @@ void MainWindow::toggleSerialConnection()
     m_serialPort->startAsyncReading();
     updateConnectionStatus(true, port);
     if (m_connectDeviceButton) m_connectDeviceButton->setText(tr("Rozłącz"));
-    addDebugMessage(tr("Uruchomiono odczyt z portu %1 przy %2 baud").arg(port).arg(DEFAULT_BAUD_RATE), "SERIAL");
+    addDebugMessage(tr("Uruchomiono odczyt z portu %1 przy %2 baud").arg(port).arg(sensor::protocol::DefaultBaudRate), "SERIAL");
 }
 
 void MainWindow::updateWeightDisplay(double value, bool isRaw)
