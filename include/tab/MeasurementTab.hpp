@@ -2,6 +2,7 @@
 #define TAB_MEASUREMENTTAB_HPP
 
 #include <QWidget>
+#include <vector>
 #include <QElapsedTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
