@@ -2,8 +2,13 @@
 
 #include <QFile>
 #include <QFileDevice>
+#include <QFileInfo>
+
+#include <cerrno>
+#include <cstring>
 
 #ifdef Q_OS_UNIX
+#include <fcntl.h>
 #include <unistd.h>
 #endif
 
@@ -145,6 +150,33 @@ QString SampleJournalWriter::errorString() const
     return m_error;
 }
 
+bool SampleJournalWriter::syncParentDirectory(const QString& path, QString& error)
+{
+#ifdef Q_OS_UNIX
+    const QByteArray directoryPath =
+        QFile::encodeName(QFileInfo(path).absolutePath());
+    const int directoryFd = ::open(directoryPath.constData(), O_RDONLY);
+    if (directoryFd < 0) {
+        error = QStringLiteral("Unable to open journal directory for fsync: %1")
+                    .arg(QString::fromLocal8Bit(std::strerror(errno)));
+        return false;
+    }
+
+    const int result = ::fsync(directoryFd);
+    const int savedErrno = errno;
+    ::close(directoryFd);
+    if (result != 0) {
+        error = QStringLiteral("Unable to fsync journal directory: %1")
+                    .arg(QString::fromLocal8Bit(std::strerror(savedErrno)));
+        return false;
+    }
+#else
+    Q_UNUSED(path);
+    Q_UNUSED(error);
+#endif
+    return true;
+}
+
 bool SampleJournalWriter::flushDurably(QFile& file, QString& error)
 {
     if (!file.flush()) {
@@ -185,7 +217,8 @@ void SampleJournalWriter::run()
                                    QFileDevice::ReadOwner | QFileDevice::WriteOwner)) {
             error = QStringLiteral("Unable to restrict sample journal file permissions");
             opened = false;
-        } else if (!writeDurably(file, m_headerLine, error)) {
+        } else if (!writeDurably(file, m_headerLine, error) ||
+                   !syncParentDirectory(m_path, error)) {
             opened = false;
         }
     }
