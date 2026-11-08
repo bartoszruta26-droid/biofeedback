@@ -25,7 +25,7 @@ A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live fo
 
 Pierwsze uruchomienie GUI prowadzi przez utworzenie konta administratora z hasłem o długości co najmniej 12 znaków; nie ma zaszytego domyślnego loginu ani hasła. Konfiguracja, konta i dane pacjentów trafiają do katalogów użytkownika XDG.
 
-Wersja TUI korzysta już ze wspólnego adaptera szeregowego i może wyświetlać rzeczywiste próbki z podłączonego, skalibrowanego czujnika (wykres tekstowy). Desktop GUI prezentuje wykres siły, trendy pomiarowe oraz analizę serii i powtórzeń. WebUI i Android pozostają trybami podglądu: ich wykresy są celowo pustymi stanami, ponieważ nie mają jeszcze strumienia pomiarowego ani wspólnego API sesji. Nie należy traktować tych dwóch interfejsów jako gotowych do rejestracji treningu. Żaden interfejs nie tworzy fikcyjnych danych pacjentów.
+Wersja TUI korzysta ze wspólnego adaptera szeregowego i wyświetla rzeczywiste próbki z podłączonego, skalibrowanego czujnika; listę pacjentów pobiera z serwera, a ukończone sesje treningowe zapisuje przez API. Desktop GUI prezentuje wykres siły, trendy pomiarowe oraz analizę serii i powtórzeń. WebUI i Android nie otrzymują jeszcze strumienia pomiarowego czasu rzeczywistego. Klient WebUI obsługuje CRUD zasobów API, a ekran Pacjenci Androida korzysta ze wspólnego repozytorium; ekrany pomiarów i treningu Androida pozostają podglądowe. Żaden interfejs nie tworzy fikcyjnych danych pomiarowych.
 
 ## Hardware Requirements
 
@@ -555,9 +555,10 @@ próbkowanej siły i progów histerezy.
 Po zakończeniu powtórzeń można analizować siłę szczytową i średnią, czas
 powtórzenia, czas do szczytu, realizację celu oraz zmienność pomiędzy
 powtórzeniami. Podsumowania serii są wykorzystywane w analizie treningowej
-i mogą być eksportowane z Desktop. TUI zapisuje własną lokalną historię CSV.
-Wspólne repozytorium sesji i wyników dla wszystkich platform jest elementem
-docelowego serwera danych, a nie ukończoną funkcją bieżącej wersji.
+i mogą być eksportowane z Desktop. TUI zapisuje sesje treningowe przez API
+do wspólnego repozytorium. Obecnie nie dołącza jeszcze identyfikatora pacjenta
+do sesji, a Desktop nie zapisuje jeszcze wszystkich wyników treningowych
+i pomiarowych przez API.
 
 ### 10. Gry biofeedbackowe
 
