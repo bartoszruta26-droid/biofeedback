@@ -178,6 +178,20 @@ bool Application::initialize()
         m_authentication = std::make_unique<Authentication>(usersPath.toStdString());
         m_authentication->setFileEncryption(encryptionEnabled, encryptionKey);
 
+        // Patient storage backend is explicit. Never silently fall back from MariaDB
+        // to local files: that could split a shared patient registry across clients.
+        const std::string patientBackend =
+            m_configManager->getString("storage.patient_backend", "files");
+        if (patientBackend == "mariadb") {
+            throw std::runtime_error(
+                "MariaDB patient storage is selected in config, but the MariaDB repository "
+                "adapter is not implemented yet. No patient data was written to local files."
+            );
+        }
+        if (patientBackend != "files") {
+            throw std::runtime_error("Unsupported storage.patient_backend value.");
+        }
+
         // Patient-linked files follow the same policy.
         m_dataManager = std::make_unique<DataManager>();
         if (!encryptionKey.empty()) m_dataManager->setEncryptionKey(encryptionKey);
