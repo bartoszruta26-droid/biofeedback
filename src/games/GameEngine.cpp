@@ -55,8 +55,8 @@ void GameEngine::start()
     // Reset stanu gry
     reset();
     
-    // Inicjalizacja specyficzna dla gry
-    initialize();
+    // reset() initializes the derived game state after clearing the base state.
+    // Keep initialization in one place to avoid running it twice on start().
     
     // Aktualizacja stanu
     m_isRunning = true;
@@ -211,6 +211,10 @@ void GameEngine::reset()
     m_invalidInputCount = 0;
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
+    // Rebuild the derived game's state as part of the public reset contract.
+    // start() delegates here too, so each new session is initialized exactly once.
+    initialize();
+
     // Wymuszenie odświeżenia widoku
     QWidget::update();
 }
