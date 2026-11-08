@@ -102,6 +102,14 @@ int main(int argc, char** argv) {
     assert(!restarted.update(QStringLiteral("patients"), id, 1, updatePayload, updated, &error));
     assert(error == QStringLiteral("VERSION_CONFLICT"));
 
+    assert(!restarted.remove(QStringLiteral("patients"), id, 2, &error));
+    assert(error == QStringLiteral("PATIENT_HAS_REFERENCES"));
+    assert(restarted.remove(QStringLiteral("training-results"),
+                            storedResult.value(QStringLiteral("id")).toString(), 1, &error));
+    assert(restarted.remove(QStringLiteral("training-sessions"), trainingSessionId, 1, &error));
+    assert(restarted.remove(QStringLiteral("measurements"),
+                            measurement.value(QStringLiteral("id")).toString(), 1, &error));
+
     assert(!restarted.get(QStringLiteral("../patients"), id, loaded, &error));
     assert(error == QStringLiteral("UNSUPPORTED_COLLECTION"));
     assert(!restarted.get(QStringLiteral("patients"), QStringLiteral("../../users"), loaded, &error));
