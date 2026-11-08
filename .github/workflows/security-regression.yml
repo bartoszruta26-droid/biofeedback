@@ -17,6 +17,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check shared patient and clinical record relationships
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("src/data/JsonResourceRepository.cpp").read_text()
+          test = Path("tests/json_resource_repository_regression.cpp").read_text()
+          required = [
+              "INVALID_PATIENT_REFERENCE",
+              "PATIENT_NOT_FOUND",
+              "INVALID_TRAINING_SESSION_REFERENCE",
+              "TRAINING_SESSION_NOT_FOUND",
+              "PATIENT_TRAINING_SESSION_MISMATCH",
+          ]
+          for token in required:
+              if token not in source:
+                  raise SystemExit(f"Missing repository validation: {token}")
+          if "PATIENT_NOT_FOUND" not in test:
+              raise SystemExit("Missing regression for orphan clinical records")
+          print("Shared record relationship guards present")
+          PY
       - name: Check installer, udev and production security defaults
         run: python3 tests/installer_safety_regression.py
       - name: Check shared serial configuration
@@ -48,7 +69,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
       - name: Build regression targets
-        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api api_auth_regression measurement_engine_regression measurement_service_regression measurement_training_pipeline_regression training_session_clock_regression session_state_machine_regression repetition_detector_regression force_units_regression serial_pty_regression training_history_restart_regression training_tab_process_restart_regression game_engine_regression game_factory_regression config_manager_regression calibration_profile_regression protocol_parser_regression biomechanical_parameter_availability_regression
+        run: cmake --build build --parallel 2 --target biofeedback login_dialog_compile password_hasher_regression encryption_regression auth_regression data_manager_regression biofeedback_legacy_migrate legacy_xor_migration_regression biofeedback_tui tui_model_regression biofeedback_api api_auth_regression json_resource_repository_regression api_client_regression measurement_engine_regression measurement_service_regression measurement_training_pipeline_regression training_session_clock_regression session_state_machine_regression repetition_detector_regression force_units_regression serial_pty_regression training_history_restart_regression training_tab_process_restart_regression game_engine_regression game_factory_regression config_manager_regression calibration_profile_regression protocol_parser_regression biomechanical_parameter_availability_regression
       - name: Smoke-test local HTTP API
         run: |
           ./build/biofeedback_api --port 18765 > /tmp/biofeedback-api.log 2>&1 &
