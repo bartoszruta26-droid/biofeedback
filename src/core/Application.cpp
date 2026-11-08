@@ -1,4 +1,5 @@
 #include "core/Application.hpp"
+#include "api/HttpApiServer.hpp"
 #include "core/ConfigManager.hpp"
 #include "core/Logger.hpp"
 #include "core/Authentication.hpp"
@@ -122,6 +123,10 @@ void Application::shutdown()
     
     // MainWindow is the sole owner of its child tabs. Destroy it once, then
     // invalidate the non-owning observers held by Application.
+    if (m_localApiServer) {
+        m_localApiServer->close();
+        m_localApiServer.reset();
+    }
     m_mainWindow.reset();
     m_outlineTab = nullptr;
     m_measurementTab = nullptr;
@@ -221,7 +226,16 @@ bool Application::initialize()
         
         // Setup connections between components
         setupConnections();
-        
+
+        // The API and Desktop share this exact repository instance.
+        m_localApiServer = std::make_unique<api::HttpApiServer>(
+            usersPath, m_sharedResources,
+            encryptionEnabled ? QString::fromStdString(encryptionKey) : QString());
+        if (!m_localApiServer->listen(QHostAddress::LocalHost, 8765)) {
+            m_logger->warning("Local shared API could not bind to 127.0.0.1:8765");
+            m_localApiServer.reset();
+        }
+
         setState(ApplicationState::Initialized);
         m_logger->info("Application initialized successfully");
         
@@ -398,12 +412,6 @@ void Application::setupConnections()
                 }
             });
     
-    // Persist and load patient charts through the same repository used by the API.
-    connect(m_patientTab, &tab::PatientTab::patientAdded,
-            this, [this](const QString&, const QString&, const QString&) {
-                if (m_logger) m_logger->info("Patient chart added [personal fields redacted]");
-            });
-
     const auto findPatientByPesel = [this](const QString& pesel, QJsonObject& found) {
         if (!m_sharedResources || pesel.isEmpty()) return false;
         QString error;
@@ -419,6 +427,13 @@ void Application::setupConnections()
         }
         return false;
     };
+
+    // Persist and load patient charts through the same repository used by the API.
+    connect(m_patientTab, &tab::PatientTab::patientAdded,
+            this, [this](const QString&, const QString&, const QString&) {
+                if (m_logger) m_logger->info("Patient chart added [personal fields redacted]");
+            });
+
 
     connect(m_patientTab, &tab::PatientTab::patientRecordChanged,
             this, [this, findPatientByPesel](const QString& pesel, const QString& firstName,
