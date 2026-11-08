@@ -196,7 +196,8 @@
           if (medicalHistory === null) return;
           try {
             await api.updatePatient(patient.id, patient.version, {
-              firstName, lastName, pesel: patient.pesel || "", medicalHistory
+              firstName, lastName, pesel: patient.pesel || "", medicalHistory,
+              birthDate: patient.birthDate || "", gender: patient.gender || ""
             });
             await refreshPatients();
             setMessage("patientMessage", "Karta została zaktualizowana.");
