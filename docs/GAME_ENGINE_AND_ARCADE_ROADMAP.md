@@ -86,6 +86,7 @@
 - [x] Pong: kolizja z paletkami uwzględnia cały obrys piłki oraz kierunek jej ruchu, dzięki czemu kontakt przy krawędzi paletki nie zależy wyłącznie od położenia środka piłki. Commit: `fb32a1a7b1fc97ddc9ceac5949457389ac3587f8`; oczekuje na kompilację i testy.
 - [x] Flappy Bird: po zmianie rozmiaru ograniczono promień ptaka i geometrię luk istniejących przeszkód do nowego widoku, także dla małych i wąskich okien. Commit: `1a6da0998e24e6886971e241a25b2e4d2cca0370`; oczekuje na kompilację i testy.
 - [ ] Statyczny przegląd poprawek Pong i Flappy Bird zakończony; zachowanie kolizji i resize wymaga potwierdzenia testami po wznowieniu walidacji.
+- [x] Arkanoid: prostokąt kolizji piłki jest wyznaczany po ewentualnym odbiciu od paletki, a więc dalsza detekcja klocków korzysta z aktualnej pozycji piłki, nie z nieaktualnego obrysu sprzed korekty. Commit: `2aa83f96acffccf6f48028f951a7e96021edd536`; oczekuje na kompilację i testy.
 - [ ] Testy scenariuszowe i pełna walidacja CI dla wszystkich gier po kolejnych zmianach.
 
 Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie wprowadzać zmian bezpośrednio do `main`.
