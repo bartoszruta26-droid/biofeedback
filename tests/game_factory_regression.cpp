@@ -6,6 +6,7 @@
 #include "games/GalagaGame.hpp"
 #include "games/ArcherGame.hpp"
 #include "games/CarRaceGame.hpp"
+#include "games/ScorchedEarthGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -43,7 +44,8 @@ int main(int argc, char **argv)
         QStringLiteral("mario"),
         QStringLiteral("galaga"),
         QStringLiteral("archer"),
-        QStringLiteral("car_race")
+        QStringLiteral("car_race"),
+        QStringLiteral("scorched_earth")
     };
 
     for (const QString& id : ids) {
@@ -139,6 +141,16 @@ int main(int argc, char **argv)
     waitForEvents(120);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->stop();
+
+    std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
+    auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
+    REQUIRE(scorchedGame != nullptr);
+    scorchedGame->resize(640, 480);
+    scorchedGame->start();
+    scorchedGame->handleSensorInput(65.0);
+    waitForEvents(100);
+    REQUIRE(scorchedGame->isRunning());
+    scorchedGame->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
