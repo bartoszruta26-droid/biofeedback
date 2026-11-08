@@ -1,4 +1,5 @@
 #include "core/ConfigManager.hpp"
+#include "sensor/SerialProtocolConfig.hpp"
 
 #include <QCoreApplication>
 #include <QTemporaryDir>
@@ -21,9 +22,12 @@ int main(int argc, char** argv)
 
     biofeedback::ConfigManager reader;
     assert(reader.load(path, true));
-    assert(reader.getInt("serial.baud_rate", 0) == 9600);
+    assert(reader.getInt("serial.baud_rate", 0) == sensor::protocol::DefaultBaudRate);
     assert(reader.getString("serial.port").size() > 0);
-    assert(reader.isEncryptionEnabled());
+    assert(!reader.isEncryptionEnabled());
+    assert(reader.getString("encryption.algorithm") == "AES-256-GCM");
+    assert(reader.getString("encryption.key_derivation") == "SHA-256 key normalization (32+ byte external secret)");
+    assert(reader.getInt("sensor.sample_rate_hz", 0) == static_cast<int>(sensor::protocol::DefaultSampleRateHz));
 
     reader.setValue("custom.label", std::string("calibration station"));
     assert(reader.save(path, false));
