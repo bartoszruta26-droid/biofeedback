@@ -47,6 +47,15 @@ int main(int argc, char** argv) {
     const QJsonArray patients = restarted.list(QStringLiteral("patients"), &error);
     assert(patients.size() == 1);
 
+    QJsonObject duplicatePatient{
+        {QStringLiteral("firstName"), QStringLiteral("Duplicate")},
+        {QStringLiteral("lastName"), QStringLiteral("Patient")},
+        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-001")}
+    };
+    QJsonObject rejectedDuplicate;
+    assert(!restarted.create(QStringLiteral("patients"), duplicatePatient, rejectedDuplicate, &error));
+    assert(error == QStringLiteral("DUPLICATE_PATIENT_REFERENCE"));
+
     QJsonObject updatePayload{
         {QStringLiteral("firstName"), QStringLiteral("Updated")},
         {QStringLiteral("lastName"), QStringLiteral("Patient")},
