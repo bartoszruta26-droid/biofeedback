@@ -26,6 +26,14 @@ public:
     bool deleteResource(const QString& collection, const QString& id, int expectedVersion,
                         QString* error = nullptr);
 
+    bool listDevices(QJsonArray& devices, QString* error = nullptr);
+    bool getAcquisitionSession(QJsonObject& session, QString* error = nullptr);
+    bool startAcquisitionSession(const QString& sessionId, const QString& patientId,
+                                 const QString& deviceId, const QString& protocolId,
+                                 QString* error = nullptr);
+    bool stopAcquisitionSession(const QString& sessionId, QString* error = nullptr);
+    bool listAcquisitionSamples(QJsonArray& samples, QString* error = nullptr);
+
 private:
     bool request(const QByteArray& method, const QString& path, const QJsonObject* body,
                  bool authenticated, QJsonObject& response, QString* error = nullptr);
