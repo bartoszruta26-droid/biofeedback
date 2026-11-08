@@ -104,7 +104,7 @@ test("login stores bearer token in memory and protected calls attach it", async 
   assert.equal(calls[1].init.headers.Authorization, "Bearer " + "a".repeat(64));
   await api.logout();
   assert.equal(calls[2].init.headers.Authorization, "Bearer " + "a".repeat(64));
-  await assert.rejects(api.getCurrentUser(), (error) => error instanceof ApiError && error.status === 404);
+  await assert.rejects(api.getCurrentUser(), (error) => error instanceof ApiError && error.status === 401);
   assert.equal(calls[3].init.headers.Authorization, undefined);
 });
 
