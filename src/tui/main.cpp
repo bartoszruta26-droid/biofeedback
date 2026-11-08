@@ -160,6 +160,7 @@ struct LiveData {
     qint64 lastRestTickMs = 0;
     bool sessionNeedsSave = false;
     bool sessionSaved = false;
+    bool sessionSaveAttempted = false;
     QString sessionStartedAt;
     std::uint64_t validSampleCount = 0;
     std::uint64_t invalidSampleCount = 0;
@@ -178,49 +179,75 @@ std::vector<std::string> scanSerialPortCandidates()
 }
 
 
-QString tuiSessionFilePath()
+void saveTrainingSession(LiveData& live, biofeedback::api::HttpApiClient& apiClient)
 {
-    return QDir(biofeedback::runtime::appDataDirectory())
-        .filePath(QStringLiteral("tui_sessions.csv"));
-}
+    std::vector<LiveData::SessionRep> repetitions;
+    QString startedAt;
+    QString exercise;
+    double targetForce = 0.0;
+    int targetSeries = 0;
+    int targetReps = 0;
+    int completedSeries = 0;
+    int completedReps = 0;
+    {
+        std::lock_guard<std::mutex> lock(live.mutex);
+        if (!live.sessionNeedsSave || live.sessionSaved || live.sessionSaveAttempted ||
+            live.sessionRepetitions.empty()) return;
+        live.sessionSaveAttempted = true;
+        repetitions = live.sessionRepetitions;
+        startedAt = live.sessionStartedAt;
+        exercise = QString::fromStdString(live.exerciseName);
+        targetForce = live.trainingTargetForceN;
+        targetSeries = live.targetSeriesCount;
+        targetReps = live.targetRepsPerSeries;
+        completedSeries = live.completedSeries;
+        completedReps = live.completedReps;
+    }
 
-void saveTrainingSession(LiveData& live)
-{
-    if (live.sessionSaved || live.sessionRepetitions.empty()) return;
-    const QString path = tuiSessionFilePath();
-    QFile file(path);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
-        live.trainingMessage = "Blad zapisu historii sesji: " + file.errorString().toStdString();
-        return;
-    }
-    QTextStream out(&file);
-    out.setCodec("UTF-8");
-    if (file.size() == 0)
-        out << "Rozpoczecie_UTC,Cwiczenie,Seria,Powtorzenie,Sila_szczytowa_N,"
-               "Sila_srednia_N,Czas_ms,Czas_do_szczytu_ms,Probki,Cel_N,Cel_osiagniety\n";
-    for (const auto& item : live.sessionRepetitions) {
+    QJsonArray repetitionRecords;
+    for (const auto& item : repetitions) {
         const auto& rep = item.measurement;
-        const bool achieved = rep.peakForceN >= live.trainingTargetForceN;
-        out << "\"" << live.sessionStartedAt << "\","
-            << "\"" << QString::fromStdString(live.exerciseName) << "\"," << item.seriesIndex << ","
-            << item.repetitionIndex << ","
-            << QString::number(rep.peakForceN, 'f', 4) << ","
-            << QString::number(rep.meanForceN, 'f', 4) << ","
-            << rep.durationMs << "," << rep.timeToPeakMs << ","
-            << static_cast<qulonglong>(rep.sampleCount) << ","
-            << QString::number(live.trainingTargetForceN, 'f', 2) << ","
-            << (achieved ? "tak" : "nie") << "\n";
+        repetitionRecords.append(QJsonObject{
+            {QStringLiteral("series_index"), item.seriesIndex},
+            {QStringLiteral("repetition_index"), item.repetitionIndex},
+            {QStringLiteral("start_timestamp_ms"), static_cast<qint64>(rep.startTimestampMs)},
+            {QStringLiteral("end_timestamp_ms"), static_cast<qint64>(rep.endTimestampMs)},
+            {QStringLiteral("duration_ms"), static_cast<qint64>(rep.durationMs)},
+            {QStringLiteral("time_to_peak_ms"), static_cast<qint64>(rep.timeToPeakMs)},
+            {QStringLiteral("peak_force_n"), rep.peakForceN},
+            {QStringLiteral("mean_force_n"), rep.meanForceN},
+            {QStringLiteral("sample_count"), static_cast<qint64>(rep.sampleCount)},
+            {QStringLiteral("target_achieved"), rep.peakForceN >= targetForce}
+        });
     }
-    out.flush();
-    const bool ok = file.error() == QFile::NoError;
-    file.close();
-    if (ok) {
-        QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-        live.sessionSaved = true;
-        live.sessionNeedsSave = false;
-        live.trainingMessage = "Sesja zapisana w lokalnej historii: " + path.toStdString();
-    } else {
-        live.trainingMessage = "Blad zapisu historii sesji.";
+
+    const QJsonObject payload{
+        {QStringLiteral("started_at"), startedAt},
+        {QStringLiteral("finished_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("exercise_name"), exercise},
+        {QStringLiteral("target_force_n"), targetForce},
+        {QStringLiteral("target_series_count"), targetSeries},
+        {QStringLiteral("target_reps_per_series"), targetReps},
+        {QStringLiteral("completed_series"), completedSeries},
+        {QStringLiteral("completed_repetitions"), completedReps},
+        {QStringLiteral("repetitions"), repetitionRecords},
+        {QStringLiteral("source_client"), QStringLiteral("tui")}
+    };
+
+    QJsonObject created;
+    QString error;
+    const bool saved = apiClient.createResource(
+        QStringLiteral("training-sessions"), payload, created, &error);
+    {
+        std::lock_guard<std::mutex> lock(live.mutex);
+        if (saved) {
+            live.sessionSaved = true;
+            live.sessionNeedsSave = false;
+            live.trainingMessage = "Sesja zapisana w serwerze danych: " +
+                created.value(QStringLiteral("id")).toString().toStdString();
+        } else {
+            live.trainingMessage = "Blad zapisu sesji w serwerze: " + error.toStdString();
+        }
     }
 }
 
@@ -432,7 +459,7 @@ void drawModule(tui::Screen screen,
                  " N | srednia " + std::to_string(mean) + " N | czas " +
                  std::to_string(duration) + " ms | do szczytu " +
                  std::to_string(timeToPeak) + " ms");
-        drawText(16, x + 2, "Historia: " + tuiSessionFilePath().toStdString());
+        drawText(16, x + 2, "Historia: wspolne repozytorium serwera danych");
         break;
     }
     case tui::Screen::Settings:
@@ -676,6 +703,7 @@ int main(int argc, char** argv)
                         live.sessionStartedAt = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
                         live.sessionNeedsSave = false;
                         live.sessionSaved = false;
+                        live.sessionSaveAttempted = false;
                         live.trainingMessage = "Trening aktywny - wykonuj pelne cykle napiecia i zwolnienia.";
                         live.repetitionDetector.setTargetForce(live.trainingTargetForceN);
                     }
@@ -795,8 +823,8 @@ int main(int argc, char** argv)
                     }
                 }
             }
-            if (live.sessionNeedsSave) saveTrainingSession(live);
         }
+        saveTrainingSession(live, *apiClient);
     }
 
     {
@@ -806,8 +834,8 @@ int main(int argc, char** argv)
             live.trainingPaused = false;
             live.sessionNeedsSave = !live.sessionRepetitions.empty();
         }
-        if (live.sessionNeedsSave) saveTrainingSession(live);
     }
+    saveTrainingSession(live, *apiClient);
     endwin();
     serial.disconnect();
     measurementEngine->unsubscribe(measurementToken);
