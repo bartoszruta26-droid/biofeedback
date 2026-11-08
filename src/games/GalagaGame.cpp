@@ -13,7 +13,7 @@ GalagaGame::GalagaGame(QWidget *parent)
     , m_keyboardDirection(0.0)
     , m_fireCooldown(0.0)
     , m_enemyDirection(1.0)
-    , m_enemyStepTimer(0.0)
+    , m_enemyFireCooldown(1.0)
     , m_lives(3)
     , m_wave(1)
     , m_fireHeld(false)
@@ -32,7 +32,7 @@ void GalagaGame::initialize()
     m_keyboardDirection = 0.0;
     m_fireCooldown = 0.0;
     m_enemyDirection = 1.0;
-    m_enemyStepTimer = 0.0;
+    m_enemyFireCooldown = 1.0;
     m_lives = 3;
     m_wave = 1;
     m_fireHeld = false;
@@ -59,7 +59,7 @@ void GalagaGame::createWave()
         }
     }
     m_enemyDirection = 1.0;
-    m_enemyStepTimer = 0.0;
+    m_enemyFireCooldown = 1.0;
 }
 
 bool GalagaGame::handleInput(double value)
@@ -131,6 +131,25 @@ void GalagaGame::update(double deltaTime)
         m_fireCooldown = 0.24;
     }
 
+    m_enemyFireCooldown -= deltaTime;
+    if (m_enemyFireCooldown <= 0.0 && !m_enemies.isEmpty()) {
+        // Deterministic shooter selection keeps replay and regression runs stable.
+        const int startIndex = (m_wave * 7 + getScore()) % m_enemies.size();
+        for (int offset = 0; offset < m_enemies.size(); ++offset) {
+            const Enemy& shooter = m_enemies[(startIndex + offset) % m_enemies.size()];
+            if (!shooter.active)
+                continue;
+            Projectile shot;
+            shot.rect = QRectF(shooter.rect.center().x() - 2.0,
+                               shooter.rect.bottom(), 4.0, 10.0);
+            shot.velocityY = 250.0 + m_wave * 8.0;
+            shot.fromPlayer = false;
+            m_projectiles.push_back(shot);
+            break;
+        }
+        m_enemyFireCooldown = qMax(0.45, 1.35 - m_wave * 0.06);
+    }
+
     const double enemySpeed = 24.0 + m_wave * 4.0;
     bool hitEdge = false;
     for (const Enemy& enemy : m_enemies) {
@@ -165,20 +184,27 @@ void GalagaGame::update(double deltaTime)
         shot.rect.translate(0.0, shot.velocityY * deltaTime);
 
     for (Projectile& shot : m_projectiles) {
-        if (!shot.fromPlayer || shot.rect.isEmpty())
+        if (shot.rect.isEmpty())
             continue;
-        for (Enemy& enemy : m_enemies) {
-            if (!enemy.active || !shot.rect.intersects(enemy.rect))
-                continue;
-            shot.rect = QRectF();
-            --enemy.hitPoints;
-            if (enemy.hitPoints <= 0) {
-                enemy.active = false;
-                addScore(10);
-            } else {
-                addScore(3);
+        if (shot.fromPlayer) {
+            for (Enemy& enemy : m_enemies) {
+                if (!enemy.active || !shot.rect.intersects(enemy.rect))
+                    continue;
+                shot.rect = QRectF();
+                --enemy.hitPoints;
+                if (enemy.hitPoints <= 0) {
+                    enemy.active = false;
+                    addScore(10);
+                } else {
+                    addScore(3);
+                }
+                break;
             }
-            break;
+        } else if (shot.rect.intersects(m_player)) {
+            shot.rect = QRectF();
+            loseLife();
+            if (!isRunning())
+                return;
         }
     }
 
