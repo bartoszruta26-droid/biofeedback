@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static safety checks for both installers, device access and diagnostics."""
+"""Static safety checks for installers, configuration and production diagnostics."""
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
@@ -8,6 +8,7 @@ installer = (root / "packaging/linux/install.sh").read_text(encoding="utf-8")
 uninstaller = (root / "packaging/linux/uninstall.sh").read_text(encoding="utf-8")
 main = (root / "src/main.cpp").read_text(encoding="utf-8")
 debug = (root / "src/core/DebugManager.cpp").read_text(encoding="utf-8")
+example = (root / "config/config.json.example").read_text(encoding="utf-8")
 
 assert 'GROUP="dialout", MODE="0660"' in legacy
 assert 'MODE="0666"' not in legacy
@@ -28,6 +29,12 @@ assert 'Dane pacjentów pozostawiono bez zmian' in uninstaller
 assert 'rm -rf -- "$canonical_data"' in uninstaller
 assert '[[ -L "$DATA_DIR" ]]' in uninstaller
 assert 'Odmowa usunięcia ścieżki spoza katalogu instalacji' in uninstaller
+
+assert '"baud_rate": 115200' in example
+assert '"algorithm": "AES-256-GCM"' in example
+assert '"key_derivation": "PBKDF2-HMAC-SHA256"' in example
+assert '"require_authentication": true' in example
+assert '"actuators_enabled": false' in example
 
 assert "constexpr bool DEBUG_VERBOSE = false;" in main
 assert "constexpr bool DEBUG_EXCEPTION_TRACE = false;" in main
