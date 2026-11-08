@@ -363,6 +363,7 @@ private:
     bool openSampleJournal();
     bool flushSampleJournal();
     void closeSampleJournal();
+    bool restoreSampleJournalIntoSession();
     bool recoverSampleJournals(const QString& dataDir);
     void updateSeriesProgress();
     double calculateMedian(const QVector<double>& values) const;
