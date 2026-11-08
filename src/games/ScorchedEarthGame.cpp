@@ -1,5 +1,6 @@
 #include "games/ScorchedEarthGame.hpp"
 #include <QKeyEvent>
+#include <QResizeEvent>
 #include <QPainter>
 #include <QLinearGradient>
 #include <QFont>
@@ -41,6 +42,36 @@ void ScorchedEarthGame::initialize()
     m_playerTurn = true;
     buildTerrain();
     updateTankPositions();
+}
+
+void ScorchedEarthGame::resizeEvent(QResizeEvent* event)
+{
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        for (QPointF& point : m_terrain)
+            point = QPointF(point.x() * scaleX, point.y() * scaleY);
+        auto scaleRect = [scaleX, scaleY](QRectF& rect) {
+            rect = QRectF(rect.x() * scaleX, rect.y() * scaleY,
+                          rect.width() * scaleX, rect.height() * scaleY);
+        };
+        scaleRect(m_playerTank);
+        scaleRect(m_enemyTank);
+        for (Projectile& projectile : m_projectiles) {
+            projectile.position = QPointF(projectile.position.x() * scaleX,
+                                           projectile.position.y() * scaleY);
+            projectile.velocity = QPointF(projectile.velocity.x() * scaleX,
+                                           projectile.velocity.y() * scaleY);
+        }
+    }
+    GameEngine::resizeEvent(event);
+    if (m_terrain.isEmpty() && width() > 0 && height() > 0) {
+        buildTerrain();
+        updateTankPositions();
+    }
 }
 
 void ScorchedEarthGame::buildTerrain()
