@@ -20,6 +20,9 @@ const QStringList Collections = {
 
 HttpApiClient::HttpApiClient(QUrl baseUrl, int timeoutMs)
     : m_baseUrl(std::move(baseUrl)), m_timeoutMs(timeoutMs) {
+    const bool hasUserInfo = !m_baseUrl.userInfo().isEmpty();
+    const bool hasQuery = !m_baseUrl.query().isEmpty();
+    const bool hasFragment = !m_baseUrl.fragment().isEmpty();
     m_baseUrl.setPath(QString());
     m_baseUrl.setQuery(QString());
     m_baseUrl.setFragment(QString());
@@ -29,8 +32,7 @@ HttpApiClient::HttpApiClient(QUrl baseUrl, int timeoutMs)
         (host == QStringLiteral("localhost") || host == QStringLiteral("127.0.0.1") ||
          host == QStringLiteral("::1"));
     if ((scheme != QStringLiteral("https") && !localHttp) ||
-        !m_baseUrl.isValid() || host.isEmpty() || !m_baseUrl.userInfo().isEmpty() ||
-        !m_baseUrl.query().isEmpty() || !m_baseUrl.fragment().isEmpty() ||
+        !m_baseUrl.isValid() || host.isEmpty() || hasUserInfo || hasQuery || hasFragment ||
         timeoutMs < 100 || timeoutMs > 60000) {
         throw std::invalid_argument("API URL must use HTTPS, or HTTP on loopback, with a valid timeout.");
     }
