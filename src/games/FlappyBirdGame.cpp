@@ -216,7 +216,9 @@ void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
         m_birdRadius = static_cast<float>(qMax(1.0, m_birdRadius * scaleRadius));
         m_obstacleWidth = static_cast<float>(qMax(1.0, m_obstacleWidth * scaleX));
         m_minGapHeight = static_cast<float>(qMax(0.0, m_minGapHeight * scaleY));
-        m_maxGapHeight = static_cast<float>(qMax(m_minGapHeight, m_maxGapHeight * scaleY));
+        m_maxGapHeight = static_cast<float>(qMax(
+            static_cast<double>(m_minGapHeight),
+            static_cast<double>(m_maxGapHeight) * scaleY));
 
         for (Obstacle& obstacle : m_obstacles) {
             obstacle.xPosition = static_cast<float>(obstacle.xPosition * scaleX);
