@@ -1,4 +1,6 @@
-# Macierz modułów interfejsów
+# 🧮 Macierz modułów i funkcji interfejsów
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski dotyczą wskazanego zakresu i momentu przeglądu; przed użyciem jako kryterium odbioru zweryfikuj bieżący kod.
 
 Statusy: **D** — potwierdzona implementacja w przeglądanym kodzie; **C** — częściowa/ograniczona; **S** — szkielet lub placeholder; **N** — brak potwierdzonej implementacji. Macierz nie jest deklaracją parytetu funkcji.
 
