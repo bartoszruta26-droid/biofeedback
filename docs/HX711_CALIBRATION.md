@@ -9,9 +9,9 @@ Desktop GUI domyślnie odbiera, rejestruje i wyświetla surowe próbki ADC. Do p
 Kalibracja nie jest wykonywana w firmware. Aplikacja zachowuje surowy odczyt w trwałym dzienniku, a przeliczenie uruchamia dopiero po wybraniu w GUI jednostki `N` albo `kg`. Wtedy GUI odczytuje profil z pliku konfiguracyjnego i przelicza próbki lokalnie. Przełączenie z powrotem na `RAW` pokazuje pierwotne wartości ADC.
 
 Domyślna ścieżka profilu:
-`~/.config/biofeedback/calibration/hx711.json`
+`QStandardPaths::AppConfigLocation/calibration/hx711.json` (na Linuksie zwykle `~/.config/Biofeedback/calibration/hx711.json`)
 
-Można ją zmienić kluczem `sensor.calibration_profile` w pliku `~/.config/biofeedback/config.json`. Ścieżka względna jest liczona od katalogu konfiguracji aplikacji. Profil musi być poprawnym dokumentem `CalibrationProfile`, zawierać własne `deviceId`, jednostkę `g`, `zeroOffsetRaw` oraz dodatni `scaleFactor`. Współczynnik oznacza gramy na jeden zliczony krok RAW. Bez poprawnego profilu GUI pozostaje w trybie RAW i nie pozwala prezentować wartości jako N/kg.
+Można ją zmienić kluczem `sensor.calibration_profile` w pliku `QStandardPaths::AppConfigLocation/config.json` (na Linuksie zwykle `~/.config/Biofeedback/config.json`). Ścieżka względna jest liczona od katalogu konfiguracji aplikacji. Profil musi być poprawnym dokumentem `CalibrationProfile`, zawierać własne `deviceId`, jednostkę `g`, `zeroOffsetRaw` oraz dodatni `scaleFactor`. Współczynnik oznacza gramy na jeden zliczony krok RAW. Bez poprawnego profilu GUI pozostaje w trybie RAW i nie pozwala prezentować wartości jako N/kg.
 
 Przeliczenie w GUI:
 `masa_g = (raw - zeroOffsetRaw) * scaleFactor`
