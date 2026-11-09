@@ -251,6 +251,11 @@ if "m_forcePlot->addSample(forceValue, currentTime)" not in sample_body:
     raise SystemExit("Measurement plot must receive every acquired sample")
 if "m_progressWidget->setCurrentForce(force);" not in training_source:
     raise SystemExit("Training live force trace must receive every acquired sample")
+training_header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
+if "std::deque<double> m_forceHistory" not in training_header or "MaximumTraceSamples = 600" not in training_source:
+    raise SystemExit("Training live trace must retain a bounded six-second sample window")
+if "QPainterPath trace;" not in training_source or "Qt::RoundJoin" not in training_source:
+    raise SystemExit("Training live trace must use antialiased rounded vector rendering")
 if "m_lastLiveUiRefreshMs = -16;" not in source or "m_lastGameInputRefreshMs = -16;" not in training_source:
     raise SystemExit("Live refresh clocks must reset when a new session starts")
 
