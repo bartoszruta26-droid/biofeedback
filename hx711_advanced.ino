@@ -55,7 +55,10 @@ volatile unsigned long last_hx711_read = 0;
 int32_t current_weight = 0;
 int32_t tare_offset = 0;
 bool continuous_mode = false;
-unsigned long last_data_send = 0;
+// A sample is publishable only once, and its timestamp is captured when HX711
+// data is actually read (not when a later serial transmission happens).
+bool has_new_sample = false;
+uint32_t last_sample_timestamp = 0;
 
 // Pseudo-thread timing
 unsigned long thread_timer_hx711 = 0;
@@ -81,7 +84,7 @@ void resetWatchdog();
 long readHX711Raw();
 int32_t readHX711Averaged(int samples);
 void processSerialCommand();
-void sendBinaryData();
+bool sendBinaryData();
 void sendDeviceID();
 void calculateCRC(uint8_t *data, size_t len, uint8_t *crc);
 uint8_t crc8(const uint8_t *data, size_t length);
@@ -236,16 +239,20 @@ void sendForceReadout() {
     Serial.print(F("g,RAW:"));
     Serial.print(raw_value);
     Serial.print(F(",TS:"));
-    Serial.print(millis());
+    Serial.print(last_sample_timestamp);
     Serial.print(F("ms,CAL:"));
     Serial.println(is_calibrated ? 1 : 0);
 }
 
-void sendBinaryData() {
+bool sendBinaryData() {
+    if (!has_new_sample) {
+        return false;
+    }
+
     DataPacket packet;
-    
-    // Fill packet data
-    packet.timestamp = millis();
+
+    // Timestamp and value belong to the same successful HX711 acquisition.
+    packet.timestamp = last_sample_timestamp;
     packet.value = current_weight - tare_offset;
     
     // Calculate CRC over timestamp and value (exclude CRC byte itself)
@@ -258,6 +265,8 @@ void sendBinaryData() {
     // Send end marker for framing
     Serial.write(0xAA);
     Serial.write(0x55);
+    has_new_sample = false;
+    return true;
 }
 
 void processSerialCommand() {
@@ -290,9 +299,12 @@ void processSerialCommand() {
                     Serial.println(F("Tare set!"));
                 }
                 else if (strcmp(upper_buffer, "DATA") == 0 || strcmp(upper_buffer, "READ") == 0) {
-                    sendBinaryData();
-                    sendForceReadout();
-                    Serial.println(F("[DATA_SENT]"));
+                    if (sendBinaryData()) {
+                        sendForceReadout();
+                        Serial.println(F("[DATA_SENT]"));
+                    } else {
+                        Serial.println(F("ERR,NO_NEW_SAMPLE"));
+                    }
                 }
                 else if (strcmp(upper_buffer, "FORCE") == 0) {
                     sendForceReadout();
@@ -369,6 +381,8 @@ void threadHX711() {
             long raw = readHX711Raw();
             if (raw != LONG_MIN) {
                 current_weight = static_cast<int32_t>(raw);
+                last_sample_timestamp = millis();
+                has_new_sample = true;
             }
         }
     }
@@ -392,8 +406,9 @@ void threadWatchdog() {
 
 // Thread: Continuous Data Sender - sends at 80Hz
 void threadContinuousData() {
-    if (continuous_mode && (millis() - last_data_send >= 12)) {  // ~80Hz
-        last_data_send = millis();
+    // Never manufacture a new frame by retransmitting the previous HX711 value.
+    // The sensor's RATE pin determines the physical conversion rate (10/80 SPS).
+    if (continuous_mode && has_new_sample) {
         sendBinaryData();
     }
 }
@@ -439,6 +454,8 @@ void setup() {
     } else {
         current_weight = initial_reading;
         tare_offset = initial_reading;
+        last_sample_timestamp = millis();
+        has_new_sample = true;
     }
     
     Serial.println(F("System Ready!"));
