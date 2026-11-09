@@ -1305,6 +1305,7 @@ void MeasurementTab::startMeasurement()
     m_isMeasuring = true;
     std::cout << "[DEBUG] startMeasurement: Calling ensureSessionClockStarted" << std::endl;
     ensureSessionClockStarted();
+    m_lastLiveUiRefreshMs = -16;
     m_measurementSessionGeneration.fetch_add(1, std::memory_order_acq_rel);
     m_journalAdmission.store(true, std::memory_order_release);
     
