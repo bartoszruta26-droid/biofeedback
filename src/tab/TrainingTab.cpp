@@ -543,6 +543,8 @@ void TrainingTab::startTraining()
     m_lastCheckpointSeconds = -1;
     m_trainingClock.reset();
     m_sessionClock.start();
+    m_lastLiveUiRefreshMs = -16;
+    m_lastGameInputRefreshMs = -16;
     m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_sessionStartedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
     m_trainingClock.update(0, true);
