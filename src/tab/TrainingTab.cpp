@@ -514,8 +514,8 @@ void TrainingTab::setupUI()
     
     visualLayout->addWidget(m_progressBox, 2);
     
-    // MainWindow detaches each game into its own maximized top-level window.
-    // Keep only a short status panel here; never squeeze the game into the tab.
+    // The game is hosted in a separate, non-modal fullscreen QDialog.
+    // Keep a reopen control in the training workspace instead of embedding it.
     m_gameBox = new QGroupBox("Gra treningowa", this);
     QVBoxLayout* gameLayout = new QVBoxLayout(m_gameBox);
     gameLayout->setContentsMargins(0, 0, 0, 0);
