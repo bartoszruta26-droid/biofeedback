@@ -130,6 +130,8 @@ Szczegółowa macierz i uwagi: [`GUI_COMPONENT_MATRIX.md`](GUI_COMPONENT_MATRIX.
 - Skorygowano główny `README.md`: rozróżniono bieżący firmware `hx711_advanced.ino` od historycznego przykładu `hx711_arduino_nano.ino`, opisano binarną transmisję ciągłą i ulotność kalibracji; doprecyzowano brak uśredniania wielopróbkowego.
 - Uzupełniono `docs/HX711_CALIBRATION.md` o bezpośrednie wskazanie właściwego firmware i niezgodności przykładu historycznego z parserem binarnym.
 - Naprawiono strukturę tabeli w `docs/README.md`, aby audyt zgodności był prawidłowym wierszem tabeli.
+- Skorygowano `BUILD_INSTRUCTIONS.md`: właściwy szkic Arduino, prędkość 115200, bezpieczne uprawnienia `dialout`, aktualny algorytm AES-256-GCM i ostrzeżenia dotyczące kalibracji oraz backendu MariaDB.
+- Dodano ostrzeżenia statusowe do rozdziałów `doc/rozdzial_2_3_architektura_hardware.md`, `doc/rozdzial_8_zalaczniki.md` i `doc/rozdzial_7_3_skalowanie_komercjalizacja_integracja.md`, aby założenia koncepcyjne, materiały robocze i planowane integracje nie były mylone z pomiarami, certyfikacją lub wdrożonymi funkcjami.
 
 ## 6. Testy i ograniczenia audytu
 
