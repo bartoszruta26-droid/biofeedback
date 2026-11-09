@@ -103,15 +103,9 @@ After building with Qt5 available, you can run the mandatory Qt5 sample:
 ./qt5_mandatory_example
 ```
 
-### Option 2: Using Makefile Directly
+### Dostępna metoda budowania
 
-```bash
-# Navigate to project directory
-cd /path/to/biofeedback
-
-# Build using provided Makefile
-make -j$(nproc)
-```
+Repozytorium nie zawiera obecnie pliku `Makefile` do samodzielnego budowania. Używaj CMake (opcja 1); nie uruchamiaj `make` poza katalogiem kompilacji wygenerowanym przez CMake.
 
 ## Running the Application
 
@@ -187,7 +181,7 @@ Konfiguracja bazowa znajduje się w [`config/config.json`](config/config.json). 
         "base_path": "./data/patients"
     },
     "encryption": {
-        "enabled": true,
+        "enabled": false,
         "algorithm": "AES-256-GCM"
     },
     "ui": {
