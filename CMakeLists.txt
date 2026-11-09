@@ -379,6 +379,25 @@ if(Qt5_FOUND)
     # Create executable
     add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+    # Graph rendering regression: bounded presentation memory, out-of-order
+    # timestamps, and offscreen paint path.
+    add_executable(graph_widget_regression
+        tests/graph_widget_regression.cpp
+        src/gui/GraphWidget.cpp
+        src/core/DebugManager.cpp
+        include/gui/GraphWidget.hpp
+        include/core/DebugManager.hpp
+    )
+    set_target_properties(graph_widget_regression PROPERTIES AUTOMOC ON)
+    target_include_directories(graph_widget_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(graph_widget_regression PRIVATE Qt5::Core Qt5::Widgets Threads::Threads)
+    add_test(NAME graph_widget_regression COMMAND graph_widget_regression)
+    set_tests_properties(graph_widget_regression PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        TIMEOUT 20
+    )
+
+
     # Durable asynchronous desktop measurement journal regression.
     add_executable(sample_journal_writer_regression
         tests/sample_journal_writer_regression.cpp
