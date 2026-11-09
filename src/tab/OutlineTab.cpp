@@ -933,31 +933,5 @@ bool OutlineTab::isSerialConnected() const
     return m_serialPort && m_serialPort->isConnected();
 }
 
-void OutlineTab::onSensorDataReceived(const sensor::SensorData& data)
-{
-    // Obsługa danych z Arduino w zakładce Konspekt
-    // Dane mogą być wykorzystywane do gier biofeedback podczas sesji treningowej
-    
-    if (!data.isValid) {
-        return;
-    }
-    
-    // Jeśli trwa sesja i gra jest aktywna, przekaż dane do gry
-    if (m_isSessionActive && !m_isPaused && m_currentGame) {
-        // Przekazanie danych do aktywnej gry
-        // Wartość skalibrowana w gramach, konwersja na Newtony
-        double forceInNewtons = data.calibratedValue * 9.81 / 1000.0;
-        
-        // Gra otrzymuje dane jako parametr
-        // Implementacja zależy od konkretnej gry
-        // Przykład: m_currentGame->updateInput(forceInNewtons);
-    }
-    
-    // Debug logging
-    if (m_serialPort && m_serialPort->isConnected()) {
-        // Można dodać logowanie do terminala debugowania jeśli dostępne
-        // through MainWindow
-    }
-}
 
 } // namespace tab
