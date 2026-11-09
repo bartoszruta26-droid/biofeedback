@@ -653,3 +653,18 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
 include(CPack)
+
+# Keep assertions enabled in regression executables even in Release builds.
+# Several tests intentionally perform the operation being checked inside assert();
+# compiling them with NDEBUG removes those operations and can cause hangs or crashes.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    get_property(BIOFEEDBACK_DIRECTORY_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+    foreach(BIOFEEDBACK_TARGET IN LISTS BIOFEEDBACK_DIRECTORY_TARGETS)
+        if(BIOFEEDBACK_TARGET MATCHES "regression$")
+            target_compile_options(${BIOFEEDBACK_TARGET} PRIVATE
+                "$<$<CONFIG:Release>:-UNDEBUG>"
+            )
+        endif()
+    endforeach()
+endif()
+
