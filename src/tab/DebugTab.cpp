@@ -160,7 +160,14 @@ void DebugTab::setupUI()
     m_sensorUiTimer = new QTimer(this);
     m_sensorUiTimer->setInterval(100);
     connect(m_sensorUiTimer, &QTimer::timeout, this, [this]() {
-        if (!m_lastSensorData.isValid) return;
+        sensor::SensorData latest;
+        {
+            std::lock_guard<std::mutex> lock(m_sensorSnapshotMutex);
+            latest = m_pendingSensorData;
+        }
+        if (!latest.isValid) return;
+        m_lastSensorData = latest;
+        m_lastDataTime = QDateTime::currentDateTime();
         m_lblLastDataTime->setText(
             tr("Ostatnie dane: %1").arg(m_lastDataTime.toString("HH:mm:ss.zzz")));
         m_lblRawValue->setText(
@@ -296,8 +303,10 @@ void DebugTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> 
     if (!m_serialPort) return;
 
     // SerialCommunication is a plain C++ service. Queue callbacks onto the Qt GUI thread.
+    // Latest-value mailbox: keep the serial worker independent of GUI latency.
     m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
-        QMetaObject::invokeMethod(this, [this, data]() { onSensorDataReceived(data); }, Qt::QueuedConnection);
+        std::lock_guard<std::mutex> lock(m_sensorSnapshotMutex);
+        m_pendingSensorData = data;
     });
     m_connectionCallbackToken = m_serialPort->addConnectionCallback([this](bool connected, const std::string& message) {
         const QString qtMessage = QString::fromStdString(message);
@@ -347,18 +356,13 @@ void DebugTab::registerAsDebugReceiver()
 void DebugTab::onSensorDataReceived(const sensor::SensorData& data)
 {
     if (data.isValid) {
-        m_lastSensorData = data;
-        m_lastDataTime = QDateTime::currentDateTime();
-        
-        // Aktualizuj UI statusu Arduino
-        updateConnectionStatus(true);
-        
-        // This is a high-rate live snapshot, not a diagnostic event.
-        // Do not render a terminal row or enqueue another widget event per sample.
+        {
+            std::lock_guard<std::mutex> lock(m_sensorSnapshotMutex);
+            m_pendingSensorData = data;
+        }
+        // No GUI work at the hardware sample cadence; the 10 Hz timer consumes
+        // only the newest snapshot.
         if (!m_sensorUiTimer->isActive()) m_sensorUiTimer->start();
-
-        // Keep the acquisition/sample signal for consumers that explicitly need it.
-        emit arduinoDataReceived(data);
     } else {
         addDebugMessage("Otrzymano nieprawidłowe dane z Arduino", "WARNING");
     }
