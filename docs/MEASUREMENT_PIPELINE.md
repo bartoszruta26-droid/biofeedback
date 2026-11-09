@@ -1,4 +1,6 @@
-# Wspólny silnik pomiarowy
+# 📡 Wspólny silnik pomiarowy
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ## Cel i granice odpowiedzialności
 
@@ -39,7 +41,7 @@ Dostępne jawne normalizacje:
 
 Silnik nie zgaduje wymiaru fizycznego i nie przelicza między różnymi wymiarami (np. kg na N). Adapter musi przekazać jednostkę wynikającą z konfiguracji urządzenia i kalibracji. Wartość surowa bez kalibracji powinna używać `count`.
 
-## Statusy jakości
+## Stany jakości
 
 - `valid` — próbka przeszła walidację.
 - `sensor_rejected` — źródłowy sterownik oznaczył próbkę jako niepoprawną.
