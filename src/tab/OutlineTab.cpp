@@ -920,24 +920,13 @@ QVector<OutlineData> OutlineTab::getOutlines() const
 
 void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
+    // MainWindow is the sole serial-to-game input owner. OutlineTab does not
+    // subscribe directly; this prevents another per-frame delivery path.
     if (m_serialPort && m_dataCallbackToken) {
         m_serialPort->removeDataCallback(m_dataCallbackToken);
         m_dataCallbackToken = 0;
     }
-    m_serialPort = serial;
-    if (m_serialPort) {
-        // This tab does not perform acquisition. Avoid one queued GUI event per
-        // sample; MainWindow owns the shared game controller and its mailbox.
-        m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
-            if (!data.isValid || !data.hasCalibratedValue ||
-                !m_isSessionActive || m_isPaused || !m_currentGame)
-                return;
-            const double forceN = data.calibratedValue *
-                biofeedback::measurement::standardGravityMetersPerSecondSquared / 1000.0;
-            if (!std::isfinite(forceN)) return;
-            m_latestSensorForceN.store(forceN, std::memory_order_release);
-        });
-    }
+    m_serialPort = std::move(serial);
 }
 bool OutlineTab::isSerialConnected() const
 {
