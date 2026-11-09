@@ -25,6 +25,7 @@ GameEngine::GameEngine(QWidget *parent)
 {
     // Konfiguracja timera gry - 60 FPS (ok. 16ms)
     m_gameTimer->setInterval(16);
+    m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
     connect(m_gameTimer, &QTimer::timeout, this, &GameEngine::gameLoop);
