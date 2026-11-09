@@ -65,9 +65,9 @@ Status w tabeli jest wskazówką redakcyjną, a nie wynikiem automatycznego audy
 
 ## 🔐 Bezpieczeństwo i audyty
 
-| [🔍 Audyt zgodności dokumentacji z kodem — 2026-11-09](audit/DOCUMENTATION_CODE_CONFORMANCE_2026-11-09.md) | Statusy funkcji, firmware, protokoły, API i macierz klientów |
-
 | Dokument | Zastosowanie |
+|---|---|
+| [🔍 Audyt zgodności dokumentacji z kodem — 2026-11-09](audit/DOCUMENTATION_CODE_CONFORMANCE_2026-11-09.md) | Statusy funkcji, firmware, protokoły, API i macierz klientów |
 |---|---|
 | [🔐 Wzmocnienie bezpieczeństwa — 2026-11-06](SECURITY_HARDENING_2026-11-06.md) | Historyczny opis PBKDF2, AES-GCM i atomowego zapisu |
 | [🔍 Audyt gałęzi integracyjnej — 2026-11-06](INTEGRATION_BRANCH_AUDIT_2026-11-06.md) | Historyczne ustalenia bezpieczeństwa i integracji |
