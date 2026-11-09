@@ -909,13 +909,13 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
     m_gameWindow = new QDialog(this, Qt::Window);
     m_gameWindow->setWindowTitle(tr("Biofeedback — %1").arg(selectedGame->gameName()));
     m_gameWindow->setModal(false);
-    m_gameWindow->setMinimumSize(800, 600);
+    m_gameWindow->setMinimumSize(640, 400);
     m_gameWindow->setAttribute(Qt::WA_DeleteOnClose, false);
     auto* gameLayout = new QVBoxLayout(m_gameWindow);
     gameLayout->setContentsMargins(0, 0, 0, 0);
     gameLayout->setSpacing(0);
     selectedGame->setParent(m_gameWindow);
-    selectedGame->setMinimumSize(640, 480);
+    selectedGame->setMinimumSize(600, 360);
     selectedGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     gameLayout->addWidget(selectedGame, 1);
 
