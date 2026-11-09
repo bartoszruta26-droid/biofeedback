@@ -11,9 +11,8 @@ measurement = read("src/tab/MeasurementTab.cpp")
 training = read("src/tab/TrainingTab.cpp")
 measurement_header = read("include/tab/MeasurementTab.hpp")
 
-assert "if (!std::isfinite(forceNewtons)) return;" in main
-assert "forceNewtons < 0.0" not in main
-assert "std::abs(forceNewtons)" in main
+assert "if (!sample.isValid() || sample.unit != \"N\"" in main
+assert "std::abs(sample.value)" in main
 assert "m_gameWindow->showFullScreen();" in main
 assert "QShortcut(QKeySequence(Qt::Key_Escape), m_gameWindow)" in main
 assert "trainingMeasurementEngine()->subscribe" in main
