@@ -196,7 +196,6 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     }
 
     // Pasek siły
-    int barWidth = width() - 2 * margin;
     
     // Tło paska
     painter.setBrush(QColor(60, 60, 60));
