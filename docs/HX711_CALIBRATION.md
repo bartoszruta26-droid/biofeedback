@@ -2,11 +2,24 @@
 
 > 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
-## Właściwy firmware i warunek uruchomienia analizy siły
+## Domyślny tryb desktop GUI: RAW
 
-Aplikacja przyjmuje wartość siły do analizy ruchu dopiero wtedy, gdy firmware zgłasza `CAL:1`. Poprawna ramka binarna z surowym odczytem ADC nie oznacza jeszcze, że wynik jest skalibrowany. Wartość `FORCE` bez potwierdzenia kalibracji pozostaje dostępna wyłącznie jako informacja diagnostyczna.
+Desktop GUI domyślnie odbiera, rejestruje i wyświetla surowe próbki ADC. Do poprawnego odbioru ramki wymagane są poprawny format i CRC, ale flaga firmware `CAL:1` ani pole `FORCE` nie są warunkiem zapisu danych RAW.
 
-Aktualnym firmware dla protokołu ramek binarnych jest plik [`hx711_advanced.ino`](../hx711_advanced.ino). Firmware rozpoczyna pracę z `is_calibrated=false`. Po restarcie lub odłączeniu zasilania wymaga ponownego potwierdzenia kalibracji. Współczynnik kalibracji nie jest obecnie zapisywany w pamięci nieulotnej.
+Kalibracja nie jest wykonywana w firmware. Aplikacja zachowuje surowy odczyt w trwałym dzienniku, a przeliczenie uruchamia dopiero po wybraniu w GUI jednostki `N` albo `kg`. Wtedy GUI odczytuje profil z pliku konfiguracyjnego i przelicza próbki lokalnie. Przełączenie z powrotem na `RAW` pokazuje pierwotne wartości ADC.
+
+Domyślna ścieżka profilu:
+`~/.config/biofeedback/calibration/hx711.json`
+
+Można ją zmienić kluczem `sensor.calibration_profile` w pliku `~/.config/biofeedback/config.json`. Ścieżka względna jest liczona od katalogu konfiguracji aplikacji. Profil musi być poprawnym dokumentem `CalibrationProfile`, zawierać własne `deviceId`, jednostkę `g`, `zeroOffsetRaw` oraz dodatni `scaleFactor`. Współczynnik oznacza gramy na jeden zliczony krok RAW. Bez poprawnego profilu GUI pozostaje w trybie RAW i nie pozwala prezentować wartości jako N/kg.
+
+Przeliczenie w GUI:
+`masa_g = (raw - zeroOffsetRaw) * scaleFactor`
+`masa_kg = masa_g / 1000`
+`siła_N = masa_kg * 9.80665`
+
+Wewnętrzne buforowanie siły i analiza biomechaniczna pozostają w jednostkach SI. Wartość RAW jest zawsze zachowana niezależnie od wybranej jednostki prezentacji.
+
 
 ## Procedura
 
