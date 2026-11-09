@@ -1356,8 +1356,8 @@ void TrainingTab::onMeasurementSample(
         return;
     }
 
-    const double force = sample.value; // Already calibrated and expressed in newtons.
-    if (!std::isfinite(force) || force < 0.0) {
+    const double force = std::abs(sample.value); // Tensile magnitude in newtons; calibration may encode bridge polarity.
+    if (!std::isfinite(force)) {
         biofeedback::training::RepetitionRecord discarded;
         m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
         return;
