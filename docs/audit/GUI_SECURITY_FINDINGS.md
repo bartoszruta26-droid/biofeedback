@@ -1,4 +1,6 @@
-# Ustalenia bezpieczeństwa interfejsów
+# 🔐 Ustalenia audytu bezpieczeństwa interfejsów
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski dotyczą wskazanego zakresu i momentu przeglądu; przed użyciem jako kryterium odbioru zweryfikuj bieżący kod.
 
 ## BF-SEC-001 — dane osobowe w logach
 
