@@ -31,6 +31,7 @@
 #include <QTimer>
 
 #include "sensor/SerialCommunication.hpp"
+#include "sensor/CalibrationProfile.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
 #include "tab/SampleJournalWriter.hpp"
 #include "training/RepetitionDetector.hpp"
@@ -387,6 +388,8 @@ private:
     // Komponenty UI - pomocnicze
     void updateStatsTableUnits();
     void updateRawTableUnits();
+    bool loadCalibrationProfile(QString* error = nullptr);
+    bool rawToNewtons(std::int32_t rawValue, double& forceNewtons) const;
     
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
@@ -463,6 +466,9 @@ private:
     
     // Tryb wyświetlania: raw value vs calibrated
     bool m_showRawValues;
+    bool m_hasCalibrationProfile{false};
+    double m_calibrationZeroOffsetRaw{0.0};
+    double m_calibrationScaleFactor{0.0};
     
     // Detekcja powtórzeń
     bool m_inContraction;
