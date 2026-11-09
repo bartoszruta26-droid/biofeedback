@@ -235,6 +235,19 @@ destructor_body = source[destructor_start:destructor_end]
 if destructor_body.index("m_measurementEngine->setCommitHook({})") > destructor_body.index("closeSampleJournal()"):
     raise SystemExit("Teardown must disable and synchronize commit hook before closing journal")
 
+# Presentation cadence is intentionally faster than acquisition analysis:
+# the sensor stream remains lossless while visible plots/game input target 60 Hz.
+training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
+game_engine_source = Path("src/games/GameEngine.cpp").read_text(encoding="utf-8")
+if "static constexpr qint64 LiveUiIntervalMs = 16;" not in training_source:
+    raise SystemExit("Training live widgets/game input must target approximately 60 Hz")
+if "m_repaintTimer.setInterval(16);" not in source:
+    raise SystemExit("Measurement force plot repaint must target approximately 60 Hz")
+if "Qt::PreciseTimer" not in game_engine_source:
+    raise SystemExit("Game frame timer must use precise scheduling")
+if "QPainterPath tracePath;" not in source or "QPointF(margin + column, y)" not in source:
+    raise SystemExit("Measurement trace must retain subpixel coordinates for smooth rendering")
+
 print("Measurement, training and game realtime dispatch regression passed")
 
 # The live sensor path must retain all samples while coalescing GUI work.
