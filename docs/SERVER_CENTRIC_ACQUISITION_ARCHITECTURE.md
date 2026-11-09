@@ -1,4 +1,6 @@
-# Architektura centralnej akwizycji i dystrybucji danych
+# 🧠 Architektura centralnej akwizycji i dystrybucji danych
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 Status: docelowy kierunek architektoniczny; nie jest deklaracją, że cały przepływ został już wdrożony.
 
