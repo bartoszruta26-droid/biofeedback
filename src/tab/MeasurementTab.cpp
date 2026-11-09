@@ -948,7 +948,7 @@ void MeasurementTab::setupUI()
             : ForceUnit::Newtons;
         setCurrentUnit(requested == ForceUnit::Raw ? ForceUnit::Newtons : requested);
     });
-    m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+    m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
     m_btnReset->setMinimumHeight(35);
@@ -3248,8 +3248,7 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
         if (unit != ForceUnit::Raw) {
             double forceNewtons = 0.0;
             if (!rawToNewtons(recorded.rawValue, forceNewtons)) continue;
-            displayValue = unit == ForceUnit::Kilograms
-                ? forceNewtons / 9.80665 : forceNewtons;
+            displayValue = forceNewtons; // Internal buffers and archives remain in SI newtons.
             recorded.calibratedMassKg = forceNewtons / 9.80665;
             recorded.hasCalibratedMass = true;
         } else {
@@ -3257,7 +3256,7 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
             recorded.hasCalibratedMass = false;
         }
         recorded.value = displayValue;
-        recorded.unit = unit == ForceUnit::Raw ? "count" : (unit == ForceUnit::Kilograms ? "kg" : "N");
+        recorded.unit = unit == ForceUnit::Raw ? "count" : "N";
         m_rawForceBuffer.append(displayValue);
         m_timeBuffer.append(recorded.elapsedTimeSeconds);
     }
