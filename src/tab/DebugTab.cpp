@@ -154,6 +154,23 @@ void DebugTab::setupUI()
     m_lblLastDataTime = new QLabel(tr("Ostatnie dane: ---"), this);
     m_lblRawValue = new QLabel(tr("Wartość surowa: ---"), this);
     m_lblCalibratedValue = new QLabel(tr("Wartość skalibrowana: ---"), this);
+
+    // Live sensor values are snapshots, not diagnostic log events. Refresh
+    // their labels at 10 Hz without posting one Qt event per sample.
+    m_sensorUiTimer = new QTimer(this);
+    m_sensorUiTimer->setInterval(100);
+    connect(m_sensorUiTimer, &QTimer::timeout, this, [this]() {
+        if (!m_lastSensorData.isValid) return;
+        m_lblLastDataTime->setText(
+            tr("Ostatnie dane: %1").arg(m_lastDataTime.toString("HH:mm:ss.zzz")));
+        m_lblRawValue->setText(
+            tr("Wartość surowa: %1").arg(m_lastSensorData.value));
+        m_lblCalibratedValue->setText(m_lastSensorData.hasCalibratedValue
+            ? tr("Wartość skalibrowana: %1 N").arg(
+                  QString::number(m_lastSensorData.calibratedValue, 'f', 2))
+            : tr("Wartość skalibrowana: brak"));
+    });
+    m_sensorUiTimer->start();
     
     m_arduinoStatusLayout->addWidget(m_lblPortName);
     m_arduinoStatusLayout->addWidget(m_lblBaudRate);
@@ -336,15 +353,11 @@ void DebugTab::onSensorDataReceived(const sensor::SensorData& data)
         // Aktualizuj UI statusu Arduino
         updateConnectionStatus(true);
         
-        // Dodaj wiadomość do terminala z danymi z Arduino
-        QString arduinoMsg = QString("RAW=%1 | CALIBRATED=%.2fN | Timestamp=%2")
-            .arg(data.value)
-            .arg(data.calibratedValue)
-            .arg(QDateTime::currentDateTime().toString("HH:mm:ss.zzz"));
-        
-        addDebugMessage(arduinoMsg, "ARDUINO");
-        
-        // Emituj sygnał dla innych komponentów
+        // This is a high-rate live snapshot, not a diagnostic event.
+        // Do not render a terminal row or enqueue another widget event per sample.
+        if (!m_sensorUiTimer->isActive()) m_sensorUiTimer->start();
+
+        // Keep the acquisition/sample signal for consumers that explicitly need it.
         emit arduinoDataReceived(data);
     } else {
         addDebugMessage("Otrzymano nieprawidłowe dane z Arduino", "WARNING");
@@ -422,7 +435,9 @@ void DebugTab::updateConnectionStatus(bool connected)
         if (m_lastSensorData.isValid) {
             m_lblLastDataTime->setText(QString("Ostatnie dane: %1").arg(m_lastDataTime.toString("HH:mm:ss")));
             m_lblRawValue->setText(QString("Wartość surowa: %1").arg(m_lastSensorData.value));
-            m_lblCalibratedValue->setText(QString("Wartość skalibrowana: %.2f N").arg(m_lastSensorData.calibratedValue));
+            m_lblCalibratedValue->setText(
+                QString("Wartość skalibrowana: %1 N")
+                    .arg(QString::number(m_lastSensorData.calibratedValue, 'f', 2)));
         }
     } else {
         m_lblConnectionStatus->setText(tr("🔴 Rozłączony"));
