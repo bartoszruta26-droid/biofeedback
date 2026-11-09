@@ -1525,16 +1525,13 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     m_recordedSamples.append(recorded);
     // The acquisition CommitHook has already durably journaled this sample.
 
-    if (m_rawBox)
-        m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)").arg(m_recordedSamples.size()));
-
+    // Keep the acquisition path free of per-sample widget mutations.
+    // The table is refreshed in updateRawTableBatch() at a bounded 10 Hz.
     constexpr int liveBufferCapacity = 10000;
     if (m_rawForceBuffer.size() > liveBufferCapacity)
         m_rawForceBuffer.remove(0, m_rawForceBuffer.size() - liveBufferCapacity);
     if (m_timeBuffer.size() > liveBufferCapacity)
         m_timeBuffer.remove(0, m_timeBuffer.size() - liveBufferCapacity);
-    if (m_btnToggleRaw) m_btnToggleRaw->setEnabled(false);
-    if (m_unitSelector) m_unitSelector->setEnabled(!m_showRawValues);
 
     if (!m_showRawValues) {
         biofeedback::training::RepetitionRecord repetition;
@@ -1559,10 +1556,19 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
         }
     }
 
-    emit newForceSample(forceValue, currentTime, m_showRawValues);
-    updateLiveDisplay(forceValue);
-
-    updateRawTableBatch();
+    // Persist/retain every sample and run repetition detection at acquisition
+    // cadence, but refresh presentation widgets no faster than 20 Hz.
+    static constexpr qint64 LiveUiIntervalMs = 50;
+    const qint64 elapsedMs = m_sessionElapsedTimer.elapsed();
+    if (elapsedMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs) {
+        m_lastLiveUiRefreshMs = elapsedMs;
+        emit newForceSample(forceValue, currentTime, m_showRawValues);
+        updateLiveDisplay(forceValue);
+        updateRawTableBatch();
+        if (m_rawBox)
+            m_rawBox->setTitle(tr("Surowe dane (ostatnie 100 z %1 próbek)")
+                                   .arg(m_recordedSamples.size()));
+    }
 }
 
 void MeasurementTab::updateRawTableBatch(bool force)
@@ -1590,6 +1596,15 @@ void MeasurementTab::updateRawTableBatch(bool force)
     if (m_rawTableLastSequence == totalSamples) {
         m_lastRawTableRefreshMs = elapsedMs;
         return;
+    }
+
+    // A slow/stalled UI must never replay an unbounded backlog. Only show
+    // the newest visible window; the full lossless sample history is retained
+    // in m_recordedSamples and the durable journal.
+    const quint64 firstVisibleRow = totalSamples > 100 ? totalSamples - 100 : 0;
+    if (m_rawTableLastSequence < firstVisibleRow) {
+        m_rawTable->setRowCount(0);
+        m_rawTableLastSequence = firstVisibleRow;
     }
 
     m_rawTable->setUpdatesEnabled(false);
