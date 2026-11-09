@@ -1,0 +1,88 @@
+name: Raspberry Pi ARM64 Debian package
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'include/**'
+      - 'tests/**'
+      - 'resources/**'
+      - 'config/**'
+      - 'packaging/**'
+      - 'docs/**'
+      - '.github/workflows/raspberry-pi-arm64-deb.yml'
+  push:
+    branches:
+      - 'packaging/raspberry-pi-arm64-deb'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-arm64-deb:
+    name: Build and test Raspberry Pi OS ARM64 package
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install native ARM64 build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake pkg-config git dpkg-dev \
+            qtbase5-dev qtbase5-dev-tools libqt5charts5-dev \
+            libserialport-dev nlohmann-json3-dev libssl-dev libncurses-dev
+
+      - name: Verify runner architecture
+        run: |
+          test "$(dpkg --print-architecture)" = "arm64"
+          uname -m
+
+      - name: Validate Linux packaging scripts
+        run: bash -n packaging/linux/run.sh packaging/linux/install.sh packaging/linux/uninstall.sh
+
+      - name: Configure Release build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build desktop application and regression targets
+        run: cmake --build build --parallel 2
+
+      - name: Run regression tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Verify desktop executable and linked libraries
+        run: |
+          test -x build/biofeedback
+          ldd build/biofeedback | tee build/runtime-dependencies.txt
+          if grep -q "not found" build/runtime-dependencies.txt; then
+            echo "Unresolved runtime dependencies detected"
+            exit 1
+          fi
+
+      - name: Build ARM64 Debian package
+        run: |
+          mkdir -p dist
+          cpack --config build/CPackConfig.cmake -G DEB -B dist
+          package="$(find dist -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$package"
+          dpkg-deb --info "$package"
+          architecture="$(dpkg-deb -f "$package" Architecture)"
+          test "$architecture" = "arm64"
+          contents="$(dpkg-deb --contents "$package")"
+          grep -q '/usr/bin/biofeedback' <<< "$contents"
+          grep -q '/usr/share/applications/biofeedback.desktop' <<< "$contents"
+          grep -q '/usr/share/icons/hicolor/scalable/apps/biofeedback.svg' <<< "$contents"
+          echo "Verified package: $package ($architecture)"
+
+      - name: Upload Raspberry Pi ARM64 DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: biofeedback-raspberry-pi-arm64-deb
+          path: dist/*.deb
+          if-no-files-found: error
+          retention-days: 30
