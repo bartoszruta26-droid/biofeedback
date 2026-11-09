@@ -1226,14 +1226,17 @@ void TrainingTab::onMeasurementSample(
     }
     m_currentForce = force;
 
+    // Update the lightweight force trace model for every acquired sample;
+    // QWidget::update() coalesces paints to the display refresh cadence.
+    m_progressWidget->setCurrentForce(force);
+
     // Preserve every sample for biomechanics/repetition detection while
-    // refreshing the visible widgets at no more than 20 Hz.
+    // throttling text/progress controls and game input to approximately 60 Hz.
     static constexpr qint64 LiveUiIntervalMs = 16;
     const qint64 nowMs = m_sessionClock.isValid() ? m_sessionClock.elapsed() : 0;
     if (nowMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs) {
         m_lastLiveUiRefreshMs = nowMs;
         m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
-        m_progressWidget->setCurrentForce(force);
 
         const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
         const int barValue = targetForce > 0.0
