@@ -17,6 +17,7 @@
 #include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QApplication>
+#include <QDialogButtonBox>
 #include <QSettings>
 #include <QDateTime>
 #include <QTabWidget>
@@ -361,68 +362,94 @@ void MainWindow::clearDebugTerminal()
 
 void MainWindow::showSettingsDialog()
 {
-    // Create settings widget if not exists
     if (!m_settingsWidget) {
-        m_settingsWidget = new QWidget(this);
+        m_settingsWidget = new QDialog(this);
         m_settingsWidget->setWindowTitle(tr("Ustawienia"));
-        m_settingsWidget->setMinimumSize(400, 300);
-        
-        QVBoxLayout* mainLayout = new QVBoxLayout(m_settingsWidget);
-        
-        // Settings group
-        QGroupBox* settingsGroup = new QGroupBox(tr("Ustawienia"), this);
-        QVBoxLayout* settingsLayout = new QVBoxLayout(settingsGroup);
-        
-        // Sampling rate
-        QHBoxLayout* samplingLayout = new QHBoxLayout();
-        samplingLayout->addWidget(new QLabel(tr("Częstotliwość:"), this));
-        m_samplingRateSpin = new QSpinBox(this);
+        m_settingsWidget->setWindowFlags(Qt::Dialog | Qt::WindowTitleHint |
+                                         Qt::WindowSystemMenuHint |
+                                         Qt::WindowMinMaxButtonsHint |
+                                         Qt::WindowCloseButtonHint);
+        m_settingsWidget->setModal(false);
+        m_settingsWidget->setMinimumSize(440, 340);
+        m_settingsWidget->setWindowModality(Qt::NonModal);
+
+        auto* mainLayout = new QVBoxLayout(m_settingsWidget);
+        mainLayout->setContentsMargins(20, 18, 20, 16);
+        mainLayout->setSpacing(14);
+
+        auto* settingsGroup = new QGroupBox(tr("Parametry pomiaru"), m_settingsWidget);
+        auto* settingsLayout = new QVBoxLayout(settingsGroup);
+        settingsLayout->setContentsMargins(16, 18, 16, 16);
+        settingsLayout->setSpacing(12);
+
+        auto* samplingLayout = new QHBoxLayout();
+        samplingLayout->addWidget(new QLabel(tr("Częstotliwość próbkowania:"), settingsGroup));
+        m_samplingRateSpin = new QSpinBox(settingsGroup);
         m_samplingRateSpin->setRange(10, 1000);
-        m_samplingRateSpin->setValue(100);
         m_samplingRateSpin->setSuffix(tr(" Hz"));
         samplingLayout->addWidget(m_samplingRateSpin);
         settingsLayout->addLayout(samplingLayout);
-        
-        // Graph duration
-        QHBoxLayout* durationLayout = new QHBoxLayout();
-        durationLayout->addWidget(new QLabel(tr("Czas wykresu:"), this));
-        m_graphDurationSpin = new QSpinBox(this);
+
+        auto* durationLayout = new QHBoxLayout();
+        durationLayout->addWidget(new QLabel(tr("Czas wykresu:"), settingsGroup));
+        m_graphDurationSpin = new QSpinBox(settingsGroup);
         m_graphDurationSpin->setRange(10, 300);
-        m_graphDurationSpin->setValue(60);
         m_graphDurationSpin->setSuffix(tr(" s"));
         durationLayout->addWidget(m_graphDurationSpin);
         settingsLayout->addLayout(durationLayout);
-        
-        // Unit selection
-        QHBoxLayout* unitLayout = new QHBoxLayout();
-        unitLayout->addWidget(new QLabel(tr("Jednostka:"), this));
-        m_unitCombo = new QComboBox(this);
+
+        auto* unitLayout = new QHBoxLayout();
+        unitLayout->addWidget(new QLabel(tr("Jednostka prezentacji:"), settingsGroup));
+        m_unitCombo = new QComboBox(settingsGroup);
         m_unitCombo->addItem(tr("Niutony (N)"));
         m_unitCombo->addItem(tr("Kilogramy (kg)"));
         unitLayout->addWidget(m_unitCombo);
         settingsLayout->addLayout(unitLayout);
-        
-        // Weight display
-        QHBoxLayout* weightLayout = new QHBoxLayout();
-        m_weightLabel = new QLabel(tr("Waga:"), this);
-        m_weightValue = new QLabel(tr("0.00 N"), this);
-        m_weightValue->setStyleSheet("font-size: 16px; font-weight: bold; color: blue;");
+
+        auto* weightLayout = new QHBoxLayout();
+        m_weightLabel = new QLabel(tr("Ostatni odczyt:"), settingsGroup);
+        m_weightValue = new QLabel(tr("0,00 N"), settingsGroup);
+        m_weightValue->setStyleSheet("font-size: 16px; font-weight: 700; color: #087f82;");
         m_weightValue->setMinimumWidth(100);
         weightLayout->addWidget(m_weightLabel);
         weightLayout->addWidget(m_weightValue);
         weightLayout->addStretch();
         settingsLayout->addLayout(weightLayout);
-        
+
         mainLayout->addWidget(settingsGroup);
         mainLayout->addStretch();
-        
-        // Connect settings signals
-        connect(m_samplingRateSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-                this, &MainWindow::onSamplingRateChanged);
-        connect(m_graphDurationSpin, QOverload<int>::of(&QSpinBox::valueChanged),
-                this, &MainWindow::onGraphDurationChanged);
+
+        auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel,
+                                             Qt::Horizontal, m_settingsWidget);
+        buttons->button(QDialogButtonBox::Ok)->setText(tr("OK"));
+        buttons->button(QDialogButtonBox::Cancel)->setText(tr("Anuluj"));
+        mainLayout->addWidget(buttons);
+
+        connect(buttons, &QDialogButtonBox::accepted, m_settingsWidget, [this]() {
+            onSamplingRateChanged(m_samplingRateSpin->value());
+            onGraphDurationChanged(m_graphDurationSpin->value());
+
+            QSettings settings("Biofeedback", "MainWindow");
+            settings.setValue("sampling/rate", m_samplingRateSpin->value());
+            settings.setValue("graph/duration", m_graphDurationSpin->value());
+            settings.setValue("measurement/unit", m_unitCombo->currentIndex());
+            m_settingsWidget->accept();
+        });
+        connect(buttons, &QDialogButtonBox::rejected, m_settingsWidget, [this]() {
+            QSettings settings("Biofeedback", "MainWindow");
+            m_samplingRateSpin->setValue(settings.value("sampling/rate", 100).toInt());
+            m_graphDurationSpin->setValue(settings.value("graph/duration", 60).toInt());
+            m_unitCombo->setCurrentIndex(settings.value("measurement/unit", 0).toInt());
+            m_settingsWidget->reject();
+        });
     }
-    
+
+    QSettings settings("Biofeedback", "MainWindow");
+    m_samplingRateSpin->setValue(settings.value("sampling/rate", 100).toInt());
+    m_graphDurationSpin->setValue(settings.value("graph/duration", 60).toInt());
+    m_unitCombo->setCurrentIndex(settings.value("measurement/unit", 0).toInt());
+
+    m_settingsWidget->adjustSize();
     m_settingsWidget->show();
     m_settingsWidget->raise();
     m_settingsWidget->activateWindow();
