@@ -1,4 +1,6 @@
-# Docelowa architektura interfejsów Biofeedback
+# 🧭 Docelowa architektura interfejsów Biofeedback
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski dotyczą wskazanego zakresu i momentu przeglądu; przed użyciem jako kryterium odbioru zweryfikuj bieżący kod.
 
 ## Cel
 
