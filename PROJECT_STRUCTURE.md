@@ -10,7 +10,6 @@ biofeedback/
 ├── BUILD_INSTRUCTIONS.md     # Detailed build instructions
 ├── PROJECT_STRUCTURE.md      # This file
 ├── CMakeLists.txt            # CMake build configuration
-├── Makefile                  # GNU Make build configuration
 ├── .gitignore                # Git ignore rules
 │
 ├── config/                   # Configuration files
@@ -130,7 +129,6 @@ biofeedback/
 
 ### Build Configuration
 - **CMakeLists.txt**: CMake build system configuration
-- **Makefile**: GNU Make build system
 
 ### Configuration
 - **config/config.json**: Runtime configuration (serial port, paths, etc.)
