@@ -1,4 +1,6 @@
-# Plan rozwoju silnika i gier
+# 🎮 Plan rozwoju silnika gier i modułu arcade
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski i statusy odnoszą się do wskazanej daty, gałęzi i commita; nie są automatycznie bieżącym stanem main.
 
 ## Zakres wymagany
 
