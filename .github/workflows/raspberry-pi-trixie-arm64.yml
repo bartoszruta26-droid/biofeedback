@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     container:
       image: debian:trixie
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - name: Install Debian Trixie ARM64 build dependencies
         run: |
@@ -48,8 +48,8 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - name: Build application and regression targets
         run: cmake --build build --parallel 2
-      - name: Run regression tests
-        run: ctest --test-dir build --output-on-failure
+      - name: Run regression tests with per-test timeout
+        run: ctest --test-dir build --output-on-failure --timeout 60
       - name: Verify ARM64 executable
         run: |
           test -x build/biofeedback
