@@ -384,9 +384,9 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-        if (h == INVALID_HANDLE_VALUE) { 
-            m_impl->setLastError("Cannot open " + portName + ": " + std::string(std::strerror(errno)));
-            DWORD errorCode = GetLastError();
+        if (h == INVALID_HANDLE_VALUE) {
+            const DWORD errorCode = GetLastError();
+            m_impl->setLastError("Cannot open " + portName + ": Windows error " + std::to_string(errorCode));
             core::DebugManager::instance().sendDebugMessage(
                 QString("Failed to open port %1. Windows error code: %2").arg(QString::fromStdString(portName)).arg(errorCode),
                 core::DebugLevel::ERROR,
