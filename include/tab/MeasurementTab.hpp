@@ -395,7 +395,7 @@ private:
     QVBoxLayout* m_mainLayout;
     
     // Sekcja kontrolna
-    QHBoxLayout* m_controlLayout;
+    QVBoxLayout* m_controlLayout;
     QPushButton* m_btnStartStop;
     QPushButton* m_btnReadManual;
     QPushButton* m_btnSave;
