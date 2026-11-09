@@ -353,15 +353,35 @@ void GraphWidget::mouseMoveEvent(QMouseEvent *event)
     QPointF dataPos = screenToData(event->pos());
     m_isHovering = false;
     
-    for (const DataPoint& point : m_dataPoints) {
-        QPointF screenPos = dataToScreen(point);
-        double dist = QLineF(screenPos, event->pos()).length();
-        
-        if (dist < 5.0) {
-            m_isHovering = true;
-            m_hoveredPoint = point;
-            emit hovered(point, dataPos);
-            break;
+    // Samples are appended in acquisition order. Restrict hit-testing to
+    // the small timestamp interval represented by a five-pixel radius.
+    // This avoids transforming and testing the complete history on every
+    // mouse-move event.
+    const QRectF area = plotArea();
+    if (area.width() > 0.0 && !m_dataPoints.isEmpty()) {
+        const qint64 centerMs = static_cast<qint64>(dataPos.x());
+        const qint64 radiusMs = qMax<qint64>(
+            1, static_cast<qint64>(
+                (5.0 * m_timeRangeSeconds * 1000.0) / area.width()));
+        const auto first = std::lower_bound(
+            m_dataPoints.cbegin(), m_dataPoints.cend(), centerMs - radiusMs,
+            [](const DataPoint& point, qint64 timestampMs) {
+                return point.timestamp.toMSecsSinceEpoch() < timestampMs;
+            });
+        const auto last = std::upper_bound(
+            first, m_dataPoints.cend(), centerMs + radiusMs,
+            [](qint64 timestampMs, const DataPoint& point) {
+                return timestampMs < point.timestamp.toMSecsSinceEpoch();
+            });
+
+        for (auto it = first; it != last; ++it) {
+            const QPointF screenPos = dataToScreen(*it);
+            if (QLineF(screenPos, event->pos()).length() < 5.0) {
+                m_isHovering = true;
+                m_hoveredPoint = *it;
+                emit hovered(*it, dataPos);
+                break;
+            }
         }
     }
     
