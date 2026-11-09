@@ -25,6 +25,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonParseError>
+#include <QStandardPaths>
+#include "sensor/CalibrationProfile.hpp"
 #include <QScrollArea>
 #include <memory>
 #include <iostream>
@@ -470,8 +474,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     , m_sampleRate(100.0)
     , m_targetForce(50.0)
     , m_sessionStartTime(0.0)
-    , m_currentUnit(ForceUnit::Newtons)
-    , m_showRawValues(false)
+    , m_currentUnit(ForceUnit::Raw)
+    , m_showRawValues(true)
     , m_inContraction(false)
     , m_repStartForce(0.0)
     , m_repPeakForce(0.0)
@@ -487,7 +491,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
     m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
-        *m_serialPort, m_measurementEngine, "desktop-hx711", m_showRawValues ? "count" : "g");
+        *m_serialPort, m_measurementEngine, "desktop-hx711", "count");
     m_measurementCallbackToken = m_measurementEngine->subscribe(
         [this](const biofeedback::measurement::MeasurementSample& sample) {
             enqueueMeasurementSample(sample);
@@ -617,33 +621,14 @@ bool MeasurementTab::commitMeasurementSample(
     const double elapsed = m_sessionElapsedTimer.isValid()
         ? m_sessionElapsedOffsetSeconds + m_sessionElapsedTimer.elapsed() / 1000.0
         : m_sessionElapsedOffsetSeconds;
-    const bool rawMode = m_showRawValues;
     bool calibratedMassAvailable = false;
-    double archivedValue = 0.0;
-    double calibratedMassKg = 0.0;
+    const double archivedValue = sample.isValid() && sample.unit == "count"
+        ? static_cast<double>(sample.rawValue) : 0.0;
+    const double calibratedMassKg = 0.0;
     QString quality = QString::fromLatin1(
         biofeedback::measurement::qualityName(sample.quality));
-
-    if (sample.isValid()) {
-        if (rawMode) {
-            if (sample.unit == "count" && std::isfinite(sample.value))
-                archivedValue = sample.value;
-            else
-                quality = QStringLiteral("invalid_unit");
-        } else if (sample.unit == "kg" && std::isfinite(sample.value)) {
-            const double forceN = sample.value *
-                biofeedback::measurement::standardGravityMetersPerSecondSquared;
-            if (std::isfinite(forceN)) {
-                archivedValue = forceN;
-                calibratedMassKg = sample.value;
-                calibratedMassAvailable = true;
-            } else {
-                quality = QStringLiteral("non_finite_value");
-            }
-        } else {
-            quality = QStringLiteral("invalid_unit");
-        }
-    }
+    if (sample.isValid() && sample.unit != "count")
+        quality = QStringLiteral("invalid_unit");
 
     QJsonObject record;
     record["recordType"] = "sample";
@@ -656,7 +641,7 @@ bool MeasurementTab::commitMeasurementSample(
     record["hasRawValue"] = true;
     record["calibratedMassKg"] = calibratedMassKg;
     record["hasCalibratedMass"] = calibratedMassAvailable;
-    record["unit"] = rawMode ? "count" : "N";
+    record["unit"] = "count";
     record["source"] = QString::fromStdString(sample.source);
     record["quality"] = quality;
 
@@ -949,30 +934,19 @@ void MeasurementTab::setupUI()
     // Przełącznik RAW jest dostępny przed pierwszą próbką; tryb jest blokowany, aby nie mieszać jednostek w jednej sesji.
     m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
     m_btnToggleRaw->setCheckable(true);
-    m_btnToggleRaw->setChecked(false); // Domyślnie skalibrowana siła
+    m_btnToggleRaw->setChecked(true); // Domyślnie rejestruj i pokazuj surowe próbki
     m_btnToggleRaw->setEnabled(true);  // Tryb diagnostyczny RAW dostępny poza pomiarem
     m_btnToggleRaw->setMinimumHeight(35);
     m_btnToggleRaw->setFont(QFont("Arial", 9));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
-        m_showRawValues = checked;
-        if (m_measurementAdapter && m_serialPort && m_measurementEngine) {
-            m_measurementAdapter.reset();
-            m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
-                *m_serialPort, m_measurementEngine, "desktop-hx711",
-                checked ? "count" : "g");
-        }
-        if (m_forcePlot)
-            m_forcePlot->setUnit(checked ? ForceUnit::Raw : m_currentUnit);
-        if (m_unitSelector) m_unitSelector->setEnabled(!checked);
         if (checked) {
-            m_btnToggleRaw->setText("TRYB: WARTOŚCI RAW");
-            m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
-        } else {
-            m_btnToggleRaw->setText("TRYB: WARTOŚCI SKALIBROWANE");
-            m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
+            setCurrentUnit(ForceUnit::Raw);
+            return;
         }
-        updateUnitDisplay();
-        updateRawTableUnits();
+        const ForceUnit requested = m_unitSelector
+            ? static_cast<ForceUnit>(m_unitSelector->currentData().toInt())
+            : ForceUnit::Newtons;
+        setCurrentUnit(requested == ForceUnit::Raw ? ForceUnit::Newtons : requested);
     });
     m_btnToggleRaw->setStyleSheet("background-color: #2196F3; color: white;");
     
@@ -983,9 +957,10 @@ void MeasurementTab::setupUI()
     
     // Wybór jednostki siły
     m_unitSelector = new QComboBox(this);
+    m_unitSelector->addItem("Surowe RAW (ADC)", static_cast<int>(ForceUnit::Raw));
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
-    m_unitSelector->addItem("Kilogram-siła (kgf)", static_cast<int>(ForceUnit::Kilograms));
-    m_unitSelector->setCurrentIndex(0);  // Domyślnie Newtony
+    m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
+    m_unitSelector->setCurrentIndex(0);  // Domyślnie RAW; bez kalibracji
     m_unitSelector->setMinimumHeight(35);
     m_unitSelector->setFont(QFont("Arial", 10));
     connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
@@ -2190,20 +2165,29 @@ void MeasurementTab::onReadSingleSample()
         m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
         return;
     }
-    if (!m_lastSensorData.isValid || (!m_showRawValues && !m_lastSensorData.hasCalibratedValue)) {
-        m_lblStatus->setText(tr("Status: OCZEKIWANIE NA SKALIBROWANĄ PRÓBKĘ"));
+    if (!m_lastSensorData.isValid) {
+        m_lblStatus->setText(tr("Status: OCZEKIWANIE NA POPRAWNĄ PRÓBKĘ RAW"));
         m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
         return;
     }
 
-    const double value = m_showRawValues
-        ? static_cast<double>(m_lastSensorData.value)
-        : biofeedback::measurement::gramsToNewtons(m_lastSensorData.calibratedValue);
+    double value = static_cast<double>(m_lastSensorData.value);
+    double calibratedMassKg = 0.0;
+    bool hasCalibratedMass = false;
+    if (!m_showRawValues) {
+        if (!rawToNewtons(m_lastSensorData.value, value)) {
+            QMessageBox::warning(this, tr("Brak kalibracji"),
+                tr("Nie można przeliczyć próbki. Sprawdź profil kalibracji w konfiguracji."));
+            return;
+        }
+        calibratedMassKg = value / 9.80665;
+        hasCalibratedMass = true;
+    }
     if (!std::isfinite(value)) return;
     if (m_sessionStartTime <= 0.0) ensureSessionClockStarted();
     ensureCurrentSeriesInitialized();
     readSingleSample(value, m_lastSensorData.timestamp, m_lastSensorData.value, true,
-                     m_lastSensorData.calibratedValue, m_lastSensorData.hasCalibratedValue);
+                     calibratedMassKg, hasCalibratedMass);
     m_lblStatus->setText(tr("Status: PRÓBKA ZAPISANA"));
     m_lblStatus->setStyleSheet("color: green; font-weight: bold;");
 }
@@ -2979,8 +2963,7 @@ void MeasurementTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunica
     m_serialPort = serial;
     if (m_serialPort && m_measurementEngine) {
         m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
-            *m_serialPort, m_measurementEngine, "desktop-hx711",
-            m_showRawValues ? "count" : "g");
+            *m_serialPort, m_measurementEngine, "desktop-hx711", "count");
     }
     if (m_serialPort) {
         m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
@@ -3005,10 +2988,8 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
         addDebugMessage(tr("Otrzymano nieprawidłową ramkę z czujnika"), "WARNING");
         return;
     }
-    if (!m_showRawValues && !data.hasCalibratedValue) {
-        addDebugMessage(tr("Ramka zawiera tylko dane RAW; oczekuję na skalibrowaną wartość w gramach."), "WARNING");
-        return;
-    }
+    // Desktop acquisition intentionally accepts valid RAW frames without firmware calibration.
+    // Conversion is performed later by this GUI from the local calibration profile.
     // Per-frame logging at the sensor's sample rate floods the debug channel
     // and adds synchronous UI work to the acquisition hot path.
 
@@ -3115,28 +3096,25 @@ void MeasurementTab::onMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
     if (!m_isMeasuring) return;
-    if (!sample.isValid()) {
+    if (!sample.isValid() || sample.unit != "count") {
         m_repetitionDetector.reset();
         return;
     }
+    const std::int32_t raw = sample.rawValue;
     if (m_showRawValues) {
-        if (sample.unit != "count") return;
-        readSingleSample(sample.value, sample.deviceTimestampMs,
-                         sample.rawValue, true, 0.0, false);
-        return;
-    }
-    if (sample.unit != "kg") {
-        m_repetitionDetector.reset();
+        readSingleSample(static_cast<double>(raw), sample.deviceTimestampMs,
+                         raw, true, 0.0, false);
         return;
     }
 
-    const double force = sample.value *
-        biofeedback::measurement::standardGravityMetersPerSecondSquared;
-    if (!std::isfinite(force) || force < 0.0) {
+    double forceNewtons = 0.0;
+    if (!rawToNewtons(raw, forceNewtons) || forceNewtons < 0.0) {
         m_repetitionDetector.reset();
         return;
     }
-    readSingleSample(force, sample.deviceTimestampMs, sample.rawValue, true, sample.value, true);
+    const double calibratedMassKg = forceNewtons / 9.80665;
+    readSingleSample(forceNewtons, sample.deviceTimestampMs, raw, true,
+                     calibratedMassKg, true);
 }
 
 // ============================================================================
@@ -3158,24 +3136,111 @@ double MeasurementTab::convertForce(double newtons, ForceUnit targetUnit) const
     }
 }
 
+bool MeasurementTab::loadCalibrationProfile(QString* error)
+{
+    const QString configPath = QDir(biofeedback::runtime::appConfigDirectory())
+        .filePath(QStringLiteral("config.json"));
+    QString profilePath = QDir(biofeedback::runtime::appConfigDirectory())
+        .filePath(QStringLiteral("calibration/hx711.json"));
+
+    QFile configFile(configPath);
+    if (configFile.open(QIODevice::ReadOnly)) {
+        QJsonParseError parseError;
+        const QJsonDocument config = QJsonDocument::fromJson(configFile.readAll(), &parseError);
+        if (parseError.error == QJsonParseError::NoError && config.isObject()) {
+            const QJsonObject sensorConfig = config.object().value(QStringLiteral("sensor")).toObject();
+            const QString configuredPath = sensorConfig.value(QStringLiteral("calibration_profile")).toString();
+            if (!configuredPath.trimmed().isEmpty()) {
+                profilePath = configuredPath.startsWith(QLatin1Char('/'))
+                    ? configuredPath
+                    : QDir(biofeedback::runtime::appConfigDirectory()).filePath(configuredPath);
+            }
+        }
+    }
+
+    QFile profileFile(profilePath);
+    if (!profileFile.open(QIODevice::ReadOnly)) {
+        m_hasCalibrationProfile = false;
+        if (error) *error = tr("Nie znaleziono pliku: %1").arg(profilePath);
+        return false;
+    }
+    QJsonParseError profileParseError;
+    const QJsonDocument profileJson = QJsonDocument::fromJson(profileFile.readAll(), &profileParseError);
+    if (profileParseError.error != QJsonParseError::NoError || !profileJson.isObject()) {
+        m_hasCalibrationProfile = false;
+        if (error) *error = tr("Nieprawidłowy JSON profilu: %1").arg(profilePath);
+        return false;
+    }
+    const QString deviceId = profileJson.object().value(QStringLiteral("deviceId")).toString();
+    if (deviceId.isEmpty()) {
+        m_hasCalibrationProfile = false;
+        if (error) *error = tr("Profil nie zawiera deviceId.");
+        return false;
+    }
+
+    std::string loadError;
+    const auto profile = sensor::CalibrationProfileStore::load(
+        profilePath.toStdString(), deviceId.toStdString(), &loadError);
+    if (!profile) {
+        m_hasCalibrationProfile = false;
+        if (error) *error = QString::fromStdString(loadError);
+        return false;
+    }
+    m_calibrationZeroOffsetRaw = profile->zeroOffsetRaw;
+    m_calibrationScaleFactor = profile->scaleFactor;
+    m_hasCalibrationProfile = true;
+    if (error) error->clear();
+    return true;
+}
+
+bool MeasurementTab::rawToNewtons(std::int32_t rawValue, double& forceNewtons) const
+{
+    if (!m_hasCalibrationProfile) return false;
+    const auto grams = sensor::CalibrationMath::convertRaw(
+        rawValue, m_calibrationZeroOffsetRaw, m_calibrationScaleFactor);
+    if (!grams || !std::isfinite(*grams)) return false;
+    forceNewtons = (*grams / 1000.0) * 9.80665;
+    return std::isfinite(forceNewtons);
+}
+
 void MeasurementTab::setCurrentUnit(ForceUnit unit)
 {
+    if (unit != ForceUnit::Raw) {
+        QString error;
+        if (!loadCalibrationProfile(&error)) {
+            const QSignalBlocker buttonBlocker(m_btnToggleRaw);
+            const QSignalBlocker comboBlocker(m_unitSelector);
+            m_currentUnit = ForceUnit::Raw;
+            m_showRawValues = true;
+            if (m_btnToggleRaw) m_btnToggleRaw->setChecked(true);
+            if (m_unitSelector)
+                m_unitSelector->setCurrentIndex(m_unitSelector->findData(static_cast<int>(ForceUnit::Raw)));
+            if (m_forcePlot) m_forcePlot->setUnit(ForceUnit::Raw);
+            updateUnitDisplay();
+            updateRawTableUnits();
+            QMessageBox::information(this, tr("Brak profilu kalibracji"),
+                tr("Dane RAW są nadal rejestrowane bez zmian. Aby wyświetlić N lub kg, zapisz poprawny profil kalibracji w pliku config/calibration/hx711.json.\\n\\n%1").arg(error));
+            return;
+        }
+    }
+
     m_currentUnit = unit;
-    m_showRawValues = false;
-    if (m_btnToggleRaw && m_btnToggleRaw->isChecked())
-        m_btnToggleRaw->setChecked(false);
-    if (m_forcePlot)
-        m_forcePlot->setUnit(unit);
-    
-    // Aktualizuj etykiety w tabelach
+    m_showRawValues = (unit == ForceUnit::Raw);
+    {
+        const QSignalBlocker buttonBlocker(m_btnToggleRaw);
+        if (m_btnToggleRaw) m_btnToggleRaw->setChecked(m_showRawValues);
+    }
+    {
+        const QSignalBlocker comboBlocker(m_unitSelector);
+        if (m_unitSelector) {
+            const int index = m_unitSelector->findData(static_cast<int>(unit));
+            if (index >= 0) m_unitSelector->setCurrentIndex(index);
+        }
+    }
+    if (m_forcePlot) m_forcePlot->setUnit(unit);
     updateUnitDisplay();
     updateStatsTableUnits();
     updateRawTableUnits();
-    
-    std::cout << "[MeasurementTab] Changed force unit to: " 
-              << (unit == ForceUnit::Newtons ? "Newtons" : 
-                  unit == ForceUnit::Kilograms ? "Kilograms" : "Raw") 
-              << std::endl;
 }
 
 void MeasurementTab::updateUnitDisplay()
