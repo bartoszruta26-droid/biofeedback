@@ -938,7 +938,7 @@ void MeasurementTab::setupUI()
     visualScroll->setFrameShape(QFrame::NoFrame);
     auto* visualPanel = new QWidget(visualScroll);
     m_visualLayout = new QVBoxLayout(visualPanel);
-    m_m_visualLayout->setSpacing(8);
+    m_visualLayout->setSpacing(8);
     m_visualLayout->setContentsMargins(4, 4, 4, 4);
 
     auto* optionsScroll = new QScrollArea(workspaceSplitter);
@@ -1098,7 +1098,7 @@ void MeasurementTab::setupUI()
     liveLayout->addWidget(m_seriesProgress);
     
     m_liveBox->setLayout(liveLayout);
-    visualLayout->addWidget(m_liveBox, 3);
+    m_visualLayout->addWidget(m_liveBox, 3);
     
 
     // MeasurementTab nie posiada własnego terminala debugowego.
@@ -1124,7 +1124,7 @@ void MeasurementTab::setupUI()
     
     statsLayout->addWidget(m_statsTable);
     m_statsBox->setLayout(statsLayout);
-    visualLayout->addWidget(m_statsBox);
+    m_visualLayout->addWidget(m_statsBox);
 
     // Pełna tabela 65 wskaźników; status oddziela wynik liczbowy od braku danych.
     m_biomechBox = new QGroupBox("Parametry biomechaniczne (65)", this);
@@ -1175,7 +1175,7 @@ void MeasurementTab::setupUI()
     m_biomechTable->setFont(QFont("Arial", 9));
     biomechLayout->addWidget(m_biomechTable);
     m_biomechBox->setLayout(biomechLayout);
-    visualLayout->addWidget(m_biomechBox);
+    m_visualLayout->addWidget(m_biomechBox);
     updateBiomechanicalTable();
 
     // Tabela surowych danych
@@ -1192,7 +1192,8 @@ void MeasurementTab::setupUI()
     
     rawLayout->addWidget(m_rawTable);
     m_rawBox->setLayout(rawLayout);
-    visualLayout->addWidget(m_rawBox);
+    m_visualLayout->addWidget(m_rawBox);
+    optionsLayout->addStretch(1);
 }
 
 void MeasurementTab::setupTrendsUI()
@@ -1217,9 +1218,8 @@ void MeasurementTab::setupTrendsUI()
     trendsLayout->addWidget(m_trendsScrollArea);
     
     m_trendsBox->setLayout(trendsLayout);
-    visualLayout->addWidget(m_trendsBox);
-    visualLayout->addStretch(1);
-    optionsLayout->addStretch(1);
+    m_visualLayout->addWidget(m_trendsBox);
+    m_visualLayout->addStretch(1);
 }
 
 void MeasurementTab::setPatientId(const QString& id)
