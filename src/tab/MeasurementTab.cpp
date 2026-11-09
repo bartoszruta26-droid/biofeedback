@@ -186,8 +186,8 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     m_repaintTimer.setInterval(33); // cap live chart repaint scheduling at ~30 Hz
     connect(&m_repaintTimer, &QTimer::timeout, this, [this] { update(); });
 
-    setMinimumHeight(200);
-    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    setMinimumHeight(360);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
 void ForcePlotWidget::scheduleRepaint()
@@ -892,15 +892,15 @@ void MeasurementTab::ensureSessionClockStarted()
 void MeasurementTab::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(15);
-    m_mainLayout->setContentsMargins(15, 15, 15, 15);
+    m_mainLayout->setSpacing(8);
+    m_mainLayout->setContentsMargins(8, 8, 8, 8);
     
     // Sekcja kontrolna
     m_controlLayout = new QHBoxLayout();
     
     m_btnStartStop = new QPushButton("START POMIARU", this);
     m_btnStartStop->setMinimumHeight(45);
-    m_btnStartStop->setFont(QFont("Arial", 12, QFont::Bold));
+    m_btnStartStop->setFont(QFont("Arial", 9, QFont::Bold));
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     connect(m_btnStartStop, &QPushButton::clicked, this, &MeasurementTab::onToggleMeasurement);
     
@@ -960,7 +960,7 @@ void MeasurementTab::setupUI()
     m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
     m_unitSelector->setCurrentIndex(0);  // Domyślnie RAW; bez kalibracji
     m_unitSelector->setMinimumHeight(35);
-    m_unitSelector->setFont(QFont("Arial", 10));
+    m_unitSelector->setFont(QFont("Arial", 9));
     connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
             this, [this](int index) {
         int unitValue = m_unitSelector->itemData(index).toInt();
@@ -968,7 +968,7 @@ void MeasurementTab::setupUI()
     });
     
     m_chkShowTrends = new QCheckBox("POKAŻ TRENDY DŁUGOTERMINOWE", this);
-    m_chkShowTrends->setFont(QFont("Arial", 10, QFont::Bold));
+    m_chkShowTrends->setFont(QFont("Arial", 9, QFont::Bold));
     m_chkShowTrends->setMinimumHeight(35);
     connect(m_chkShowTrends, &QCheckBox::toggled, this, &MeasurementTab::onShowTrends);
     
@@ -987,17 +987,18 @@ void MeasurementTab::setupUI()
     
     // Panel żywy z wykresem
     m_liveBox = new QGroupBox("Podgląd Na Żywo", this);
-    m_liveBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_liveBox->setFont(QFont("Arial", 9, QFont::Bold));
     QVBoxLayout* liveLayout = new QVBoxLayout();
     liveLayout->setSpacing(10);
     
     m_forcePlot = new ForcePlotWidget(this);
     m_forcePlot->setTargetForce(m_targetForce);
     m_forcePlot->setMaxTimeWindow(10.0);
-    m_forcePlot->setMinimumHeight(250);
+    m_forcePlot->setMinimumHeight(360);
+    m_forcePlot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     m_lblCurrentForce = new QLabel("Aktualna siła: 0.0 N", this);
-    m_lblCurrentForce->setFont(QFont("Arial", 16, QFont::Bold));
+    m_lblCurrentForce->setFont(QFont("Arial", 12, QFont::Bold));
     m_lblCurrentForce->setAlignment(Qt::AlignCenter);
     m_lblCurrentForce->setMinimumHeight(30);
     
@@ -1008,12 +1009,12 @@ void MeasurementTab::setupUI()
     m_forceBar->setMinimumHeight(25);
     
     m_lblStatus = new QLabel("Status: GOTOWY", this);
-    m_lblStatus->setFont(QFont("Arial", 11, QFont::Bold));
+    m_lblStatus->setFont(QFont("Arial", 9, QFont::Bold));
     m_lblStatus->setStyleSheet("color: blue; font-weight: bold;");
     m_lblStatus->setMinimumHeight(25);
     
     m_lblSeriesInfo = new QLabel("Seria: 0/3 | Powtórzenia: 0/8", this);
-    m_lblSeriesInfo->setFont(QFont("Arial", 11));
+    m_lblSeriesInfo->setFont(QFont("Arial", 9));
     m_lblSeriesInfo->setMinimumHeight(25);
     
     m_seriesProgress = new QProgressBar(this);
