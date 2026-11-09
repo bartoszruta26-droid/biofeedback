@@ -1,789 +1,452 @@
-# Biofeedback Application for Raspberry Pi 4
+# 🧠 Biofeedback — system pomiaru siły i treningu z biologicznym sprzężeniem zwrotnym
+
+<p align="center">
+  <strong>Aplikacja C++17 / Qt5 dla Raspberry Pi i systemów Linux</strong><br>
+  Pomiar siły • analiza ruchu • trening • gry sterowane czujnikiem • archiwizacja danych
+</p>
+
+<p align="center">
+  <a href="https://github.com/bartoszruta26-droid/biofeedback/actions"><img alt="GitHub Actions" src="https://img.shields.io/github/actions/workflow/status/bartoszruta26-droid/biofeedback/raspberry-pi-arm64-deb.yml?label=kompilacja%20Raspberry%20Pi&logo=githubactions"></a>
+  <a href="https://github.com/bartoszruta26-droid/biofeedback"><img alt="Repozytorium" src="https://img.shields.io/badge/repozytorium-GitHub-181717?logo=github"></a>
+  <a href="https://img.shields.io/badge/C%2B%2B-17-00599C"><img alt="C++17" src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus"></a>
+  <a href="https://www.qt.io/"><img alt="Qt5" src="https://img.shields.io/badge/Qt-5-41CD52?logo=qt&logoColor=white"></a>
+  <a href="https://www.raspberrypi.com/"><img alt="Raspberry Pi" src="https://img.shields.io/badge/Raspberry%20Pi-4%20%7C%20ARM64-C51A4A?logo=raspberrypi&logoColor=white"></a>
+  <img alt="Licencja" src="https://img.shields.io/badge/licencja-nieokre%C5%9Blona-lightgrey">
+</p>
+
+> [!IMPORTANT]
+> **Stan projektu należy oceniać na podstawie kodu, testów i aktualnych przebiegów CI.** Samo istnienie ekranu, klasy lub wpisu w fabryce nie oznacza zakończonej walidacji sprzętowej ani klinicznej. Projekt nie zastępuje certyfikowanego wyrobu medycznego.
+
+---
+
+## 🧭 Spis treści
+
+- [🎯 O projekcie](#-o-projekcie)
+- [✨ Najważniejsze możliwości](#-najważniejsze-możliwości)
+- [🎮 Gry biofeedbackowe — pełna lista](#-gry-biofeedbackowe--pełna-lista)
+- [🖥️ Interfejsy użytkownika](#️-interfejsy-użytkownika)
+- [🔌 Sprzęt i przepływ pomiaru](#-sprzęt-i-przepływ-pomiaru)
+- [📈 Analiza pomiarów i treningu](#-analiza-pomiarów-i-treningu)
+- [🔐 Dane, bezpieczeństwo i prywatność](#-dane-bezpieczeństwo-i-prywatność)
+- [⚙️ Wymagania](#️-wymagania)
+- [🚀 Szybkie uruchomienie](#-szybkie-uruchomienie)
+- [🍓 Raspberry Pi — instalacja i pakiet DEB](#-raspberry-pi--instalacja-i-pakiet-deb)
+- [🧰 Budowanie ze źródeł](#-budowanie-ze-źródeł)
+- [🧪 Testowanie](#-testowanie)
+- [🗂️ Struktura repozytorium](#️-struktura-repozytorium)
+- [📚 Dokumentacja](#-dokumentacja)
+- [⚠️ Ograniczenia i bezpieczeństwo użytkowania](#️-ograniczenia-i-bezpieczeństwo-użytkowania)
+- [🤝 Współpraca](#-współpraca)
+
+## 🎯 O projekcie
+
+Biofeedback to rozwijana aplikacja do rejestracji sygnału z czujnika siły, wizualizacji pomiaru w czasie rzeczywistym oraz analizy powtórzeń i serii treningowych. Główna aplikacja komputerowa jest napisana w C++17 z wykorzystaniem Qt5. Typowa konfiguracja sprzętowa obejmuje Raspberry Pi, Arduino Nano i przetwornik tensometryczny HX711.
+
+Dane z czujnika przechodzą przez warstwę komunikacji szeregowej, walidację ramek i silnik pomiarowy. Następnie mogą być prezentowane na wykresie, analizowane pod kątem parametrów biomechanicznych albo wykorzystywane jako sygnał sterujący grą.
+
+**Główne założenia projektu:**
+- rzetelny odczyt i walidacja danych zamiast generowania pozornych pomiarów;
+- oddzielenie akwizycji próbek od odświeżania interfejsu;
+- analiza pojedynczych powtórzeń, serii i całych sesji;
+- możliwość wykorzystania gier jako uzupełnienia ćwiczeń;
+- stopniowe ujednolicanie dostępu do danych w różnych interfejsach;
+- jawne opisywanie funkcji gotowych, rozwijanych i wymagających dalszej walidacji.
+
+## ✨ Najważniejsze możliwości
+
+| Obszar | Możliwości |
+|---|---|
+| 👤 Kartoteka | Tworzenie, odczyt, edycja, usuwanie, import i eksport kart pacjentów — zakres zależy od klienta |
+| 📡 Akwizycja | Odczyt danych z Arduino Nano/HX711 przez port szeregowy |
+| 📉 Wizualizacja | Wykres siły, podgląd próbek i statystyki pomiaru |
+| 💪 Analiza powtórzeń | Wykrywanie powtórzeń z histerezą, czas trwania, wartość szczytowa i średnia |
+| 🧮 Analiza serii | Zestawienia serii, zmienność wyników i realizacja celu |
+| 🕹️ Trening | Konfiguracja ćwiczenia, celu, serii, powtórzeń i odpoczynku |
+| 🎮 Gry | Zestaw gier sterowanych sygnałem biofeedback |
+| 📄 Raporty | Eksport wybranych danych i raportów do CSV |
+| 🔐 Ochrona danych | Haszowanie haseł PBKDF2, kontrola dostępu, dziennik zdarzeń i opcjonalne szyfrowanie rekordów |
+| 🌐 API | Serwer HTTP i wspólny model zasobów — integracja klientów jest stopniowo rozwijana |
+
+## 🎮 Gry biofeedbackowe — pełna lista
+
+W kodzie projektu znajduje się dziesięć pozycji gier rozpoznawanych przez GameFactory i uwzględnionych w konfiguracji budowania. Poniższa tabela przedstawia nazwy i opisane w projekcie koncepcje rozgrywki.
+
+| Lp. | Gra | Identyfikator / klasa | Zasada rozgrywki |
+|---:|---|---|---|
+| 1 | 🌊 **Sin Force Trainer** — trening sinusoidalny | sin, sin_game, SinGame | Dopasowywanie sygnału siły do przebiegu sinusoidalnego i wyznaczonych stref celu. |
+| 2 | 📐 **Tan Force Trainer** — trening tangensoidalny | tan, tan_game, TanGame | Ćwiczenie kontroli siły względem przebiegu tangensoidalnego; wartości w pobliżu asymptot są ograniczane. |
+| 3 | 🏓 **Pong** | pong, PongGame | Sterowanie położeniem paletki sygnałem z czujnika, odbijanie piłki i zdobywanie punktów. |
+| 4 | 🧱 **Arkanoid** | arkanoid, ArkanoidGame | Sterowanie paletką, odbijanie piłki i niszczenie bloków; projekt obejmuje życia i poziomy. |
+| 5 | 🐦 **Flappy Bird** | flappy, flappy_bird, FlappyBirdGame | Sterowanie ruchem ptaka sygnałem siły i omijanie przeszkód. Narastające zbocze sygnału wyzwala impuls machnięcia. |
+| 6 | 🍄 **Mario Run** | mario, mario_run, MarioGame | Bieg z przeszkodami i skokami sterowanymi wejściem biofeedback; ładowanie skoku jest zależne od czasu symulacji. |
+| 7 | 👾 **Galaga** | galaga, galaga_force, GalagaGame | Strzelanka z falami przeciwników, pociskami, życiami i punktacją. |
+| 8 | 🏹 **Archer** | archer, archer_force, ArcherGame | Strzelanie z łuku do ruchomych celów, z regulacją kąta i punktacją. |
+| 9 | 🏎️ **Car Race** | car_race, carrace, CarRaceGame | Wyścig z przeszkodami i sterowaniem pozycją pojazdu na pasach. |
+| 10 | 💥 **Scorched Earth** | scorched_earth, scorched-earth, ScorchedEarthGame | Turowa gra artyleryjska z kątem i siłą strzału, grawitacją, wiatrem oraz ukształtowaniem terenu. |
+
+### ℹ️ Ważne informacje o grach
+
+- Rejestracja gry w GameFactory oznacza, że aplikacja potrafi rozpoznać jej identyfikator i utworzyć odpowiedni obiekt.
+- Nie oznacza to automatycznie, że każda gra przeszła pełne testy długiej rozgrywki, testy wszystkich poziomów trudności lub testy z fizycznym czujnikiem.
+- Nie należy zakładać, że wszystkie gry są dostępne w TUI, WebUI i Androidzie. Głównym klientem gier pozostaje aplikacja Desktop.
+- Balans rozgrywki, progi siły, ergonomia sterowania i walidacja na rzeczywistym stanowisku wymagają osobnej oceny.
+- Wyniki gier i ich synchronizacja między wszystkimi klientami są odrębnym obszarem rozwoju.
+
+## 🖥️ Interfejsy użytkownika
+
+### 🪟 Desktop GUI — Qt5
+
+Główna aplikacja okienkowa. Obejmuje moduły kartoteki, pomiarów, treningu, analityki, gier, urządzeń, diagnostyki i ustawień. Wykres i prezentacja danych korzystają z mechanizmów Qt. Pierwsze uruchomienie prowadzi przez utworzenie konta administratora — aplikacja nie powinna używać zaszytego domyślnego hasła.
+
+### ⌨️ TUI — interfejs terminalowy
 
-A C++17/Qt5 biofeedback application with Arduino Nano/HX711 acquisition, live force visualization, repetition analysis, and sensor-driven training. Hardware calibration and clinical validation remain separate acceptance requirements.
+Klient C++/ncurses z ekranami pulpitu, pomiarów, pacjentów, treningu, urządzeń, diagnostyki i ustawień. Obsługuje nawigację klawiaturą, prezentację stanu połączenia i próbki oraz wybrane operacje treningowe. Szczegóły: [projekt interfejsu TUI](docs/TUI_DESIGN.md).
 
-## Features
+### 🌐 WebUI — interfejs przeglądarkowy
 
-- **Patient Management**: Create, edit, import, export, and delete patient records
-- **Live Measurement**: Real-time graph visualization, validated sample stream, and statistical analysis
-- **Repetition and Set Analysis**: Hysteresis-based repetition detection, peak/mean force, duration, time-to-peak, target achievement, and set variability (CV%)
-- **Desktop Training Analytics**: Peak-force chart, repetition and series tables, explicit local session-history snapshots, and detailed CSV reports including game points
-- **Training Games**: Multiple biofeedback-controlled games including:
-  - **Sin/Tan Games** - Wave-based training exercises
-  - **Flappy Bird** - Classic flapping game controlled by strain gauge
-  - **Pong** - Retro tennis game with biofeedback paddle control
-  - **Mario Run** - 4-bit endless runner with charge-based jumping mechanics
-- **Data Security**: PBKDF2 password hashing, first-run administrator setup, per-user account storage, and optional encryption for sensitive records
-- **Medical Standards**: Comprehensive logging, data validation, and audit trails
+Responsywny interfejs HTML/CSS/JavaScript w katalogu platforms/webui. Można go uruchomić jako stronę statyczną:
 
-## Interfejsy użytkownika
-
-- **Desktop GUI (Qt5)** — główna aplikacja okienkowa: pacjenci, pomiary, trening, analityka powtórzeń i serii, wykres siły, historia sesji oraz raporty CSV.
-- **TUI (C++/ncurses)** — terminalowy pulpit z modułami Pulpit, Pomiary, Pacjenci, Trening, Urządzenia, Diagnostyka i Ustawienia; konfiguracja ćwiczenia, celu, serii, powtórzeń i odpoczynku, zapis sesji CSV oraz diagnostyka jakości próbek. Zobacz `docs/TUI_DESIGN.md`.
-- **WebUI** — responsywny panel przeglądarkowy w `platforms/webui`; uruchomienie opisano w `platforms/webui/README.md`.
-- **Android** — natywny szkielet Kotlin/Jetpack Compose w `platforms/android`; instrukcja w `platforms/android/README.md`.
-
-Pierwsze uruchomienie GUI prowadzi przez utworzenie konta administratora z hasłem o długości co najmniej 12 znaków; nie ma zaszytego domyślnego loginu ani hasła. Konfiguracja, konta i dane pacjentów trafiają do katalogów użytkownika XDG.
-
-Wersja TUI korzysta ze wspólnego adaptera szeregowego i wyświetla rzeczywiste próbki z podłączonego, skalibrowanego czujnika; listę pacjentów pobiera z serwera, a ukończone sesje treningowe zapisuje przez API. Desktop GUI prezentuje wykres siły, trendy pomiarowe oraz analizę serii i powtórzeń. WebUI i Android nie otrzymują jeszcze strumienia pomiarowego czasu rzeczywistego. Klient WebUI obsługuje CRUD zasobów API, a ekran Pacjenci Androida korzysta ze wspólnego repozytorium; ekrany pomiarów i treningu Androida pozostają podglądowe. Żaden interfejs nie tworzy fikcyjnych danych pomiarowych.
-
-## Hardware Requirements
-
-Before force-based training, calibrate the HX711 using a known reference mass and confirm the firmware reports `CAL:1`. See [docs/HX711_CALIBRATION.md](docs/HX711_CALIBRATION.md). Uncalibrated RAW frames are diagnostic only.
-
-- Raspberry Pi 4
-- Arduino Nano
-- HX711 strain gauge sensor module
-- USB cable for Arduino-Raspberry connection
-
-## Software Dependencies
-
-- Qt5 (QtWidgets, QtCharts)
-- libserialport
-- nlohmann/json
-- OpenSSL (for encryption)
-
-### Installing Dependencies on Debian/Ubuntu/Raspberry Pi OS
-
-```bash
-sudo apt update && sudo apt upgrade -y
-
-sudo apt install -y qtbase5-dev libqt5charts5-dev libserialport-dev \
-    nlohmann-json3-dev libssl-dev git cmake build-essential pkg-config
-```
-
-> **Package name note:** on Ubuntu/Debian the Qt Charts development package is usually
-> `libqt5charts5-dev`. On some Raspberry Pi OS images it may be exposed as
-> `qtcharts5-dev`.
-
-## Installation
-
-For the current Debian/Ubuntu build and DEB package instructions, see [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
-
-### System Setup
-
-```bash
-# Update system
-sudo apt update && sudo apt upgrade -y
-
-# Install dependencies
-sudo apt install -y qtbase5-dev libqt5charts5-dev libserialport-dev nlohmann-json3-dev libssl-dev git cmake build-essential geany
-
-# Set up serial port permissions
-sudo usermod -a -G dialout $USER
-```
-
-### Git Clone
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd biofeedback-app
-```
-
-### Build Instructions (Command Line)
-
-```bash
-# Create build directory
-mkdir build && cd build
-
-# Configure with CMake
-cmake ..
-
-# Build
-make -j$(nproc)
-
-# Run
-./biofeedback
-```
-
-### Mandatory Qt5 Code Example
-
-This project includes mandatory Qt5 example code in:
-
-- `examples/qt5_mandatory.cpp`
-
-Build and run it from `build/`:
-
-```bash
-./qt5_mandatory_example
-```
-
-For Raspberry Pi specific native Qt5 build notes, see:
-https://wiki.qt.io/Native_Build_of_Qt5_on_a_Raspberry_Pi
-
-### Working with Geany IDE
-
-#### Opening the Project in Geany
-
-1. Launch Geany:
-   ```bash
-   geany &
-   ```
-
-2. Open the project file:
-   - Go to **File** → **Open...**
-   - Navigate to the project directory
-   - Select `biofeedback.geany` file
-   - Click **Open**
-
-   Alternatively, open from command line:
-   ```bash
-   geany biofeedback.geany
-   ```
-
-#### Configuring Geany Settings
-
-The project includes a pre-configured `biofeedback.geany` file with build settings. To verify or modify settings:
-
-1. Go to **Build** → **Set Build Commands**
-2. Verify the following commands are configured:
-   - **Compile**: `cd $(dir) && mkdir -p build && cd build && cmake .. && make`
-   - **Build**: `cd $(dir)/build && make`
-   - **Execute**: `$(dir)/build/biofeedback`
-
-3. Optional custom settings:
-   - Go to **Edit** → **Preferences**
-   - Set indentation width to 4 spaces
-   - Enable auto-indentation
-   - Set long line column to 80
-
-#### Building and Running in Geany
-
-After opening the project:
-
-1. **Build the project**:
-   - Press **F8** (Build) or go to **Build** → **Build**
-   - Or use the custom menu: **Build** → **Build Release** for optimized build
-   - Or use **Build** → **Clean Build** to start fresh
-
-2. **Run the application**:
-   - Press **F5** (Execute) or go to **Build** → **Execute**
-   - Or use the custom menu: **Build** → **Run Application**
-
-3. **Available build options** (in Build menu):
-   - **Clean Build** - Remove build directory and recreate
-   - **Configure Only** - Run CMake without building
-   - **Build Debug** - Build with debug symbols
-   - **Build Release** - Build with optimizations
-   - **Run Application** - Execute the built application
-
-#### Quick Start in Geany
-
-```bash
-# Open project in Geany
-cd biofeedback-app
-geany biofeedback.geany
-
-# Then press F8 to build, F5 to run
-```
-
-## Project Structure
-
-```
-biofeedback-app/
-├── src/                    # Source files
-│   ├── core/              # Core functionality
-│   ├── gui/               # GUI components
-│   ├── tabs/              # Tab implementations
-│   ├── sensor/            # Sensor communication
-│   ├── games/             # Game implementations
-│   └── data/              # Data management
-├── include/               # Header files
-├── config/                # Configuration files
-├── data/                  # Patient data storage
-├── resources/             # Images, icons, multimedia
-├── build/                 # Build output
-└── docs/                  # Documentation
-    └── MATHEMATICAL_FORMULAS.md  # Biomechanical formulas
-```
-
-## Arduino Nano Communication Protocol
-
-### Format Wysyłania i Odbioru Danych z Arduino Nano
-
-Komunikacja z Arduino Nano (plik `hx711_advanced.ino`) odbywa się przez port szeregowy z następującym formatem:
-
-#### Konfiguracja Portu Szeregowego
-- **Baud Rate**: 115200
-- **Data Bits**: 8
-- **Parity**: None ('N')
-- **Stop Bits**: 1
-- **Port**: `/dev/ttyUSB0` lub `/dev/ttyACM0` (automatyczne wykrywanie)
-
-#### Komendy Wysyłane do Arduino (TX - Raspberry Pi → Arduino)
-
-| Komenda | Opis | Przykład |
-|---------|------|----------|
-| `ID` lub `WHOAMI` | Pobranie identyfikacji urządzenia | `ID\n` |
-| `TARE` lub `CALZERO` | Wyzerowanie wagi (tare) | `TARE\n` |
-| `DATA` lub `READ` | Żądanie danych binarnych + odczyt | `DATA\n` |
-| `FORCE` | Żądanie odczytu siły w formacie tekstowym | `FORCE\n` |
-| `CONT` | Włączenie trybu ciągłego (80Hz) | `CONT\n` |
-| `STOP` | Wyłączenie trybu ciągłego | `STOP\n` |
-| `CAL:<grams>` | Kalibracja ze znaną wagą | `CAL:100.0\n` |
-| `RESET` | Reset urządzenia przez watchdog | `RESET\n` |
-
-#### Odpowiedzi z Arduino (RX - Arduino → Raspberry Pi)
-
-**1. Odpowiedź na komendę ID:**
-```
-DEVICE:Advanced HX711 Weight Scale
-ID:HX711-SCALE-V1.0
-FW:1.0,BR:115200
-OK
-```
-
-**2. Dane binarne (pakiet 9 bajtów + markery końca):**
-```cpp
-struct DataPacket {
-    uint32_t timestamp;  // 4 bajty - czas w milisekundach
-    int32_t value;       // 4 bajty - wartość surowa z czujnika
-    uint8_t crc;         // 1 bajt - suma kontrolna CRC-8
-};
-// Po pakiecie: 0xAA 0x55 (markery końca ramki)
-```
-
-**3. Odpowiedź tekstowa FORCE:**
-```
-FORCE:123.45g,RAW:6789,TS:1234567ms
-```
-
-**4. Potwierdzenia:**
-- `Taring...` / `Tare set!` - potwierdzenie zerowania
-- `Continuous mode ON/OFF` - status trybu ciągłego
-- `Calibrated! Factor:X.XXXXXX` - potwierdzenie kalibracji
-- `[DATA_SENT]` - potwierdzenie wysłania danych
-
-#### Suma Kontrolna CRC-8
-
-Arduino używa CRC-8 z wielomianem x^8 + x^2 + x + 1 (0x07):
-- Wartość początkowa: 0xFF
-- Obliczana dla timestamp + value (8 bajtów)
-- CRC jest ostatnim bajtem pakietu
-
-#### Tryb Ciągły (Continuous Mode)
-
-Po wysłaniu komendy `CONT`, Arduino wysyła dane binarne z częstotliwością 80Hz:
-- Pakiet binarny co ~12.5ms
-- Każdy pakiet zawiera timestamp, wartość i CRC
-- Markery końca ramki: 0xAA 0x55
-
-#### Przykład Sekwencji Komunikacji
-
-```cpp
-// 1. Połączenie i identyfikacja
-send("ID\n");
-// Oczekuj: DEVICE:..., ID:..., FW:...
-
-// 2. Zerowanie
-send("TARE\n");
-// Oczekuj: Taring... Tare set!
-
-// 3. Rozpoczęcie pomiaru ciągłego
-send("CONT\n");
-// Oczekuj: Continuous mode ON
-
-// 4. Odbieranie danych (80Hz)
-while (measuring) {
-    readBinaryPacket();  // 9 bajtów + 2 markery
-    verifyCRC();
-    processForceData();
-}
-
-// 5. Zatrzymanie
-send("STOP\n");
-```
-
-## Mathematical Formulas
-
-For detailed mathematical formulas used to calculate biomechanical and training parameters from strain gauge data, see:
-
-- **[MATHEMATICAL_FORMULAS.md](MATHEMATICAL_FORMULAS.md)** - Complete documentation of 65+ parameters with LaTeX notation including:
-  - Force metrics (peak force, mean force, force range)
-  - Time-based parameters (rep duration, phase times, rest periods)
-  - Power and energy calculations
-  - Variability and stability indices
-  - Performance and progress tracking
-  - Advanced composite scores
-
-- **[MATHEMATICAL_REPORT.docx](MATHEMATICAL_REPORT.docx)** - Graphically formatted report document (.docx) containing:
-  - All mathematical formulas with professional formatting
-  - Variable legend tables
-  - Implementation examples in Python for Raspberry Pi
-  - Structured sections for each parameter category
-  - Ready for printing or sharing as formal documentation
-
-- **[REPORT_FORMULAS.md](REPORT_FORMULAS.md)** - Markdown version of the graphical report with full LaTeX rendering support
-
-The formulas are designed for analyzing resistance band exercises with 3 sets × 8 repetitions, captured via HX711 strain gauge sensor on Raspberry Pi.
-
-## Architektura aplikacji i przepływ danych
-
-Biofeedback składa się z kilku interfejsów użytkownika, warstwy akwizycji pomiarów,
-logiki treningowej, firmware urządzeń oraz rozwijanej usługi wymiany danych.
-Należy rozróżniać funkcje już działające od elementów przygotowanych jako klient
-lub kontrakt przyszłej integracji. Obecnie nie wszystkie platformy współdzielą
-jeszcze dane przez serwer.
-
-### 1. Desktop GUI — Linux i docelowo Windows
-
-Główna aplikacja okienkowa jest napisana w C++17 z użyciem Qt5. Jej główne obszary
-funkcjonalne to:
-
-- **Logowanie i konta** — pierwsze uruchomienie prowadzi przez utworzenie konta
-  administratora; hasło konta jest przechowywane w postaci skrótu PBKDF2.
-- **Pulpit i nawigacja** — główne okno udostępnia moduły aplikacji.
-- **Pacjenci** — formularz kart pacjentów, operacje dodawania, odczytu, edycji
-  i usuwania oraz import i eksport CSV. Obecna integracja Desktop korzysta
-  z lokalnego magazynu plikowego.
-- **Pomiary** — połączenie z urządzeniem, prezentacja bieżącego przebiegu siły,
-  tabela próbek i statystyki pomiarowe.
-- **Trening** — konfiguracja ćwiczenia, celu, liczby serii i powtórzeń,
-  odpoczynku oraz analiza wykonania.
-- **Gry** — wybór gry biofeedbackowej i sterowanie rozgrywką sygnałem z czujnika.
-- **Diagnostyka i ustawienia** — konfiguracja portu, parametrów urządzenia,
-  kalibracji i zachowania aplikacji.
-
-Kod głównego okna i warstwa aplikacyjna nadal wymagają dalszego rozdzielenia
-odpowiedzialności. Kod współdzielony dla systemów Windows i Linux nie oznacza
-jeszcze potwierdzonego wydania Windows: osobna kompilacja MSVC, instalator
-i testy Windows muszą być weryfikowane niezależnie.
-
-### 2. TUI — interfejs terminalowy
-
-TUI jest klientem C++17 opartym na ncurses. Korzysta ze wspólnego adaptera
-komunikacji szeregowej i silnika pomiarowego, a nie z własnego parsera ramek.
-Udostępnia ekrany:
-
-- Pulpit — status programu, połączenia i ostatniej próbki.
-- Pomiary — aktualna wartość siły i krótki przebieg ostatnich próbek.
-- Pacjenci — informacja o stanie integracji repozytorium kart.
-- Trening — konfiguracja i przebieg sesji, serie, powtórzenia, cel siły i odpoczynek.
-- Urządzenia — skanowanie portów, wybór urządzenia, połączenie i rozłączenie.
-- Diagnostyka — liczba próbek prawidłowych i odrzuconych, jakość ostatniej próbki
-  oraz podstawowe statystyki ostatniego powtórzenia.
-- Ustawienia — skróty i parametry transmisji.
-
-Sterowanie obejmuje m.in. strzałki i Enter do nawigacji, C do połączenia,
-D do rozłączenia, R do ponownego skanowania, S do startu/zatrzymania,
-P do pauzy/wznowienia, a także klawisze zmiany celu, serii i powtórzeń.
-Dostępne są również tryby `--status`, `--list-ports`, `--version` i `--help`.
-
-TUI odczytuje listę pacjentów i zapisuje ukończone sesje treningowe
-przez uwierzytelnione API do wspólnego repozytorium. Sesja zawiera parametry
-ćwiczenia oraz statystyki i metadane powtórzeń. Obecnie TUI nie wybiera jeszcze
-pacjenta, więc rekord treningu nie ma powiązania `patient_id`; pełne powiązanie
-pacjent–sesja oraz osobna kolekcja wyników treningowych pozostają do wdrożenia.
-
-### 3. WebUI — interfejs przeglądarkowy
-
-WebUI jest responsywną aplikacją HTML/CSS/JavaScript w katalogu
-`platforms/webui`. Oferuje nawigację modułową opartą o adresy URL, motyw jasny
-i ciemny oraz klienta API REST/WebSocket. Klient ma przygotowane metody do
-obsługi statusu i urządzeń, pacjentów, sesji pomiarowych i subskrypcji zdarzeń.
-
-Uruchomienie statycznego interfejsu:
-
-```bash
+~~~bash
 python3 -m http.server 8080 --directory platforms/webui
-```
+~~~
 
-Otwórz `http://localhost:8080`. Interfejs sprawdza dostępność
-`GET /api/v1/status` i jawnie pokazuje brak serwera. Nie tworzy fikcyjnych
-pacjentów, pomiarów ani wyników.
+Następnie otwórz adres http://localhost:8080. Sam serwer statyczny nie uruchamia API. Dostępność funkcji zależy od uruchomienia i konfiguracji serwera danych. Instrukcja: [platforms/webui/README.md](platforms/webui/README.md).
 
-**Ograniczenie:** klient WebUI jest przygotowany do integracji, ale backend API
-nie udostępnia jeszcze zasobów pacjentów, pomiarów, treningów ani gier.
-Serwerowy WebSocket również nie jest jeszcze zaimplementowany. Samo uruchomienie
-statycznej strony nie uruchamia serwera danych.
+### 📱 Android
 
-### 4. Android GUI
+Natywny klient Kotlin/Jetpack Compose w katalogu platforms/android. Projekt zawiera widoki pulpitu, pomiarów, pacjentów, treningu i urządzeń. Nie należy traktować ekranów podglądowych jako gotowej obsługi akwizycji z czujnika. Instrukcja budowania: [platforms/android/README.md](platforms/android/README.md).
 
-Aplikacja Android jest natywnym klientem Kotlin/Jetpack Compose z Material 3.
-Wersja 0.1 zawiera responsywną nawigację dolną oraz widoki:
+### 🔄 Rzeczywisty zakres integracji
 
-- Pulpit,
-- Pomiary,
-- Pacjenci,
-- Trening,
-- Urządzenia.
+Interfejsy rozwijają się niezależnie. Desktop jest głównym klientem sprzętowym. TUI korzysta ze wspólnego adaptera komunikacji szeregowej i wybranych operacji API. WebUI i Android mają częściową obsługę zasobów API, ale nie należy zakładać, że odbierają strumień pomiarowy w czasie rzeczywistym. Przed wdrożeniem konkretnego klienta sprawdź jego instrukcję i aktualne testy.
 
-Są to obecnie ekrany demonstracyjne/podglądowe. Aplikacja nie ma jeszcze
-komunikacji z serwerem API ani obsługi Bluetooth, USB lub portu szeregowego.
-Nie należy traktować jej jako gotowego rejestratora pomiarów lub dokumentacji
-pacjenta. Docelowo ma korzystać z tego samego wersjonowanego API co WebUI,
-Desktop i TUI.
+## 🔌 Sprzęt i przepływ pomiaru
 
-Budowanie opisano w `platforms/android/README.md`; wymagane są JDK 17
-i Android SDK Platform 35.
+### 🧩 Typowy zestaw sprzętowy
 
-### 5. Serwer wymiany danych i API
+- 🍓 Raspberry Pi 4 lub zgodny komputer Linux;
+- 🔧 Arduino Nano;
+- ⚖️ czujnik tensometryczny i moduł wzmacniacza/przetwornika HX711;
+- 🔌 przewód USB do komunikacji Arduino–Raspberry Pi;
+- 🧪 znana masa odniesienia do kalibracji.
 
-Docelowy model zakłada jeden wspólny serwer danych dla wszystkich klientów.
-Serwer jest właścicielem trwałych rekordów i udostępnia je przez wersjonowane
-API, zamiast pozwalać klientom na bezpośredni dostęp do plików serwera lub bazy.
+### 🔁 Schemat przepływu danych
 
-Docelowe odpowiedzialności serwera:
+~~~text
+Czujnik tensometryczny
+        │
+        ▼
+     Moduł HX711
+        │
+        ▼
+  Arduino Nano
+  (firmware pomiarowy)
+        │ USB / port szeregowy
+        ▼
+  Adapter komunikacji
+        │
+        ▼
+  Walidacja i silnik pomiarowy
+        │
+        ├──► wykres i podgląd próbek
+        ├──► analiza powtórzeń i serii
+        ├──► zapis sesji i raport CSV
+        └──► sterowanie grą biofeedback
+~~~
 
-- repozytorium kart pacjentów i mapowanie tożsamości;
-- archiwum pomiarów, próbek i metadanych sesji;
-- plany treningowe, sesje, checkpointy i wyniki;
-- sesje gier, punktacja i historia wyników;
-- uwierzytelnianie, autoryzacja do konkretnych zasobów i rejestr audytowy;
-- kopie zapasowe, odtwarzanie, eksport, kontrola wersji rekordu i konfliktów;
-- powiadomienia o zmianach i zdarzeniach czasu rzeczywistego.
+### ⚙️ Parametry komunikacji
 
-Docelowe rodziny endpointów obejmują `/api/v1/patients`,
-`/api/v1/measurements`, `/api/v1/training-sessions`,
-`/api/v1/training-results`, `/api/v1/game-sessions`,
-`/api/v1/game-results` oraz kanał zdarzeń WebSocket lub SSE.
-
-**Stan obecny:** serwer udostępnia health/status, logowanie i wylogowanie
-oraz CRUD sześciu kolekcji: pacjenci, pomiary, sesje treningowe, wyniki treningów,
-sesje gier i wyniki gier. Aktualizacja i usunięcie wymagają numeru wersji rekordu;
-konflikt zwracany jest jako HTTP 409. Desktop uruchamia API loopback po
-inicjalizacji i współdzieli z nim tę samą instancję repozytorium. Endpointy
-danych są obecnie ograniczone do roli `administrator` do czasu wdrożenia
-pełnych zakresów RBAC. Serwer nie udostępnia jeszcze WebSocket/SSE.
-
-Desktop zapisuje sesje pomiarowe wraz z próbkami, sesje treningowe,
-wyniki ćwiczeń oraz wyniki gier. TUI loguje się przez API, pobiera listę
-pacjentów i zapisuje sesje oraz wyniki treningowe, ale nie dołącza jeszcze
-identyfikatora pacjenta ani nie archiwizuje pomiarów i gier. WebUI umożliwia
-CRUD kart pacjentów i odczyt archiwum pomiarów, treningów oraz gier. Android
-umożliwia CRUD pacjentów i odczyt tych samych archiwów. Żaden z klientów
-WebUI/Android nie odbiera jeszcze strumienia pomiarowego czasu rzeczywistego.
-Serwer nasłuchuje domyślnie wyłącznie na loopback; zdalny Android wymaga
-bramy HTTPS/WSS. Nie wystawiaj prototypu HTTP bezpośrednio do sieci publicznej.
-
-Szczegółowy opis decyzji i etapów wdrożenia znajduje się w
-[docs/ARCHITECTURE_SHARED_DATA_SERVER.md](docs/ARCHITECTURE_SHARED_DATA_SERVER.md).
-
-### 6. Arduino Nano, HX711 i Raspberry Pi Pico
-
-**Arduino Nano + HX711** stanowią aktualną ścieżkę pozyskiwania pomiaru siły.
-Arduino odczytuje przetwornik HX711 i przesyła dane do komputera przez port
-szeregowy. Typowe parametry łącza to 115200 bit/s, 8N1. Firmware udostępnia
-m.in. identyfikację urządzenia, zerowanie (tare), odczyt, tryb ciągły, kalibrację
-znaną masą i reset. Strumień binarny zawiera 32-bitowy znacznik czasu,
-32-bitową wartość surową, CRC-8 i znaczniki końca ramki `0xAA 0x55`.
-Dostępna jest także odpowiedź tekstowa z odczytem siły.
-
-Przed użyciem pomiaru siły wymagane jest zerowanie i kalibracja znaną masą.
-Surowe wartości ADC bez potwierdzonej kalibracji są danymi diagnostycznymi,
-a nie wiarygodną siłą w niutonach. Szczegóły: [docs/HX711_CALIBRATION.md](docs/HX711_CALIBRATION.md).
-
-**Raspberry Pi Pico** ma obecnie firmware komunikacyjny UART0: GP0 TX, GP1 RX,
-115200 bit/s, 8N1, watchdog 2 s oraz ograniczony parser poleceń diagnostycznych
-PING, STATUS i SAFE. Akwizycja czujników, kalibracja i generowanie ramek
-pomiarowych w tym firmware nie są jeszcze zaimplementowane ani zweryfikowane
-na sprzęcie. Kanału diagnostycznego Pico nie wolno utożsamiać ze strumieniem
-pomiarowym HX711. Szczegóły: [firmware/pico/README.md](firmware/pico/README.md)
-i [docs/PICO_FIRMWARE_MEASUREMENT_STATUS.md](docs/PICO_FIRMWARE_MEASUREMENT_STATUS.md).
-
-### 7. Rejestracja pomiaru, walidacja i wykres
-
-Główna ścieżka pomiarowa Desktop przebiega następująco:
-
-```text
-HX711 -> Arduino Nano -> port szeregowy
-  -> SerialCommunication
-  -> MeasurementSerialAdapter
-  -> MeasurementEngine
-  -> MeasurementTab
-  -> RepetitionDetector
-  -> statystyki powtórzenia i serii
-  -> ForcePlotWidget + tabela próbek + tabela parametrów
-  -> eksport JSON / CSV
-```
-
-`SerialCommunication` odbiera dane z portu, a `MeasurementSerialAdapter`
-mapuje dane sterownika na wspólny model wejściowy. `MeasurementEngine`
-nadaje próbkom numer sekwencyjny i czas odbioru hosta UTC, zachowuje czas
-urządzenia, wartość surową, wartość przeliczoną, jednostkę, źródło i status
-jakości. Silnik normalizuje wyłącznie jawnie obsługiwane jednostki, sprawdza
-wartości niefinitywne, znaczniki czasu, źródło i skonfigurowany zakres.
-Próbki odrzucone są oznaczane statusem jakości; konsument musi sprawdzić
-poprawność próbki przed wykreśleniem, agregacją lub eksportem.
-
-Desktop używa `ForcePlotWidget` do prezentacji przebiegu siły w czasie.
-Widok pomiarowy obejmuje tabelę ostatnich próbek oraz tabele statystyk
-powtórzeń/serii. Wykres korzysta z próbek sesji i osi czasu, a nie z danych
-wymyślonych. Bufory interfejsu są ograniczane, aby długotrwały pomiar nie
-powodował nieograniczonego wzrostu pamięci.
-
-`MeasurementEngine` utrzymuje ograniczoną historię w pamięci RAM (domyślnie
-512 próbek); nie jest samodzielnym archiwum długoterminowym. W Desktop pełny
-strumień bieżącej sesji może zostać ręcznie wyeksportowany do JSON, natomiast
-CSV służy przede wszystkim do eksportu tabeli statystyk. Nagłe zamknięcie
-aplikacji przed eksportem może utracić bieżącą sesję. Trwały, przyrostowy
-dziennik próbek i automatyczna synchronizacja przez serwer pozostają do
-wdrożenia.
-
-TUI subskrybuje wspólny silnik i prezentuje skrócony przebieg próbek w terminalu.
-WebUI i Android nie otrzymują jeszcze rzeczywistego strumienia pomiarowego
-z backendu. Szczegółowy opis: [docs/MEASUREMENT_PIPELINE.md](docs/MEASUREMENT_PIPELINE.md)
-oraz [docs/REALTIME_MEASUREMENT_AUDIT.md](docs/REALTIME_MEASUREMENT_AUDIT.md).
-
-### 8. Obliczanie parametrów biomechanicznych
-
-`RepetitionDetector` wykorzystuje próg aktywacji i niższy próg zwolnienia
-(histereza), aby wyznaczać początek i koniec powtórzenia. Rekord powtórzenia
-zawiera m.in. czas początku i końca, czas trwania, czas do osiągnięcia szczytu,
-siłę szczytową, średnią siłę, liczbę próbek i próbki źródłowe.
-
-Podsumowanie serii obejmuje m.in. liczbę powtórzeń, średnią i maksymalną siłę
-szczytową, średni czas powtórzenia, średni czas do szczytu, współczynnik
-zmienności siły szczytowej oraz procent realizacji celu. Dodatkowe wzory
-biomechaniczne są zebrane w module `Formulas` i dokumentacji matematycznej.
-Parametry wymagające kalibracji, dodatkowego czujnika, historii lub
-wystarczającej liczby próbek powinny być oznaczane statusem dostępności;
-brak danych nie może być prezentowany jako wynik równy zero.
-
-Katalog modelu obejmuje 65 nazw parametrów, ale nie oznacza to, że wszystkie
-są już w pełni obliczane, wyświetlane i archiwizowane w każdym widoku.
-Dostępność zależy od danych wejściowych i stopnia integracji danego parametru.
-Nie należy interpretować wyniku matematycznego jako diagnozy klinicznej.
-Opis wzorów: [MATHEMATICAL_FORMULAS.md](MATHEMATICAL_FORMULAS.md).
-
-### 9. Trening i analiza sesji
-
-Logika treningowa obejmuje konfigurację ćwiczenia, celu siły, serii,
-powtórzeń i przerw. `SessionStateMachine` modeluje stany Idle, Active,
-Paused, Resting, Completed i Interrupted. `TrainingSessionClock` odpowiada
-za pomiar czasu sesji, a `RepetitionDetector` wykrywa powtórzenia na podstawie
-próbkowanej siły i progów histerezy.
-
-Po zakończeniu powtórzeń można analizować siłę szczytową i średnią, czas
-powtórzenia, czas do szczytu, realizację celu oraz zmienność pomiędzy
-powtórzeniami. Podsumowania serii są wykorzystywane w analizie treningowej
-i mogą być eksportowane z Desktop. Desktop zapisuje sesje pomiarowe z pełnym strumieniem próbek, serie i
-powtórzenia, a także sesje treningowe, wyniki ćwiczeń i wyniki gier.
-TUI zapisuje sesje treningowe przez API do wspólnego repozytorium, lecz
-nie dołącza jeszcze identyfikatora pacjenta.
-
-### 10. Gry biofeedbackowe
-
-Gry korzystają ze wspólnego `GameEngine`: monotonicznego zegara, stałego kroku
-symulacji, ograniczonego nadrabiania czasu, wspólnego cyklu życia oraz
-obsługi wejścia z czujnika. Próbki czujnika są wejściem sterującym; nie powinny
-bezpośrednio modyfikować widgetów z wątku portu szeregowego. Gry obsługują
-lub rozwijają obsługę startu, pauzy, wznowienia, zatrzymania, resetu,
-zmiany rozmiaru i nieprawidłowych danych wejściowych.
-
-Dostępne identyfikatory gier w fabryce:
-
-| Gra | Charakter rozgrywki |
+| Parametr | Wartość |
 |---|---|
-| **Sin Force Trainer** | Ćwiczenie sterowania siłą według przebiegu sinusoidalnego. |
-| **Tan Force Trainer** | Ćwiczenie sterowania siłą według przebiegu tangensoidalnego. |
-| **Pong** | Sterowanie paletką siłą z czujnika; odbijanie piłki i punktacja. |
-| **Arkanoid** | Sterowanie paletką, odbijanie piłki i niszczenie bloków. |
-| **Flappy Bird** | Sterowanie ruchem ptaka sygnałem siły, omijanie przeszkód. |
-| **Mario Run** | Bieg z przeszkodami i skokami sterowanymi wejściem biofeedback. |
-| **Galaga** | Strzelanka z falami przeciwników, pociskami, życiami i punktacją. |
-| **Archer** | Strzelanie z łuku do ruchomych celów; regulacja kąta i punktacja. |
-| **Car Race** | Wyścig z przeszkodami i sterowaniem pozycją pojazdu na pasach. |
-| **Scorched Earth** | Turowa artyleria z kątem, siłą strzału, grawitacją, wiatrem i terenem. |
+| Prędkość transmisji | 115200 bit/s |
+| Format | 8N1 |
+| Typowe porty Linux | /dev/ttyUSB0, /dev/ttyACM0 |
+| Tryb ciągły | nominalnie 80 próbek/s — zależnie od firmware i urządzenia |
+| Ramka binarna | znacznik czasu 32-bit, wartość surowa 32-bit, CRC-8 |
+| Znaczniki końca ramki | 0xAA 0x55 |
 
-Gry są dostępne przez `GameFactory` i selektory interfejsu Desktop. Obecność
-gry w fabryce nie oznacza automatycznie, że każda platforma ma już jej klienta
-lub że każda mechanika przeszła pełne testy sprzętowe. Testy scenariuszowe,
-balans rozgrywki i walidacja z fizycznym czujnikiem pozostają osobnymi etapami.
-Wyniki gier nie są jeszcze zapisywane we wspólnym repozytorium serwera.
+### 🗣️ Podstawowe komendy firmware
 
-### 11. Dane pacjentów i prywatność
-
-Desktop i serwer API korzystają ze wspólnego `JsonResourceRepository`
-w katalogu danych aplikacji `shared-data`. Karty pacjentów mają identyfikatory
-UUID, metadane wersji i znaczniki czasu; nazwy plików nie ujawniają PESEL.
-Zapis jest atomowy przez Qt `QSaveFile`, a katalogi i pliki otrzymują
-uprawnienia tylko dla właściciela. Pierwsze uruchomienie migruje stare pliki
-pacjentów do repozytorium; źródła migracji pozostają zachowane do czasu
-usunięcia karty przez operatora.
-
-Gdy `encryption.enabled=true`, rekordy repozytorium są szyfrowane AES-256-GCM
-kluczem `BIOFEEDBACK_ENCRYPTION_KEY`. W profilu deweloperskim szyfrowanie może
-pozostawać wyłączone; przed użyciem rzeczywistych danych pacjentów wymagane
-jest włączenie szyfrowania, bezpieczne przechowanie klucza i sprawdzenie kopii
-zapasowych. Brak klucza przy włączonym szyfrowaniu powoduje fail-closed.
-Nie należy przechowywać klucza w repozytorium.
-
-Wybór `storage.patient_backend` nadal dotyczy backendu kart pacjentów.
-`files` jest obsługiwany; adapter MariaDB nie jest jeszcze dostępny.
-Kolekcje pomiarów, treningów i gier mają wspólny serwerowy CRUD, lecz integracja
-producentów tych danych i klienta TUI pozostaje w toku. Nie należy zakładać
-pełnej synchronizacji wszystkich pięciu interfejsów, dopóki te etapy nie
-zostaną ukończone i potwierdzone testami integracyjnymi.
-
-## Configuration
-
-Edit `config/config.json` to customize:
-- Serial port settings
-- Data storage paths
-- Encryption settings
-- UI preferences
-
-## Wybór miejsca przechowywania danych pacjentów
-
-Sposób przechowywania danych pacjentów wybiera się w pliku `config/config.json`,
-w sekcji `storage`, za pomocą pola `patient_backend`.
-
-### Zapis w plikach — opcja działająca
-
-Aby przechowywać dane pacjentów w plikach na dysku, ustaw:
-
-```json
-"storage": {
-  "patient_backend": "files",
-  "mariadb": {
-    "host": "127.0.0.1",
-    "port": 3306,
-    "database": "biofeedback",
-    "username": "biofeedback_app",
-    "password_env": "BIOFEEDBACK_MARIADB_PASSWORD",
-    "tls": true,
-    "connect_timeout_seconds": 5
-  }
-}
-```
-
-Wartość `"files"` jest ustawieniem domyślnym. Wspólne repozytorium jest
-zapisywane w katalogu `QStandardPaths::AppDataLocation/shared-data`.
-`data.base_path` pozostaje ścieżką starszego magazynu wykorzystywanego
-podczas migracji i zachowania zgodności wstecznej. Wybór backendu plikowego
-nie wymaga konfiguracji MariaDB ani hasła do bazy.
-
-### MariaDB — konfiguracja docelowa, adapter jeszcze niedostępny
-
-Aby wskazać MariaDB jako wybrany backend, zmień:
-
-```json
-"patient_backend": "mariadb"
-```
-
-Parametry połączenia znajdują się w `storage.mariadb`:
-
-| Pole | Znaczenie |
+| Komenda | Znaczenie |
 |---|---|
-| `host` | Adres serwera MariaDB, np. `127.0.0.1` |
-| `port` | Port serwera, domyślnie `3306` |
-| `database` | Nazwa bazy danych, domyślnie `biofeedback` |
-| `username` | Użytkownik bazy, domyślnie `biofeedback_app` |
-| `password_env` | Nazwa zmiennej środowiskowej zawierającej hasło |
-| `tls` | Żądanie używania szyfrowanego połączenia TLS |
-| `connect_timeout_seconds` | Limit czasu na połączenie w sekundach |
+| ID / WHOAMI | Identyfikacja urządzenia |
+| TARE / CALZERO | Zerowanie wskazania |
+| DATA / READ | Żądanie danych |
+| FORCE | Odczyt siły w formacie tekstowym |
+| CONT | Włączenie transmisji ciągłej |
+| STOP | Zatrzymanie transmisji ciągłej |
+| CAL:<grams> | Kalibracja z użyciem znanej masy, np. CAL:100.0 |
+| RESET | Reset urządzenia |
 
-**Ważny stan implementacji:** bieżąca wersja waliduje wybór `mariadb` i jego
-parametry, ale nie zawiera jeszcze sterownika ani adaptera repozytorium MariaDB.
-Po wybraniu `"mariadb"` aplikacja celowo kończy inicjalizację z czytelnym błędem.
-Nie zapisuje wtedy danych zastępczo do plików. Samo ustawienie hasła i parametrów
-połączenia nie uruchamia jeszcze obsługi bazy. Do czasu wdrożenia adaptera używaj
-`"files"`.
+Szczegółowe wymagania i procedurę kalibracji opisuje dokument [kalibracja HX711](docs/HX711_CALIBRATION.md).
 
-### Ustawianie hasła MariaDB
+> [!WARNING]
+> **Nie używaj surowych, nieskalibrowanych wartości ADC jako wiarygodnego pomiaru siły.** Przed treningiem wykonaj zerowanie i kalibrację znaną masą. Potwierdź stan kalibracji firmware (CAL:1) oraz poprawność wskazań w całym używanym zakresie obciążenia.
 
-Hasła **nie wpisuj** do `config.json`, `config.json.example`, kodu źródłowego
-ani repozytorium. Konfiguracja przechowuje wyłącznie nazwę zmiennej środowiskowej:
-`BIOFEEDBACK_MARIADB_PASSWORD`. Nazwa ta musi odpowiadać wartości
-`storage.mariadb.password_env`.
+## 📈 Analiza pomiarów i treningu
 
-Linux — ustawienie tymczasowe dla bieżącej sesji terminala:
+Aplikacja rozwija analizę obejmującą między innymi:
 
-```bash
-read -rsp "Hasło MariaDB: " BIOFEEDBACK_MARIADB_PASSWORD
-echo
-export BIOFEEDBACK_MARIADB_PASSWORD
-```
+- siłę szczytową, średnią i zakres zmian;
+- czas trwania powtórzenia i jego faz;
+- czas do osiągnięcia wartości szczytowej;
+- realizację zadanego celu;
+- liczbę wykrytych powtórzeń i serii;
+- odpoczynek między powtórzeniami i seriami;
+- zmienność wyników, w tym współczynnik zmienności (CV%);
+- historię sesji oraz eksport wybranych wyników.
 
-Zmienna będzie dostępna dla procesów uruchomionych z tego terminala. Po zamknięciu
-sesji ustaw ją ponownie. Nie umieszczaj hasła bezpośrednio w poleceniu, ponieważ
-może ono zostać zapisane w historii powłoki.
+Sposób wyznaczania parametrów i stosowane równania opisuje [dokumentacja wzorów matematycznych](MATHEMATICAL_FORMULAS.md). Dodatkowe opracowania: [REPORT_FORMULAS.md](REPORT_FORMULAS.md) oraz [raport DOCX](MATHEMATICAL_REPORT.docx), jeśli plik jest dostępny w danym wydaniu repozytorium.
 
-Windows PowerShell — ustawienie tymczasowe dla bieżącego okna:
+## 🔐 Dane, bezpieczeństwo i prywatność
 
-```powershell
-$securePassword = Read-Host "Hasło MariaDB" -AsSecureString
-$ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-try {
-    $env:BIOFEEDBACK_MARIADB_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
-}
-finally {
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr)
-}
-```
+### 👥 Konta i uwierzytelnianie
 
-To ustawienie obowiązuje tylko w bieżącym procesie PowerShell i procesach
-uruchomionych z niego. Zakończenie sesji usuwa zmienną z tego środowiska.
+Pierwsze uruchomienie Desktop wymaga utworzenia konta administratora. Hasła są przechowywane jako skróty PBKDF2. Nie należy zakładać istnienia domyślnego loginu ani hasła.
 
-Na serwerze produkcyjnym ustaw zmienną w bezpiecznym menedżerze sekretów lub
-mechanizmie zarządzania usługą, z dostępem ograniczonym do konta uruchamiającego
-Biofeedback. Nie zapisuj jawnego hasła w plikach konfiguracyjnych projektu,
-dziennikach ani systemie kontroli wersji. Używaj odrębnego konta MariaDB
-o minimalnych uprawnieniach wymaganych przez aplikację.
+### 🗄️ Magazyn danych
 
-## Data Storage
+Bieżący wspólny magazyn plikowy wykorzystuje katalog danych aplikacji Qt (QStandardPaths::AppDataLocation/shared-data). Struktura logiczna obejmuje:
 
-Bieżący wspólny magazyn plikowy znajduje się w katalogu danych aplikacji
-wyznaczanym przez Qt `QStandardPaths::AppDataLocation`:
+~~~text
+shared-data/
+├── patients/
+├── measurements/
+├── training-sessions/
+├── training-results/
+├── game-sessions/
+└── game-results/
+~~~
 
-```text
-<AppDataLocation>/
-└── shared-data/
-    ├── patients/
-    │   └── <uuid>.json
-    ├── measurements/
-    │   └── <uuid>.json
-    ├── training-sessions/
-    ├── training-results/
-    ├── game-sessions/
-    └── game-results/
-```
+Rekordy używają identyfikatorów UUID, wersji i znaczników czasu. Nazwy plików nie powinny ujawniać numeru PESEL ani nazwiska. Zapis jest wykonywany atomowo.
 
-Każdy rekord ma identyfikator UUID, wersję i znaczniki czasu. Nazwy plików
-nie zawierają PESEL ani nazwisk. Zapis odbywa się atomowo. Przy włączonym
-`encryption.enabled` rekordy są szyfrowane AES-256-GCM. Ustawienie
-`data.base_path` pozostaje ścieżką starszego magazynu plikowego używanego
-do migracji i zgodności wstecznej; nowe wspólne repozytorium korzysta
-z katalogu danych aplikacji.
+### 🔒 Szyfrowanie
 
-## Safety & Compliance
+Opcjonalne szyfrowanie rekordów wykorzystuje AES-256-GCM. Klucz jest przekazywany przez zmienną środowiskową BIOFEEDBACK_ENCRYPTION_KEY; nie wolno umieszczać go w repozytorium, pliku konfiguracyjnym ani dziennikach. Gdy szyfrowanie jest włączone, a klucza brakuje, dostęp do zasobów powinien zostać zablokowany.
 
-This application follows medical software standards:
-- Data validation and integrity checks
-- Comprehensive error handling
-- Audit logging
-- User authentication ready
-- Data backup capabilities
+### 🧱 MariaDB
 
-## License
+Konfiguracja przewiduje wybór backendu MariaDB, ale w bieżącym stanie repozytorium adapter repozytorium MariaDB nie jest dostępny. **Do czasu wdrożenia adaptera należy używać backendu files.** Samo wpisanie danych połączenia nie oznacza działającej integracji.
 
-[Specify your license]
+### 🌐 Serwer API
 
-## Contributing
+Serwer można zbudować jako cel biofeedback_api. Domyślnie nasłuchuje na 127.0.0.1. Dostęp do zasobów jest ograniczony do administratora. Nie wystawiaj prototypowego HTTP bezpośrednio do Internetu. Zdalny dostęp wymaga odpowiednio zabezpieczonej bramy HTTPS/WSS, kontroli dostępu, zarządzania kluczami i testów bezpieczeństwa.
 
-Please read CONTRIBUTING.md for details on our code of conduct and the process for submitting pull requests.
+## ⚙️ Wymagania
 
-## Disclaimer
+### 🖥️ System i kompilator
 
-This software is for research and development purposes. For medical use, proper certification and regulatory approval are required.
+- Debian, Ubuntu lub Raspberry Pi OS;
+- CMake;
+- kompilator zgodny z C++17 (np. GCC);
+- make lub inny generator obsługiwany przez CMake;
+- pkg-config;
+- Qt5 z modułami Qt Widgets i Qt Charts;
+- biblioteki libserialport, nlohmann/json i OpenSSL;
+- ncurses — dla budowania TUI.
 
+### 📦 Instalacja zależności w Debianie / Ubuntu / Raspberry Pi OS
 
-## Wspólny serwer danych API
+~~~bash
+sudo apt update
+sudo apt install -y \
+  build-essential cmake git pkg-config \
+  qtbase5-dev libqt5charts5-dev \
+  libserialport-dev nlohmann-json3-dev \
+  libssl-dev libncurses-dev
+~~~
 
-Samodzielny serwer HTTP (Qt Network) można zbudować i uruchomić:
+W zależności od wydania systemu nazwa pakietu Qt Charts może się różnić. Jeżeli libqt5charts5-dev nie jest dostępny, sprawdź nazwę pakietu dla używanej wersji dystrybucji.
 
-    cmake -S . -B build
-    cmake --build build --target biofeedback_api
-    ./build/biofeedback_api --port 8765
+## 🚀 Szybkie uruchomienie
 
-Usługa nasłuchuje wyłącznie na `127.0.0.1`. Oprócz health/status i
-uwierzytelniania udostępnia CRUD kolekcji pacjentów, pomiarów, sesji i wyników
-treningowych oraz sesji i wyników gier. Dostęp do zasobów jest obecnie
-ograniczony do konta administratora. Gdy `encryption.enabled=true`, ustaw
-`BIOFEEDBACK_ENCRYPTION_KEY` przed uruchomieniem serwera; bez klucza zasoby
-pozostaną niedostępne. Desktop uruchamia ten sam serwer automatycznie we
-własnym procesie. TUI łączy się domyślnie z `http://127.0.0.1:8765`; można
-zmienić adres przez `BIOFEEDBACK_API_URL`. Android wymaga HTTPS i bramy TLS.
-Nie wystawiaj surowego prototypu HTTP na sieć publiczną.
+### 1. Pobranie repozytorium
+
+~~~bash
+git clone https://github.com/bartoszruta26-droid/biofeedback.git
+cd biofeedback
+~~~
+
+### 2. Konfiguracja i kompilacja
+
+~~~bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel "$(nproc)"
+~~~
+
+### 3. Uruchomienie aplikacji
+
+~~~bash
+./build/biofeedback
+~~~
+
+Jeżeli kompilacja w danej konfiguracji tworzy plik wykonywalny w innym katalogu, sprawdź wynik CMake i zawartość katalogu build/.
+
+### 4. Uprawnienia portu szeregowego
+
+Aby użytkownik mógł korzystać z portu Arduino bez uruchamiania aplikacji jako administrator:
+
+~~~bash
+sudo usermod -aG dialout "$USER"
+~~~
+
+Następnie wyloguj się i zaloguj ponownie. Sprawdź nazwę urządzenia:
+
+~~~bash
+ls -l /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
+~~~
+
+## 🍓 Raspberry Pi — instalacja i pakiet DEB
+
+Dla Raspberry Pi z 64-bitowym systemem Debian/Raspberry Pi OS wymagany jest pakiet o architekturze **arm64**. Pakiet amd64 przeznaczony dla typowego komputera PC nie jest zgodny z Raspberry Pi ARM64.
+
+Sprawdź architekturę systemu:
+
+~~~bash
+dpkg --print-architecture
+~~~
+
+Oczekiwany wynik dla pakietu ARM64:
+
+~~~text
+arm64
+~~~
+
+Instrukcja instalacji i budowania pakietu: [docs/INSTALL_LINUX.md](docs/INSTALL_LINUX.md).
+
+Przebieg budowania pakietu ARM64: [GitHub Actions — pakiet Raspberry Pi](https://github.com/bartoszruta26-droid/biofeedback/actions/workflows/raspberry-pi-arm64-deb.yml).
+
+Po pobraniu artefaktu DEB i umieszczeniu go w bieżącym katalogu instalacja przebiega następująco:
+
+~~~bash
+sudo apt update
+sudo apt install ./biofeedback_1.0.0_arm64.deb
+~~~
+
+Jeżeli APT zgłosi brakujące zależności:
+
+~~~bash
+sudo apt --fix-broken install
+~~~
+
+**Uwaga:** nazwa pakietu w poleceniu musi odpowiadać faktycznej nazwie pobranego pliku. Nie instaluj pakietu, dopóki przebieg CI nie zakończy się sukcesem, artefakt nie zostanie opublikowany, a jego architektura nie zostanie potwierdzona.
+
+## 🧰 Budowanie ze źródeł
+
+### 🧱 Budowanie aplikacji i celów projektu
+
+~~~bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --parallel "$(nproc)"
+~~~
+
+### 🧪 Uruchomienie testów CTest
+
+~~~bash
+ctest --test-dir build --output-on-failure
+~~~
+
+### 🖥️ Przykład Qt5
+
+W repozytorium znajduje się przykład examples/qt5_mandatory.cpp. Po zbudowaniu sprawdź nazwę wygenerowanego celu i uruchom go z katalogu kompilacji.
+
+### 🛠️ Geany
+
+Projekt można otworzyć w środowisku Geany, jeżeli jest ono zainstalowane:
+
+~~~bash
+geany biofeedback.geany
+~~~
+
+Polecenia kompilacji i uruchamiania można skonfigurować w menu budowania Geany. Podstawowym i zalecanym źródłem konfiguracji pozostaje jednak CMakeLists.txt.
+
+## 🧪 Testowanie
+
+Projekt zawiera testy jednostkowe, regresyjne i kontrolne uruchamiane przez CTest oraz dodatkowe skrypty w katalogu tests/. W zależności od konfiguracji obejmują one m.in.:
+
+- walidację ramek i protokołu HX711;
+- konwersję wartości czujnika i kalibrację;
+- analizę parametrów biomechanicznych;
+- odświeżanie wykresu;
+- obsługę sesji treningowych;
+- silnik gier i fabrykę gier;
+- kontrolę wejścia z czujnika i własności strumienia próbek;
+- mechanizmy bezpieczeństwa i prywatności.
+
+Uruchomienie testów lokalnie:
+
+~~~bash
+ctest --test-dir build --output-on-failure
+~~~
+
+Wynik testów należy przypisywać do konkretnego commita i konkretnej konfiguracji kompilacji. Zielony test programowy nie potwierdza jeszcze dokładności fizycznego toru pomiarowego, bezpieczeństwa klinicznego ani poprawności kalibracji całego stanowiska.
+
+## 🗂️ Struktura repozytorium
+
+~~~text
+biofeedback/
+├── .github/workflows/   # Automatyczna kompilacja i testy
+├── config/              # Konfiguracja aplikacji
+├── data/                # Dane przykładowe i konspekty
+├── docs/                # Dokumentacja techniczna
+├── examples/            # Przykłady
+├── firmware/            # Oprogramowanie urządzeń, jeśli obecne w danym wydaniu
+├── include/             # Publiczne nagłówki C++
+├── packaging/           # Pliki integracji i pakowania systemowego
+├── platforms/
+│   ├── android/         # Klient Android
+│   └── webui/           # Klient przeglądarkowy
+├── resources/           # Ikony, grafiki i pozostałe zasoby
+├── src/
+│   ├── core/            # Logika aplikacji
+│   ├── data/            # Magazyn i obsługa danych
+│   ├── games/           # Silniki i implementacje gier
+│   ├── gui/             # Główny interfejs Qt
+│   ├── sensor/          # Komunikacja z czujnikiem
+│   └── tab/             # Widoki i moduły aplikacji
+├── tests/               # Testy jednostkowe i regresyjne
+├── CMakeLists.txt       # Konfiguracja budowania
+└── README.md            # Główny opis projektu
+~~~
+
+Rzeczywista zawartość katalogów może się zmieniać wraz z rozwojem projektu. W razie rozbieżności pierwszeństwo mają pliki źródłowe i aktualna konfiguracja CMake.
+
+## 📚 Dokumentacja
+
+| Dokument | Zakres |
+|---|---|
+| [Instalacja Linux](docs/INSTALL_LINUX.md) | Zależności, budowanie i instalacja w systemach Debian/Ubuntu |
+| [Kalibracja HX711](docs/HX711_CALIBRATION.md) | Zerowanie, kalibracja i kontrola wskazań |
+| [Projekt TUI](docs/TUI_DESIGN.md) | Obsługa interfejsu terminalowego |
+| [Architektura wspólnego serwera danych](docs/ARCHITECTURE_SHARED_DATA_SERVER.md) | Model zasobów i integracja API |
+| [Wzory matematyczne](MATHEMATICAL_FORMULAS.md) | Parametry biomechaniczne i obliczenia |
+| [Raport wzorów](REPORT_FORMULAS.md) | Opracowanie parametrów w formacie Markdown |
+| [Audyt silnika gier](docs/GAME_ENGINE_AUDIT_2026-11-07.md) | Historia audytu i zakres walidacji gier — dokument historyczny, może dotyczyć innej gałęzi |
+
+## ⚠️ Ograniczenia i bezpieczeństwo użytkowania
+
+1. **Kalibracja:** przed pomiarem siły wymagane są zerowanie i kalibracja z użyciem znanej masy odniesienia.
+2. **Walidacja sprzętowa:** testy automatyczne nie zastępują kontroli czujnika, przewodów, mocowania, zakresu obciążenia i powtarzalności wskazań.
+3. **Zastosowanie kliniczne:** projekt nie jest sam w sobie certyfikowanym wyrobem medycznym ani zatwierdzonym narzędziem diagnostycznym.
+4. **Dane osobowe:** przed użyciem rzeczywistych danych należy skonfigurować kontrolę dostępu, szyfrowanie, kopie zapasowe i procedury ochrony danych.
+5. **Sieć:** nie wystawiaj niezabezpieczonego serwera HTTP na publiczny interfejs sieciowy.
+6. **Platformy:** nie wszystkie funkcje Desktop, TUI, WebUI i Android są równoważne.
+7. **Gry:** dostępność gry w fabryce nie jest równoznaczna z zakończeniem testów funkcjonalnych, ergonomicznych i sprzętowych.
+
+Oprogramowanie jest rozwijane do celów badawczo-rozwojowych, edukacyjnych i prototypowania. Odpowiedzialność za ocenę przydatności konkretnego zastosowania, bezpieczeństwo stanowiska i zgodność regulacyjną spoczywa na podmiocie wdrażającym.
+
+## 🤝 Współpraca
+
+1. Zapoznaj się z kodem i dokumentacją dotyczącą obszaru, który chcesz zmienić.
+2. Zgłoś błąd lub opisz proponowane usprawnienie w GitHub Issues.
+3. Przygotuj zmianę w osobnej gałęzi.
+4. Dodaj lub zaktualizuj testy regresyjne.
+5. Otwórz Pull Request z opisem zakresu, sposobu weryfikacji i ewentualnych ograniczeń.
+
+Przy zmianach dotyczących akwizycji, kalibracji, danych pacjentów i sterowania grami szczególnie ważne są testy błędnych danych, utraty połączenia, przeciążenia strumienia i bezpiecznego zatrzymania.
+
+---
+
+<p align="center">
+  🧠 <strong>Biofeedback</strong> — mierz świadomie, analizuj rzetelnie, trenuj bezpiecznie. 💪
+</p>
