@@ -247,3 +247,16 @@ if "m_recordedSamples.append(recorded)" not in sample_body:
     raise SystemExit("Full measurement samples must still be retained")
 if "m_rawBox->setTitle" in sample_body:
     raise SystemExit("Per-sample raw-table title updates remain in acquisition path")
+
+
+# Every-frame status callbacks must not flood the GUI event queue.
+debug_source = Path("src/tab/DebugTab.cpp").read_text(encoding="utf-8")
+debug_header = Path("include/tab/DebugTab.hpp").read_text(encoding="utf-8")
+if "QMetaObject::invokeMethod(this, [this, data]" in debug_source:
+    raise SystemExit("DebugTab still queues one GUI event per sensor frame")
+if "m_pendingSensorData = data" not in debug_source:
+    raise SystemExit("DebugTab latest sensor snapshot missing")
+if "m_sensorUiTimer->setInterval(100)" not in debug_source:
+    raise SystemExit("DebugTab status refresh must be bounded to 10 Hz")
+if "m_sensorSnapshotMutex" not in debug_header:
+    raise SystemExit("DebugTab latest sensor snapshot must be synchronized")
