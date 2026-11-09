@@ -1,4 +1,6 @@
-# Biofeedback Application - Build Instructions
+# Biofeedback — instrukcja budowania i konfiguracji
+
+> **Uwaga o aktualności:** ten dokument został skorygowany względem bieżącego firmware i konfiguracji repozytorium. Główną instrukcją instalacji Linux jest również [`docs/INSTALL_LINUX.md`](docs/INSTALL_LINUX.md). Nie stosuj starych wartości portu 9600 ani historycznego szkicu Arduino.
 
 ## Prerequisites
 
@@ -46,19 +48,14 @@ Depending on distro naming, install either:
 
 ### 3. Configure Serial Port Permissions
 ```bash
-# Add user to dialout group
-sudo usermod -a -G dialout $USER
+# Dodaj bieżącego użytkownika do grupy dostępu do portów szeregowych
+sudo usermod -aG dialout "$USER"
 
-# Create udev rule for Arduino
-echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", MODE="0666"' | sudo tee /etc/udev/rules.d/50-arduino.rules
-
-# Reload udev rules
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-
-# Verify serial port
-ls -l /dev/ttyUSB*
+# Sprawdź port urządzenia
+ls -l /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
 ```
+
+Wyloguj się i zaloguj ponownie, aby zastosować zmianę grup. Nie twórz reguły udev nadającej wszystkim użytkownikom uprawnienia `0666` do portu urządzenia.
 
 ### 4. Verify Qt5 Installation
 ```bash
@@ -163,33 +160,35 @@ sudo apt install -y arduino
 ```
 
 ### 2. Upload Firmware
-1. Open `hx711_arduino_nano.ino` in Arduino IDE
-2. Select Board: Arduino Nano
-3. Select correct Port: `/dev/ttyUSB0`
-4. Click Upload
+1. Otwórz plik [`hx711_advanced.ino`](hx711_advanced.ino) w Arduino IDE. To aktualny firmware zgodny z parserem ramek binarnych aplikacji.
+2. Wybierz płytkę Arduino Nano oraz właściwy procesor/bootloader dla używanej wersji płytki.
+3. Wybierz port urządzenia, np. `/dev/ttyUSB0` lub `/dev/ttyACM0`.
+4. Skompiluj szkic i wgraj go do Arduino.
+
+Plik `hx711_arduino_nano.ino` jest historycznym przykładem tekstowym i nie jest zgodny z bieżącym parserem ramek binarnych. Nie używaj go do aktualnej aplikacji.
 
 ### 3. Verify Communication
 ```bash
 # Use screen or minicom to test
-screen /dev/ttyUSB0 9600
+screen /dev/ttyUSB0 115200
 ```
 
 ## Configuration
 
-Edit `config/config.json` to customize:
+Konfiguracja bazowa znajduje się w [`config/config.json`](config/config.json). Zmieniaj wyłącznie potrzebne pola, zachowując pozostałe ustawienia i strukturę. Dla aktualnego firmware Nano wymagane jest 115200 bit/s, protokół `hx711-frame-v1`, a domyślny backend danych to `files`. Przykładowe kluczowe wartości:
 
 ```json
 {
     "serial": {
         "port": "/dev/ttyUSB0",
-        "baud_rate": 9600
+        "baud_rate": 115200
     },
     "data": {
         "base_path": "./data/patients"
     },
     "encryption": {
         "enabled": true,
-        "algorithm": "AES-256-CBC"
+        "algorithm": "AES-256-GCM"
     },
     "ui": {
         "theme": "default",
@@ -197,6 +196,10 @@ Edit `config/config.json` to customize:
     }
 }
 ```
+
+**Bezpieczeństwo konfiguracji:** przykładowy plik repozytorium ma `encryption.enabled=false` dla profilu deweloperskiego. Profil produkcyjny wymaga włączonego AES-256-GCM i zewnętrznego sekretu klucza; nie wpisuj sekretu bezpośrednio do pliku JSON ani repozytorium. Adapter MariaDB nie jest obecnie zaimplementowany — używaj `storage.patient_backend: "files"`.
+
+Kalibracja firmware Arduino jest przechowywana w RAM i po restarcie urządzenia wymaga ponownego wykonania. `HX711_SAMPLES=1`, więc aktualny szkic nie uśrednia wielu próbek. Procedura: [`docs/HX711_CALIBRATION.md`](docs/HX711_CALIBRATION.md).
 
 ## Testing
 
