@@ -70,7 +70,7 @@ void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
         }
         
         // Presentation-only buffer: never allow a delayed GUI to grow without bound.
-        constexpr int MaximumGraphPoints = 12000;
+        constexpr int MaximumGraphPoints = 32000;
         if (!timestamp.isValid()) {
             ++m_invalidPointCount;
             return;
@@ -195,20 +195,33 @@ void GraphWidget::refresh()
 void GraphWidget::pruneOldData()
 {
     if (m_dataPoints.isEmpty()) return;
-    
-    QDateTime cutoff = QDateTime::currentDateTime().addSecs(-m_timeRangeSeconds);
-    
+
+    const QDateTime cutoff = QDateTime::currentDateTime().addSecs(-m_timeRangeSeconds);
     int removeCount = 0;
-    for (int i = 0; i < m_dataPoints.size(); ++i) {
-        if (m_dataPoints[i].timestamp < cutoff) {
-            removeCount++;
-        } else {
-            break;
+
+    if (m_timestampsMonotonic) {
+        // Fast path: monotonic acquisition timestamps form an expired prefix.
+        while (removeCount < m_dataPoints.size() &&
+               m_dataPoints[removeCount].timestamp < cutoff) {
+            ++removeCount;
+        }
+        if (removeCount > 0) {
+            m_dataPoints.remove(0, removeCount);
+        }
+    } else {
+        // Clock adjustments or delayed samples can put expired points anywhere.
+        const auto newEnd = std::remove_if(
+            m_dataPoints.begin(), m_dataPoints.end(),
+            [&cutoff](const DataPoint& point) {
+                return point.timestamp < cutoff;
+            });
+        removeCount = static_cast<int>(std::distance(newEnd, m_dataPoints.end()));
+        if (removeCount > 0) {
+            m_dataPoints.erase(newEnd, m_dataPoints.end());
         }
     }
-    
+
     if (removeCount > 0) {
-        m_dataPoints.remove(0, removeCount);
         if (m_autoScaleY) {
             calculateAutoScale();
             m_samplesSinceAutoScale = 0;
