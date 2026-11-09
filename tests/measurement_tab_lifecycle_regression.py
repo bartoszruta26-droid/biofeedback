@@ -251,7 +251,7 @@ if "QPainterPath tracePath;" not in source or "QPointF(margin + column, y)" not 
     raise SystemExit("Measurement trace must retain subpixel coordinates for smooth rendering")
 if "tracePath.cubicTo(control1, control2, p2);" not in source:
     raise SystemExit("Measurement trace must use shape-preserving cubic interpolation")
-if "m_forcePlot->addSample(forceValue, currentTime)" not in sample_body:
+if "m_forcePlot->addSample(forceValue, currentTime)" not in source:
     raise SystemExit("Measurement plot must receive every acquired sample")
 if "m_progressWidget->setCurrentForce(force);" not in training_source:
     raise SystemExit("Training live force trace must receive every acquired sample")
