@@ -1,4 +1,6 @@
-# Konfigurowalne szyfrowanie plików
+# 🔐 Konfigurowalne szyfrowanie plików
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ## Tryb deweloperski
 
