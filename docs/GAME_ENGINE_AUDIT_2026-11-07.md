@@ -1,4 +1,6 @@
-# Audyt GameEngine i gier — 2026-11-07
+# 🎮 Audyt silnika GameEngine i gier — 2026-11-07
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski i statusy odnoszą się do wskazanej daty, gałęzi i commita; nie są automatycznie bieżącym stanem main.
 
 Zakres: gałąź `integration/all-work`. Zmiany nie są kierowane do `main`.
 
