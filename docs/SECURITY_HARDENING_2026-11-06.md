@@ -1,44 +1,49 @@
-# Security hardening — integration/all-work (2026-11-06)
+# 🔐 Wzmocnienie bezpieczeństwa — gałąź integration/all-work (2026-11-06)
 
-## Scope
+> 📘 Audyt historyczny • Język: polski • Zakres: wskazany commit gałęzi integration/all-work  
+> ⚠️ Wyników i statusów z tego dokumentu nie należy przypisywać automatycznie do bieżącej gałęzi main.
 
-This change set introduces password hashing, authenticated encryption, atomic persistence and fail-closed patient-record handling. It is not a production security certification.
+## 1. Zakres
 
-## Account credentials
+Ten zestaw zmian wprowadza haszowanie haseł, szyfrowanie uwierzytelnione, atomowy zapis oraz bezpieczne blokowanie dostępu do kart pacjentów w razie błędu. Nie stanowi certyfikacji bezpieczeństwa rozwiązania produkcyjnego.
 
-- New credentials are stored as \`pbkdf2-sha256$v1$<iterations>$<salt-hex>$<digest-hex>\`.
-- PBKDF2-HMAC-SHA-256 uses 600,000 iterations, a 16-byte CSPRNG salt and a 32-byte digest.
-- Password verification uses constant-time digest comparison.
-- A legacy plaintext account is migrated on its first successful login. The migrated account is marked \`mustChangePassword\`; the GUI blocks completion of login until a new password of at least 12 characters is chosen and persisted.
-- New account creation is restricted to an authenticated administrator and requires a password of at least 12 characters.
-- The forced password change rejects reuse of the compromised legacy password.
-- Legacy reversible XOR-encrypted password records are rejected. There is no automatic XOR fallback.
-- \`config/users.json\` is not modified by this code change alone. The first successful legacy login writes the PBKDF2 migration atomically.
+## 2. Dane uwierzytelniające kont
 
-## Data encryption
+- Nowe dane uwierzytelniające są przechowywane w formacie `pbkdf2-sha256$v1$<iterations>$<salt-hex>$<digest-hex>`.
+- PBKDF2-HMAC-SHA-256 wykorzystuje 600 000 iteracji, 16-bajtową sól z CSPRNG i 32-bajtowy skrót.
+- Weryfikacja hasła wykorzystuje porównanie skrótów o stałym czasie wykonania.
+- Starsze konto z hasłem jawnym jest migrowane przy pierwszym poprawnym logowaniu. Konto otrzymuje znacznik `mustChangePassword`; GUI blokuje zakończenie logowania do czasu ustawienia i zapisania nowego hasła o długości co najmniej 12 znaków.
+- Tworzenie nowych kont jest ograniczone do uwierzytelnionego administratora i wymaga hasła o długości co najmniej 12 znaków.
+- Wymuszona zmiana hasła odrzuca ponowne użycie naruszonego hasła legacy.
+- Starsze rekordy haseł szyfrowane odwracalnym XOR są odrzucane. Nie ma automatycznego mechanizmu awaryjnego XOR.
+- Sama zmiana kodu nie modyfikuje `config/users.json`. Pierwsze poprawne logowanie legacy zapisuje migrację PBKDF2 atomowo.
 
-- New encrypted values use the \`BFENC:v1:\` prefix and AES-256-GCM.
-- The payload is Base64 of 12-byte nonce, 16-byte authentication tag and ciphertext.
-- A fresh nonce is generated with OpenSSL \`RAND_bytes\` for every encryption.
-- The supplied key material is SHA-256-derived into a 256-bit AES key. The application requires \`BIOFEEDBACK_ENCRYPTION_KEY\` to be supplied externally and to contain at least 32 bytes. Provision a cryptographically random secret; do not use a human password or commit the secret.
-- Authentication-tag failure, wrong keys, malformed payloads and unsupported legacy formats fail closed.
-- XOR ciphertexts are not migrated automatically. Preserve a protected backup and perform any required legacy migration as a separately reviewed, explicit offline operation.
+## 3. Szyfrowanie danych
 
-## File persistence
+- Nowe zaszyfrowane wartości używają prefiksu `BFENC:v1:` i algorytmu AES-256-GCM.
+- Ładunek jest kodowaniem Base64 12-bajtowego nonce, 16-bajtowego znacznika uwierzytelniającego i szyfrogramu.
+- Dla każdego szyfrowania generowany jest nowy nonce za pomocą OpenSSL `RAND_bytes`.
+- Materiał klucza jest przekształcany funkcją SHA-256 do 256-bitowego klucza AES. Aplikacja wymaga zewnętrznego przekazania `BIOFEEDBACK_ENCRYPTION_KEY` o długości co najmniej 32 bajtów. Należy używać losowego sekretu kryptograficznego, a nie hasła użytkownika. Sekretu nie wolno commitować.
+- Błąd znacznika uwierzytelniającego, niewłaściwy klucz, niepoprawny ładunek i nieobsługiwany format legacy powodują odmowę dostępu.
+- Szyfrogramy XOR nie są migrowane automatycznie. Należy zachować chronioną kopię zapasową, a ewentualną migrację legacy wykonać jako oddzielną, jawnie zatwierdzoną operację offline.
 
-- DataManager writes to a same-directory temporary file created with \`mkstemp\`, restricts it to owner read/write, writes all bytes, calls \`fsync\`, and atomically renames it over the destination.
-- The parent directory is synchronized after rename where supported.
-- Authentication account files use the same pattern.
-- A failure before rename leaves the previous destination untouched. A directory-sync failure after rename can report a durability error even though the atomic replacement has already occurred.
+## 4. Trwały zapis plików
 
-## Patient records and JSON export
+- `DataManager` zapisuje do pliku tymczasowego w tym samym katalogu, tworzonego przez `mkstemp`, ogranicza uprawnienia do odczytu/zapisu właściciela, zapisuje wszystkie bajty, wywołuje `fsync` i atomowo zmienia nazwę pliku na docelową.
+- Po zmianie nazwy synchronizowany jest katalog nadrzędny, jeśli system to obsługuje.
+- Pliki kont uwierzytelniania korzystają z tego samego wzorca.
+- Błąd przed zmianą nazwy pozostawia poprzedni plik docelowy bez zmian. Błąd synchronizacji katalogu po zmianie nazwy może zgłosić problem trwałości, mimo że atomowa podmiana już nastąpiła.
 
-- Patient records, patient-linked exercise results and training plans always use AES-GCM; legacy boolean arguments cannot disable encryption.
-- Patient reads without an encryption key or with plaintext/legacy data fail closed.
-- JSON export/import now encrypts and authenticates the payload and requires the configured key.
+## 5. Kartoteki pacjentów i eksport JSON
 
-## Verification status
+- Rekordy pacjentów, wyniki ćwiczeń powiązane z pacjentem i plany treningowe zawsze używają AES-GCM; starsze argumenty logiczne nie mogą wyłączyć szyfrowania.
+- Odczyt pacjentów bez klucza szyfrowania albo z danymi jawnymi/legacy kończy się odmową dostępu.
+- Eksport/import JSON szyfruje i uwierzytelnia ładunek oraz wymaga skonfigurowanego klucza.
 
-Regression tests were added for PBKDF2 hashing/verification, legacy account migration and forced password change, account creation, AES-GCM round-trip, wrong-key rejection, tag tampering, legacy-format rejection, fail-closed patient writes, encrypted exercise results and training plans, encrypted JSON export/import, and an RLIMIT_FSIZE-induced partial-write failure that verifies preservation of the previous destination.
+## 6. Historyczny stan weryfikacji
 
-GitHub Actions passed on code head `412357e39d960e22d9d34e758fc0cd5a32e8e3dd`: the `LoginDialog.cpp` compile-only target and all four CTest suites (`encryption_regression`, `password_hasher_regression`, `auth_regression`, `data_manager_regression`) built and passed. The complete Qt GUI executable was not built because the CI environment does not install Qt Charts; the changed login-dialog translation unit was compiled independently. Hardware, penetration, process-crash and filesystem-specific durability testing remain outstanding.
+Dodano testy regresyjne dla haszowania i weryfikacji PBKDF2, migracji starszego konta i wymuszonej zmiany hasła, tworzenia kont, cyklu AES-GCM, odrzucenia niewłaściwego klucza, manipulacji znacznikiem, odrzucania starszych formatów, bezpiecznego blokowania zapisu pacjentów, szyfrowania wyników ćwiczeń i planów treningowych, szyfrowania eksportu/importu JSON oraz częściowego zapisu wymuszonego przez RLIMIT_FSIZE, który sprawdza zachowanie poprzedniego pliku.
+
+GitHub Actions zakończyło się powodzeniem dla commita `412357e39d960e22d9d34e758fc0cd5a32e8e3dd`: zbudowano cel kompilacji samego `LoginDialog.cpp` i przeszły cztery zestawy CTest (`encryption_regression`, `password_hasher_regression`, `auth_regression`, `data_manager_regression`). Pełny plik wykonywalny GUI Qt nie został zbudowany, ponieważ środowisko CI nie instaluje Qt Charts; zmienioną jednostkę translacji okna logowania skompilowano niezależnie.
+
+Do wykonania pozostają testy sprzętowe, testy penetracyjne, testy awarii procesu oraz testy trwałości właściwe dla systemu plików. Historyczny wynik CI dotyczy wyłącznie wskazanego SHA i nie potwierdza bieżącego stanu gałęzi main.
