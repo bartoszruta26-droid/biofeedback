@@ -105,6 +105,7 @@ void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
 void GraphWidget::clear()
 {
     m_dataPoints.clear();
+    m_samplesSinceAutoScale = 0;
     m_yMin = 0.0;
     m_yMax = 100.0;
     m_cacheValid = false;
