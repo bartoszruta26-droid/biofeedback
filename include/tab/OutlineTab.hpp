@@ -202,7 +202,6 @@ public slots:
      * @brief Obsługuje dane z sensora Arduino
      * @param data Dane z czujnika
      */
-    void onSensorDataReceived(const sensor::SensorData& data);
 
 private slots:
     void onOutlineSelected(int index);
