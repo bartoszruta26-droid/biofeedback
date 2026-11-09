@@ -245,8 +245,12 @@ if "static constexpr qint64 LiveUiIntervalMs = 50" not in sample_body:
     raise SystemExit("Live UI updates must be coalesced to at most 20 Hz")
 if "m_recordedSamples.append(recorded)" not in sample_body:
     raise SystemExit("Full measurement samples must still be retained")
-if "m_rawBox->setTitle" in sample_body:
-    raise SystemExit("Per-sample raw-table title updates remain in acquisition path")
+if "m_rawBox->setTitle" in sample_body and "LiveUiIntervalMs" not in sample_body:
+    raise SystemExit("Raw-table title update is not protected by the bounded live UI cadence")
+ui_gate = sample_body.find("if (elapsedMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs)")
+title_update = sample_body.find("m_rawBox->setTitle")
+if title_update >= 0 and (ui_gate < 0 or title_update < ui_gate):
+    raise SystemExit("Raw-table title update must remain inside the throttled UI block")
 
 
 # Every-frame status callbacks must not flood the GUI event queue.
