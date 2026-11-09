@@ -14,6 +14,7 @@
 #include <QMessageBox>
 #include <QSignalBlocker>
 #include <QPainter>
+#include <QPolygon>
 #include <QPen>
 #include <QBrush>
 #include <QFont>
@@ -252,6 +253,7 @@ void ForcePlotWidget::addSample(double force, double time)
 
 void ForcePlotWidget::clearData()
 {
+    m_repaintTimer.stop();
     m_forces.clear();
     m_times.clear();
     m_maxCandidates.clear();
@@ -411,10 +413,11 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
         painter.setPen(QPen(QColor(0, 100, 200), 2, Qt::SolidLine));
         painter.drawPolyline(tracePoints.constData(), tracePoints.size());
 
-        QVector<QPoint> fillPoints;
+        QPolygon fillPoints;
         fillPoints.reserve(tracePoints.size() + 2);
         fillPoints.append(QPoint(margin, zeroY));
-        fillPoints += tracePoints;
+        for (const QPoint& point : tracePoints)
+            fillPoints.append(point);
         fillPoints.append(QPoint(margin + plotWidth, zeroY));
         painter.setBrush(QBrush(QColor(0, 100, 200, 50)));
         painter.setPen(Qt::NoPen);
