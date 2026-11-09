@@ -42,7 +42,8 @@
     "type": "HX711",
     "sample_rate_hz": 80,
     "gain": 128,
-    "calibration_enabled": true,
+    "calibration_enabled": false,
+    "calibration_profile": "calibration/hx711.json",
     "zero_threshold": 0.5
   },
   "devices": {
