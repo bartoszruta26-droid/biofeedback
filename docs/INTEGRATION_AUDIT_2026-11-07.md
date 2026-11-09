@@ -1,4 +1,6 @@
-# Audyt integracyjny Biofeedback — 2026-11-07
+# 🔗 Audyt integracyjny Biofeedback — 2026-11-07
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski i statusy odnoszą się do wskazanej daty, gałęzi i commita; nie są automatycznie bieżącym stanem main.
 
 ## Zakres
 
@@ -47,7 +49,7 @@ Linux CI wykonało pełną kompilację aplikacji Qt, CTest, kontrolę zależnoś
 2. **HTTP API:** obecny lokalny serwer API udostępnia zdrowie/status, natomiast operacje urządzenia i pomiaru pozostają jawnie wyłączone (`CAPABILITY_NOT_AVAILABLE`). To świadome ograniczenie granicy usługi, a nie potwierdzona integracja API z silnikiem pomiarowym.
 3. **Walidacja sprzętowa:** CI potwierdza zachowanie programowe i testy regresyjne; nie zastępuje pomiaru na rzeczywistym HX711/Arduino, testu długiego czasu pracy ani walidacji klinicznej.
 
-## Status
+## Stan
 
 PR #200 zawiera poprawki routingu pacjenta, semantyki zawijania timestampu oraz synchronizacji cyklu życia callbacków, wraz z regresjami. CI zweryfikowano ponownie na aktualnym HEAD PR po tych zmianach. PR pozostaje skierowany do `integration/all-work`; `main` nie jest celem integracji.
 
