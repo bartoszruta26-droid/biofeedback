@@ -153,15 +153,15 @@ int main() {
         expect(dm.importFromJson(kResultsFile) == exportPayload, "plaintext mode JSON import");
 
 
-        // /proc is a read-only virtual filesystem, so this failure-path test
-        // behaves consistently for both unprivileged CI users and root.
+        // /proc/self/cmdline is a read-only, stable process attribute. Using it
+        // avoids chmod semantics under root and avoids volatile status counters.
         // The previous contents of the existing destination must remain intact.
-        const std::string protectedDestination = "/proc/self/status";
+        const std::string protectedDestination = "/proc/self/cmdline";
         std::ifstream protectedBeforeFile(protectedDestination, std::ios::binary);
         const std::string protectedBefore(
             (std::istreambuf_iterator<char>(protectedBeforeFile)),
             std::istreambuf_iterator<char>());
-        expect(!protectedBefore.empty(), "read protected destination before failed atomic write");
+        expect(!protectedBefore.empty(), "read stable protected destination before failed atomic write");
         const bool interruptedWrite = dm.exportToJson(
             "payload-that-cannot-be-written", protectedDestination);
         expect(!interruptedWrite, "read-only proc destination must reject atomic write");
