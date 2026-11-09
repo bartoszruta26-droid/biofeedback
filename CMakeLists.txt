@@ -613,6 +613,11 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/measurement_tab_lifecycle_regression.py)
     set_tests_properties(measurement_tab_lifecycle_regression PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    add_test(NAME desktop_presentation_regression
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/desktop_presentation_regression.py)
+    set_tests_properties(desktop_presentation_regression PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 
 enable_testing()
