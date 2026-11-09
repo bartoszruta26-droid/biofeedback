@@ -424,8 +424,9 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         newPortHandle = reinterpret_cast<intptr_t>(h);
 #else
         int fd = open(portName.c_str(), O_RDWR|O_NOCTTY|O_NONBLOCK);
-        if (fd < 0) { 
-            m_impl->setLastError("Cannot open " + portName);
+        if (fd < 0) {
+            const std::string error = std::strerror(errno);
+            m_impl->setLastError("Cannot open " + portName + ": " + error);
             core::DebugManager::instance().sendDebugMessage(
                 QString("Failed to open port %1: %2").arg(QString::fromStdString(portName)).arg(strerror(errno)),
                 core::DebugLevel::ERROR,
