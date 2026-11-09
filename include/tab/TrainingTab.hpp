@@ -320,7 +320,7 @@ private:
     QLabel* m_lblTargetForce;
     QLabel* m_lblRestTimer;
     
-    // Placeholder for the standalone game window managed by MainWindow.
+    // Game widget is owned by the independent floating fullscreen dialog.
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
     QDialog* m_gameWindow;
