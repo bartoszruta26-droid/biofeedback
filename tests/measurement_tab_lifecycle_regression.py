@@ -236,3 +236,14 @@ if destructor_body.index("m_measurementEngine->setCommitHook({})") > destructor_
     raise SystemExit("Teardown must disable and synchronize commit hook before closing journal")
 
 print("Measurement, training and game realtime dispatch regression passed")
+
+# The live sensor path must retain all samples while coalescing GUI work.
+sample_start = source.index("void MeasurementTab::readSingleSample(")
+sample_end = source.index("void MeasurementTab::updateRawTableBatch(", sample_start)
+sample_body = source[sample_start:sample_end]
+if "static constexpr qint64 LiveUiIntervalMs = 50" not in sample_body:
+    raise SystemExit("Live UI updates must be coalesced to at most 20 Hz")
+if "m_recordedSamples.append(recorded)" not in sample_body:
+    raise SystemExit("Full measurement samples must still be retained")
+if "m_rawBox->setTitle" in sample_body:
+    raise SystemExit("Per-sample raw-table title updates remain in acquisition path")
