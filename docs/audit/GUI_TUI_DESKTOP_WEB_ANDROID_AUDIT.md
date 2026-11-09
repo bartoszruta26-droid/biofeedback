@@ -1,4 +1,6 @@
-# Audyt interfejsów Biofeedback
+# 🔍 Audyt interfejsów Desktop, TUI, WebUI i Android
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski dotyczą wskazanego zakresu i momentu przeglądu; przed użyciem jako kryterium odbioru zweryfikuj bieżący kod.
 
 Data audytu: 2026-11-07  
 Audytowana gałąź: `integration/all-work`  
