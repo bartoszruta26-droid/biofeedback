@@ -445,6 +445,7 @@ private:
     QVector<RecordedMeasurementSample> m_recordedSamples;
     quint64 m_rawTableLastSequence{0};
     qint64 m_lastRawTableRefreshMs{-100};
+    qint64 m_lastLiveUiRefreshMs{-50};
     SampleJournalWriter m_sampleJournalWriter;
     QString m_sampleJournalPath;
     QString m_activeSessionId;
