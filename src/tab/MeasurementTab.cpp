@@ -186,7 +186,7 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     m_repaintTimer.setInterval(33); // cap live chart repaint scheduling at ~30 Hz
     connect(&m_repaintTimer, &QTimer::timeout, this, [this] { update(); });
 
-    setMinimumHeight(360);
+    setMinimumHeight(280);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 }
 
@@ -306,7 +306,8 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
 
     const int widgetWidth = width();
     const int widgetHeight = height();
-    const int margin = 40;
+    // Proportional margins leave more drawing area in compact desktop layouts.
+    const int margin = qBound(28, qMin(widgetWidth, widgetHeight) / 14, 48);
     const int plotWidth = widgetWidth - 2 * margin;
     const int plotHeight = widgetHeight - 2 * margin;
 
@@ -495,9 +496,8 @@ MeasurementTab::MeasurementTab(QWidget *parent)
             enqueueMeasurementSample(sample);
         });
     m_lastSensorData = sensor::SensorData();
-    // Default presentation polarity is inverted for a tensile load cell whose
-    // measured direction is currently negative. The acquisition journal always
-    // retains the untouched signed ADC value.
+    // RAW polarity affects presentation only. Signed calibration determines
+    // physical force polarity; the acquisition journal preserves raw ADC.
     QString ignoredCalibrationError;
     loadCalibrationProfile(&ignoredCalibrationError);
     m_repetitionDetector.setTargetForce(m_targetForce);
@@ -999,7 +999,7 @@ void MeasurementTab::setupUI()
     m_forcePlot = new ForcePlotWidget(this);
     m_forcePlot->setTargetForce(m_targetForce);
     m_forcePlot->setMaxTimeWindow(10.0);
-    m_forcePlot->setMinimumHeight(360);
+    m_forcePlot->setMinimumHeight(280);
     m_forcePlot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     m_lblCurrentForce = new QLabel("Aktualna siła: 0.0 N", this);
@@ -1036,7 +1036,7 @@ void MeasurementTab::setupUI()
     liveLayout->addWidget(m_seriesProgress);
     
     m_liveBox->setLayout(liveLayout);
-    m_mainLayout->addWidget(m_liveBox);
+    m_mainLayout->addWidget(m_liveBox, 3);
     
 
     // MeasurementTab nie posiada własnego terminala debugowego.
@@ -3112,10 +3112,12 @@ void MeasurementTab::onMeasurementSample(
     }
 
     double forceNewtons = 0.0;
-    if (!rawToNewtons(raw, forceNewtons) || forceNewtons < 0.0) {
+    if (!rawToNewtons(raw, forceNewtons)) {
         m_repetitionDetector.reset();
         return;
     }
+    // A negative calibration scale is valid for a load cell whose ADC counts
+    // decrease under tensile loading. The calibration sign corrects polarity.
     const double calibratedMassKg = forceNewtons / 9.80665;
     readSingleSample(forceNewtons, sample.deviceTimestampMs, raw, true,
                      calibratedMassKg, true);
