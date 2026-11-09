@@ -80,9 +80,9 @@ std::optional<double> CalibrationMath::scaleFromReference(double zeroOffsetRaw,
 {
     const double delta = static_cast<double>(referenceRaw) - zeroOffsetRaw;
     if (!std::isfinite(zeroOffsetRaw) || !std::isfinite(referenceValue) ||
-        delta <= 0.0 || referenceValue <= 0.0) return std::nullopt;
+        std::abs(delta) < 1e-9 || referenceValue <= 0.0) return std::nullopt;
     const double scale = referenceValue / delta;
-    if (!std::isfinite(scale) || scale <= 0.0) return std::nullopt;
+    if (!std::isfinite(scale) || std::abs(scale) < 1e-15) return std::nullopt;
     return scale;
 }
 
@@ -102,12 +102,12 @@ bool CalibrationProfile::isValidFor(const std::string& expectedDeviceId) const n
     if (schemaVersion != CurrentSchemaVersion || deviceId.empty() ||
         deviceId != expectedDeviceId || unit != "g" ||
         !std::isfinite(zeroOffsetRaw) || !std::isfinite(scaleFactor) ||
-        scaleFactor <= 0.0 || !std::isfinite(referenceValue) ||
+        std::abs(scaleFactor) < 1e-15 || !std::isfinite(referenceValue) ||
         referenceValue <= 0.0 || sampleCount < 1 || sampleCount > 1000 ||
         createdAtUtc.empty()) return false;
 
     const double rawDelta = static_cast<double>(referenceRaw) - zeroOffsetRaw;
-    if (rawDelta <= 0.0) return false;
+    if (std::abs(rawDelta) < 1e-9) return false;
     const double expectedScale = referenceValue / rawDelta;
     const double scaleTolerance = std::max(1e-12, std::abs(expectedScale) * 1e-6);
     return std::abs(scaleFactor - expectedScale) <= scaleTolerance;
