@@ -1,4 +1,6 @@
-# Rozdział 8. Załączniki – Kompleksowa dokumentacja techniczna, oprogramowanie, protokoły metrologiczne i wyniki walidacji klinicznej
+# Rozdział 8. Załączniki — materiały techniczne i robocze
+
+> **Status dokumentu: zbiór materiałów roboczych i przykładów, a nie kompletny pakiet dowodowy.** Samo wymienienie protokołów wzorcowania, deklaracji zgodności, wyników walidacji klinicznej lub oświadczeń nie potwierdza, że takie badania, certyfikaty i dokumenty zostały wykonane albo uzyskane. Fragmenty kodu i procedur w tym rozdziale mogą być historyczne; przed użyciem należy porównać je z aktualnymi plikami źródłowymi. Bieżącym firmware Arduino zgodnym z parserem binarnym jest [`hx711_advanced.ino`](../hx711_advanced.ino), a nie historyczny [`hx711_arduino_nano.ino`](../hx711_arduino_nano.ino). Aktualne ograniczenia opisują [`docs/MEASUREMENT_PIPELINE.md`](../docs/MEASUREMENT_PIPELINE.md) i [`docs/HX711_CALIBRATION.md`](../docs/HX711_CALIBRATION.md).
 
 ## 8.1. Wprowadzenie do załączników pracy habilitacyjnej
 
