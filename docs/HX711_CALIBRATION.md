@@ -2,6 +2,10 @@
 
 > 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
+## Kierunek wskazań czujnika rozciąganego
+
+Niektóre mostki tensometryczne przy rozciąganiu zmniejszają, zamiast zwiększać, podpisany odczyt ADC. Dla bieżącej konfiguracji desktop GUI domyślnie odwraca wyłącznie kierunek prezentacji (`sensor.raw_polarity: -1`), aby rozciąganie było pokazywane jako wzrost dodatni. Surowa próbka sprzętowa pozostaje zapisana bez zmian ze swoim znakiem. Ustawienie `sensor.raw_polarity: 1` przywraca natywny kierunek prezentacji. To nie jest kalibracja i nie zmienia firmware.
+
 ## Domyślny tryb desktop GUI: RAW
 
 Desktop GUI domyślnie odbiera, rejestruje i wyświetla surowe próbki ADC. Do poprawnego odbioru ramki wymagane są poprawny format i CRC, ale flaga firmware `CAL:1` ani pole `FORCE` nie są warunkiem zapisu danych RAW.
