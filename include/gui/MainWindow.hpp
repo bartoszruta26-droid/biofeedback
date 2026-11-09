@@ -2,6 +2,7 @@
 #define GUI_MAINWINDOW_HPP
 
 #include <QMainWindow>
+#include <QDialog>
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -285,7 +286,7 @@ private:
     QTimer* m_updateTimer;
     
     // Dialog ustawień
-    QWidget* m_settingsWidget;
+    QDialog* m_settingsWidget;
     
     // Stan aplikacji
     bool m_isCollectingData;
