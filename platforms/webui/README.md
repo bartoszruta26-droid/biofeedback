@@ -1,38 +1,47 @@
 # Biofeedback WebUI
 
-Responsywny interfejs webowy dla systemu Biofeedback. Wersja 0.2 zawiera
-nawigację modułową z obsługą adresów URL, tryb jasny/ciemny oraz klienta
-wspólnego API REST/WebSocket.
+> 📘 Weryfikacja kodu: 2026-11-09 • Zakres: `platforms/webui/` i `src/api/HttpApiServer.cpp`.
 
-## Uruchomienie
+Responsywny interfejs przeglądarkowy HTML/CSS/JavaScript. Zawiera nawigację modułową, tryb jasny/ciemny, logowanie oraz klienta wspólnego API HTTP.
+
+## Uruchomienie interfejsu
 
 Z katalogu głównego repozytorium:
 
-    python3 -m http.server 8080 --directory platforms/webui
+```bash
+python3 -m http.server 8080 --directory platforms/webui
+```
 
-Następnie otwórz http://localhost:8080.
+Następnie otwórz `http://localhost:8080`. Jest to wyłącznie serwer plików statycznych WebUI; nie uruchamia backendu Biofeedback API. Samodzielny serwer API należy zbudować i uruchomić oddzielnie zgodnie z `docs/INSTALL_LINUX.md` oraz `docs/ARCHITECTURE_SHARED_DATA_SERVER.md`.
 
-## Klient API i widoki danych
+## Funkcje potwierdzone w kodzie
 
-`api-client.js` udostępnia `window.BiofeedbackApi.createApiClient()`:
-- logowanie Bearer i wylogowanie;
-- CRUD pacjentów, pomiarów, sesji/wyników treningowych oraz sesji/wyników gier;
-- kontrolę wersji rekordów przy aktualizacji i usuwaniu;
-- ujednolicone błędy HTTP, sieci i niepoprawnej odpowiedzi.
+- Logowanie i wylogowanie przez token Bearer.
+- Odczyt statusu API.
+- CRUD kart pacjentów: lista, dodawanie, edycja i usuwanie.
+- Odczyt archiwów pomiarów, sesji treningowych, wyników treningowych, sesji gier i wyników gier.
+- Ręczne tworzenie wpisu sesji treningowej i wyniku treningu (`source_mode: manual_entry`).
+- Ręczne tworzenie wpisu sesji gry i wyniku gry (`source_mode: manual_entry`).
+- Kontrola wersji rekordów przy aktualizacji i usuwaniu.
+- Jawne prezentowanie błędów HTTP, sieci i braku uprawnień; brak fikcyjnych danych zastępczych.
 
-Po zalogowaniu strony Pacjenci, Pomiary i Trening pobierają dane z tych samych
-kolekcji API. Karty pacjentów można dodawać, edytować i usuwać; pozostałe strony
-wyświetlają archiwum pomiarów, treningów i gier. Klient domyślnie używa tego
-samego pochodzenia (same-origin). Brak serwera i brak uprawnień są jawnie
-pokazywane. Nie ma trybu zastępczego z fikcyjnymi danymi. WebSocket i
-strumieniowanie pomiarów czasu rzeczywistego nie są jeszcze dostępne.
+Ręczny wpis treningu lub wyniku gry jest archiwizacją danych wprowadzonych przez operatora. Nie uruchamia rzeczywistego treningu z czujnikiem ani silnika gry biofeedback.
 
-## Ważne ograniczenie wersji 0.2
+## Ograniczenia integracji
 
-Serwer API i adapter sprzętowy nie są jeszcze zaimplementowane. Klient
-definiuje warstwę integracyjną, ale nie zastępuje backendu ani
-MeasurementEngine. Nie generuje fikcyjnych odczytów, kart pacjentów ani
-wyników terapii.
+- WebUI nie otwiera portu szeregowego i nie prowadzi akwizycji czujnika.
+- Serwer nie udostępnia obecnie endpointów połączenia/rozłączenia urządzenia, mimo że klient JavaScript zawiera metody `connectDevice` i `disconnectDevice`.
+- Klient zawiera metody subskrypcji `/ws/measurements` i `/ws/events`, ale serwer nie implementuje WebSocket ani SSE. Nie należy traktować tych metod jako działającej funkcji.
+- Odczyt próbek z serwerowej akwizycji jest obecnie dostępny wyłącznie przez ograniczony endpoint HTTP `GET /api/v1/acquisition/samples`, wymagający administratora; WebUI nie ma gotowego widoku strumienia.
+- Endpointy danych wymagają obecnie roli `administrator`.
+- Serwer API domyślnie nasłuchuje na loopback. Wdrożenie zdalne wymaga bramy TLS/reverse proxy i odpowiedniej polityki CORS.
 
-Kontrakt integracyjny opisano w `API_CONTRACT.md`.
-Testy klienta: `node --test platforms/webui/api-client.test.js`.
+## Testy
+
+Test klienta JavaScript:
+
+```bash
+node --test platforms/webui/api-client.test.js
+```
+
+Testy te weryfikują zachowanie klienta z kontrolowanymi odpowiedziami HTTP; nie zastępują testów integracyjnych z uruchomionym backendem.
