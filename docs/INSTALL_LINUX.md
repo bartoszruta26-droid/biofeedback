@@ -1,4 +1,6 @@
-# Instalacja Biofeedback w systemie Linux
+# 🐧 Instalacja Biofeedback w systemie Linux
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ## Obsługiwane środowisko
 
