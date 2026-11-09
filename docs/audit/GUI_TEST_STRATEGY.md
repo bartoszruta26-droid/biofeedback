@@ -1,4 +1,6 @@
-# Strategia testów interfejsów Biofeedback
+# 🧪 Strategia testowania interfejsów Biofeedback
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski dotyczą wskazanego zakresu i momentu przeglądu; przed użyciem jako kryterium odbioru zweryfikuj bieżący kod.
 
 ## Warstwy testów
 
@@ -22,7 +24,7 @@
 - eksport/odtworzenie danych;
 - responsywność Web i różne rozmiary ekranu Android.
 
-## CI
+## Integracja ciągła (CI)
 
 - C++: format/kompilacja, CTest, sanitizery dla wybranych celów.
 - TUI: test modelu, smoke test trybów CLI, test terminala pseudoterminalem.
