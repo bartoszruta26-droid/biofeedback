@@ -466,6 +466,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
 MeasurementTab::MeasurementTab(QWidget *parent)
     : QWidget(parent)
     , m_mainLayout(nullptr)
+    , m_visualLayout(nullptr)
     , m_controlLayout(nullptr)
     , m_btnStartStop(nullptr)
     , m_btnReadManual(nullptr)
@@ -936,9 +937,9 @@ void MeasurementTab::setupUI()
     visualScroll->setWidgetResizable(true);
     visualScroll->setFrameShape(QFrame::NoFrame);
     auto* visualPanel = new QWidget(visualScroll);
-    auto* visualLayout = new QVBoxLayout(visualPanel);
-    visualLayout->setSpacing(8);
-    visualLayout->setContentsMargins(4, 4, 4, 4);
+    m_visualLayout = new QVBoxLayout(visualPanel);
+    m_m_visualLayout->setSpacing(8);
+    m_visualLayout->setContentsMargins(4, 4, 4, 4);
 
     auto* optionsScroll = new QScrollArea(workspaceSplitter);
     optionsScroll->setWidgetResizable(true);
