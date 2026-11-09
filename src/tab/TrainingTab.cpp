@@ -1518,6 +1518,7 @@ void TrainingTab::loadNextSeries()
     if (m_currentGame) {
         m_currentGame->reset();
         m_currentGame->start();
+        showGameWindow();
     }
     updateProgressWidgets();
     saveExecutionCheckpoint();
