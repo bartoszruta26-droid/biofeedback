@@ -393,6 +393,7 @@ private:
     
     // Komponenty UI
     QVBoxLayout* m_mainLayout;
+    QVBoxLayout* m_visualLayout;
     
     // Sekcja kontrolna
     QVBoxLayout* m_controlLayout;
