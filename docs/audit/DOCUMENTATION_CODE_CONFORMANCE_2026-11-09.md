@@ -127,6 +127,9 @@ Szczegółowa macierz i uwagi: [`GUI_COMPONENT_MATRIX.md`](GUI_COMPONENT_MATRIX.
 - Skorygowano topologię i kontrakt API w `docs/ARCHITECTURE_SHARED_DATA_SERVER.md`.
 - Przepisano `platforms/webui/README.md` i `platforms/webui/API_CONTRACT.md`.
 - Zaktualizowano `platforms/android/README.md`.
+- Skorygowano główny `README.md`: rozróżniono bieżący firmware `hx711_advanced.ino` od historycznego przykładu `hx711_arduino_nano.ino`, opisano binarną transmisję ciągłą i ulotność kalibracji; doprecyzowano brak uśredniania wielopróbkowego.
+- Uzupełniono `docs/HX711_CALIBRATION.md` o bezpośrednie wskazanie właściwego firmware i niezgodności przykładu historycznego z parserem binarnym.
+- Naprawiono strukturę tabeli w `docs/README.md`, aby audyt zgodności był prawidłowym wierszem tabeli.
 
 ## 6. Testy i ograniczenia audytu
 
