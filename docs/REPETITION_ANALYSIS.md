@@ -1,4 +1,6 @@
-# Analiza powtórzeń i serii
+# 💪 Analiza powtórzeń i serii
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ## Zakres
 
@@ -65,7 +67,7 @@ Algorytm rozpoznaje cykl narastania i zwolnienia siły. Nie rozdziela jeszcze fa
 
 Testy syntetyczne obejmują histerezę, minimalny czas, niepoprawne próbki, utratę próbek, przepełnienie 32-bitowego zegara urządzenia i statystyki serii. Ostateczny odbiór wymaga porównania z obserwacją rzeczywistych powtórzeń oraz wzorcem siły po kalibracji HX711. Oprogramowanie nie jest samo w sobie wyrobem medycznym ani zwalidowanym narzędziem diagnostycznym.
 
-## Desktop analysis and session history
+## Analiza w Desktop i historia sesji
 
 The desktop Training tab now exposes a dedicated analytics panel:
 - peak-force trace across repetitions, separated by exercise;
@@ -76,13 +78,13 @@ The operator can explicitly save a session summary to the local history. The his
 
 The Training tab instantiates the selected Pong, Flappy Bird, Mario Run or sinusoidal game. Sensor force is mapped to a 0–100 game input relative to the exercise target force. Game points are kept separate from sensor-derived repetition counts and are displayed in the session analytics.
 
-## Patient-linked records and privacy boundaries
+## Rekordy powiązane z pacjentem i granice prywatności
 
 Patient charts are reloaded from the local application data directory at startup and saved through DataManager when added or edited. The patient JSON file follows the application's encryption setting (`encryption.enabled`) and is written with owner-only permissions. The directory name uses a SHA-256 digest rather than displaying the PESEL value; this is path obfuscation/pseudonymization, not anonymization.
 
 Selecting a patient switches the desktop session-history view to that patient's data directory. Patient switching is disabled while a training session is active to prevent accidental cross-patient attribution. The session-history JSON is an explicit opt-in summary and is owner-only but is not encrypted by the analytics widget. Do not treat filesystem permissions or a hashed directory name as a substitute for encrypted backups and appropriate access controls.
 
-## HX711 calibration and serial-frame validity
+## Kalibracja HX711 i poprawność ramek szeregowych
 
 The advanced Arduino firmware transmits a CRC-protected binary raw frame and a text record containing calibrated mass in grams. The text record now includes an explicit `CAL:1` or `CAL:0` flag. A binary frame can be valid as raw sensor data while still being unsuitable for force or movement calculations. Desktop measurement, training and games require `hasCalibratedValue=true`; RAW diagnostic capture remains separate.
 
