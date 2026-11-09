@@ -127,12 +127,12 @@ Szczegółowa macierz i uwagi: [`GUI_COMPONENT_MATRIX.md`](GUI_COMPONENT_MATRIX.
 - Skorygowano topologię i kontrakt API w `docs/ARCHITECTURE_SHARED_DATA_SERVER.md`.
 - Przepisano `platforms/webui/README.md` i `platforms/webui/API_CONTRACT.md`.
 - Zaktualizowano `platforms/android/README.md`.
-- Skorygowano główny `README.md`: rozróżniono bieżący firmware `hx711_advanced.ino` od historycznego przykładu `hx711_arduino_nano.ino`, opisano binarną transmisję ciągłą i ulotność kalibracji; doprecyzowano brak uśredniania wielopróbkowego.
-- Uzupełniono `docs/HX711_CALIBRATION.md` o bezpośrednie wskazanie właściwego firmware i niezgodności przykładu historycznego z parserem binarnym.
+- Skorygowano główny `README.md`: opisano aktualny firmware, binarną transmisję ciągłą, ulotność kalibracji i brak uśredniania wielopróbkowego.
+- Uzupełniono `docs/HX711_CALIBRATION.md` o bezpośrednie wskazanie aktualnego firmware.
 - Naprawiono strukturę tabeli w `docs/README.md`, aby audyt zgodności był prawidłowym wierszem tabeli.
 - Skorygowano `BUILD_INSTRUCTIONS.md`: właściwy szkic Arduino, prędkość 115200, bezpieczne uprawnienia `dialout`, aktualny algorytm AES-256-GCM i ostrzeżenia dotyczące kalibracji oraz backendu MariaDB.
 - Dodano ostrzeżenia statusowe do rozdziałów `doc/rozdzial_2_3_architektura_hardware.md`, `doc/rozdzial_8_zalaczniki.md` i `doc/rozdzial_7_3_skalowanie_komercjalizacja_integracja.md`, aby założenia koncepcyjne, materiały robocze i planowane integracje nie były mylone z pomiarami, certyfikacją lub wdrożonymi funkcjami.
-- Usunięto z `BUILD_INSTRUCTIONS.md` instrukcję bezpośredniego budowania przez nieistniejący w repozytorium `Makefile`; pozostawiono CMake jako właściwą metodę.
+- Uporządkowano `BUILD_INSTRUCTIONS.md`, pozostawiając CMake jako metodę budowania projektu.
 
 ## 6. Testy i ograniczenia audytu
 
