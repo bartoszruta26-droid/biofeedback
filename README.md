@@ -178,7 +178,7 @@ Czujnik tensometryczny
 | CAL:<grams> | Kalibracja z użyciem znanej masy, np. CAL:100.0 |
 | RESET | Reset urządzenia |
 
-Szczegółowe wymagania i procedurę kalibracji opisuje dokument [kalibracja HX711](docs/HX711_CALIBRATION.md). Aktualny firmware znajduje się w pliku [`hx711_advanced.ino`](hx711_advanced.ino); plik [`hx711_arduino_nano.ino`](hx711_arduino_nano.ino) jest przykładem historycznym, tekstowym i niezgodnym z bieżącym parserem ramek binarnych. Kalibracja jest przechowywana tylko w pamięci RAM Arduino — po restarcie trzeba ją wykonać ponownie. `HX711_SAMPLES=1`, więc obecny odczyt nie uśrednia wielu próbek.
+Szczegółowe wymagania i procedurę kalibracji opisuje dokument [kalibracja HX711](docs/HX711_CALIBRATION.md). Aktualny firmware znajduje się w pliku [`hx711_advanced.ino`](hx711_advanced.ino). Kalibracja jest przechowywana tylko w pamięci RAM Arduino — po restarcie trzeba ją wykonać ponownie. `HX711_SAMPLES=1`, więc obecny odczyt nie uśrednia wielu próbek.
 
 > [!WARNING]
 > **Nie używaj surowych, nieskalibrowanych wartości ADC jako wiarygodnego pomiaru siły.** Przed treningiem wykonaj zerowanie i kalibrację znaną masą. Potwierdź stan kalibracji firmware (CAL:1) oraz poprawność wskazań w całym używanym zakresie obciążenia.
