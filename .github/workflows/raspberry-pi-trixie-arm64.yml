@@ -1,0 +1,78 @@
+name: Raspberry Pi ARM64 Debian Trixie package
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/raspberry-pi-trixie-arm64.yml'
+      - 'CMakeLists.txt'
+      - 'include/**'
+      - 'src/**'
+      - 'tests/**'
+      - 'resources/**'
+      - 'config/**'
+      - 'packaging/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  raspberry-pi-trixie-arm64:
+    runs-on: ubuntu-24.04-arm
+    container:
+      image: debian:trixie
+    timeout-minutes: 45
+    steps:
+      - name: Install Debian Trixie ARM64 build dependencies
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git build-essential cmake pkg-config \
+            qtbase5-dev qtbase5-dev-tools libqt5charts5-dev \
+            libserialport-dev nlohmann-json3-dev libssl-dev libncurses-dev \
+            dpkg-dev file binutils
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate Linux packaging scripts
+        run: bash -n packaging/linux/run.sh packaging/linux/install.sh packaging/linux/uninstall.sh
+      - name: Verify native ARM64 Trixie environment
+        run: |
+          test "$(dpkg --print-architecture)" = arm64
+          test "$(uname -m)" = aarch64
+          . /etc/os-release
+          test "$VERSION_CODENAME" = trixie
+          ldd --version | head -n 1
+      - name: Configure Release build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build application and regression targets
+        run: cmake --build build --parallel 2
+      - name: Run regression tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Verify ARM64 executable
+        run: |
+          test -x build/biofeedback
+          file build/biofeedback
+          file build/biofeedback | grep -E 'ARM aarch64|ARM64'
+      - name: Build Debian Trixie ARM64 package
+        run: |
+          mkdir -p dist
+          cpack --config build/CPackConfig.cmake -G DEB -B dist
+          package="$(find dist -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$package"
+          dpkg-deb --info "$package"
+          arch="$(dpkg-deb -f "$package" Architecture)"
+          test "$arch" = arm64
+          dpkg-deb --contents "$package" | grep -q '/usr/bin/biofeedback'
+          mv "$package" dist/biofeedback-raspberry-pi-arm64-trixie.deb
+          sha256sum dist/biofeedback-raspberry-pi-arm64-trixie.deb > dist/SHA256SUMS
+      - name: Upload Raspberry Pi Debian Trixie ARM64 package
+        uses: actions/upload-artifact@v4
+        with:
+          name: biofeedback-raspberry-pi-arm64-trixie-deb
+          path: |
+            dist/biofeedback-raspberry-pi-arm64-trixie.deb
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
