@@ -155,6 +155,8 @@ private:
     int m_baudRate;
     QDateTime m_lastDataTime;
     QTimer* m_sensorUiTimer{nullptr};
+    sensor::SensorData m_pendingSensorData;
+    std::mutex m_sensorSnapshotMutex;
 
     std::mutex m_messageMutex;
 };
