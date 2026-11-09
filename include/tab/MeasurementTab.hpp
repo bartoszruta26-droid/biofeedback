@@ -28,6 +28,7 @@
 #include <QComboBox>
 #include <QDoubleSpinBox>
 #include <QJsonObject>
+#include <QTimer>
 
 #include "sensor/SerialCommunication.hpp"
 #include "sensor/MeasurementSerialAdapter.hpp"
@@ -100,6 +101,8 @@ private:
     double m_minObservedForce;
     ForceUnit m_unit;
     QString getUnitLabel() const;
+    void scheduleRepaint();
+    QTimer m_repaintTimer;
 };
 
 /**
