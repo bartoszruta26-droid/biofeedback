@@ -26,10 +26,10 @@ for source in (measurement, training):
     assert "workspaceSplitter->setSizes({900, 300});" in source
 
 assert "optionsLayout->addLayout(m_controlLayout);" in measurement
-assert "visualLayout->addWidget(m_liveBox, 3);" in measurement
-assert "visualLayout->addWidget(m_statsBox);" in measurement
-assert "visualLayout->addWidget(m_biomechBox);" in measurement
-assert "visualLayout->addWidget(m_rawBox);" in measurement
+assert "m_visualLayout->addWidget(m_liveBox, 3);" in measurement
+assert "m_visualLayout->addWidget(m_statsBox);" in measurement
+assert "m_visualLayout->addWidget(m_biomechBox);" in measurement
+assert "m_visualLayout->addWidget(m_rawBox);" in measurement
 assert "m_forcePlot->setMinimumHeight(360);" in measurement
 assert "setMinimumHeight(280);" in training
 assert "QSizePolicy::Expanding, QSizePolicy::Preferred" in training
