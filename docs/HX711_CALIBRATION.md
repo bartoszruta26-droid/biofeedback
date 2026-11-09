@@ -1,4 +1,6 @@
-# HX711 — kalibracja i kontrola wiarygodności pomiaru
+# ⚖️ HX711 — kalibracja i kontrola wiarygodności pomiaru
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ## Warunek uruchomienia analizy siły
 
