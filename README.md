@@ -413,6 +413,9 @@ Rzeczywista zawartość katalogów może się zmieniać wraz z rozwojem projektu
 
 ## 📚 Dokumentacja
 
+Pełny katalog dokumentów, podział tematyczny i legenda statusów: [📚 Indeks dokumentacji technicznej](docs/README.md). Zasady redakcyjne: [📐 Standard dokumentacji](docs/STANDARD_DOKUMENTACJI.md).
+
+
 | Dokument | Zakres |
 |---|---|
 | [Instalacja Linux](docs/INSTALL_LINUX.md) | Zależności, budowanie i instalacja w systemach Debian/Ubuntu |
