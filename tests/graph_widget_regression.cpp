@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QImage>
 #include <QDateTime>
+#include <QMouseEvent>
 #include <iostream>
 
 int main(int argc, char** argv)
@@ -40,6 +41,10 @@ int main(int argc, char** argv)
     QImage frame(graph.size(), QImage::Format_ARGB32_Premultiplied);
     frame.fill(Qt::transparent);
     graph.render(&frame);
+    // Exercise the timestamp-order fallback in cursor hit-testing.
+    QMouseEvent moveEvent(QEvent::MouseMove, QPointF(400.0, 200.0),
+                          Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(&graph, &moveEvent);
     if (frame.isNull()) {
         std::cerr << "Graph render produced a null image\n";
         return 3;
