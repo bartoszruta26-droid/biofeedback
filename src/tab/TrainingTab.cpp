@@ -1228,7 +1228,7 @@ void TrainingTab::onMeasurementSample(
 
     // Preserve every sample for biomechanics/repetition detection while
     // refreshing the visible widgets at no more than 20 Hz.
-    static constexpr qint64 LiveUiIntervalMs = 50;
+    static constexpr qint64 LiveUiIntervalMs = 16;
     const qint64 nowMs = m_sessionClock.isValid() ? m_sessionClock.elapsed() : 0;
     if (nowMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs) {
         m_lastLiveUiRefreshMs = nowMs;
