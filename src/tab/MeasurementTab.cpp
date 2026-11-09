@@ -1585,8 +1585,13 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
         }
     }
 
+    // Feed every acquired sample into the bounded plot model. Its own
+    // 16 ms repaint timer coalesces painting to ~60 Hz without losing peaks.
+    if (m_forcePlot)
+        m_forcePlot->addSample(forceValue, currentTime);
+
     // Persist/retain every sample and run repetition detection at acquisition
-    // cadence, but refresh presentation widgets no faster than 20 Hz.
+    // cadence; text controls and the raw table are refreshed at ~60 Hz or less.
     static constexpr qint64 LiveUiIntervalMs = 16;
     const qint64 elapsedMs = m_sessionElapsedTimer.elapsed();
     if (elapsedMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs) {
@@ -1665,8 +1670,6 @@ void MeasurementTab::updateLiveDisplay(double force)
     m_forceBar->setValue(static_cast<int>(displayForce));
     m_forceBar->setFormat(QString("%v %1").arg(unitLabel));
 
-    const double lastTime = m_timeBuffer.isEmpty() ? 0.0 : m_timeBuffer.last();
-    m_forcePlot->addSample(force, lastTime);
 }
 
 void MeasurementTab::calculateRepetitionStats()
