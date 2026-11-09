@@ -34,6 +34,8 @@
 #include <cstdio>
 #include <stdexcept>
 #include <system_error>
+#include <filesystem>
+#include <set>
 
 // ============================================================================
 // DEBUG FLAGS AND CONFIGURATION
@@ -238,83 +240,81 @@ SerialCommunication::~SerialCommunication() {
 }
 
 std::vector<std::string> SerialCommunication::scanAvailablePorts() {
-#if DEBUG_CONNECTION
-    core::DebugManager::instance().sendDebugMessage(
-        "Scanning for available serial ports...",
-        core::DebugLevel::INFO,
-        "SerialCommunication::scanAvailablePorts"
-    );
-#endif
-
     std::vector<std::string> ports;
-    
+
     try {
 #ifdef _WIN32
+        // Probe standard Windows COM names without assuming a particular USB
+        // serial driver or Arduino board identifier.
         for (int i = 1; i <= 256; ++i) {
-            std::stringstream ss; ss << "\\\\.\\" << "COM" << i;
-            HANDLE h = CreateFileA(ss.str().c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
-            if (h != INVALID_HANDLE_VALUE) { 
-                ports.push_back("COM" + std::to_string(i)); 
-                CloseHandle(h);
-#if DEBUG_CONNECTION
-                core::DebugManager::instance().sendDebugMessage(
-                    QString("Found port: %1").arg(QString::fromStdString("COM" + std::to_string(i))),
-                    core::DebugLevel::VERBOSE,
-                    "SerialCommunication::scanAvailablePorts"
-                );
-#endif
+            const std::string name = "COM" + std::to_string(i);
+            const std::string devicePath = "\\\\.\\" + name;
+            HANDLE handle = CreateFileA(devicePath.c_str(), GENERIC_READ | GENERIC_WRITE,
+                                        0, nullptr, OPEN_EXISTING, 0, nullptr);
+            if (handle != INVALID_HANDLE_VALUE) {
+                ports.push_back(name);
+                CloseHandle(handle);
             }
         }
 #else
-        DIR* dir = opendir("/dev");
-        if (dir) {
-            struct dirent* e;
-            while ((e = readdir(dir))) {
-                std::string n = e->d_name;
-                if (n.find("ttyUSB")==0 || n.find("ttyACM")==0 || n.find("cu.usbserial")==0 || n.find("cu.usbmodem")==0) {
-                    std::string portPath = "/dev/" + n;
-                    ports.push_back(portPath);
-#if DEBUG_CONNECTION
-                    core::DebugManager::instance().sendDebugMessage(
-                        QString("Found port: %1").arg(QString::fromStdString(portPath)),
-                        core::DebugLevel::VERBOSE,
-                        "SerialCommunication::scanAvailablePorts"
-                    );
-#endif
+        namespace fs = std::filesystem;
+        std::set<std::string> seenDevices;
+
+        const auto addDevice = [&ports, &seenDevices](const fs::path& candidate) {
+            std::error_code ec;
+            if (!fs::exists(candidate, ec) || ec) return;
+            if (!fs::is_character_file(candidate, ec) || ec) return;
+
+            // Prefer stable /dev/serial/by-id aliases when present, while
+            // avoiding duplicate entries for their /dev/ttyUSB* targets.
+            fs::path canonical = fs::canonical(candidate, ec);
+            const std::string identity = ec ? candidate.string() : canonical.string();
+            if (seenDevices.insert(identity).second)
+                ports.push_back(candidate.string());
+        };
+
+        const auto startsWith = [](const std::string& value, const char* prefix) {
+            return value.rfind(prefix, 0) == 0;
+        };
+
+        const fs::path devRoot("/dev");
+        std::error_code ec;
+        if (fs::is_directory(devRoot, ec) && !ec) {
+            for (fs::directory_iterator it(devRoot, ec), end; !ec && it != end; it.increment(ec)) {
+                const std::string name = it->path().filename().string();
+                if (startsWith(name, "ttyUSB") || startsWith(name, "ttyACM") ||
+                    startsWith(name, "ttyS") || startsWith(name, "ttyAMA") ||
+                    startsWith(name, "ttyTHS") || startsWith(name, "ttyGS") ||
+                    startsWith(name, "rfcomm") || startsWith(name, "cu.usbserial") ||
+                    startsWith(name, "cu.usbmodem")) {
+                    addDevice(it->path());
                 }
             }
-            closedir(dir);
-        } else {
-            core::DebugManager::instance().sendDebugMessage(
-                "Failed to open /dev directory for scanning",
-                core::DebugLevel::WARNING,
-                "SerialCommunication::scanAvailablePorts"
-            );
+        }
+
+        // Stable udev-created aliases are useful for identifying boards and
+        // remain valid when kernel-assigned tty numbers change.
+        for (const fs::path& aliasDirectory : {
+                 fs::path("/dev/serial/by-id"), fs::path("/dev/serial/by-path")}) {
+            ec.clear();
+            if (!fs::is_directory(aliasDirectory, ec) || ec) continue;
+            for (fs::directory_iterator it(aliasDirectory, ec), end; !ec && it != end; it.increment(ec))
+                addDevice(it->path());
         }
 #endif
-        
-#if DEBUG_CONNECTION
-        core::DebugManager::instance().sendDebugMessage(
-            QString("Scan complete. Found %1 ports.").arg(ports.size()),
-            core::DebugLevel::INFO,
-            "SerialCommunication::scanAvailablePorts"
-        );
-#endif
-        
+        std::sort(ports.begin(), ports.end());
     } catch (const std::exception& e) {
         core::DebugManager::instance().sendDebugMessage(
-            QString("Exception during port scanning: %1").arg(e.what()),
+            QString("Serial port scan failed: %1").arg(e.what()),
             core::DebugLevel::ERROR,
-            "SerialCommunication::scanAvailablePorts"
-        );
+            "SerialCommunication::scanAvailablePorts");
     } catch (...) {
         core::DebugManager::instance().sendDebugMessage(
-            "Unknown exception during port scanning",
-            core::DebugLevel::CRITICAL,
-            "SerialCommunication::scanAvailablePorts"
-        );
+            "Unknown error during serial port scan",
+            core::DebugLevel::ERROR,
+            "SerialCommunication::scanAvailablePorts");
     }
-    
+
     return ports;
 }
 
