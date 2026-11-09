@@ -184,6 +184,7 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     , m_unit(ForceUnit::Newtons)
 {
     m_repaintTimer.setSingleShot(true);
+    m_repaintTimer.setTimerType(Qt::PreciseTimer);
     m_repaintTimer.setInterval(16); // cap live chart repaint scheduling at ~60 Hz
     connect(&m_repaintTimer, &QTimer::timeout, this, [this] { update(); });
 
