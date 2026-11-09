@@ -15,7 +15,7 @@ assert "if (!sample.isValid() || sample.unit != \"N\"" in main
 assert "std::abs(sample.value)" in main
 assert "m_gameWindow->showFullScreen();" in main
 assert "QShortcut(QKeySequence(Qt::Key_Escape), m_gameWindow)" in main
-assert "trainingMeasurementEngine()->subscribe" in main
+assert "gameMeasurementEngine->subscribe" in main
 assert "m_measurementTab->hasCalibrationProfile()" in main
 assert "m_measurementTab->trainingMeasurementEngine()" in main
 assert "m_gameWindow->showFullScreen();" in training
