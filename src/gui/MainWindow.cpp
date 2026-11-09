@@ -26,6 +26,8 @@
 #include <QMessageBox>
 #include <QGridLayout>
 #include <QFrame>
+#include <QScreen>
+#include <QGuiApplication>
 #include <QMetaObject>
 #include <cmath>
 #include <memory>
@@ -47,6 +49,7 @@ MainWindow::MainWindow(QWidget *parent)
     , m_debugTab(nullptr)
     , m_gameStack(nullptr)
     , m_currentGame(nullptr)
+    , m_gameWindow(nullptr)
     , m_startButton(nullptr)
     , m_stopButton(nullptr)
     , m_clearButton(nullptr)
@@ -871,7 +874,7 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
         return;
     }
 
-    games::GameEngine* selectedGame = games::createGame(gameId, this);
+    games::GameEngine* selectedGame = games::createGame(gameId, nullptr);
     if (!selectedGame) {
         QMessageBox::warning(this, tr("Gra niedostępna"),
                              tr("Ta gra nie ma jeszcze aktywnej implementacji: %1").arg(gameId));
@@ -900,16 +903,38 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
     else if (auto* game = dynamic_cast<games::GalagaGame*>(selectedGame))
         game->setSerialConnection(m_serialPort);
 
+    // Games run in their own top-level window, not inside the small dashboard stack.
+    // This gives the renderer the full available desktop area and keyboard focus.
+    m_gameWindow = new QDialog(this, Qt::Window);
+    m_gameWindow->setWindowTitle(tr("Biofeedback — %1").arg(selectedGame->gameName()));
+    m_gameWindow->setModal(false);
+    m_gameWindow->setMinimumSize(800, 600);
+    m_gameWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+    auto* gameLayout = new QVBoxLayout(m_gameWindow);
+    gameLayout->setContentsMargins(0, 0, 0, 0);
+    gameLayout->setSpacing(0);
+    selectedGame->setParent(m_gameWindow);
+    selectedGame->setMinimumSize(640, 480);
+    selectedGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    gameLayout->addWidget(selectedGame, 1);
+
     m_currentGame = selectedGame;
     connect(m_currentGame, &games::GameEngine::gameEnded,
             this, [this](int score) { onGameFinished(score); });
+    connect(m_gameWindow, &QDialog::rejected, this, [this]() {
+        if (m_currentGame) stopGame();
+    });
 
-    m_gameStack->addWidget(m_currentGame);
-    m_gameStack->setCurrentWidget(m_currentGame);
-    m_gameStack->show();
+    const QRect available = QGuiApplication::primaryScreen()
+        ? QGuiApplication::primaryScreen()->availableGeometry() : QRect(0, 0, 1280, 800);
+    m_gameWindow->setGeometry(available);
+    m_gameWindow->showMaximized();
+    m_gameWindow->raise();
+    m_gameWindow->activateWindow();
     m_currentGame->start();
+    m_currentGame->setFocus(Qt::OtherFocusReason);
 
-    qDebug() << "Game started successfully:" << m_currentGame->gameName();
+    qDebug() << "Game started in dedicated window:" << m_currentGame->gameName();
 }
 
 void MainWindow::stopGame()
@@ -921,12 +946,17 @@ void MainWindow::stopGame()
     // które również sprząta widget. Ustawienie wskaźnika na nullptr przed
     // emisją sygnałów chroni przed rekurencyjnym i podwójnym usuwaniem.
     games::GameEngine* game = m_currentGame;
+    QDialog* gameWindow = m_gameWindow;
     m_currentGame = nullptr;
+    m_gameWindow = nullptr;
     disconnect(game, nullptr, this, nullptr);
     game->stop();
-    m_gameStack->removeWidget(game);
-    game->deleteLater();
-    m_gameStack->hide();
+    if (gameWindow) {
+        gameWindow->close();
+        gameWindow->deleteLater(); // Owns and destroys the game widget.
+    } else {
+        game->deleteLater();
+    }
     qDebug() << "Game stopped";
 }
 
