@@ -11,6 +11,8 @@
 #include <QFont>
 #include <QColor>
 #include <QStackedWidget>
+#include <QScrollArea>
+#include <QSplitter>
 #include <QDir>
 #include <QElapsedTimer>
 #include <QPainterPath>
@@ -294,13 +296,48 @@ TrainingTab::~TrainingTab()
 void TrainingTab::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(15);
-    m_mainLayout->setContentsMargins(15, 15, 15, 15);
-    
-    // Panel konfiguracji
-    m_configBox = new QGroupBox("Konfiguracja ćwiczenia", this);
+    m_mainLayout->setSpacing(4);
+    m_mainLayout->setContentsMargins(6, 6, 6, 6);
+
+    // Keep the training display, progress and analytics on the left (75%).
+    // The exercise plan and its parameters live in a scrollable right column.
+    auto* workspaceSplitter = new QSplitter(Qt::Horizontal, this);
+    workspaceSplitter->setChildrenCollapsible(false);
+    workspaceSplitter->setHandleWidth(5);
+
+    auto* visualScroll = new QScrollArea(workspaceSplitter);
+    visualScroll->setWidgetResizable(true);
+    visualScroll->setFrameShape(QFrame::NoFrame);
+    auto* visualPanel = new QWidget(visualScroll);
+    auto* visualLayout = new QVBoxLayout(visualPanel);
+    visualLayout->setSpacing(8);
+    visualLayout->setContentsMargins(4, 4, 4, 4);
+
+    auto* optionsScroll = new QScrollArea(workspaceSplitter);
+    optionsScroll->setWidgetResizable(true);
+    optionsScroll->setFrameShape(QFrame::NoFrame);
+    optionsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto* optionsPanel = new QWidget(optionsScroll);
+    auto* optionsLayout = new QVBoxLayout(optionsPanel);
+    optionsLayout->setSpacing(8);
+    optionsLayout->setContentsMargins(8, 8, 8, 8);
+    auto* optionsHeading = new QLabel(tr("KONFIGURACJA TRENINGU"), optionsPanel);
+    optionsHeading->setStyleSheet("font-weight:700;color:#40516a;");
+    optionsLayout->addWidget(optionsHeading);
+
+    visualScroll->setWidget(visualPanel);
+    optionsScroll->setWidget(optionsPanel);
+    workspaceSplitter->addWidget(visualScroll);
+    workspaceSplitter->addWidget(optionsScroll);
+    workspaceSplitter->setStretchFactor(0, 3);
+    workspaceSplitter->setStretchFactor(1, 1);
+    workspaceSplitter->setSizes({900, 300});
+    m_mainLayout->addWidget(workspaceSplitter, 1);
+
+    // Panel konfiguracji w prawej kolumnie.
+    m_configBox = new QGroupBox("Konfiguracja ćwiczenia", optionsPanel);
     m_configBox->setFont(QFont("Arial", 11, QFont::Bold));
-    QHBoxLayout* configLayout = new QHBoxLayout(m_configBox);
+    QVBoxLayout* configLayout = new QVBoxLayout(m_configBox);
     configLayout->setSpacing(10);
     
     m_exerciseSelector = new QComboBox(this);
@@ -371,7 +408,7 @@ void TrainingTab::setupUI()
     m_btnRemoveExercise->setFont(QFont("Arial", 10));
     configLayout->addWidget(m_btnRemoveExercise);
     
-    m_mainLayout->addWidget(m_configBox);
+    optionsLayout->addWidget(m_configBox);
     
     // Panel sterowania
     m_controlLayout = new QHBoxLayout();
@@ -403,7 +440,7 @@ void TrainingTab::setupUI()
     m_btnExport->setFont(QFont("Arial", 10));
     m_controlLayout->addWidget(m_btnExport);
     
-    m_mainLayout->addLayout(m_controlLayout);
+    visualLayout->addLayout(m_controlLayout);
     
     // Panel postępu
     m_progressBox = new QGroupBox("Postęp treningu", this);
@@ -453,7 +490,7 @@ void TrainingTab::setupUI()
     
     progressLayout->addLayout(forceLayout);
     
-    m_mainLayout->addWidget(m_progressBox);
+    visualLayout->addWidget(m_progressBox, 2);
     
     // MainWindow detaches each game into its own maximized top-level window.
     // Keep only a short status panel here; never squeeze the game into the tab.
@@ -471,7 +508,7 @@ void TrainingTab::setupUI()
         "background-color:#1a1a1a;color:#888;font-size:10pt;border:1px solid #333;");
     gameLayout->addWidget(gamePlaceholder);
 
-    m_mainLayout->addWidget(m_gameBox, 0);
+    visualLayout->addWidget(m_gameBox, 0);
     
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki sesji", this);
@@ -487,7 +524,9 @@ void TrainingTab::setupUI()
     statsContentLayout->addWidget(m_analyticsWidget, 1);
     statsLayout->addWidget(m_statsContainer);
     
-    m_mainLayout->addWidget(m_statsBox);
+    visualLayout->addWidget(m_statsBox, 3);
+    visualLayout->addStretch(1);
+    optionsLayout->addStretch(1);
     
     // TrainingTab nie posiada własnego terminala debugowego.
     // Wszystkie wiadomości debugowe są wysyłane do DebugManager,
