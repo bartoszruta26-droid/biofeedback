@@ -69,7 +69,7 @@ Backend jest wybierany w `config/config.json`:
 
 Ustawienia połączenia MariaDB znajdują się w `storage.mariadb`: `host`, `port`, `database`, `username`, `password_env`, `tls` i `connect_timeout_seconds`. Hasło jest dostarczane przez wskazaną zmienną środowiskową (domyślnie `BIOFEEDBACK_MARIADB_PASSWORD`), nigdy przez JSON ani repozytorium.
 
-<badge>Stan implementacji</badge> Magazyn plikowy jest obecnie podłączony do aplikacji Desktop. Adapter repozytorium MariaDB i integracja sterownika nie są jeszcze zaimplementowane. Wybranie `mariadb` powoduje jawny błąd uruchomienia Desktop i nie przełącza automatycznie aplikacji na pliki.
+**Stan implementacji:** Magazyn plikowy jest obecnie podłączony do aplikacji Desktop. Adapter repozytorium MariaDB i integracja sterownika nie są jeszcze zaimplementowane. Wybranie `mariadb` powoduje jawny błąd uruchomienia Desktop i nie przełącza automatycznie aplikacji na pliki.
 
 ## 4. Kontrakt API
 
