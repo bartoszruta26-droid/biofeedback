@@ -48,6 +48,7 @@ public:
     void setCurrentRep(int current, int total);
     void setTargetForce(double force);
     void setCurrentForce(double force);
+    void clearForceHistory();
     void setSessionTime(int seconds);
     
 protected:
@@ -62,6 +63,7 @@ private:
     int m_totalReps;
     double m_targetForce;
     double m_currentForce;
+    std::deque<double> m_forceHistory;
     int m_sessionTime;
     
     static QColor getForceColorStatic(double current, double target);
