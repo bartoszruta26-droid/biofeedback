@@ -1,5 +1,7 @@
 # Rozdział 7.3. Możliwości skalowania, komercjalizacji i integracji z systemami telemedycznymi
 
+> **Status dokumentu: analiza koncepcyjna i scenariusze rozwoju.** Opisy integracji z EDM, FHIR, systemami telemedycznymi, chmurą, AI, platformami zewnętrznymi, certyfikacji, modeli biznesowych i harmonogramów nie stanowią deklaracji wdrożenia ani uzyskanych pozwoleń. Fragmenty oznaczone jako „obecna implementacja” wymagają każdorazowo porównania z aktualnym kodem. Bieżący stan API i klientów opisują [`docs/ARCHITECTURE_SHARED_DATA_SERVER.md`](../docs/ARCHITECTURE_SHARED_DATA_SERVER.md), [`docs/MEASUREMENT_PIPELINE.md`](../docs/MEASUREMENT_PIPELINE.md) oraz [`docs/audit/DOCUMENTATION_CODE_CONFORMANCE_2026-11-09.md`](../docs/audit/DOCUMENTATION_CODE_CONFORMANCE_2026-11-09.md).
+
 ## 7.3.1. Wprowadzenie: Strategiczne kierunki rozwoju autorskiego systemu pomiarowo-treningowego
 
 Niniejszy rozdział stanowi syntezę analiz dotyczących potencjału rozwojowego, wdrożeniowego i komercyjnego autorskiego systemu pomiarowo-treningowego z pętlą sprzężenia zwrotnego do analizy naprężeń lateksowego tubeingu. Przedstawione w poprzednich rozdziałach osiągnięcia projektowe, konstrukcyjne i technologiczne tworzą solidny fundament dla dalszej ekspansji rozwiązania w trzech kluczowych wymiarach:
