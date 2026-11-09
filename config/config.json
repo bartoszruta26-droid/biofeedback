@@ -44,6 +44,7 @@
     "gain": 128,
     "calibration_enabled": false,
     "calibration_profile": "calibration/hx711.json",
+    "raw_polarity": -1,
     "zero_threshold": 0.5
   },
   "devices": {
