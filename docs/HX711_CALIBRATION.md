@@ -2,11 +2,11 @@
 
 > 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
-## Warunek uruchomienia analizy siły
+## Właściwy firmware i warunek uruchomienia analizy siły
 
 Aplikacja przyjmuje wartość siły do analizy ruchu dopiero wtedy, gdy firmware zgłasza `CAL:1`. Poprawna ramka binarna z surowym odczytem ADC nie oznacza jeszcze, że wynik jest skalibrowany. Wartość `FORCE` bez potwierdzenia kalibracji pozostaje dostępna wyłącznie jako informacja diagnostyczna.
 
-Aktualny firmware `hx711_advanced.ino` rozpoczyna pracę z `is_calibrated=false`. Po restarcie lub odłączeniu zasilania wymaga ponownego potwierdzenia kalibracji. Współczynnik kalibracji nie jest obecnie zapisywany w pamięci nieulotnej.
+Aktualnym firmware dla protokołu ramek binarnych jest plik [`hx711_advanced.ino`](../hx711_advanced.ino). Plik [`hx711_arduino_nano.ino`](../hx711_arduino_nano.ino) jest historycznym przykładem tekstowym i nie jest zgodny z parserem binarnym aplikacji. Firmware rozpoczyna pracę z `is_calibrated=false`. Po restarcie lub odłączeniu zasilania wymaga ponownego potwierdzenia kalibracji. Współczynnik kalibracji nie jest obecnie zapisywany w pamięci nieulotnej.
 
 ## Procedura
 
