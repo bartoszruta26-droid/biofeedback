@@ -62,6 +62,7 @@ private:
     int m_totalReps;
     double m_targetForce;
     double m_currentForce;
+    qint64 m_lastLiveUiRefreshMs{-50};
     int m_sessionTime;
     
     static QColor getForceColorStatic(double current, double target);
