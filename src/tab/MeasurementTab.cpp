@@ -14,6 +14,7 @@
 #include <QMessageBox>
 #include <QSignalBlocker>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPolygon>
 #include <QPen>
 #include <QBrush>
@@ -390,8 +391,12 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
         }
     }
 
-    QVector<QPoint> tracePoints;
-    tracePoints.reserve(plotWidth * 2);
+    // Keep sub-pixel coordinates and use a round-joined painter path. Integer
+    // QPoint conversion quantized every sample to whole pixels and made the
+    // live trace visibly angular even with antialiasing enabled.
+    QPainterPath tracePath;
+    bool traceStarted = false;
+    QPointF lastTracePoint;
     for (int column = 0; column < plotWidth; ++column) {
         const PixelBucket& bucket = buckets[static_cast<std::size_t>(column)];
         if (!bucket.valid)
@@ -400,32 +405,37 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
         const auto toPoint = [&](double force) {
             const double y = margin + plotHeight -
                 ((force + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
-            return QPoint(margin + column, static_cast<int>(y));
+            return QPointF(margin + column, y);
         };
 
-        if (bucket.minIndex <= bucket.maxIndex) {
-            tracePoints.append(toPoint(bucket.minForce));
-            if (bucket.maxIndex != bucket.minIndex)
-                tracePoints.append(toPoint(bucket.maxForce));
+        const QPointF first = bucket.minIndex <= bucket.maxIndex
+            ? toPoint(bucket.minForce) : toPoint(bucket.maxForce);
+        const QPointF second = bucket.minIndex <= bucket.maxIndex
+            ? toPoint(bucket.maxForce) : toPoint(bucket.minForce);
+        if (!traceStarted) {
+            tracePath.moveTo(first);
+            traceStarted = true;
         } else {
-            tracePoints.append(toPoint(bucket.maxForce));
-            tracePoints.append(toPoint(bucket.minForce));
+            tracePath.lineTo(first);
         }
+        if (bucket.minIndex != bucket.maxIndex)
+            tracePath.lineTo(second);
+        lastTracePoint = bucket.minIndex != bucket.maxIndex ? second : first;
     }
 
-    if (tracePoints.size() >= 2) {
-        painter.setPen(QPen(QColor(0, 100, 200), 2, Qt::SolidLine));
-        painter.drawPolyline(tracePoints.constData(), tracePoints.size());
+    if (traceStarted) {
+        painter.setPen(QPen(QColor(0, 100, 200), 2.2, Qt::SolidLine,
+                            Qt::RoundCap, Qt::RoundJoin));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawPath(tracePath);
 
-        QPolygon fillPoints;
-        fillPoints.reserve(tracePoints.size() + 2);
-        fillPoints.append(QPoint(margin, zeroY));
-        for (const QPoint& point : tracePoints)
-            fillPoints.append(point);
-        fillPoints.append(QPoint(margin + plotWidth, zeroY));
+        QPainterPath fillPath = tracePath;
+        fillPath.lineTo(QPointF(margin + plotWidth, zeroY));
+        fillPath.lineTo(QPointF(margin, zeroY));
+        fillPath.closeSubpath();
         painter.setBrush(QBrush(QColor(0, 100, 200, 50)));
         painter.setPen(Qt::NoPen);
-        painter.drawPolygon(fillPoints);
+        painter.drawPath(fillPath);
     }
 
     painter.setPen(Qt::black);
