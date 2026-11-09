@@ -75,8 +75,9 @@ MainWindow::MainWindow(QWidget *parent)
     , m_serialPort(nullptr)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
-    setMinimumSize(1280, 800);
-    setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:10px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:11px 18px;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:12px;} QLabel#dashboardValue{color:#14243a;font-size:21pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:8px;padding:10px 16px;font-weight:600;} QPushButton:hover{background:#06696c;}");
+    setMinimumSize(1024, 640);
+    QApplication::setFont(QFont("Arial", 9));
+    setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;font-size:9pt;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:8px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:6px 10px;font-size:9pt;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:10px;} QLabel#dashboardValue{color:#14243a;font-size:14pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:6px;padding:6px 10px;font-size:9pt;font-weight:600;} QPushButton:hover{background:#06696c;}");
     
     // Shared serial service; UI tabs subscribe independently to its data stream.
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
