@@ -172,6 +172,7 @@ void MainWindow::setupTabs()
         m_outlineTab->setSerialConnection(m_serialPort);
         m_trainingTab->setSerialConnection(m_serialPort);
         m_trainingTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());
+        m_trainingTab->setSensorCalibrationReady(m_measurementTab->hasCalibrationProfile());
         const auto gameMeasurementEngine = m_measurementTab->trainingMeasurementEngine();
         if (gameMeasurementEngine) {
             m_gameMeasurementCallbackToken = gameMeasurementEngine->subscribe(
