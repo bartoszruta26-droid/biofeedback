@@ -1,4 +1,6 @@
-# Plan naprawczy P0/P1
+# 🛠️ Plan refaktoryzacji interfejsów — priorytety P0/P1
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski dotyczą wskazanego zakresu i momentu przeglądu; przed użyciem jako kryterium odbioru zweryfikuj bieżący kod.
 
 Każdy punkt ma być osobnym PR do `integration/all-work`. Nie scalać automatycznie. Przed utworzeniem gałęzi i przed aktualizacją ref ponownie sprawdzić HEAD.
 
