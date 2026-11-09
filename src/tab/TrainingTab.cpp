@@ -47,7 +47,8 @@ TrainingProgressWidget::TrainingProgressWidget(QWidget *parent)
     , m_currentForce(0.0)
     , m_sessionTime(0)
 {
-    setMinimumHeight(150);
+    setMinimumHeight(280);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 }
 
 void TrainingProgressWidget::setCurrentExercise(int current, int total)
