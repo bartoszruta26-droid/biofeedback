@@ -218,6 +218,7 @@ private:
     // Dane wykresu
     QVector<DataPoint> m_dataPoints;
     int m_samplesSinceAutoScale{0};
+    mutable QDateTime m_renderNow;
     
     // Zakresy osi
     double m_yMin;
