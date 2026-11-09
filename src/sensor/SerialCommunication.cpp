@@ -277,8 +277,20 @@ std::vector<std::string> SerialCommunication::scanAvailablePorts() {
             return value.rfind(prefix, 0) == 0;
         };
 
-        const fs::path devRoot("/dev");
         std::error_code ec;
+
+        // Add stable udev aliases first so the user sees a descriptive board
+        // name instead of a transient ttyUSB/ttyACM number.
+        for (const fs::path& aliasDirectory : {
+                 fs::path("/dev/serial/by-id"), fs::path("/dev/serial/by-path")}) {
+            ec.clear();
+            if (!fs::is_directory(aliasDirectory, ec) || ec) continue;
+            for (fs::directory_iterator it(aliasDirectory, ec), end; !ec && it != end; it.increment(ec))
+                addDevice(it->path());
+        }
+
+        const fs::path devRoot("/dev");
+        ec.clear();
         if (fs::is_directory(devRoot, ec) && !ec) {
             for (fs::directory_iterator it(devRoot, ec), end; !ec && it != end; it.increment(ec)) {
                 const std::string name = it->path().filename().string();
@@ -290,16 +302,6 @@ std::vector<std::string> SerialCommunication::scanAvailablePorts() {
                     addDevice(it->path());
                 }
             }
-        }
-
-        // Stable udev-created aliases are useful for identifying boards and
-        // remain valid when kernel-assigned tty numbers change.
-        for (const fs::path& aliasDirectory : {
-                 fs::path("/dev/serial/by-id"), fs::path("/dev/serial/by-path")}) {
-            ec.clear();
-            if (!fs::is_directory(aliasDirectory, ec) || ec) continue;
-            for (fs::directory_iterator it(aliasDirectory, ec), end; !ec && it != end; it.increment(ec))
-                addDevice(it->path());
         }
 #endif
         std::sort(ports.begin(), ports.end());
