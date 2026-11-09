@@ -17,6 +17,7 @@
 #include "measurement/Units.hpp"
 #include "sensor/SerialCommunication.hpp"
 #include <QApplication>
+#include <QAbstractItemView>
 #include <QDialogButtonBox>
 #include <QSettings>
 #include <QDateTime>
@@ -654,7 +655,10 @@ void MainWindow::refreshSerialPorts()
     }
 
     // Avoid resetting the combo box on every background poll when nothing changed.
-    if (currentItems == nextItems) return;
+    if (currentItems == nextItems &&
+        (!nextItems.isEmpty() || (m_devicePortCombo->count() == 1 &&
+                                  m_devicePortCombo->currentData().toString().isEmpty())))
+        return;
 
     m_devicePortCombo->clear();
     for (const QString& port : nextItems)
