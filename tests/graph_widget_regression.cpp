@@ -16,7 +16,7 @@ int main(int argc, char** argv)
     graph.setTimeRange(300);
 
     const QDateTime start = QDateTime::currentDateTime();
-    constexpr int sampleCount = 13050;
+    constexpr int sampleCount = 33050;
     for (int i = 0; i < sampleCount; ++i) {
         // Insert a deliberately out-of-order timestamp once. Hover lookup
         // must switch to its safe fallback rather than binary-searching
@@ -26,14 +26,14 @@ int main(int argc, char** argv)
         graph.addDataPoint(value, start.addMSecs(offsetMs));
     }
 
-    if (graph.dataPointCount() != 12000) {
+    if (graph.dataPointCount() != 32000) {
         std::cerr << "Graph buffer cap violated: " << graph.dataPointCount()
-                  << " points (expected 12000)\n";
+                  << " points (expected 32000)\n";
         return 1;
     }
 
     const QVector<gui::DataPoint> samples = graph.getData();
-    if (samples.size() != 12000 || samples.isEmpty()) {
+    if (samples.size() != 32000 || samples.isEmpty()) {
         std::cerr << "Graph data export is inconsistent\n";
         return 2;
     }
