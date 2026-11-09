@@ -1,4 +1,6 @@
-# Wspólna warstwa usług urządzeń i pomiarów
+# 🧩 Wspólna warstwa usług urządzeń i pomiarów
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ApplicationServices jest kompozycją pojedynczego potoku pomiarowego i rejestru urządzeń w obrębie procesu. Interfejsy lokalne powinny otrzymywać referencje do usług devices() i measurements(), zamiast tworzyć własne silniki lub historie.
 
