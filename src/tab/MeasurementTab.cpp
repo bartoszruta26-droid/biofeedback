@@ -516,6 +516,7 @@ MeasurementTab::MeasurementTab(QWidget *parent)
     // Inicjalizacja połączenia szeregowego
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
     m_measurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
+    m_trainingMeasurementEngine = std::make_shared<biofeedback::measurement::MeasurementEngine>();
     m_measurementAdapter = std::make_unique<sensor::MeasurementSerialAdapter>(
         *m_serialPort, m_measurementEngine, "desktop-hx711", "count");
     m_measurementCallbackToken = m_measurementEngine->subscribe(
@@ -3064,6 +3065,24 @@ bool MeasurementTab::isArduinoConnected() const
 
 void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
 {
+    // Publish a second, calibrated SI stream for training and games. The
+    // ordinary measurement engine deliberately retains raw ADC counts for
+    // lossless acquisition and display; consumers must never interpret ADC
+    // counts as physical force.
+    if (m_trainingMeasurementEngine) {
+        double forceNewtons = 0.0;
+        const bool calibrated = data.isValid && rawToNewtons(data.value, forceNewtons);
+        biofeedback::measurement::MeasurementInput input;
+        input.deviceTimestampMs = data.timestamp;
+        input.hasTimestamp = data.hasTimestamp;
+        input.rawValue = data.value;
+        input.value = calibrated ? forceNewtons : 0.0;
+        input.unit = "N";
+        input.source = "desktop-hx711-calibrated";
+        input.sensorValid = calibrated;
+        m_trainingMeasurementEngine->ingest(input);
+    }
+
     // Always replace the last frame, including rejected frames, so manual
     // capture can never reuse a stale calibrated sample.
     m_lastSensorData = data;
