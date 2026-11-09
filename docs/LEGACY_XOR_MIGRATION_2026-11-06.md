@@ -1,4 +1,6 @@
-# Kontrolowana migracja danych legacy XOR → AES-256-GCM
+# 🔐 Kontrolowana migracja danych legacy XOR → AES-256-GCM
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ## Cel i granice
 
