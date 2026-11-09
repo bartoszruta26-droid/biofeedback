@@ -25,9 +25,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
-#include <QJsonDocument>
 #include <QJsonParseError>
-#include <QStandardPaths>
 #include "sensor/CalibrationProfile.hpp"
 #include <QScrollArea>
 #include <memory>
@@ -3219,7 +3217,7 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
             updateUnitDisplay();
             updateRawTableUnits();
             QMessageBox::information(this, tr("Brak profilu kalibracji"),
-                tr("Dane RAW są nadal rejestrowane bez zmian. Aby wyświetlić N lub kg, zapisz poprawny profil kalibracji w pliku config/calibration/hx711.json.\\n\\n%1").arg(error));
+                tr("Dane RAW są nadal rejestrowane bez zmian. Aby wyświetlić N lub kg, zapisz poprawny profil kalibracji w pliku calibration/hx711.json w katalogu konfiguracji aplikacji.\\n\\n%1").arg(error));
             return;
         }
     }
