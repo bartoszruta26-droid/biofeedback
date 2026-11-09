@@ -395,8 +395,8 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     // Keep sub-pixel coordinates and use a round-joined painter path. Integer
     // QPoint conversion quantized every sample to whole pixels and made the
     // live trace visibly angular even with antialiasing enabled.
-    QPainterPath tracePath;
-    bool traceStarted = false;
+    QVector<QPointF> tracePoints;
+    tracePoints.reserve(plotWidth * 2);
     for (int column = 0; column < plotWidth; ++column) {
         const PixelBucket& bucket = buckets[static_cast<std::size_t>(column)];
         if (!bucket.valid)
@@ -408,21 +408,37 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
             return QPointF(margin + column, y);
         };
 
-        const QPointF first = bucket.minIndex <= bucket.maxIndex
-            ? toPoint(bucket.minForce) : toPoint(bucket.maxForce);
-        const QPointF second = bucket.minIndex <= bucket.maxIndex
-            ? toPoint(bucket.maxForce) : toPoint(bucket.minForce);
-        if (!traceStarted) {
-            tracePath.moveTo(first);
-            traceStarted = true;
-        } else {
-            tracePath.lineTo(first);
+        tracePoints.append(bucket.minIndex <= bucket.maxIndex
+            ? toPoint(bucket.minForce) : toPoint(bucket.maxForce));
+        if (bucket.minIndex != bucket.maxIndex) {
+            tracePoints.append(bucket.minIndex <= bucket.maxIndex
+                ? toPoint(bucket.maxForce) : toPoint(bucket.minForce));
         }
-        if (bucket.minIndex != bucket.maxIndex)
-            tracePath.lineTo(second);
     }
 
-    if (traceStarted) {
+    QPainterPath tracePath;
+    if (!tracePoints.isEmpty()) {
+        tracePath.moveTo(tracePoints.front());
+        for (int i = 0; i + 1 < tracePoints.size(); ++i) {
+            const QPointF& p1 = tracePoints[i];
+            const QPointF& p2 = tracePoints[i + 1];
+            if (qFuzzyCompare(p1.x() + 1.0, p2.x() + 1.0)) {
+                tracePath.lineTo(p2);
+                continue;
+            }
+            const QPointF& p0 = tracePoints[qMax(0, i - 1)];
+            const QPointF& p3 = tracePoints[qMin(i + 2, tracePoints.size() - 1)];
+            const qreal lowY = qMin(p1.y(), p2.y());
+            const qreal highY = qMax(p1.y(), p2.y());
+            QPointF control1 = p1 + (p2 - p0) / 6.0;
+            QPointF control2 = p2 - (p3 - p1) / 6.0;
+            control1.setY(qBound(lowY, control1.y(), highY));
+            control2.setY(qBound(lowY, control2.y(), highY));
+            tracePath.cubicTo(control1, control2, p2);
+        }
+    }
+
+    if (tracePoints.size() >= 2) {
         painter.setPen(QPen(QColor(0, 100, 200), 2.2, Qt::SolidLine,
                             Qt::RoundCap, Qt::RoundJoin));
         painter.setBrush(Qt::NoBrush);
