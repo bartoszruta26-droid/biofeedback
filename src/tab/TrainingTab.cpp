@@ -159,17 +159,31 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
             painter.drawLine(QPointF(traceRect.left(), y), QPointF(traceRect.right(), y));
         }
 
-        QPainterPath trace;
+        QVector<QPointF> tracePoints;
+        tracePoints.reserve(static_cast<int>(m_forceHistory.size()));
         const double denominator = static_cast<double>(m_forceHistory.size() - 1);
         for (std::size_t index = 0; index < m_forceHistory.size(); ++index) {
             const qreal x = traceRect.left() +
                 traceRect.width() * static_cast<double>(index) / denominator;
             const qreal y = traceRect.bottom() -
                 qBound(0.0, m_forceHistory[index] / scaleMax, 1.0) * traceRect.height();
-            if (index == 0)
-                trace.moveTo(x, y);
-            else
-                trace.lineTo(x, y);
+            tracePoints.append(QPointF(x, y));
+        }
+
+        QPainterPath trace;
+        trace.moveTo(tracePoints.front());
+        for (int index = 0; index + 1 < tracePoints.size(); ++index) {
+            const QPointF& p1 = tracePoints[index];
+            const QPointF& p2 = tracePoints[index + 1];
+            const QPointF& p0 = tracePoints[qMax(0, index - 1)];
+            const QPointF& p3 = tracePoints[qMin(index + 2, tracePoints.size() - 1)];
+            const qreal lowY = qMin(p1.y(), p2.y());
+            const qreal highY = qMax(p1.y(), p2.y());
+            QPointF control1 = p1 + (p2 - p0) / 6.0;
+            QPointF control2 = p2 - (p3 - p1) / 6.0;
+            control1.setY(qBound(lowY, control1.y(), highY));
+            control2.setY(qBound(lowY, control2.y(), highY));
+            trace.cubicTo(control1, control2, p2);
         }
         painter.setBrush(Qt::NoBrush);
         painter.setPen(QPen(QColor(70, 190, 240), 2.2, Qt::SolidLine,
