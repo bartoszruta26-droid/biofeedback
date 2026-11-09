@@ -31,6 +31,7 @@
 #include "GraphWidget.hpp"
 #include "tab/OutlineTab.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include "measurement/MeasurementEngine.hpp"
 
 namespace gui {
 
@@ -314,7 +315,7 @@ private:
     // Połączenie szeregowe z Arduino - współdzielone między zakładkami
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_serialConnectionCallbackToken = 0;
-    sensor::SerialCommunication::CallbackToken m_serialDataCallbackToken = 0;
+    biofeedback::measurement::MeasurementEngine::CallbackToken m_gameMeasurementCallbackToken = 0;
     // Latest-value mailbox: game control should react to the newest sensor
     // value instead of replaying stale samples from a GUI backlog.
     std::mutex m_gameInputQueueMutex;
