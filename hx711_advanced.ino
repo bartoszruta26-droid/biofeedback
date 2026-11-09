@@ -55,7 +55,9 @@ volatile unsigned long last_hx711_read = 0;
 int32_t current_weight = 0;
 int32_t tare_offset = 0;
 bool continuous_mode = false;
-unsigned long last_data_send = 0;
+// Publish each successful HX711 conversion at most once.
+bool has_new_sample = false;
+uint32_t last_sample_timestamp = 0;
 
 // Pseudo-thread timing
 unsigned long thread_timer_hx711 = 0;
@@ -81,7 +83,7 @@ void resetWatchdog();
 long readHX711Raw();
 int32_t readHX711Averaged(int samples);
 void processSerialCommand();
-void sendBinaryData();
+bool sendBinaryData();
 void sendDeviceID();
 void calculateCRC(uint8_t *data, size_t len, uint8_t *crc);
 uint8_t crc8(const uint8_t *data, size_t length);
@@ -236,16 +238,18 @@ void sendForceReadout() {
     Serial.print(F("g,RAW:"));
     Serial.print(raw_value);
     Serial.print(F(",TS:"));
-    Serial.print(millis());
+    Serial.print(last_sample_timestamp);
     Serial.print(F("ms,CAL:"));
     Serial.println(is_calibrated ? 1 : 0);
 }
 
-void sendBinaryData() {
+bool sendBinaryData() {
+    if (!has_new_sample) {
+        return false;
+    }
     DataPacket packet;
-    
-    // Fill packet data
-    packet.timestamp = millis();
+    // Timestamp and value belong to the same successful HX711 acquisition.
+    packet.timestamp = last_sample_timestamp;
     packet.value = current_weight - tare_offset;
     
     // Calculate CRC over timestamp and value (exclude CRC byte itself)
@@ -258,6 +262,8 @@ void sendBinaryData() {
     // Send end marker for framing
     Serial.write(0xAA);
     Serial.write(0x55);
+    has_new_sample = false;
+    return true;
 }
 
 void processSerialCommand() {
@@ -290,9 +296,12 @@ void processSerialCommand() {
                     Serial.println(F("Tare set!"));
                 }
                 else if (strcmp(upper_buffer, "DATA") == 0 || strcmp(upper_buffer, "READ") == 0) {
-                    sendBinaryData();
-                    sendForceReadout();
-                    Serial.println(F("[DATA_SENT]"));
+                    if (sendBinaryData()) {
+                        sendForceReadout();
+                        Serial.println(F("[DATA_SENT]"));
+                    } else {
+                        Serial.println(F("ERR,NO_NEW_SAMPLE"));
+                    }
                 }
                 else if (strcmp(upper_buffer, "FORCE") == 0) {
                     sendForceReadout();
@@ -357,18 +366,20 @@ void processSerialCommand() {
 // PSEUDO-THREADING (Cooperative Multitasking)
 // ============================================================
 
-// Thread: HX711 Reader - reads at 80Hz (every ~12.5ms)
+// Thread: HX711 Reader - poll readiness; physical SPS is set by the HX711 RATE pin.
 void threadHX711() {
-    if (millis() - thread_timer_hx711 >= 12) {  // ~80Hz = 12.5ms interval
+    if (millis() - thread_timer_hx711 >= 12) {  // Poll often; do not assume this sets the ADC conversion rate.
         thread_timer_hx711 = millis();
         
         // Check if HX711 is ready
         pinMode(HX711_DT_PIN, INPUT);
         if (digitalRead(HX711_DT_PIN) == LOW) {
-            // Read single sample at 80Hz
+            // Read only when the converter reports a completed sample.
             long raw = readHX711Raw();
             if (raw != LONG_MIN) {
                 current_weight = static_cast<int32_t>(raw);
+                last_sample_timestamp = millis();
+                has_new_sample = true;
             }
         }
     }
@@ -395,8 +406,7 @@ void threadContinuousData() {
     // Continuous mode emits binary frames only. Do not append the human-readable
     // FORCE/RAW/CAL status line to every frame: it doubles serial traffic and
     // makes a line-oriented host parser mistake binary payload for text.
-    if (continuous_mode && (millis() - last_data_send >= 12)) {  // ~80Hz
-        last_data_send = millis();
+    if (continuous_mode && has_new_sample) {
         sendBinaryData();
     }
 }
@@ -442,6 +452,8 @@ void setup() {
     } else {
         current_weight = initial_reading;
         tare_offset = initial_reading;
+        last_sample_timestamp = millis();
+        has_new_sample = true;
     }
     
     Serial.println(F("System Ready!"));
