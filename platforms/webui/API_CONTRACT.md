@@ -1,154 +1,113 @@
-# WebUI — kontrakt integracyjny API
+# WebUI — rzeczywisty kontrakt integracyjny API i funkcje planowane
 
-Docelowa komunikacja korzysta ze wspólnej warstwy usług aplikacyjnych.
-Przeglądarka nie implementuje parsera czujnika, kalibracji ani logiki sesji.
+> 📘 Weryfikacja kodu: 2026-11-09 • Bazowy SHA: `28272ea153864747d947038a3c0e853f9c1864ec`  
+> Ten dokument rozdziela endpointy faktycznie zaimplementowane od funkcji docelowych. Źródłem prawdy jest `src/api/HttpApiServer.cpp`.
 
-## HTTP v1
+## 1. Endpointy zaimplementowane
 
-| Metoda | Ścieżka | Cel |
+| Metoda | Ścieżka | Dostęp | Działanie |
+|---|---|---|---|
+| GET | `/healthz` | Publiczny | Test dostępności |
+| GET | `/api/v1/status` | Publiczny | Wersja, tryb, kolekcje, możliwości i ograniczenia |
+| POST | `/api/v1/auth/login` | Publiczny | Logowanie i wydanie tokenu Bearer |
+| GET | `/api/v1/auth/me` | Zalogowany | Tożsamość, rola i termin wygaśnięcia |
+| POST | `/api/v1/auth/logout` | Zalogowany | Unieważnienie bieżącej sesji |
+| GET | `/api/v1/devices` | Administrator | Lista urządzeń i ich stanów |
+| GET | `/api/v1/acquisition/session` | Administrator | Odczyt stanu aktywnej sesji |
+| POST | `/api/v1/acquisition/session` | Administrator | Rozpoczęcie sesji akwizycji |
+| DELETE | `/api/v1/acquisition/session` | Administrator | Zatrzymanie sesji po identyfikatorze |
+| GET | `/api/v1/acquisition/samples?after_sequence=N` | Administrator | Odczyt próbek z ograniczonej historii w pamięci |
+| GET/POST | `/api/v1/{collection}` | Administrator | Lista / utworzenie rekordu |
+| GET/PUT/DELETE | `/api/v1/{collection}/{id}` | Administrator | Odczyt / aktualizacja / usunięcie rekordu |
+
+Dozwolone kolekcje:
+- `patients`
+- `measurements`
+- `training-sessions`
+- `training-results`
+- `game-sessions`
+- `game-results`
+
+### Przykład operacji CRUD
+
+Utworzenie rekordu:
+
+```http
+POST /api/v1/patients
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"firstName":"Jan","lastName":"Kowalski","pesel":"<identyfikator>","medicalHistory":""}
+```
+
+Aktualizacja wymaga treści `{"expected_version":1,"record":{...}}`. Usunięcie wymaga `{"expected_version":1}`. Konflikt wersji zwraca HTTP 409. Serwer tworzy UUID i pola `version`, `created_at`, `updated_at`.
+
+Rekord pacjenta wymaga niepustych pól `firstName`, `lastName` i `pesel`; identyfikator ma maksymalnie 32 znaki i musi być unikalny. Ścieżka rekordu używa UUID, nigdy PESEL.
+
+## 2. Sesja akwizycji
+
+Rozpoczęcie sesji wymaga obiektu zawierającego:
+- `id` — identyfikator sesji;
+- `patient_id` — UUID istniejącego pacjenta;
+- `device_id` — identyfikator zarejestrowanego i połączonego urządzenia;
+- opcjonalnie `protocol_id`.
+
+Serwer odrzuca żądanie, jeśli repozytorium pacjentów lub rejestr urządzeń są niedostępne, pacjent nie istnieje, urządzenie nie jest zarejestrowane albo nie jest połączone. W danym momencie może działać jedna sesja akwizycji.
+
+Urządzenie Arduino Nano HX711 jest rejestrowane przez samodzielny proces API tylko po jawnym ustawieniu `BIOFEEDBACK_SERIAL_PORT`. Opcjonalne zmienne: `BIOFEEDBACK_SERIAL_BAUD` i `BIOFEEDBACK_DEVICE_ID`. Bez portu sprzętowa akwizycja pozostaje wyłączona.
+
+## 3. Odczyt próbek — ograniczenia retencji
+
+`GET /api/v1/acquisition/samples?after_sequence=N` zwraca m.in.:
+- `items` — próbki o numerze większym niż `after_sequence`;
+- `count`;
+- `after_sequence`;
+- `next_sequence`;
+- `retention: "bounded_in_memory"`;
+- opcjonalnie `session_id` i `device_id`.
+
+Domyślna historia silnika obejmuje 512 próbek. W samodzielnym `biofeedback_api` nie jest obecnie podłączony trwały dziennik próbek ani `CommitHook`. Historia jest tracona po restarcie procesu, a sekwencja zaczyna się ponownie od wartości początkowej. Ten endpoint nie jest archiwum klinicznym ani strumieniem push czasu rzeczywistego.
+
+## 4. Endpointy i funkcje NIEZAIMPLEMENTOWANE
+
+Poniższe funkcje są wymienione w kliencie JavaScript lub w starszym opisie docelowym, ale nie mają działających tras serwera:
+
+| Metoda / kanał | Ścieżka | Stan |
 |---|---|---|
-| GET | /api/v1/status | Publiczny status usługi, wersja i gotowość |
-| POST | /api/v1/auth/login | Logowanie; zwraca losowy token Bearer |
-| GET | /api/v1/auth/me | Tożsamość i rola aktywnej sesji |
-| POST | /api/v1/auth/logout | Unieważnienie tokenu bieżącej sesji |
-| GET | /api/v1/devices | Lista urządzeń i stan adapterów |
-| POST | /api/v1/devices/{id}/connect | Żądanie połączenia |
-| POST | /api/v1/devices/{id}/disconnect | Żądanie rozłączenia |
-| GET | /api/v1/{collection} | Lista rekordów kolekcji |
-| POST | /api/v1/{collection} | Utworzenie rekordu |
-| GET | /api/v1/{collection}/{id} | Odczyt rekordu |
-| PUT | /api/v1/{collection}/{id} | Aktualizacja z kontrolą wersji |
-| DELETE | /api/v1/{collection}/{id} | Usunięcie z kontrolą wersji |
+| POST | `/api/v1/devices/{id}/connect` | Niezaimplementowane |
+| POST | `/api/v1/devices/{id}/disconnect` | Niezaimplementowane |
+| WebSocket | `/ws/measurements` | Niezaimplementowane |
+| WebSocket | `/ws/events` | Niezaimplementowane |
+| SSE | — | Niezaimplementowane |
+| RBAC per rola/pacjent | — | Niezaimplementowane |
 
-Dozwolone kolekcje: `patients`, `measurements`, `training-sessions`,
-`training-results`, `game-sessions`, `game-results`.
+Metody `connectDevice`, `disconnectDevice`, `subscribeMeasurements` i `subscribeEvents` w `platforms/webui/api-client.js` nie potwierdzają dostępności odpowiednich funkcji po stronie serwera.
 
-Rekord pacjenta wymaga niepustych pól `firstName`, `lastName` i `pesel`
-(identyfikatorze pacjenta; do 32 znaków). Serwer odrzuca duplikat tego
-identyfikatora. Ścieżka rekordu nadal używa losowego UUID, nigdy PESEL.
+## 5. Uwierzytelnianie i bezpieczeństwo
 
-Aktualizacja wymaga treści `{"expected_version": 1, "record": {...}}`.
-Usunięcie wymaga `{"expected_version": 1}`. Serwer zwraca `409 VERSION_CONFLICT`,
-gdy klient próbuje zmienić wersję, która nie jest już aktualna.
+- Token Bearer powstaje z 32 losowych bajtów, ma 64 znaki szesnastkowe i wygasa po 30 minutach.
+- Serwer przechowuje sesje w pamięci; limit wynosi 64 aktywne sesje.
+- Po pięciu nieudanych próbach logowania z danego adresu klienta następuje blokada na 60 sekund.
+- Wszystkie operacje na kolekcjach, rejestrze urządzeń i sesji akwizycji wymagają obecnie roli `administrator`.
+- Serwer API domyślnie nasłuchuje na `127.0.0.1:8765`; sam serwer nie zapewnia TLS.
+- Android wymaga adresu HTTPS. Połączenie zdalne wymaga terminacji TLS przez reverse proxy/bramę.
+- Publiczne `/healthz` i `/api/v1/status` nie zwracają danych pacjentów.
+- Nie wystawiaj surowego HTTP poza loopback.
 
-### Przykładowe odpowiedzi
+## 6. Status odpowiedzi API
 
-Status usługi:
+Endpoint `/api/v1/status` aktualnie zwraca wersję `0.3.0`, tryb `shared-data-api`, kolekcje, możliwości i ograniczenia. Wskazuje m.in. ograniczenia `device_control`, `measurement_stream`, `role_scoped_authorization`, `websocket_events` i `mariadb_adapter`.
 
-```json
-{
-  "status": "ready",
-  "version": "1.0.0",
-  "mode": "desktop",
-  "timestamp": "2026-11-07T10:00:00Z"
-}
-```
+Uwaga: `QCoreApplication::applicationVersion()` w `src/api/main.cpp` jest ustawione na `0.2.0`, podczas gdy odpowiedź statusu ma `0.3.0`. To rozbieżność wersjonowania do usunięcia w kodzie.
 
-Urządzenie:
+## 7. Wymagane dalsze prace
 
-```json
-{
-  "id": "sensor-01",
-  "name": "Czujnik siły",
-  "state": "connected",
-  "transport": "serial",
-  "last_seen": "2026-11-07T10:00:00Z"
-}
-```
+1. Trwałe zatwierdzanie próbek i odzyskiwanie sekwencji po restarcie.
+2. Wybór oraz wdrożenie transportu strumieniowego (WebSocket/SSE) lub stabilnego odpytywania z wykrywaniem luk.
+3. Dodanie rzeczywistych tras łączenia/rozłączania urządzeń albo usunięcie nieobsługiwanych metod z klienta.
+4. Wdrożenie RBAC i kontroli dostępu do danych pacjentów.
+5. Testy integracyjne WebUI–API, Android–API oraz testy restartu, utraty sieci i konfliktów wersji.
 
-Próbka pomiarowa:
+## 8. Testy
 
-```json
-{
-  "session_id": "session-uuid",
-  "timestamp": "2026-11-07T10:00:00.125Z",
-  "value": 12.4,
-  "unit": "N",
-  "source": "sensor-01",
-  "quality": "valid"
-}
-```
-
-## WebSocket
-
-- /ws/measurements — strumień próbek pomiarowych.
-- /ws/events — zdarzenia urządzeń, sesji i stanu usług.
-
-Wiadomości są obiektami JSON. Klient musi obsługiwać niepoprawne
-wiadomości, zamknięcie połączenia i brak serwera bez generowania danych
-zastępczych.
-
-## Błędy i stany
-
-- 400 — niepoprawne żądanie lub parametry.
-- 401 — brak uwierzytelnienia.
-- 403 — brak uprawnień do zasobu lub operacji.
-- 404 — nieznane urządzenie, pacjent lub sesja.
-- 409 — konflikt stanu, np. urządzenie już połączone.
-- 422 — poprawne składniowo żądanie, którego nie można wykonać.
-- 503 — usługa lub adapter niedostępny.
-
-Odpowiedź błędu powinna zawierać stabilny kod i bezpieczny komunikat,
-np. `{"code":"DEVICE_BUSY","message":"Urządzenie jest zajęte"}`.
-
-## Bezpieczeństwo i integralność
-
-- Logowanie API korzysta z tego samego magazynu kont i weryfikacji haseł co aplikacja Qt.
-- Token Bearer ma 256 bitów losowości, jest przechowywany wyłącznie w pamięci serwera i wygasa po 30 minutach.
-- Serwer ogranicza próby logowania: po pięciu błędnych próbach z adresu klienta blokuje kolejne próby na 60 sekund.
-- WebUI przechowuje token wyłącznie w pamięci klienta; nie zapisuje go w localStorage ani w adresie URL.
-- Endpoint /api/v1/status i /healthz są publiczne i nie zwracają danych pacjentów.
-- Endpointy danych, sesji i sterowania urządzeniami pozostają wyłączone do czasu wdrożenia kontroli ról i integracji usług.
-- API musi egzekwować uwierzytelnianie i autoryzację po stronie serwera.
-- Dane pacjentów są dostępne wyłącznie zgodnie z rolą i zakresem uprawnień.
-- Nie wolno umieszczać danych osobowych ani sekretów w adresach URL i logach.
-- Polecenia sprzętowe wymagają potwierdzenia stanu adaptera.
-- Próbki muszą zawierać czas, jednostkę, źródło i status jakości.
-- Należy rozróżniać brak danych, brak urządzenia i błąd pomiaru.
-- WebUI nie może prezentować danych demonstracyjnych jako klinicznych.
-- Wdrożenie produkcyjne wymaga HTTPS/WSS i jawnej polityki CORS.
-
-## Stan implementacji
-
-Klient JavaScript jest zaimplementowany w `api-client.js` i pokryty testami
-Node.js. Udostępnia metody CRUD dla sześciu kolekcji danych. Klient Android
-ma metody CRUD dla tych samych kolekcji; ekran Pacjenci korzysta z odczytu,
-dodawania, edycji i usuwania kart. Desktop uruchamia serwer loopback po
-inicjalizacji aplikacji i współdzieli z nim tę samą instancję repozytorium
-plikowego. Zakładka Pacjenci odczytuje i zapisuje karty przez to repozytorium.
-Przy pierwszym uruchomieniu aplikacja migruje istniejące pliki pacjentów
-bez usuwania źródeł migracji.
-
-Serwer udostępnia `GET /healthz`, `GET /api/v1/status`, logowanie,
-wylogowanie i CRUD kolekcji. Repozytorium plikowe używa identyfikatorów UUID,
-atomowego zapisu `QSaveFile`, limitu 16 MiB na rekord i uprawnień tylko dla
-właściciela. Przy `encryption.enabled=true` rekordy są szyfrowane AES-256-GCM;
-brak klucza powoduje niedostępność repozytorium, a nie zapis jawny.
-Do czasu wdrożenia zakresów RBAC endpointy danych są ograniczone do roli
-`administrator`. To ograniczenie jest celowe i tymczasowe.
-
-`biofeedback_api` jest samodzielnym wariantem serwera; Desktop uruchamia
-serwer w swoim procesie. Domyślnie nasłuch odbywa się na
-`127.0.0.1:8765`. CORS dopuszcza wyłącznie źródła localhost/127.0.0.1/::1.
-Android wymaga HTTPS, więc połączenie zdalne wymaga bramy TLS/reverse proxy.
-Nie wystawiać surowego serwera HTTP poza loopback.
-
-**Ograniczenia pozostałe:** MariaDB adapter nie jest zaimplementowany;
-wybranie `storage.patient_backend=mariadb` powoduje fail-closed.
-Desktop zapisuje do repozytorium sesje pomiarowe z próbkami, sesje treningowe,
-wyniki ćwiczeń i wyniki gier. TUI loguje się przez API, odczytuje pacjentów
-i zapisuje sesje oraz wyniki treningowe, ale nie wiąże ich jeszcze z pacjentem
-oraz nie archiwizuje pomiarów i gier. WebUI obsługuje CRUD kart pacjentów
-i odczyt archiwów pomiarów, treningów oraz gier. Android obsługuje CRUD kart
-pacjentów i odczyt tych samych archiwów. WebSocket/SSE i strumień próbek
-czasu rzeczywistego pozostają do wdrożenia. Nie należy
-traktować tego API jako gotowego systemu dokumentacji klinicznej.
-
-Uruchomienie:
-
-    cmake -S . -B build
-    cmake --build build --target biofeedback_api
-    ./build/biofeedback_api
-
-Przykłady JSON powyżej są schematem kontraktu; rzeczywista odpowiedź statusu
-jest generowana przez lokalny serwer.
+`node --test platforms/webui/api-client.test.js` weryfikuje klienta JavaScript z kontrolowanymi odpowiedziami. Nie jest to test kompletności endpointów backendu ani test end-to-end z urządzeniem.
