@@ -700,8 +700,17 @@ void MainWindow::toggleSerialConnection()
     }
     if (!m_serialPort->connect(port.toStdString(), sensor::protocol::DefaultBaudRate)) {
         updateConnectionStatus(false);
-        QMessageBox::warning(this, tr("Połączenie"), tr("Nie udało się otworzyć portu %1.").arg(port));
-        addDebugMessage(tr("Nie udało się połączyć z %1").arg(port), "ERROR");
+        const QString error = QString::fromStdString(m_serialPort->getLastError());
+        QString detail = tr("Nie udało się otworzyć portu %1.").arg(port);
+        if (!error.isEmpty())
+            detail += tr("\\n\\nSzczegóły systemowe: %1").arg(error);
+#ifndef _WIN32
+        if (error.contains(QStringLiteral("Permission denied"), Qt::CaseInsensitive)) {
+            detail += tr("\\n\\nBrak uprawnień do portu. W Debianie dodaj użytkownika do grupy dialout poleceniem:\\nsudo usermod -aG dialout $USER\\nNastępnie wyloguj się i zaloguj ponownie.");
+        }
+#endif
+        QMessageBox::warning(this, tr("Połączenie z urządzeniem"), detail);
+        addDebugMessage(tr("Nie udało się połączyć z %1: %2").arg(port, error), "ERROR");
         return;
     }
     m_serialPort->startAsyncReading();
