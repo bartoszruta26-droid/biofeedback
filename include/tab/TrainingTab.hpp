@@ -315,7 +315,7 @@ private:
     QLabel* m_lblTargetForce;
     QLabel* m_lblRestTimer;
     
-    // Widget gry (embedowany)
+    // Placeholder for the standalone game window managed by MainWindow.
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
     QString m_activeGameType;
