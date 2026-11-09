@@ -13,6 +13,7 @@
 #include <QStackedWidget>
 #include <QDir>
 #include <QElapsedTimer>
+#include <QPainterPath>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QUuid>
@@ -76,7 +77,20 @@ void TrainingProgressWidget::setTargetForce(double force)
 
 void TrainingProgressWidget::setCurrentForce(double force)
 {
+    if (!std::isfinite(force))
+        return;
     m_currentForce = force;
+    constexpr std::size_t MaximumTraceSamples = 600; // 6 s at 100 samples/s
+    m_forceHistory.push_back(force);
+    while (m_forceHistory.size() > MaximumTraceSamples)
+        m_forceHistory.pop_front();
+    update();
+}
+
+void TrainingProgressWidget::clearForceHistory()
+{
+    m_forceHistory.clear();
+    m_currentForce = 0.0;
     update();
 }
 
@@ -126,9 +140,45 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     painter.drawText(repRect, Qt::AlignTop | Qt::AlignHCenter,
                     progressLabel(QStringLiteral("Powtórzenie"), m_currentRep, m_totalReps));
     
+    // Live force trace: bounded six-second window, updated on every sensor
+    // sample and painted at the display cadence with sub-pixel coordinates.
+    const int barHeight = 20;
+    const int barY = height() - barHeight - margin;
+    const int barWidth = width() - 2 * margin;
+    const QRectF traceRect(margin, 42, barWidth, qMax(8, barY - 50));
+    if (m_forceHistory.size() >= 2 && traceRect.width() > 1.0 && traceRect.height() > 1.0) {
+        double scaleMax = qMax(1.0, m_targetForce * 1.2);
+        for (double value : m_forceHistory)
+            scaleMax = qMax(scaleMax, value * 1.05);
+
+        painter.save();
+        painter.setClipRect(traceRect);
+        painter.setPen(QPen(QColor(90, 110, 130, 110), 1, Qt::DashLine));
+        for (int grid = 1; grid <= 2; ++grid) {
+            const qreal y = traceRect.top() + traceRect.height() * grid / 3.0;
+            painter.drawLine(QPointF(traceRect.left(), y), QPointF(traceRect.right(), y));
+        }
+
+        QPainterPath trace;
+        const double denominator = static_cast<double>(m_forceHistory.size() - 1);
+        for (std::size_t index = 0; index < m_forceHistory.size(); ++index) {
+            const qreal x = traceRect.left() +
+                traceRect.width() * static_cast<double>(index) / denominator;
+            const qreal y = traceRect.bottom() -
+                qBound(0.0, m_forceHistory[index] / scaleMax, 1.0) * traceRect.height();
+            if (index == 0)
+                trace.moveTo(x, y);
+            else
+                trace.lineTo(x, y);
+        }
+        painter.setBrush(Qt::NoBrush);
+        painter.setPen(QPen(QColor(70, 190, 240), 2.2, Qt::SolidLine,
+                            Qt::RoundCap, Qt::RoundJoin));
+        painter.drawPath(trace);
+        painter.restore();
+    }
+
     // Pasek siły
-    int barHeight = 20;
-    int barY = height() - barHeight - margin;
     int barWidth = width() - 2 * margin;
     
     // Tło paska
@@ -543,6 +593,7 @@ void TrainingTab::startTraining()
     m_lastCheckpointSeconds = -1;
     m_trainingClock.reset();
     m_sessionClock.start();
+    m_progressWidget->clearForceHistory();
     m_lastLiveUiRefreshMs = -16;
     m_lastGameInputRefreshMs = -16;
     m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
