@@ -396,7 +396,6 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     // live trace visibly angular even with antialiasing enabled.
     QPainterPath tracePath;
     bool traceStarted = false;
-    QPointF lastTracePoint;
     for (int column = 0; column < plotWidth; ++column) {
         const PixelBucket& bucket = buckets[static_cast<std::size_t>(column)];
         if (!bucket.valid)
@@ -420,7 +419,6 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
         }
         if (bucket.minIndex != bucket.maxIndex)
             tracePath.lineTo(second);
-        lastTracePoint = bucket.minIndex != bucket.maxIndex ? second : first;
     }
 
     if (traceStarted) {
