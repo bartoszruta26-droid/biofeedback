@@ -1598,15 +1598,6 @@ void MeasurementTab::updateRawTableBatch(bool force)
         return;
     }
 
-    // A slow/stalled UI must never replay an unbounded backlog. Only show
-    // the newest visible window; the full lossless sample history is retained
-    // in m_recordedSamples and the durable journal.
-    const quint64 firstVisibleRow = totalSamples > 100 ? totalSamples - 100 : 0;
-    if (m_rawTableLastSequence < firstVisibleRow) {
-        m_rawTable->setRowCount(0);
-        m_rawTableLastSequence = firstVisibleRow;
-    }
-
     m_rawTable->setUpdatesEnabled(false);
     for (quint64 index = m_rawTableLastSequence; index < totalSamples; ++index) {
         const auto& sample = m_recordedSamples[static_cast<int>(index)];
