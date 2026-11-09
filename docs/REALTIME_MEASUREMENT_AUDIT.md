@@ -1,4 +1,6 @@
-# Audyt toru pomiarowego czasu rzeczywistego
+# 📈 Audyt toru pomiarowego czasu rzeczywistego
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski i statusy odnoszą się do wskazanej daty, gałęzi i commita; nie są automatycznie bieżącym stanem main.
 
 Data audytu: 2026-11-07  
 Zakres: wykres, akwizycja HX711/port szeregowy, walidacja próbek, zegary, detekcja powtórzeń, obliczenia biomechaniczne, archiwizacja i prezentacja.
