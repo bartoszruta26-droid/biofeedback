@@ -55,3 +55,14 @@ if failed:
         print(f" - {label}")
     sys.exit(1)
 print("Serial read policy passed.")
+
+# The Nano continuous stream is binary-framed; line-oriented FORCE output
+# is limited to explicit DATA/FORCE transactions, never every 80 Hz frame.
+firmware = Path("hx711_advanced.ino").read_text(encoding="utf-8")
+continuous_start = firmware.index("void threadContinuousData()")
+continuous_end = firmware.index("// ============================================================", continuous_start)
+continuous_body = firmware[continuous_start:continuous_end]
+if "sendForceReadout()" in continuous_body:
+    raise SystemExit("Continuous stream must not append text FORCE lines to every binary sample")
+if "sendBinaryData()" not in continuous_body:
+    raise SystemExit("Continuous stream must retain CRC-framed binary samples")
