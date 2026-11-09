@@ -90,7 +90,7 @@ std::optional<double> CalibrationMath::convertRaw(int32_t raw,
                                                    double zeroOffsetRaw,
                                                    double scaleFactor) noexcept
 {
-    if (!std::isfinite(zeroOffsetRaw) || !std::isfinite(scaleFactor) || scaleFactor <= 0.0)
+    if (!std::isfinite(zeroOffsetRaw) || !std::isfinite(scaleFactor) || std::abs(scaleFactor) < 1e-15)
         return std::nullopt;
     const double result = (static_cast<double>(raw) - zeroOffsetRaw) * scaleFactor;
     if (!std::isfinite(result)) return std::nullopt;
