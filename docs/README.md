@@ -15,11 +15,11 @@
 
 | Oznaczenie | Znaczenie |
 |---|---|
-| <badge color="success">WDROŻONE</badge> | Funkcja potwierdzona w aktualnym kodzie lub testach wskazanych w dokumencie |
-| <badge color="warning">CZĘŚCIOWO</badge> | Istnieje implementacja, ale brakuje części integracji lub walidacji |
-| <badge color="info">PLAN</badge> | Rozwiązanie docelowe albo zadanie do wykonania |
-| <badge color="danger">NIEZWERYFIKOWANE</badge> | Brak wystarczającego potwierdzenia testami lub sprzętem |
-| <badge>HISTORYCZNE</badge> | Wnioski dotyczą określonej daty, gałęzi lub SHA |
+| 🟢 **WDROŻONE** | Funkcja potwierdzona w aktualnym kodzie lub testach wskazanych w dokumencie |
+| 🟡 **CZĘŚCIOWO** | Istnieje implementacja, ale brakuje części integracji lub walidacji |
+| 🔵 **PLAN** | Rozwiązanie docelowe albo zadanie do wykonania |
+| 🔴 **NIEZWERYFIKOWANE** | Brak wystarczającego potwierdzenia testami lub sprzętem |
+| ⚪ **HISTORYCZNE** | Wnioski dotyczą określonej daty, gałęzi lub SHA |
 
 Status w tabeli jest wskazówką redakcyjną, a nie wynikiem automatycznego audytu bieżącego commita.
 
