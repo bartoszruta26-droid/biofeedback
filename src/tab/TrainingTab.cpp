@@ -99,22 +99,32 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     int margin = 10;
     int sectionWidth = (width() - 3 * margin) / 3;
     
+    // Empty plans and idle sessions are represented explicitly; never display
+    // a phantom "1/0" progress state. Clamp stale indices after plan edits.
+    const auto progressLabel = [](const QString& name, int current, int total) {
+        if (total <= 0) {
+            return QString("%1 —/0").arg(name);
+        }
+        const int safeCurrent = qBound(0, current, total - 1);
+        return QString("%1 %2/%3").arg(name).arg(safeCurrent + 1).arg(total);
+    };
+
     // Sekcja 1: Ćwiczenie
     QRect exerciseRect(margin, margin, sectionWidth - margin, height() - 2 * margin);
     painter.setPen(Qt::white);
     painter.setFont(QFont("Arial", 10, QFont::Bold));
-    painter.drawText(exerciseRect, Qt::AlignTop | Qt::AlignHCenter, 
-                    QString("Ćwiczenie %1/%2").arg(m_currentExercise + 1).arg(m_totalExercises));
-    
+    painter.drawText(exerciseRect, Qt::AlignTop | Qt::AlignHCenter,
+                    progressLabel(QStringLiteral("Ćwiczenie"), m_currentExercise, m_totalExercises));
+
     // Sekcja 2: Seria
     QRect seriesRect(margin + sectionWidth, margin, sectionWidth - margin, height() - 2 * margin);
     painter.drawText(seriesRect, Qt::AlignTop | Qt::AlignHCenter,
-                    QString("Seria %1/%2").arg(m_currentSeries + 1).arg(m_totalSeries));
-    
+                    progressLabel(QStringLiteral("Seria"), m_currentSeries, m_totalSeries));
+
     // Sekcja 3: Powtórzenie
     QRect repRect(margin + 2 * sectionWidth, margin, sectionWidth - margin, height() - 2 * margin);
     painter.drawText(repRect, Qt::AlignTop | Qt::AlignHCenter,
-                    QString("Powtórzenie %1/%2").arg(m_currentRep + 1).arg(m_totalReps));
+                    progressLabel(QStringLiteral("Powtórzenie"), m_currentRep, m_totalReps));
     
     // Pasek siły
     int barHeight = 20;
