@@ -29,6 +29,7 @@
 #include <QJsonParseError>
 #include "sensor/CalibrationProfile.hpp"
 #include <QScrollArea>
+#include <QSplitter>
 #include <memory>
 #include <iostream>
 #include <limits>
@@ -922,11 +923,46 @@ void MeasurementTab::ensureSessionClockStarted()
 void MeasurementTab::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(8);
-    m_mainLayout->setContentsMargins(8, 8, 8, 8);
-    
-    // Sekcja kontrolna
-    m_controlLayout = new QHBoxLayout();
+    m_mainLayout->setSpacing(4);
+    m_mainLayout->setContentsMargins(6, 6, 6, 6);
+
+    // Main workspace: the measurement/analysis area gets 75% of the width;
+    // configuration and file actions remain in a compact right-hand column.
+    auto* workspaceSplitter = new QSplitter(Qt::Horizontal, this);
+    workspaceSplitter->setChildrenCollapsible(false);
+    workspaceSplitter->setHandleWidth(5);
+
+    auto* visualScroll = new QScrollArea(workspaceSplitter);
+    visualScroll->setWidgetResizable(true);
+    visualScroll->setFrameShape(QFrame::NoFrame);
+    auto* visualPanel = new QWidget(visualScroll);
+    auto* visualLayout = new QVBoxLayout(visualPanel);
+    visualLayout->setSpacing(8);
+    visualLayout->setContentsMargins(4, 4, 4, 4);
+
+    auto* optionsScroll = new QScrollArea(workspaceSplitter);
+    optionsScroll->setWidgetResizable(true);
+    optionsScroll->setFrameShape(QFrame::NoFrame);
+    optionsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto* optionsPanel = new QWidget(optionsScroll);
+    auto* optionsLayout = new QVBoxLayout(optionsPanel);
+    optionsLayout->setSpacing(8);
+    optionsLayout->setContentsMargins(8, 8, 8, 8);
+    auto* optionsHeading = new QLabel(tr("STEROWANIE I OPCJE"), optionsPanel);
+    optionsHeading->setStyleSheet("font-weight:700;color:#40516a;");
+    optionsLayout->addWidget(optionsHeading);
+
+    visualScroll->setWidget(visualPanel);
+    optionsScroll->setWidget(optionsPanel);
+    workspaceSplitter->addWidget(visualScroll);
+    workspaceSplitter->addWidget(optionsScroll);
+    workspaceSplitter->setStretchFactor(0, 3);
+    workspaceSplitter->setStretchFactor(1, 1);
+    workspaceSplitter->setSizes({900, 300});
+    m_mainLayout->addWidget(workspaceSplitter, 1);
+
+    // Sekcja kontrolna w prawej, wąskiej kolumnie.
+    m_controlLayout = new QVBoxLayout();
     
     m_btnStartStop = new QPushButton("START POMIARU", this);
     m_btnStartStop->setMinimumHeight(45);
@@ -1013,7 +1049,7 @@ void MeasurementTab::setupUI()
     m_controlLayout->addWidget(m_chkShowTrends);
     m_controlLayout->addWidget(m_btnReset);
     
-    m_mainLayout->addLayout(m_controlLayout);
+    optionsLayout->addLayout(m_controlLayout);
     
     // Panel żywy z wykresem
     m_liveBox = new QGroupBox("Podgląd Na Żywo", this);
@@ -1061,7 +1097,7 @@ void MeasurementTab::setupUI()
     liveLayout->addWidget(m_seriesProgress);
     
     m_liveBox->setLayout(liveLayout);
-    m_mainLayout->addWidget(m_liveBox, 3);
+    visualLayout->addWidget(m_liveBox, 3);
     
 
     // MeasurementTab nie posiada własnego terminala debugowego.
@@ -1087,7 +1123,7 @@ void MeasurementTab::setupUI()
     
     statsLayout->addWidget(m_statsTable);
     m_statsBox->setLayout(statsLayout);
-    m_mainLayout->addWidget(m_statsBox);
+    visualLayout->addWidget(m_statsBox);
 
     // Pełna tabela 65 wskaźników; status oddziela wynik liczbowy od braku danych.
     m_biomechBox = new QGroupBox("Parametry biomechaniczne (65)", this);
@@ -1138,7 +1174,7 @@ void MeasurementTab::setupUI()
     m_biomechTable->setFont(QFont("Arial", 9));
     biomechLayout->addWidget(m_biomechTable);
     m_biomechBox->setLayout(biomechLayout);
-    m_mainLayout->addWidget(m_biomechBox);
+    visualLayout->addWidget(m_biomechBox);
     updateBiomechanicalTable();
 
     // Tabela surowych danych
@@ -1155,7 +1191,7 @@ void MeasurementTab::setupUI()
     
     rawLayout->addWidget(m_rawTable);
     m_rawBox->setLayout(rawLayout);
-    m_mainLayout->addWidget(m_rawBox);
+    visualLayout->addWidget(m_rawBox);
 }
 
 void MeasurementTab::setupTrendsUI()
@@ -1180,7 +1216,9 @@ void MeasurementTab::setupTrendsUI()
     trendsLayout->addWidget(m_trendsScrollArea);
     
     m_trendsBox->setLayout(trendsLayout);
-    m_mainLayout->addWidget(m_trendsBox);
+    visualLayout->addWidget(m_trendsBox);
+    visualLayout->addStretch(1);
+    optionsLayout->addStretch(1);
 }
 
 void MeasurementTab::setPatientId(const QString& id)
