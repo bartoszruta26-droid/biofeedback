@@ -2,6 +2,7 @@
 #define TAB_TRAININGTAB_HPP
 
 #include <QWidget>
+#include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -195,11 +196,13 @@ public:
      */
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
     void setMeasurementEngine(std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine);
+    void setSensorCalibrationReady(bool ready);
     
     /**
      * @brief Podłącza silnik gry
      */
     void setGameEngine(games::GameEngine* game);
+    void showGameWindow();
     void setCurrentPatientContext(const QString& patientPesel, const QString& patientDataPath);
     
     /**
@@ -320,6 +323,9 @@ private:
     // Placeholder for the standalone game window managed by MainWindow.
     QGroupBox* m_gameBox;
     games::GameEngine* m_currentGame;
+    QDialog* m_gameWindow;
+    QPushButton* m_btnOpenGame;
+    bool m_sensorCalibrationReady{false};
     QString m_activeGameType;
     QString m_currentPatientPesel;
     QString m_activeSessionId;
