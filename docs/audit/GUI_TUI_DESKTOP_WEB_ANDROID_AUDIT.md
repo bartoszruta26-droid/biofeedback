@@ -5,6 +5,8 @@
 Data audytu: 2026-11-07  
 Audytowana gałąź: `integration/all-work`  
 Commit bazowy audytu: `cdbb661e6154362aca125cb07091f9cd1085ac15`  
+> ⚠️ **Aktualizacja:** ten audyt jest historyczny i dotyczy wyłącznie gałęzi `integration/all-work` oraz SHA podanego poniżej. Bieżące ustalenia dla `main` z 2026-11-09 znajdują się w [audycie zgodności dokumentacji z kodem](DOCUMENTATION_CODE_CONFORMANCE_2026-11-09.md) oraz w [aktualnej macierzy funkcji](GUI_COMPONENT_MATRIX.md). Późniejsze wdrożenia API, TUI, WebUI i Androida nie zmieniają historycznego zakresu tego raportu.
+
 Zakres: Desktop GUI, TUI, Web UI, Android GUI, kontrakty integracyjne i CI.
 
 ## Zakres i ograniczenia
