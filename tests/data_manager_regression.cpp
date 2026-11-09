@@ -153,24 +153,24 @@ int main() {
         expect(dm.importFromJson(kResultsFile) == exportPayload, "plaintext mode JSON import");
 
 
-        // Make the destination directory unwritable so QSaveFile cannot create
-        // its sibling temporary file. The existing destination must remain intact.
-        ::chmod(kAtomicFailureDirectory, 0700);
-        ::unlink(kAtomicFailureFile);
-        ::rmdir(kAtomicFailureDirectory);
-        expect(::mkdir(kAtomicFailureDirectory, 0700) == 0, "create atomic failure directory");
-        {
-            std::ofstream original(kAtomicFailureFile, std::ios::binary);
-            original << "original-content";
-        }
-        expect(::chmod(kAtomicFailureDirectory, 0500) == 0, "make atomic destination directory read-only");
-        const bool interruptedWrite = dm.exportToJson("payload-that-cannot-be-written", kAtomicFailureFile);
-        const int restoreResult = ::chmod(kAtomicFailureDirectory, 0700);
-        expect(restoreResult == 0, "restore atomic destination directory permissions");
-        expect(!interruptedWrite, "unwritable atomic destination must fail");
-        std::ifstream preserved(kAtomicFailureFile, std::ios::binary);
-        std::string preservedContent((std::istreambuf_iterator<char>(preserved)), std::istreambuf_iterator<char>());
-        expect(preservedContent == "original-content", "previous destination must survive failed atomic write");
+        // /proc is a read-only virtual filesystem, so this failure-path test
+        // behaves consistently for both unprivileged CI users and root.
+        // The previous contents of the existing destination must remain intact.
+        const std::string protectedDestination = "/proc/self/status";
+        std::ifstream protectedBeforeFile(protectedDestination, std::ios::binary);
+        const std::string protectedBefore(
+            (std::istreambuf_iterator<char>(protectedBeforeFile)),
+            std::istreambuf_iterator<char>());
+        expect(!protectedBefore.empty(), "read protected destination before failed atomic write");
+        const bool interruptedWrite = dm.exportToJson(
+            "payload-that-cannot-be-written", protectedDestination);
+        expect(!interruptedWrite, "read-only proc destination must reject atomic write");
+        std::ifstream protectedAfterFile(protectedDestination, std::ios::binary);
+        const std::string protectedAfter(
+            (std::istreambuf_iterator<char>(protectedAfterFile)),
+            std::istreambuf_iterator<char>());
+        expect(protectedAfter == protectedBefore,
+               "read-only proc destination must remain unchanged after failed atomic write");
 
         std::remove(kAtomicFailureFile);
         ::rmdir(kAtomicFailureDirectory);
