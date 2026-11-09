@@ -217,6 +217,7 @@ private:
 
     // Dane wykresu
     QVector<DataPoint> m_dataPoints;
+    int m_samplesSinceAutoScale{0};
     
     // Zakresy osi
     double m_yMin;
