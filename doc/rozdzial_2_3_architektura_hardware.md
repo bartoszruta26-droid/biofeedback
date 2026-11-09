@@ -1,4 +1,6 @@
-# Rozdział 2.3. Architektura hardware: Raspberry Pi jako jednostka rejestrująca i treningowa
+# Rozdział 2.3. Architektura sprzętowa: Raspberry Pi jako jednostka rejestrująca i treningowa
+
+> **Status dokumentu: opracowanie koncepcyjne, nie specyfikacja zgodności ani protokół odbioru.** Wymienione dalej wartości docelowe (m.in. dokładność ±2%, opóźnienie poniżej 100 ms, MTBF 1000 godzin, 80 Hz, filtry, priorytety czasu rzeczywistego i zgodność z IEC 60601-1) nie są potwierdzone samym kodem repozytorium. Nie należy przedstawiać ich jako wyników pomiarów, certyfikacji, walidacji klinicznej ani właściwości aktualnego urządzenia. Rzeczywisty stan implementacji opisują przede wszystkim [`README.md`](../README.md), [`docs/MEASUREMENT_PIPELINE.md`](../docs/MEASUREMENT_PIPELINE.md) i [`docs/PICO_FIRMWARE_MEASUREMENT_STATUS.md`](../docs/PICO_FIRMWARE_MEASUREMENT_STATUS.md). Aktualny firmware Arduino to [`hx711_advanced.ino`](../hx711_advanced.ino); firmware Pico ma obecnie zakres diagnostyczny.
 
 ## 2.3.1. Wprowadzenie do architektury sprzętowej systemów embedded w zastosowaniach biomedycznych
 
