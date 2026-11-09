@@ -495,6 +495,11 @@ MeasurementTab::MeasurementTab(QWidget *parent)
             enqueueMeasurementSample(sample);
         });
     m_lastSensorData = sensor::SensorData();
+    // Default presentation polarity is inverted for a tensile load cell whose
+    // measured direction is currently negative. The acquisition journal always
+    // retains the untouched signed ADC value.
+    QString ignoredCalibrationError;
+    loadCalibrationProfile(&ignoredCalibrationError);
     m_repetitionDetector.setTargetForce(m_targetForce);
     
     // Device discovery and connection are owned by MainWindow's explicit device controls.
@@ -621,7 +626,7 @@ bool MeasurementTab::commitMeasurementSample(
         : m_sessionElapsedOffsetSeconds;
     bool calibratedMassAvailable = false;
     const double archivedValue = sample.isValid() && sample.unit == "count"
-        ? static_cast<double>(sample.rawValue) : 0.0;
+        ? static_cast<double>(sample.rawValue) : 0.0; // Preserve the signed hardware ADC value.
     const double calibratedMassKg = 0.0;
     QString quality = QString::fromLatin1(
         biofeedback::measurement::qualityName(sample.quality));
@@ -2170,7 +2175,7 @@ void MeasurementTab::onReadSingleSample()
         return;
     }
 
-    double value = static_cast<double>(m_lastSensorData.value);
+    double value = static_cast<double>(m_lastSensorData.value) * m_rawDisplayPolarity;
     double calibratedMassKg = 0.0;
     bool hasCalibratedMass = false;
     if (!m_showRawValues) {
@@ -3101,7 +3106,7 @@ void MeasurementTab::onMeasurementSample(
     }
     const std::int32_t raw = sample.rawValue;
     if (m_showRawValues) {
-        readSingleSample(static_cast<double>(raw), sample.deviceTimestampMs,
+        readSingleSample(static_cast<double>(raw) * m_rawDisplayPolarity, sample.deviceTimestampMs,
                          raw, true, 0.0, false);
         return;
     }
@@ -3148,6 +3153,8 @@ bool MeasurementTab::loadCalibrationProfile(QString* error)
         const QJsonDocument config = QJsonDocument::fromJson(configFile.readAll(), &parseError);
         if (parseError.error == QJsonParseError::NoError && config.isObject()) {
             const QJsonObject sensorConfig = config.object().value(QStringLiteral("sensor")).toObject();
+            const int configuredPolarity = sensorConfig.value(QStringLiteral("raw_polarity")).toInt(-1);
+            m_rawDisplayPolarity = configuredPolarity < 0 ? -1 : 1;
             const QString configuredPath = sensorConfig.value(QStringLiteral("calibration_profile")).toString();
             if (!configuredPath.trimmed().isEmpty()) {
                 profilePath = configuredPath.startsWith(QLatin1Char('/'))
@@ -3243,7 +3250,7 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
     if (m_forcePlot) m_forcePlot->clearData();
     for (auto& recorded : m_recordedSamples) {
         if (!recorded.hasRawValue) continue;
-        double displayValue = static_cast<double>(recorded.rawValue);
+        double displayValue = static_cast<double>(recorded.rawValue) * m_rawDisplayPolarity;
         if (unit != ForceUnit::Raw) {
             double forceNewtons = 0.0;
             if (!rawToNewtons(recorded.rawValue, forceNewtons)) continue;
