@@ -183,7 +183,7 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     , m_unit(ForceUnit::Newtons)
 {
     m_repaintTimer.setSingleShot(true);
-    m_repaintTimer.setInterval(33); // cap live chart repaint scheduling at ~30 Hz
+    m_repaintTimer.setInterval(16); // cap live chart repaint scheduling at ~60 Hz
     connect(&m_repaintTimer, &QTimer::timeout, this, [this] { update(); });
 
     setMinimumHeight(280);
@@ -1579,7 +1579,7 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
 
     // Persist/retain every sample and run repetition detection at acquisition
     // cadence, but refresh presentation widgets no faster than 20 Hz.
-    static constexpr qint64 LiveUiIntervalMs = 50;
+    static constexpr qint64 LiveUiIntervalMs = 16;
     const qint64 elapsedMs = m_sessionElapsedTimer.elapsed();
     if (elapsedMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs) {
         m_lastLiveUiRefreshMs = elapsedMs;
