@@ -262,39 +262,99 @@ W zależności od wydania systemu nazwa pakietu Qt Charts może się różnić. 
 
 ### 1. Pobranie repozytorium
 
-~~~bash
+Jeżeli repozytorium nie jest jeszcze na komputerze:
+
+```bash
 git clone https://github.com/bartoszruta26-droid/biofeedback.git
 cd biofeedback
-~~~
+```
 
-### 2. Konfiguracja i kompilacja
+Jeżeli masz już lokalną kopię i chcesz pobrać najnowsze zmiany z gałęzi `main`, przejdź do katalogu repozytorium i wykonaj:
 
-~~~bash
+```bash
+cd biofeedback
+git status
+git switch main
+git pull --ff-only origin main
+```
+
+Jeżeli `git status` pokazuje własne, niezapisane zmiany, najpierw je zatwierdź albo bezpiecznie odłóż (`git stash`). Nie używaj `git reset --hard`, jeżeli chcesz zachować lokalną pracę.
+
+Sprawdź, jaki commit został pobrany:
+
+```bash
+git log -1 --oneline
+```
+
+### 2. Instalacja zależności (Debian / Ubuntu / Raspberry Pi OS)
+
+```bash
+sudo apt update
+sudo apt install -y \
+  build-essential cmake git pkg-config \
+  qtbase5-dev qtbase5-dev-tools libqt5charts5-dev \
+  libserialport-dev nlohmann-json3-dev \
+  libssl-dev libncurses-dev
+```
+
+Pakiety Qt5 Widgets i Qt5 Charts są wymagane do zbudowania aplikacji Desktop. `libserialport-dev` zapewnia obsługę portu szeregowego, `nlohmann-json3-dev` obsługę JSON, a `libssl-dev` biblioteki OpenSSL. `libncurses-dev` jest potrzebny do opcjonalnego TUI.
+
+### 3. Konfiguracja i kompilacja aplikacji Desktop
+
+W katalogu głównym repozytorium wykonaj:
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel "$(nproc)"
-~~~
+cmake --build build --target biofeedback --parallel 2
+```
 
-### 3. Uruchomienie aplikacji
+Na komputerze z większą ilością pamięci możesz zwiększyć liczbę równoległych zadań, np. do `--parallel "$(nproc)"`. Na Raspberry Pi zalecane jest rozpoczęcie od `--parallel 2`, aby ograniczyć zużycie pamięci.
 
-~~~bash
+Jeżeli CMake był wcześniej skonfigurowany dla innego kompilatora, innej wersji Qt lub innej architektury, usuń wyłącznie katalog kompilacji i skonfiguruj projekt ponownie:
+
+```bash
+rm -rf build
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target biofeedback --parallel 2
+```
+
+Nie usuwaj katalogu danych użytkownika aplikacji — nie jest on katalogiem kompilacji.
+
+### 4. Uruchomienie aplikacji
+
+```bash
 ./build/biofeedback
-~~~
+```
 
-Jeżeli kompilacja w danej konfiguracji tworzy plik wykonywalny w innym katalogu, sprawdź wynik CMake i zawartość katalogu build/.
+Jeśli plik wykonywalny nie powstał, sprawdź komunikaty konfiguracji CMake. Komunikat `Qt5 not found` albo brak wymaganych modułów Qt oznacza, że cel Desktop nie został skonfigurowany. Komunikat o braku `libserialport` oznacza konieczność doinstalowania `libserialport-dev` i ponownego uruchomienia konfiguracji CMake.
 
-### 4. Uprawnienia portu szeregowego
+### 5. Uprawnienia portu szeregowego Arduino
 
 Aby użytkownik mógł korzystać z portu Arduino bez uruchamiania aplikacji jako administrator:
 
-~~~bash
+```bash
 sudo usermod -aG dialout "$USER"
-~~~
+```
 
 Następnie wyloguj się i zaloguj ponownie. Sprawdź nazwę urządzenia:
 
-~~~bash
+```bash
 ls -l /dev/ttyUSB* /dev/ttyACM* 2>/dev/null
-~~~
+```
+
+### 6. Aktualizacja i ponowna kompilacja w przyszłości
+
+Przy kolejnej aktualizacji istniejącej kopii repozytorium:
+
+```bash
+cd biofeedback
+git switch main
+git pull --ff-only origin main
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --target biofeedback --parallel 2
+```
+
+Jeżeli zmiany obejmują wyłącznie kod źródłowy, zwykle nie trzeba usuwać katalogu `build`. CMake i system budowania przebudują zmienione pliki. Po zmianie zależności systemowych lub konfiguracji kompilatora ponownie wykonaj konfigurację; pełne czyszczenie `build` stosuj tylko wtedy, gdy cache CMake jest niezgodny.
 
 ## 🍓 Raspberry Pi — instalacja i pakiet DEB
 
@@ -333,32 +393,59 @@ sudo apt --fix-broken install
 
 ## 🧰 Budowanie ze źródeł
 
-### 🧱 Budowanie aplikacji i celów projektu
+### 🧱 Budowanie aplikacji Desktop
 
-~~~bash
+Pełna instrukcja aktualizacji istniejącej kopii, instalacji zależności i uruchomienia aplikacji znajduje się w sekcji [Szybkie uruchomienie](#-szybkie-uruchomienie). Najkrótsza procedura kompilacji z katalogu głównego repozytorium:
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel "$(nproc)"
-~~~
+cmake --build build --target biofeedback --parallel 2
+```
+
+Cel `biofeedback` buduje główną aplikację okienkową Qt5. TUI jest celem opcjonalnym i jest konfigurowane, gdy CMake wykryje ncurses. Brak Qt5 Widgets/Charts lub libserialport uniemożliwia zbudowanie pełnej aplikacji Desktop.
 
 ### 🧪 Uruchomienie testów CTest
 
-~~~bash
+Po zbudowaniu celów testowych:
+
+```bash
+cmake --build build --parallel 2
 ctest --test-dir build --output-on-failure
-~~~
+```
+
+Aby zbudować wyłącznie aplikację Desktop, użyj `--target biofeedback`; aby uruchomić pełny zestaw testów, zbuduj wszystkie cele, a następnie wykonaj CTest.
+
+### 📦 Utworzenie pakietu DEB (opcjonalnie)
+
+Po pomyślnej konfiguracji i kompilacji:
+
+```bash
+cpack --config build/CPackConfig.cmake -G DEB -B dist
+```
+
+Pakiet można zainstalować poleceniem:
+
+```bash
+sudo apt install ./dist/biofeedback_*.deb
+```
 
 ### 🖥️ Przykład Qt5
 
-W repozytorium znajduje się przykład examples/qt5_mandatory.cpp. Po zbudowaniu sprawdź nazwę wygenerowanego celu i uruchom go z katalogu kompilacji.
+W repozytorium znajduje się przykład `examples/qt5_mandatory.cpp`. Cel przykładowy można zbudować poleceniem:
+
+```bash
+cmake --build build --target qt5_mandatory_example --parallel 2
+```
 
 ### 🛠️ Geany
 
 Projekt można otworzyć w środowisku Geany, jeżeli jest ono zainstalowane:
 
-~~~bash
+```bash
 geany biofeedback.geany
-~~~
+```
 
-Polecenia kompilacji i uruchamiania można skonfigurować w menu budowania Geany. Podstawowym i zalecanym źródłem konfiguracji pozostaje jednak CMakeLists.txt.
+Podstawowym i zalecanym źródłem konfiguracji pozostaje jednak `CMakeLists.txt`.
 
 ## 🧪 Testowanie
 
