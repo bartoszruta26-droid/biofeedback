@@ -469,6 +469,7 @@ private:
     bool m_hasCalibrationProfile{false};
     double m_calibrationZeroOffsetRaw{0.0};
     double m_calibrationScaleFactor{0.0};
+    int m_rawDisplayPolarity{-1}; // Correct inverted tensile load-cell direction in presentation only.
     
     // Detekcja powtórzeń
     bool m_inContraction;
