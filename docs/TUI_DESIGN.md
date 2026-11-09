@@ -1,4 +1,6 @@
-# Biofeedback TUI
+# ⌨️ Biofeedback — projekt interfejsu terminalowego TUI
+
+> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
 
 ## Cel
 
@@ -54,7 +56,7 @@ Zainstaluj libncurses-dev, a następnie:
 
 Jeśli ncurses nie jest dostępne, CMake pomija wyłącznie program TUI.
 
-## Training session controls and history
+## Sterowanie sesją treningową i historia
 
 The training screen supports configuration before starting:
 - exercise preset: E cycles through hand grip, wrist flexion, wrist extension and generic exercise;
@@ -67,6 +69,6 @@ After each completed series, the TUI pauses repetition detection during the conf
 
 The Patients screen reads the shared `patients` collection through the API and displays the records returned by the server. The Diagnostics screen reports valid and rejected sample counts, the last sample-quality classification, and the last repetition's peak and mean force, duration and time-to-peak. The TUI currently does not select a patient and therefore does not yet attach a `patient_id` to a training session. Patient-to-session association and full training-result history are next integration steps.
 
-## HX711 calibration requirement
+## Wymagania kalibracji HX711
 
 The TUI uses the shared measurement adapter with calibrated grams as its input. The advanced firmware reports whether its calibration is active. Raw binary frames without a confirmed `CAL:1` status are marked sensor-rejected by the physical-unit pipeline and cannot contribute to force-based repetitions. Calibrate with a known reference mass using `CAL:<grams>` after tare; the current firmware does not persist this flag through power cycles.
