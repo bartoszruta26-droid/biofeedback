@@ -14,6 +14,7 @@
 #include <QMessageBox>
 #include <QSignalBlocker>
 #include <QPainter>
+#include <QPolygon>
 #include <QPen>
 #include <QBrush>
 #include <QFont>
@@ -179,8 +180,18 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     , m_minObservedForce(0.0)
     , m_unit(ForceUnit::Newtons)
 {
+    m_repaintTimer.setSingleShot(true);
+    m_repaintTimer.setInterval(33); // cap live chart repaint scheduling at ~30 Hz
+    connect(&m_repaintTimer, &QTimer::timeout, this, [this] { update(); });
+
     setMinimumHeight(200);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+}
+
+void ForcePlotWidget::scheduleRepaint()
+{
+    if (!m_repaintTimer.isActive())
+        m_repaintTimer.start();
 }
 
 void ForcePlotWidget::setUnit(ForceUnit unit)
@@ -237,11 +248,12 @@ void ForcePlotWidget::addSample(double force, double time)
     const double observedMagnitude = std::max(
         std::abs(m_maxObservedForce), std::abs(m_minObservedForce));
     m_maxForce = std::max(5.0, observedMagnitude * 1.2);
-    update();
+    scheduleRepaint();
 }
 
 void ForcePlotWidget::clearData()
 {
+    m_repaintTimer.stop();
     m_forces.clear();
     m_times.clear();
     m_maxCandidates.clear();
@@ -286,105 +298,135 @@ void ForcePlotWidget::setMaxTimeWindow(double seconds)
 void ForcePlotWidget::paintEvent(QPaintEvent *event)
 {
     Q_UNUSED(event);
-    
+
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    
-    int width = this->width();
-    int height = this->height();
-    int margin = 40;
-    
-    int plotWidth = width - 2 * margin;
-    int plotHeight = height - 2 * margin;
-    
-    if (plotWidth <= 0 || plotHeight <= 0 || m_forces.empty()) {
+
+    const int widgetWidth = width();
+    const int widgetHeight = height();
+    const int margin = 40;
+    const int plotWidth = widgetWidth - 2 * margin;
+    const int plotHeight = widgetHeight - 2 * margin;
+
+    if (plotWidth <= 0 || plotHeight <= 0 || m_forces.empty())
         return;
-    }
-    
-    // Tło
+
     painter.fillRect(margin, margin, plotWidth, plotHeight, QColor(250, 250, 255));
-    
-    // Linie siatki
+
     painter.setPen(QPen(QColor(200, 200, 200), 1, Qt::DashLine));
     for (int i = 1; i <= 4; ++i) {
-        int y = margin + (plotHeight * i / 5);
+        const int y = margin + (plotHeight * i / 5);
         painter.drawLine(margin, y, margin + plotWidth, y);
     }
-    
-    // Oś czasu (X)
+
     painter.setPen(QPen(Qt::black, 2));
     painter.drawLine(margin, margin + plotHeight, margin + plotWidth, margin + plotHeight);
-    
-    // Oś siły (Y)
     painter.drawLine(margin, margin, margin, margin + plotHeight);
-    
-    // Etykiety osi Y - teraz z zakresem od -m_maxForce do +m_maxForce
+
     painter.setFont(QFont("Arial", 8));
     painter.setPen(Qt::black);
     for (int i = 0; i <= 10; ++i) {
-        int y = margin + plotHeight - (plotHeight * i / 10);
-        double force = (-m_maxForce + (2.0 * m_maxForce * i / 10)) * (m_unit == ForceUnit::Kilograms ? 1.0 / 9.80665 : 1.0);
-        QString label = QString::number(force, 'f', m_unit == ForceUnit::Kilograms ? 2 : 0);
-        painter.drawText(5, y + 3, label);
+        const int y = margin + plotHeight - (plotHeight * i / 10);
+        const double force = (-m_maxForce + (2.0 * m_maxForce * i / 10)) *
+            (m_unit == ForceUnit::Kilograms ? 1.0 / 9.80665 : 1.0);
+        painter.drawText(5, y + 3,
+            QString::number(force, 'f', m_unit == ForceUnit::Kilograms ? 2 : 0));
     }
-    
-    // Narysuj linię zera
+
     painter.setPen(QPen(QColor(150, 150, 150), 1, Qt::DashLine));
-    int zeroY = margin + plotHeight / 2;
+    const int zeroY = margin + plotHeight / 2;
     painter.drawLine(margin, zeroY, margin + plotWidth, zeroY);
-    
-    // Linia docelowej siły
-    if (m_targetForce > 0 && m_maxForce > 0) {
-        int targetY = margin + plotHeight - static_cast<int>(
+
+    // A force target is meaningful only for calibrated force units, not raw ADC counts.
+    if (m_unit != ForceUnit::Raw && m_targetForce > 0.0 && m_maxForce > 0.0) {
+        const int targetY = margin + plotHeight - static_cast<int>(
             ((m_targetForce + m_maxForce) / (2.0 * m_maxForce)) * plotHeight);
         painter.setPen(QPen(QColor(255, 100, 100), 2, Qt::DashLine));
         painter.drawLine(margin, targetY, margin + plotWidth, targetY);
         painter.setPen(QColor(255, 100, 100));
-        painter.drawText(margin + plotWidth - 60, targetY - 5, QString("Cel [%1]").arg(getUnitLabel()));
+        painter.drawText(margin + plotWidth - 60, targetY - 5,
+                         QString("Cel [%1]").arg(getUnitLabel()));
     }
-    
-    // Rysowanie wykresu siły
-    if (m_forces.size() < 2) {
+
+    if (m_forces.size() < 2)
         return;
-    }
-    
-    double minTime = m_times.front();
-    double maxTime = m_times.back();
-    double timeRange = maxTime - minTime;
-    if (timeRange <= 0) timeRange = 1.0;
-    
-    painter.setPen(QPen(QColor(0, 100, 200), 2, Qt::SolidLine));
-    
-    for (std::size_t i = 1; i < m_forces.size(); ++i) {
-        double x1 = margin + ((m_times[i-1] - minTime) / timeRange) * plotWidth;
-        // Skalowanie z zakresem symetrycznym: -m_maxForce do +m_maxForce
-        double y1 = margin + plotHeight - ((m_forces[i-1] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
-        double x2 = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
-        double y2 = margin + plotHeight - ((m_forces[i] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
-        
-        painter.drawLine(static_cast<int>(x1), static_cast<int>(y1), 
-                        static_cast<int>(x2), static_cast<int>(y2));
-    }
-    
-    // Wypełnienie pod wykresem - teraz względem linii zera
-    painter.setBrush(QBrush(QColor(0, 100, 200, 50)));
-    painter.setPen(Qt::NoPen);
-    
-    QVector<QPoint> fillPoints;
-    // Zaczynamy od linii zera (używamy istniejącej zmiennej zeroY zdefiniowanej wcześniej)
-    fillPoints.append(QPoint(margin, zeroY));
+
+    const double minTime = m_times.front();
+    const double maxTime = m_times.back();
+    const double timeRange = (maxTime > minTime) ? (maxTime - minTime) : 1.0;
+
+    struct PixelBucket {
+        bool valid{false};
+        std::size_t minIndex{0};
+        std::size_t maxIndex{0};
+        double minForce{0.0};
+        double maxForce{0.0};
+    };
+    std::vector<PixelBucket> buckets(static_cast<std::size_t>(plotWidth));
+
+    // Keep the temporal order of each column's extrema. This envelope
+    // preserves brief peaks while limiting the trace to <= 2 points/pixel.
     for (std::size_t i = 0; i < m_forces.size(); ++i) {
-        double x = margin + ((m_times[i] - minTime) / timeRange) * plotWidth;
-        double y = margin + plotHeight - ((m_forces[i] + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
-        fillPoints.append(QPoint(static_cast<int>(x), static_cast<int>(y)));
+        const double ratio = (m_times[i] - minTime) / timeRange;
+        const int x = qBound(0, static_cast<int>(ratio * plotWidth), plotWidth - 1);
+        PixelBucket& bucket = buckets[static_cast<std::size_t>(x)];
+        const double force = m_forces[i];
+        if (!bucket.valid) {
+            bucket.valid = true;
+            bucket.minIndex = bucket.maxIndex = i;
+            bucket.minForce = bucket.maxForce = force;
+        } else {
+            if (force < bucket.minForce) {
+                bucket.minForce = force;
+                bucket.minIndex = i;
+            }
+            if (force > bucket.maxForce) {
+                bucket.maxForce = force;
+                bucket.maxIndex = i;
+            }
+        }
     }
-    fillPoints.append(QPoint(margin + plotWidth, zeroY));
-    
-    painter.drawPolygon(fillPoints);
-    
-    // Etykiety osi X
+
+    QVector<QPoint> tracePoints;
+    tracePoints.reserve(plotWidth * 2);
+    for (int column = 0; column < plotWidth; ++column) {
+        const PixelBucket& bucket = buckets[static_cast<std::size_t>(column)];
+        if (!bucket.valid)
+            continue;
+
+        const auto toPoint = [&](double force) {
+            const double y = margin + plotHeight -
+                ((force + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
+            return QPoint(margin + column, static_cast<int>(y));
+        };
+
+        if (bucket.minIndex <= bucket.maxIndex) {
+            tracePoints.append(toPoint(bucket.minForce));
+            if (bucket.maxIndex != bucket.minIndex)
+                tracePoints.append(toPoint(bucket.maxForce));
+        } else {
+            tracePoints.append(toPoint(bucket.maxForce));
+            tracePoints.append(toPoint(bucket.minForce));
+        }
+    }
+
+    if (tracePoints.size() >= 2) {
+        painter.setPen(QPen(QColor(0, 100, 200), 2, Qt::SolidLine));
+        painter.drawPolyline(tracePoints.constData(), tracePoints.size());
+
+        QPolygon fillPoints;
+        fillPoints.reserve(tracePoints.size() + 2);
+        fillPoints.append(QPoint(margin, zeroY));
+        for (const QPoint& point : tracePoints)
+            fillPoints.append(point);
+        fillPoints.append(QPoint(margin + plotWidth, zeroY));
+        painter.setBrush(QBrush(QColor(0, 100, 200, 50)));
+        painter.setPen(Qt::NoPen);
+        painter.drawPolygon(fillPoints);
+    }
+
     painter.setPen(Qt::black);
-    painter.drawText(margin + plotWidth / 2 - 20, height - 15, "Czas [s]");
+    painter.drawText(margin + plotWidth / 2 - 20, widgetHeight - 15, "Czas [s]");
     painter.drawText(5, margin - 5, QString("Siła [%1]").arg(getUnitLabel()));
 }
 
