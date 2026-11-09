@@ -16,21 +16,23 @@ for path in games:
 
 main = Path("src/gui/MainWindow.cpp").read_text(encoding="utf-8")
 training = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
-if "addDataCallback(" not in main or "enqueueGameSensorInput(normalizedGameInput)" not in main:
-    raise SystemExit("MainWindow must own and enqueue the global game input")
+measurement = Path("src/tab/MeasurementTab.cpp").read_text(encoding="utf-8")
+if "gameMeasurementEngine->subscribe" not in main or "enqueueGameSensorInput(normalized)" not in main:
+    raise SystemExit("MainWindow must subscribe to calibrated force and enqueue global game input")
 if ("m_pendingGameSensorInput = value" not in main or
         "m_gameSensorInputAvailable = true" not in main or
         "forwardSensorToGame(latestValue)" not in main):
     raise SystemExit("MainWindow must coalesce game control to the newest valid sensor value")
-if "gramsToNewtons(data.calibratedValue)" not in main:
-    raise SystemExit("Global game input must convert calibrated grams to SI force")
+if ("m_trainingMeasurementEngine->ingest(input)" not in measurement or
+        "rawToNewtons(data.value, forceNewtons)" not in measurement or 'input.unit = "N"' not in measurement):
+    raise SystemExit("MeasurementTab must publish locally calibrated force in SI newtons")
 if "setMeasurementEngine" not in training or "m_measurementEngine->subscribe" not in training:
     raise SystemExit("TrainingTab must consume the shared MeasurementEngine stream")
 if "addDataCallback(" in training or "onSensorDataReceived" in training:
     raise SystemExit("TrainingTab must not create a second serial sample path")
-if "sample.value * biofeedback::measurement::standardGravityMetersPerSecondSquared" not in training:
-    raise SystemExit("TrainingTab must convert canonical kilograms to SI force")
-if "!sample.isValid()" not in training or 'sample.unit != "kg"' not in training:
+if "const double force = std::abs(sample.value)" not in training:
+    raise SystemExit("TrainingTab must use calibrated tensile force in newtons")
+if "!sample.isValid()" not in training or 'sample.unit != "N"' not in training:
     raise SystemExit("TrainingTab must reject invalid or non-mass canonical samples")
 if "if (!m_serialPort || !m_serialPort->isConnected())" not in training:
     raise SystemExit("Training must refuse to start without a connected sensor")
