@@ -247,6 +247,12 @@ if "Qt::PreciseTimer" not in game_engine_source:
     raise SystemExit("Game frame timer must use precise scheduling")
 if "QPainterPath tracePath;" not in source or "QPointF(margin + column, y)" not in source:
     raise SystemExit("Measurement trace must retain subpixel coordinates for smooth rendering")
+if "m_forcePlot->addSample(forceValue, currentTime)" not in sample_body:
+    raise SystemExit("Measurement plot must receive every acquired sample")
+if "m_progressWidget->setCurrentForce(force);" not in training_source:
+    raise SystemExit("Training live force trace must receive every acquired sample")
+if "m_lastLiveUiRefreshMs = -16;" not in source or "m_lastGameInputRefreshMs = -16;" not in training_source:
+    raise SystemExit("Live refresh clocks must reset when a new session starts")
 
 print("Measurement, training and game realtime dispatch regression passed")
 
