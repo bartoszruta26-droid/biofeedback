@@ -14,6 +14,10 @@
 #include <QScrollArea>
 #include <QSplitter>
 #include <QDir>
+#include <QGuiApplication>
+#include <QScreen>
+#include <QShortcut>
+#include <QKeySequence>
 #include <QElapsedTimer>
 #include <QPainterPath>
 #include <QJsonArray>
@@ -262,6 +266,8 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_lblRestTimer(nullptr)
     , m_gameBox(nullptr)
     , m_currentGame(nullptr)
+    , m_gameWindow(nullptr)
+    , m_btnOpenGame(nullptr)
     , m_activeGameType("none")
     , m_statsBox(nullptr)
     , m_statsContainer(nullptr)
@@ -291,6 +297,12 @@ TrainingTab::~TrainingTab()
         m_measurementCallbackToken = 0;
     }
     stopTraining();
+    if (m_gameWindow) {
+        m_gameWindow->close();
+        delete m_gameWindow;
+        m_gameWindow = nullptr;
+        m_currentGame = nullptr;
+    }
 }
 
 void TrainingTab::setupUI()
@@ -509,14 +521,14 @@ void TrainingTab::setupUI()
     gameLayout->setContentsMargins(0, 0, 0, 0);
     gameLayout->setSpacing(0);
 
-    auto* gamePlaceholder = new QLabel(
-        tr("Gra otwiera się w osobnym, maksymalizowanym oknie."), m_gameBox);
-    gamePlaceholder->setAlignment(Qt::AlignCenter);
-    gamePlaceholder->setMinimumHeight(90);
-    gamePlaceholder->setWordWrap(true);
-    gamePlaceholder->setStyleSheet(
-        "background-color:#1a1a1a;color:#888;font-size:10pt;border:1px solid #333;");
-    gameLayout->addWidget(gamePlaceholder);
+    m_btnOpenGame = new QPushButton(
+        tr("Otwórz grę w osobnym oknie pełnoekranowym"), m_gameBox);
+    m_btnOpenGame->setMinimumHeight(54);
+    m_btnOpenGame->setEnabled(false);
+    m_btnOpenGame->setToolTip(
+        tr("Gra działa w niezależnym oknie. Klawisz Esc przywraca okno z paskiem tytułu."));
+    gameLayout->addWidget(m_btnOpenGame);
+    connect(m_btnOpenGame, &QPushButton::clicked, this, &TrainingTab::showGameWindow);
 
     visualLayout->addWidget(m_gameBox, 0);
     
@@ -642,6 +654,12 @@ void TrainingTab::startTraining()
         return;
     }
 
+    if (!m_sensorCalibrationReady) {
+        QMessageBox::warning(this, tr("Brak kalibracji"),
+                             tr("Zapisz i wczytaj profil kalibracji HX711 przed rozpoczęciem treningu."));
+        return;
+    }
+
     if (m_analyticsWidget && !m_analyticsWidget->beginSession()) {
         QMessageBox::warning(this, tr("Niezapisana sesja"),
                              tr("Zapisz poprzednią sesję treningową przed rozpoczęciem kolejnej."));
@@ -705,6 +723,7 @@ void TrainingTab::stopTraining(bool completed)
     // Stop the game before snapshotting analytics: gameEnded may add final points.
     if (m_currentGame && m_currentGame->isRunning())
         m_currentGame->stop();
+    if (m_gameWindow) m_gameWindow->hide();
 
     refreshAnalytics();
     if (m_analyticsWidget) {
@@ -816,6 +835,11 @@ void TrainingTab::setMeasurementEngine(
         });
 }
 
+void TrainingTab::setSensorCalibrationReady(bool ready)
+{
+    m_sensorCalibrationReady = ready;
+}
+
 void TrainingTab::setCurrentPatientContext(const QString& patientPesel,
                                              const QString& patientDataPath)
 {
@@ -848,40 +872,49 @@ void TrainingTab::setGameEngine(games::GameEngine* game)
     m_currentGame = game;
     if (!m_currentGame) return;
 
-    m_currentGame->setParent(m_gameBox);
-    m_currentGame->setMinimumHeight(400);
-    if (m_gameBox->layout() && m_gameBox->layout()->indexOf(m_currentGame) < 0) {
-        while (QLayoutItem* item = m_gameBox->layout()->takeAt(0)) {
-            if (QWidget* widget = item->widget()) {
-                widget->hide();
-                widget->deleteLater();
-            }
-            delete item;
-        }
-        m_gameBox->layout()->addWidget(m_currentGame);
+    if (!m_gameWindow) {
+        m_gameWindow = new QDialog(this, Qt::Window);
+        m_gameWindow->setWindowTitle(tr("Biofeedback — gra treningowa"));
+        m_gameWindow->setModal(false);
+        m_gameWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+        m_gameWindow->setMinimumSize(640, 400);
+        auto* gameLayout = new QVBoxLayout(m_gameWindow);
+        gameLayout->setContentsMargins(0, 0, 0, 0);
+        gameLayout->setSpacing(0);
+        auto* leaveFullscreen = new QShortcut(QKeySequence(Qt::Key_Escape), m_gameWindow);
+        connect(leaveFullscreen, &QShortcut::activated, m_gameWindow, [this]() {
+            if (!m_gameWindow) return;
+            m_gameWindow->showNormal();
+            m_gameWindow->resize(1280, 800);
+            m_gameWindow->raise();
+            m_gameWindow->activateWindow();
+        });
     }
 
-    disconnect(m_currentGame, nullptr, this, nullptr);
+    m_currentGame->setParent(m_gameWindow);
+    m_currentGame->setMinimumSize(600, 360);
+    m_currentGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    if (m_gameWindow->layout())
+        m_gameWindow->layout()->addWidget(m_currentGame);
+
     connect(m_currentGame, &games::GameEngine::gameEnded, this, &TrainingTab::onGameEnded);
     connect(m_currentGame, &games::GameEngine::gameStarted, this, &TrainingTab::onGameStarted);
     connect(m_currentGame, &games::GameEngine::scoreChanged, this, &TrainingTab::onScoreChanged);
 
-    if (m_serialPort) {
-        if (auto* game = dynamic_cast<games::PongGame*>(m_currentGame))
-            game->setSerialConnection(m_serialPort);
-        if (auto* game = dynamic_cast<games::FlappyBirdGame*>(m_currentGame))
-            game->setSerialConnection(m_serialPort);
-        if (auto* game = dynamic_cast<games::MarioGame*>(m_currentGame))
-            game->setSerialConnection(m_serialPort);
-        if (auto* game = dynamic_cast<games::SinGame*>(m_currentGame))
-            game->setSerialConnection(m_serialPort);
-        if (auto* game = dynamic_cast<games::TanGame*>(m_currentGame))
-            game->setSerialConnection(m_serialPort);
-        if (auto* game = dynamic_cast<games::ArkanoidGame*>(m_currentGame))
-            game->setSerialConnection(m_serialPort);
-        if (auto* game = dynamic_cast<games::GalagaGame*>(m_currentGame))
-            game->setSerialConnection(m_serialPort);
-    }
+    if (m_btnOpenGame) m_btnOpenGame->setEnabled(true);
+    showGameWindow();
+}
+
+void TrainingTab::showGameWindow()
+{
+    if (!m_gameWindow || !m_currentGame) return;
+    const QRect available = QGuiApplication::primaryScreen()
+        ? QGuiApplication::primaryScreen()->availableGeometry() : QRect(0, 0, 1280, 800);
+    m_gameWindow->setGeometry(available);
+    m_gameWindow->showFullScreen();
+    m_gameWindow->raise();
+    m_gameWindow->activateWindow();
+    m_currentGame->setFocus(Qt::OtherFocusReason);
 }
 
 void TrainingTab::configureGameForExercise()
@@ -895,36 +928,25 @@ void TrainingTab::configureGameForExercise()
     if (type.isEmpty()) type = "none";
     if (type == m_activeGameType && (type == "none" || m_currentGame)) return;
 
-    if (m_currentGame) {
-        if (m_currentGame->isRunning()) m_currentGame->stop();
-        if (m_gameBox->layout()) m_gameBox->layout()->removeWidget(m_currentGame);
-        delete m_currentGame;
-        m_currentGame = nullptr;
-    }
-    if (m_gameBox->layout()) {
-        while (QLayoutItem* item = m_gameBox->layout()->takeAt(0)) {
-            if (QWidget* widget = item->widget()) delete widget;
-            delete item;
-        }
+    if (m_currentGame && m_currentGame->isRunning())
+        m_currentGame->stop();
+    m_currentGame = nullptr;
+    if (m_gameWindow) {
+        m_gameWindow->close();
+        delete m_gameWindow;
+        m_gameWindow = nullptr;
     }
 
     m_activeGameType = type;
-    games::GameEngine* selectedGame = nullptr;
-    if (type != "none")
-        selectedGame = games::createGame(type, m_gameBox);
+    if (m_btnOpenGame) m_btnOpenGame->setEnabled(false);
+    if (type == "none") return;
 
-    if (selectedGame) {
-        m_gameBox->layout()->addWidget(selectedGame);
-        setGameEngine(selectedGame);
-    } else {
-        auto* placeholder = new QLabel(
-            type == "none" ? tr("Trening bez gry") : tr("Nieznany typ gry: %1").arg(type),
-            m_gameBox);
-        placeholder->setAlignment(Qt::AlignCenter);
-        placeholder->setMinimumHeight(400);
-        placeholder->setStyleSheet("background-color:#1a1a1a;color:#888;font-size:18px;");
-        m_gameBox->layout()->addWidget(placeholder);
+    games::GameEngine* selectedGame = games::createGame(type, nullptr);
+    if (!selectedGame) {
+        addDebugMessage(QString("Nieznany typ gry w planie treningowym: %1").arg(type), "WARNING");
+        return;
     }
+    setGameEngine(selectedGame);
 }
 
 QVector<ExerciseStats> TrainingTab::getTrainingStats() const
@@ -1325,16 +1347,16 @@ void TrainingTab::onMeasurementSample(
 {
     if (!m_stateMachine.running()) return;
 
-    // MeasurementEngine normalizes firmware grams to kilograms. Convert the
-    // canonical mass-equivalent value to SI force exactly once for biomechanics.
-    if (m_stateMachine.paused() || m_stateMachine.resting() || !sample.isValid() || sample.unit != "kg" ||
+    // Training consumes only the calibrated SI force stream published by
+    // MeasurementTab. Raw ADC counts are never treated as force values.
+    if (m_stateMachine.paused() || m_stateMachine.resting() || !sample.isValid() || sample.unit != "N" ||
         m_currentExerciseIndex < 0 || m_currentExerciseIndex >= m_exercisePlan.size()) {
         biofeedback::training::RepetitionRecord discarded;
         m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
         return;
     }
 
-    const double force = sample.value * biofeedback::measurement::standardGravityMetersPerSecondSquared;
+    const double force = sample.value; // Already calibrated and expressed in newtons.
     if (!std::isfinite(force) || force < 0.0) {
         biofeedback::training::RepetitionRecord discarded;
         m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
