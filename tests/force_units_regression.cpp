@@ -13,6 +13,7 @@ int main() {
         !near(gramsToNewtons(1000.0), 9.80665) ||
         !near(gramsToNewtons(100.0), 0.980665) ||
         !near(gramsToNewtons(-100.0), -0.980665) ||
+        !near(std::abs(gramsToNewtons(-100.0)), 0.980665) ||
         !near(newtonsToKilogramForce(9.80665), 1.0) ||
         !near(newtonsToKilogramForce(0.980665), 0.1)) {
         std::cerr << "SI force conversion regression failed\n";
