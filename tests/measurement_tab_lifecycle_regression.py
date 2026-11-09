@@ -249,6 +249,8 @@ if "Qt::PreciseTimer" not in game_engine_source:
     raise SystemExit("Game frame timer must use precise scheduling")
 if "QPainterPath tracePath;" not in source or "QPointF(margin + column, y)" not in source:
     raise SystemExit("Measurement trace must retain subpixel coordinates for smooth rendering")
+if "tracePath.cubicTo(control1, control2, p2);" not in source:
+    raise SystemExit("Measurement trace must use shape-preserving cubic interpolation")
 if "m_forcePlot->addSample(forceValue, currentTime)" not in sample_body:
     raise SystemExit("Measurement plot must receive every acquired sample")
 if "m_progressWidget->setCurrentForce(force);" not in training_source:
@@ -258,6 +260,8 @@ if "std::deque<double> m_forceHistory" not in training_header or "MaximumTraceSa
     raise SystemExit("Training live trace must retain a bounded six-second sample window")
 if "QPainterPath trace;" not in training_source or "Qt::RoundJoin" not in training_source:
     raise SystemExit("Training live trace must use antialiased rounded vector rendering")
+if "trace.cubicTo(control1, control2, p2);" not in training_source:
+    raise SystemExit("Training live trace must use shape-preserving cubic interpolation")
 if "m_lastLiveUiRefreshMs = -16;" not in source or "m_lastGameInputRefreshMs = -16;" not in training_source:
     raise SystemExit("Live refresh clocks must reset when a new session starts")
 
