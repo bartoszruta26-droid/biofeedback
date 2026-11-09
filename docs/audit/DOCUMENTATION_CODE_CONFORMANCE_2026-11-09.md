@@ -132,6 +132,7 @@ Szczegółowa macierz i uwagi: [`GUI_COMPONENT_MATRIX.md`](GUI_COMPONENT_MATRIX.
 - Naprawiono strukturę tabeli w `docs/README.md`, aby audyt zgodności był prawidłowym wierszem tabeli.
 - Skorygowano `BUILD_INSTRUCTIONS.md`: właściwy szkic Arduino, prędkość 115200, bezpieczne uprawnienia `dialout`, aktualny algorytm AES-256-GCM i ostrzeżenia dotyczące kalibracji oraz backendu MariaDB.
 - Dodano ostrzeżenia statusowe do rozdziałów `doc/rozdzial_2_3_architektura_hardware.md`, `doc/rozdzial_8_zalaczniki.md` i `doc/rozdzial_7_3_skalowanie_komercjalizacja_integracja.md`, aby założenia koncepcyjne, materiały robocze i planowane integracje nie były mylone z pomiarami, certyfikacją lub wdrożonymi funkcjami.
+- Usunięto z `BUILD_INSTRUCTIONS.md` instrukcję bezpośredniego budowania przez nieistniejący w repozytorium `Makefile`; pozostawiono CMake jako właściwą metodę.
 
 ## 6. Testy i ograniczenia audytu
 
