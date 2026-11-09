@@ -1,5 +1,7 @@
 #include "gui/GraphWidget.hpp"
 #include <QPainterPath>
+#include <QLineF>
+#include <iterator>
 #include <QGradient>
 #include <QLinearGradient>
 #include <QElapsedTimer>
