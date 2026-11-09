@@ -28,6 +28,8 @@
 #include <QFrame>
 #include <QScreen>
 #include <QGuiApplication>
+#include <QShortcut>
+#include <QKeySequence>
 #include <QMetaObject>
 #include <cmath>
 #include <memory>
@@ -92,20 +94,6 @@ MainWindow::MainWindow(QWidget *parent)
             }, Qt::QueuedConnection);
         });
 
-    m_serialDataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
-        if (!data.isValid || !data.hasCalibratedValue) return;
-        const double forceNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
-        if (!std::isfinite(forceNewtons)) return;
-        // Signed calibration supports either HX711 bridge wiring polarity.
-        // Game controls use tensile magnitude, while recorded physical samples
-        // and their calibrated sign remain unchanged.
-        const double tensileForceNewtons = std::abs(forceNewtons);
-        constexpr double gameReferenceForceN = 50.0;
-        const double normalizedGameInput = qBound(
-            0.0, tensileForceNewtons / gameReferenceForceN * 100.0, 100.0);
-        enqueueGameSensorInput(normalizedGameInput);
-    });
-
     setupUI();
     setupMenuBar();
     setupToolBar();
@@ -118,8 +106,11 @@ MainWindow::~MainWindow()
 {
     saveSettings();
     if (m_serialPort) {
-        m_serialPort->removeDataCallback(m_serialDataCallbackToken);
-        m_serialDataCallbackToken = 0;
+        if (m_measurementTab && m_gameMeasurementCallbackToken) {
+            const auto engine = m_measurementTab->trainingMeasurementEngine();
+            if (engine) engine->unsubscribe(m_gameMeasurementCallbackToken);
+            m_gameMeasurementCallbackToken = 0;
+        }
         m_serialPort->removeConnectionCallback(m_serialConnectionCallbackToken);
         m_serialConnectionCallbackToken = 0;
         m_serialPort->stopAsyncReading();
@@ -180,7 +171,19 @@ void MainWindow::setupTabs()
         m_measurementTab->setSerialConnection(m_serialPort);
         m_outlineTab->setSerialConnection(m_serialPort);
         m_trainingTab->setSerialConnection(m_serialPort);
-        m_trainingTab->setMeasurementEngine(m_measurementTab->measurementEngine());
+        m_trainingTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());
+        const auto gameMeasurementEngine = m_measurementTab->trainingMeasurementEngine();
+        if (gameMeasurementEngine) {
+            m_gameMeasurementCallbackToken = gameMeasurementEngine->subscribe(
+                [this](const biofeedback::measurement::MeasurementSample& sample) {
+                    if (!sample.isValid() || sample.unit != "N" || !std::isfinite(sample.value))
+                        return;
+                    constexpr double gameReferenceForceN = 50.0;
+                    const double normalized = qBound(
+                        0.0, std::abs(sample.value) / gameReferenceForceN * 100.0, 100.0);
+                    enqueueGameSensorInput(normalized);
+                });
+        }
         m_debugTab->setSerialConnection(m_serialPort);
     }
 
@@ -894,21 +897,14 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
         return;
     }
 
-    if (auto* game = dynamic_cast<games::PongGame*>(selectedGame))
-        game->setSerialConnection(m_serialPort);
-    else if (auto* game = dynamic_cast<games::FlappyBirdGame*>(selectedGame))
-        game->setSerialConnection(m_serialPort);
-    else if (auto* game = dynamic_cast<games::MarioGame*>(selectedGame))
-        game->setSerialConnection(m_serialPort);
-    else if (auto* game = dynamic_cast<games::SinGame*>(selectedGame))
-        game->setSerialConnection(m_serialPort);
-    else if (auto* game = dynamic_cast<games::TanGame*>(selectedGame))
-        game->setSerialConnection(m_serialPort);
-    else if (auto* game = dynamic_cast<games::ArkanoidGame*>(selectedGame))
-        game->setSerialConnection(m_serialPort);
-    else if (auto* game = dynamic_cast<games::GalagaGame*>(selectedGame))
-        game->setSerialConnection(m_serialPort);
+    if (!m_measurementTab || !m_measurementTab->hasCalibrationProfile()) {
+        delete selectedGame;
+        QMessageBox::warning(this, tr("Brak kalibracji"),
+                             tr("Zapisz i wczytaj profil kalibracji czujnika przed uruchomieniem gry."));
+        return;
+    }
 
+    // Every game receives calibrated force through the shared SI measurement stream.
     // Games run in their own top-level window, not inside the small dashboard stack.
     // This gives the renderer the full available desktop area and keyboard focus.
     m_gameWindow = new QDialog(this, Qt::Window);
@@ -916,6 +912,13 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
     m_gameWindow->setModal(false);
     m_gameWindow->setMinimumSize(640, 400);
     m_gameWindow->setAttribute(Qt::WA_DeleteOnClose, false);
+    auto* leaveFullscreen = new QShortcut(QKeySequence(Qt::Key_Escape), m_gameWindow);
+    connect(leaveFullscreen, &QShortcut::activated, m_gameWindow, [this]() {
+        if (!m_gameWindow) return;
+        m_gameWindow->showNormal();
+        m_gameWindow->raise();
+        m_gameWindow->activateWindow();
+    });
     auto* gameLayout = new QVBoxLayout(m_gameWindow);
     gameLayout->setContentsMargins(0, 0, 0, 0);
     gameLayout->setSpacing(0);
@@ -934,7 +937,7 @@ void MainWindow::startGame(const QString& gameId, const tab::ExerciseData& exerc
     const QRect available = QGuiApplication::primaryScreen()
         ? QGuiApplication::primaryScreen()->availableGeometry() : QRect(0, 0, 1280, 800);
     m_gameWindow->setGeometry(available);
-    m_gameWindow->showMaximized();
+    m_gameWindow->showFullScreen();
     m_gameWindow->raise();
     m_gameWindow->activateWindow();
     m_currentGame->start();
