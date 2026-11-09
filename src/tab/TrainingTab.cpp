@@ -350,7 +350,7 @@ void TrainingTab::setupUI()
             [workspaceSplitter](int position, int) {
         const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
         const int maxVisualWidth = availableWidth * 3 / 4;
-        if (position > maxVisualWidth) {
+        if (position < maxVisualWidth) {
             workspaceSplitter->setSizes({maxVisualWidth, availableWidth - maxVisualWidth});
         }
     });
