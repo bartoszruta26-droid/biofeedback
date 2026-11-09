@@ -325,7 +325,6 @@ private:
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
-    std::atomic<double> m_latestSensorForceN{0.0};
     std::atomic<bool> m_gameInputUpdateScheduled{false};
     
 public:
