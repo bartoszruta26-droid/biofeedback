@@ -207,7 +207,7 @@ void ForcePlotWidget::setUnit(ForceUnit unit)
 QString ForcePlotWidget::getUnitLabel() const
 {
     switch (m_unit) {
-        case ForceUnit::Kilograms: return "kgf";
+        case ForceUnit::Kilograms: return "kg";
         case ForceUnit::Raw: return "ADC";
         default: return "N";
     }
@@ -3237,10 +3237,46 @@ void MeasurementTab::setCurrentUnit(ForceUnit unit)
             if (index >= 0) m_unitSelector->setCurrentIndex(index);
         }
     }
-    if (m_forcePlot) m_forcePlot->setUnit(unit);
+    // Rebuild the visible presentation from immutable raw counts. Switching
+    // units never changes the values already committed to the acquisition journal.
+    m_rawForceBuffer.clear();
+    m_timeBuffer.clear();
+    if (m_forcePlot) m_forcePlot->clearData();
+    for (auto& recorded : m_recordedSamples) {
+        if (!recorded.hasRawValue) continue;
+        double displayValue = static_cast<double>(recorded.rawValue);
+        if (unit != ForceUnit::Raw) {
+            double forceNewtons = 0.0;
+            if (!rawToNewtons(recorded.rawValue, forceNewtons)) continue;
+            displayValue = unit == ForceUnit::Kilograms
+                ? forceNewtons / 9.80665 : forceNewtons;
+            recorded.calibratedMassKg = forceNewtons / 9.80665;
+            recorded.hasCalibratedMass = true;
+        } else {
+            recorded.calibratedMassKg = 0.0;
+            recorded.hasCalibratedMass = false;
+        }
+        recorded.value = displayValue;
+        recorded.unit = unit == ForceUnit::Raw ? "count" : (unit == ForceUnit::Kilograms ? "kg" : "N");
+        m_rawForceBuffer.append(displayValue);
+        m_timeBuffer.append(recorded.elapsedTimeSeconds);
+    }
+    constexpr int liveBufferCapacity = 10000;
+    if (m_rawForceBuffer.size() > liveBufferCapacity) {
+        const int removeCount = m_rawForceBuffer.size() - liveBufferCapacity;
+        m_rawForceBuffer.remove(0, removeCount);
+        m_timeBuffer.remove(0, removeCount);
+    }
+    if (m_forcePlot) {
+        m_forcePlot->setUnit(unit);
+        const int first = std::max(0, m_rawForceBuffer.size() - liveBufferCapacity);
+        for (int i = first; i < m_rawForceBuffer.size(); ++i)
+            m_forcePlot->addSample(m_rawForceBuffer[i], m_timeBuffer[i]);
+    }
     updateUnitDisplay();
     updateStatsTableUnits();
     updateRawTableUnits();
+    updateRawTableBatch(true);
 }
 
 void MeasurementTab::updateUnitDisplay()
@@ -3250,7 +3286,7 @@ void MeasurementTab::updateUnitDisplay()
         unitLabel = "ADC";
     } else {
         switch (m_currentUnit) {
-            case ForceUnit::Kilograms: unitLabel = "kgf"; break;
+            case ForceUnit::Kilograms: unitLabel = "kg"; break;
             case ForceUnit::Raw: unitLabel = "ADC"; break;
             case ForceUnit::Newtons: default: unitLabel = "N"; break;
         }
