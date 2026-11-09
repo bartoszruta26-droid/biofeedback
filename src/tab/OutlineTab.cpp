@@ -926,10 +926,26 @@ void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication
     }
     m_serialPort = serial;
     if (m_serialPort) {
+        // This tab does not acquire or store samples. Only post a coalesced
+        // game-input update while an active Outline game can consume it.
         m_dataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
-            QMetaObject::invokeMethod(this, [this, data]() {
-                onSensorDataReceived(data);
-            }, Qt::QueuedConnection);
+            if (!data.isValid || !data.hasCalibratedValue ||
+                !m_isSessionActive || m_isPaused || !m_currentGame)
+                return;
+            const double forceN = data.calibratedValue *
+                biofeedback::measurement::standardGravityMetersPerSecondSquared / 1000.0;
+            if (!std::isfinite(forceN)) return;
+            m_latestSensorForceN.store(forceN, std::memory_order_release);
+            if (!m_gameInputUpdateScheduled.exchange(true, std::memory_order_acq_rel)) {
+                QMetaObject::invokeMethod(this, [this]() {
+                    m_gameInputUpdateScheduled.store(false, std::memory_order_release);
+                    if (!m_isSessionActive || m_isPaused || !m_currentGame) return;
+                    const double latest = m_latestSensorForceN.load(std::memory_order_acquire);
+                    Q_UNUSED(latest);
+                    // Active Outline game input is intentionally routed through
+                    // MainWindow's shared game controller.
+                }, Qt::QueuedConnection);
+            }
         });
     }
 }
