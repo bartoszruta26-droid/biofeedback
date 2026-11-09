@@ -243,6 +243,8 @@ if "static constexpr qint64 LiveUiIntervalMs = 16;" not in training_source:
     raise SystemExit("Training live widgets/game input must target approximately 60 Hz")
 if "m_repaintTimer.setInterval(16);" not in source:
     raise SystemExit("Measurement force plot repaint must target approximately 60 Hz")
+if "m_repaintTimer.setTimerType(Qt::PreciseTimer);" not in source:
+    raise SystemExit("Measurement force plot must use precise timer scheduling")
 if "Qt::PreciseTimer" not in game_engine_source:
     raise SystemExit("Game frame timer must use precise scheduling")
 if "QPainterPath tracePath;" not in source or "QPointF(margin + column, y)" not in source:
