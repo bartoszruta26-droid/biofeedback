@@ -232,16 +232,13 @@ void DebugTab::addDebugMessage(const QString& message, const QString& type)
     }
     
     m_debugTerminal->append(formattedMessage);
-    
-    // Ogranicz liczbę linii
-    QStringList lines = m_debugTerminal->toPlainText().split("\n");
-    while (lines.size() > m_maxLines) {
-        lines.removeFirst();
+
+    // Bound terminal history at the document level. Rebuilding the entire
+    // QTextDocument via toPlainText()/clear()/append() per log row is O(n)
+    // and creates avoidable GUI stalls as the log grows.
+    if (QTextDocument* document = m_debugTerminal->document()) {
+        document->setMaximumBlockCount(qMax(1, m_maxLines));
     }
-    
-    // Wyczyść i przywróć ograniczoną zawartość
-    m_debugTerminal->clear();
-    m_debugTerminal->append(lines.join("\n"));
     
     // Przewiń do ostatniej linii jeśli auto-scroll jest włączony
     if (m_autoScroll) {
