@@ -385,7 +385,7 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
 #ifdef _WIN32
         HANDLE h = CreateFileA(("\\\\.\\" + portName).c_str(), GENERIC_READ|GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
         if (h == INVALID_HANDLE_VALUE) { 
-            m_impl->setLastError("Cannot open " + portName);
+            m_impl->setLastError("Cannot open " + portName + ": " + std::string(std::strerror(errno)));
             DWORD errorCode = GetLastError();
             core::DebugManager::instance().sendDebugMessage(
                 QString("Failed to open port %1. Windows error code: %2").arg(QString::fromStdString(portName)).arg(errorCode),
@@ -434,7 +434,9 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
             return false; 
         }
         termios tty{};
-        if (tcgetattr(fd, &tty)) { 
+        if (tcgetattr(fd, &tty)) {
+            const std::string error = std::strerror(errno);
+            m_impl->setLastError("Cannot read terminal settings for " + portName + ": " + error);
             close(fd);
             core::DebugManager::instance().sendDebugMessage(
                 QString("Failed to get terminal attributes for %1").arg(QString::fromStdString(portName)),
@@ -450,7 +452,9 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         tty.c_lflag &= ~(ICANON|ECHO|ISIG); tty.c_oflag &= ~OPOST; tty.c_iflag &= ~(IXON|IXOFF);
         tty.c_cc[VMIN] = 0; tty.c_cc[VTIME] = 10;
         tcflush(fd, TCIFLUSH);
-        if (tcsetattr(fd, TCSANOW, &tty)) { 
+        if (tcsetattr(fd, TCSANOW, &tty)) {
+            const std::string error = std::strerror(errno);
+            m_impl->setLastError("Cannot configure terminal " + portName + ": " + error);
             close(fd);
             core::DebugManager::instance().sendDebugMessage(
                 QString("Failed to set terminal attributes for %1").arg(QString::fromStdString(portName)),
