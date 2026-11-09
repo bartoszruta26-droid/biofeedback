@@ -269,9 +269,29 @@ void MainWindow::setupTabs()
     deviceControls->addWidget(m_connectDeviceButton);
     deviceControls->addStretch();
     dashboardLayout->addLayout(deviceControls);
-    connect(scanPortsButton, &QPushButton::clicked, this, &MainWindow::refreshSerialPorts);
+    connect(scanPortsButton, &QPushButton::clicked, this, [this]() {
+        refreshSerialPorts();
+        if (statusBar()) {
+            const int count = m_devicePortCombo ? m_devicePortCombo->count() : 0;
+            const bool hasPorts = count > 0 && !m_devicePortCombo->currentData().toString().isEmpty();
+            statusBar()->showMessage(hasPorts
+                ? tr("Skanowanie zakończone. Wykryto %1 portów szeregowych.").arg(count)
+                : tr("Skanowanie zakończone. Nie wykryto portów. Sprawdź USB, zasilanie i uprawnienia systemowe."), 6000);
+        }
+    });
     connect(m_connectDeviceButton, &QPushButton::clicked, this, &MainWindow::toggleSerialConnection);
     refreshSerialPorts();
+
+    // Detect hot-plugged Arduino boards without requiring an application restart.
+    auto* serialScanTimer = new QTimer(this);
+    serialScanTimer->setInterval(2000);
+    connect(serialScanTimer, &QTimer::timeout, this, [this]() {
+        if (!m_serialPort || m_serialPort->isConnected() ||
+            !m_devicePortCombo || m_devicePortCombo->view()->isVisible())
+            return;
+        refreshSerialPorts();
+    });
+    serialScanTimer->start();
 
     dashboardLayout->addStretch();
     m_tabWidget->addTab(dashboard, tr("⌂ Pulpit"));
@@ -618,19 +638,40 @@ void MainWindow::saveSettings()
 void MainWindow::refreshSerialPorts()
 {
     if (!m_devicePortCombo) return;
+
     const QString previousPort = m_devicePortCombo->currentData().toString();
-    m_devicePortCombo->clear();
-    const auto ports = sensor::SerialCommunication::scanAvailablePorts();
-    for (const auto& port : ports) {
-        const QString value = QString::fromStdString(port);
-        m_devicePortCombo->addItem(value, value);
+    const auto discoveredPorts = sensor::SerialCommunication::scanAvailablePorts();
+
+    QStringList nextItems;
+    nextItems.reserve(static_cast<int>(discoveredPorts.size()));
+    for (const auto& port : discoveredPorts)
+        nextItems.push_back(QString::fromStdString(port));
+
+    QStringList currentItems;
+    for (int i = 0; i < m_devicePortCombo->count(); ++i) {
+        const QString value = m_devicePortCombo->itemData(i).toString();
+        if (!value.isEmpty()) currentItems.push_back(value);
     }
-    if (ports.empty()) {
+
+    // Avoid resetting the combo box on every background poll when nothing changed.
+    if (currentItems == nextItems) return;
+
+    m_devicePortCombo->clear();
+    for (const QString& port : nextItems)
+        m_devicePortCombo->addItem(port, port);
+
+    if (nextItems.isEmpty()) {
         m_devicePortCombo->addItem(tr("Brak wykrytych portów"), QString());
+        m_devicePortCombo->setToolTip(
+            tr("Nie znaleziono urządzeń szeregowych. Podłącz Arduino i sprawdź, czy system utworzył /dev/ttyACM* lub /dev/ttyUSB*."));
         return;
     }
+
     const int previousIndex = m_devicePortCombo->findData(previousPort);
-    if (previousIndex >= 0) m_devicePortCombo->setCurrentIndex(previousIndex);
+    if (previousIndex >= 0)
+        m_devicePortCombo->setCurrentIndex(previousIndex);
+    m_devicePortCombo->setToolTip(
+        tr("Wykryte porty szeregowe. Wybierz port odpowiadający płytce Arduino."));
 }
 
 void MainWindow::toggleSerialConnection()
