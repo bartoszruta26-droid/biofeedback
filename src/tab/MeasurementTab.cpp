@@ -1061,7 +1061,7 @@ void MeasurementTab::setupUI()
     m_forcePlot = new ForcePlotWidget(this);
     m_forcePlot->setTargetForce(m_targetForce);
     m_forcePlot->setMaxTimeWindow(10.0);
-    m_forcePlot->setMinimumHeight(280);
+    m_forcePlot->setMinimumHeight(360);
     m_forcePlot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     m_lblCurrentForce = new QLabel("Aktualna siła: 0.0 N", this);
