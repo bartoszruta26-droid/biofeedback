@@ -1,36 +1,39 @@
-# Raspberry Pi Pico firmware — measurement communication status
+# 🍓 Firmware Raspberry Pi Pico — stan komunikacji pomiarowej
 
-## Current implementation
+> 📘 Dokument techniczny • Język: polski • Status: częściowa implementacja diagnostyczna  
+> ⚠️ Dokument opisuje cel firmware Pico; nie potwierdza gotowości akwizycji czujnika.
 
-The repository contains a Raspberry Pi Pico SDK build target and a bounded UART command loop.
+## 1. Aktualny stan implementacji
 
-| Function | Current state |
+Repozytorium zawiera cel budowania oparty na Raspberry Pi Pico SDK oraz ograniczoną pętlę obsługi komend UART.
+
+| Funkcja | Stan |
 |---|---|
-| UART0 communication | Implemented: GP0 TX / GP1 RX, 115200 baud, 8N1 |
-| Hardware watchdog | Implemented: 2-second timeout |
-| Bounded command parser | Implemented |
-| PING / STATUS / SAFE diagnostics | Implemented |
-| Unknown command handling | Rejected |
-| Sensor acquisition and measurement frames | Not yet implemented in this Pico firmware target |
-| Calibration against physical sensors | Not verified |
+| Komunikacja UART0 | Zaimplementowana: GP0 TX / GP1 RX, 115200 bodów, 8N1 |
+| Sprzętowy watchdog | Zaimplementowany: limit 2 sekund |
+| Ograniczony parser komend | Zaimplementowany |
+| Diagnostyka PING / STATUS / SAFE | Zaimplementowana |
+| Obsługa nieznanych komend | Odrzucanie |
+| Akwizycja czujnika i ramki pomiarowe | Jeszcze niezaimplementowane w tym celu firmware Pico |
+| Kalibracja z fizycznymi czujnikami | Niezweryfikowana |
 
-## Host/Pico diagnostic protocol
+## 2. Protokół diagnostyczny host–Pico
 
-- UART: 115200 baud, 8 data bits, no parity, 1 stop bit.
-- Commands are bounded printable ASCII lines terminated by CR or LF.
-- PING returns `OK,PONG,FW=0.2.0,PROTO=1`.
-- STATUS returns `OK,STATUS,READY=1,PROTO=1`.
-- SAFE returns `OK,SAFE`.
-- Unknown or malformed commands are rejected.
+- UART: 115200 bodów, 8 bitów danych, brak parzystości, 1 bit stopu.
+- Komendy są ograniczonymi liniami drukowalnego ASCII zakończonymi CR lub LF.
+- `PING` zwraca `OK,PONG,FW=0.2.0,PROTO=1`.
+- `STATUS` zwraca `OK,STATUS,READY=1,PROTO=1`.
+- `SAFE` zwraca `OK,SAFE`.
+- Nieznane lub niepoprawne komendy są odrzucane.
 
-This diagnostic channel is separate from the existing HX711 binary measurement frame (little-endian timestamp, signed raw value, CRC-8, trailer 0xAA 0x55). The host parser and firmware must not conflate diagnostic commands with measurement frames.
+Kanał diagnostyczny jest oddzielony od binarnej ramki pomiarowej HX711 (little-endian: znacznik czasu, wartość surowa ze znakiem, CRC-8, zakończenie `0xAA 0x55`). Parser hosta i firmware nie mogą utożsamiać komend diagnostycznych z ramkami pomiarowymi.
 
-## Next engineering work
+## 3. Dalsze prace inżynierskie
 
-1. Confirm the exact sensor models and electrical interfaces connected to the Pico.
-2. Implement bounded sensor acquisition with explicit sample validity and fault states.
-3. Apply calibrated units and timestamp semantics shared with the host measurement pipeline.
-4. Add firmware-side protocol tests and host/Pico integration tests.
-5. Verify on physical hardware with reference loads and recorded calibration evidence.
+1. Potwierdzić dokładne modele czujników i interfejsy elektryczne podłączone do Pico.
+2. Zaimplementować ograniczoną akwizycję czujnika z jawnym stanem poprawności próbki i stanami awarii.
+3. Zastosować skalibrowane jednostki i semantykę znaczników czasu wspólne z hostowym silnikiem pomiarowym.
+4. Dodać testy protokołu po stronie firmware oraz testy integracyjne host–Pico.
+5. Wykonać weryfikację na fizycznym sprzęcie z obciążeniami odniesienia i udokumentowanymi wynikami kalibracji.
 
-A successful firmware build is not proof of physical sensor accuracy or clinical validity.
+Pomyślna kompilacja firmware nie potwierdza dokładności fizycznego czujnika ani przydatności klinicznej.
