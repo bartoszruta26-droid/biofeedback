@@ -392,6 +392,9 @@ void threadWatchdog() {
 
 // Thread: Continuous Data Sender - sends at 80Hz
 void threadContinuousData() {
+    // Continuous mode emits binary frames only. Do not append the human-readable
+    // FORCE/RAW/CAL status line to every frame: it doubles serial traffic and
+    // makes a line-oriented host parser mistake binary payload for text.
     if (continuous_mode && (millis() - last_data_send >= 12)) {  // ~80Hz
         last_data_send = millis();
         sendBinaryData();
