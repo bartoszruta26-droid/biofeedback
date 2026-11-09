@@ -1,6 +1,6 @@
 # Biofeedback — instrukcja budowania i konfiguracji
 
-> **Uwaga o aktualności:** ten dokument został skorygowany względem bieżącego firmware i konfiguracji repozytorium. Główną instrukcją instalacji Linux jest również [`docs/INSTALL_LINUX.md`](docs/INSTALL_LINUX.md). Nie stosuj starych wartości portu 9600 ani historycznego szkicu Arduino.
+> **Uwaga o aktualności:** ten dokument został skorygowany względem bieżącego firmware i konfiguracji repozytorium. Główną instrukcją instalacji Linux jest również [`docs/INSTALL_LINUX.md`](docs/INSTALL_LINUX.md).
 
 ## Prerequisites
 
@@ -105,7 +105,7 @@ After building with Qt5 available, you can run the mandatory Qt5 sample:
 
 ### Dostępna metoda budowania
 
-Repozytorium nie zawiera obecnie pliku `Makefile` do samodzielnego budowania. Używaj CMake (opcja 1); nie uruchamiaj `make` poza katalogiem kompilacji wygenerowanym przez CMake.
+CMake jest jedyną udokumentowaną metodą konfiguracji i budowania projektu.
 
 ## Running the Application
 
@@ -159,7 +159,6 @@ sudo apt install -y arduino
 3. Wybierz port urządzenia, np. `/dev/ttyUSB0` lub `/dev/ttyACM0`.
 4. Skompiluj szkic i wgraj go do Arduino.
 
-Plik `hx711_arduino_nano.ino` jest historycznym przykładem tekstowym i nie jest zgodny z bieżącym parserem ramek binarnych. Nie używaj go do aktualnej aplikacji.
 
 ### 3. Verify Communication
 ```bash
