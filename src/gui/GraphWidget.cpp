@@ -69,11 +69,18 @@ void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
             return;
         }
         
+        // Presentation-only buffer: never allow a delayed GUI to grow without bound.
+        constexpr int MaximumGraphPoints = 12000;
         m_dataPoints.append(DataPoint(timestamp, value));
+        if (m_dataPoints.size() > MaximumGraphPoints) {
+            m_dataPoints.remove(0, m_dataPoints.size() - MaximumGraphPoints);
+        }
         m_totalDataPointsAdded++;
-        
-        if (m_autoScaleY) {
+
+        // At 80 SPS this bounds full-buffer autoscaling to about 10 calculations/s.
+        if (m_autoScaleY && (++m_samplesSinceAutoScale >= 8)) {
             calculateAutoScale();
+            m_samplesSinceAutoScale = 0;
         }
         
         m_cacheValid = false;
@@ -190,6 +197,10 @@ void GraphWidget::pruneOldData()
     
     if (removeCount > 0) {
         m_dataPoints.remove(0, removeCount);
+        if (m_autoScaleY) {
+            calculateAutoScale();
+            m_samplesSinceAutoScale = 0;
+        }
         m_cacheValid = false;
         update();
     }
@@ -226,12 +237,12 @@ void GraphWidget::calculateAutoScale()
         // Dla wartości raw (bardzo dużych) lub ujemnych - nie ograniczaj do zera
         // Pozwól na wyświetlanie wartości ujemnych dla tensometrów
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget] ERROR in calculateAutoScale: " << e.what() << std::endl;
+
         // Set safe defaults on error
         m_yMin = 0.0;
         m_yMax = 100.0;
     } catch (...) {
-        std::cerr << "[GraphWidget] ERROR in calculateAutoScale: Unknown exception" << std::endl;
+
         m_yMin = 0.0;
         m_yMax = 100.0;
     }
@@ -240,9 +251,7 @@ void GraphWidget::calculateAutoScale()
 void GraphWidget::paintEvent(QPaintEvent *event)
 {
     try {
-        std::cout << "[GraphWidget::paintEvent] START - Rendering graph with " 
-                  << m_dataPoints.size() << " data points" << std::endl;
-        
+
         Q_UNUSED(event);
         
         QPainter painter(this);
@@ -253,65 +262,61 @@ void GraphWidget::paintEvent(QPaintEvent *event)
         
         if (m_dataPoints.isEmpty()) {
             // Wyświetl komunikat o braku danych
-            std::cout << "[GraphWidget::paintEvent] No data points to render, showing 'Brak danych' message" << std::endl;
+
             painter.setPen(m_textColor);
             painter.setFont(QFont("Arial", 14));
             painter.drawText(rect(), Qt::AlignCenter, tr("Brak danych"));
             return;
         }
-        
-        std::cout << "[GraphWidget::paintEvent] Y-axis range: [" << m_yMin << ", " << m_yMax 
-                  << "], Time range: " << m_timeRangeSeconds << "s" << std::endl;
-        
+
         try {
             drawGrid(painter);
-            std::cout << "[GraphWidget::paintEvent] Grid drawn successfully" << std::endl;
+
         } catch (const std::exception& e) {
-            std::cerr << "[GraphWidget::paintEvent] ERROR drawing grid: " << e.what() << std::endl;
+
         }
         
         try {
             drawAxes(painter);
-            std::cout << "[GraphWidget::paintEvent] Axes drawn successfully" << std::endl;
+
         } catch (const std::exception& e) {
-            std::cerr << "[GraphWidget::paintEvent] ERROR drawing axes: " << e.what() << std::endl;
+
         }
         
         try {
             drawDataLine(painter);
-            std::cout << "[GraphWidget::paintEvent] Data line drawn successfully" << std::endl;
+
         } catch (const std::exception& e) {
-            std::cerr << "[GraphWidget::paintEvent] ERROR drawing data line: " << e.what() << std::endl;
+
         }
         
         try {
             drawDataPoints(painter);
-            std::cout << "[GraphWidget::paintEvent] Data points drawn successfully" << std::endl;
+
         } catch (const std::exception& e) {
-            std::cerr << "[GraphWidget::paintEvent] ERROR drawing data points: " << e.what() << std::endl;
+
         }
         
         try {
             drawLabels(painter);
-            std::cout << "[GraphWidget::paintEvent] Labels drawn successfully" << std::endl;
+
         } catch (const std::exception& e) {
-            std::cerr << "[GraphWidget::paintEvent] ERROR drawing labels: " << e.what() << std::endl;
+
         }
         
         if (m_showCurrent && !m_dataPoints.isEmpty()) {
             try {
                 drawCurrentValue(painter);
-                std::cout << "[GraphWidget::paintEvent] Current value label drawn successfully" << std::endl;
+
             } catch (const std::exception& e) {
-                std::cerr << "[GraphWidget::paintEvent] ERROR drawing current value: " << e.what() << std::endl;
+
             }
         }
-        
-        std::cout << "[GraphWidget::paintEvent] END - Rendering complete" << std::endl;
+
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::paintEvent] CRITICAL ERROR: " << e.what() << std::endl;
+
     } catch (...) {
-        std::cerr << "[GraphWidget::paintEvent] CRITICAL ERROR: Unknown exception during rendering" << std::endl;
+
     }
 }
 
@@ -392,10 +397,9 @@ void GraphWidget::leaveEvent(QEvent *event)
 void GraphWidget::drawGrid(QPainter& painter)
 {
     try {
-        std::cout << "[GraphWidget::drawGrid] START" << std::endl;
-        
+
         if (!m_showGrid) {
-            std::cout << "[GraphWidget::drawGrid] Grid disabled, skipping" << std::endl;
+
             return;
         }
         
@@ -418,13 +422,12 @@ void GraphWidget::drawGrid(QPainter& painter)
             painter.drawLine(static_cast<int>(x), static_cast<int>(area.top()),
                             static_cast<int>(x), static_cast<int>(area.bottom()));
         }
-        
-        std::cout << "[GraphWidget::drawGrid] END - Grid drawn successfully" << std::endl;
+
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::drawGrid] ERROR: " << e.what() << std::endl;
+
         throw;
     } catch (...) {
-        std::cerr << "[GraphWidget::drawGrid] ERROR: Unknown exception" << std::endl;
+
         throw;
     }
 }
@@ -432,8 +435,7 @@ void GraphWidget::drawGrid(QPainter& painter)
 void GraphWidget::drawAxes(QPainter& painter)
 {
     try {
-        std::cout << "[GraphWidget::drawAxes] START" << std::endl;
-        
+
         QRectF area = plotArea();
         
         painter.setPen(QPen(m_textColor, 2));
@@ -441,23 +443,17 @@ void GraphWidget::drawAxes(QPainter& painter)
         // Oś X
         painter.drawLine(static_cast<int>(area.left()), static_cast<int>(area.bottom()),
                         static_cast<int>(area.right()), static_cast<int>(area.bottom()));
-        std::cout << "[GraphWidget::drawAxes] X-axis drawn from (" 
-                  << area.left() << ", " << area.bottom() << ") to ("
-                  << area.right() << ", " << area.bottom() << ")" << std::endl;
-        
+
         // Oś Y
         painter.drawLine(static_cast<int>(area.left()), static_cast<int>(area.top()),
                         static_cast<int>(area.left()), static_cast<int>(area.bottom()));
-        std::cout << "[GraphWidget::drawAxes] Y-axis drawn from (" 
-                  << area.left() << ", " << area.top() << ") to ("
-                  << area.left() << ", " << area.bottom() << ")" << std::endl;
-        
-        std::cout << "[GraphWidget::drawAxes] END - Axes drawn successfully" << std::endl;
+
+
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::drawAxes] ERROR: " << e.what() << std::endl;
+
         throw;
     } catch (...) {
-        std::cerr << "[GraphWidget::drawAxes] ERROR: Unknown exception" << std::endl;
+
         throw;
     }
 }
@@ -465,11 +461,9 @@ void GraphWidget::drawAxes(QPainter& painter)
 void GraphWidget::drawDataLine(QPainter& painter)
 {
     try {
-        std::cout << "[GraphWidget::drawDataLine] START - Processing " 
-                  << m_dataPoints.size() << " data points" << std::endl;
-        
+
         if (m_dataPoints.size() < 2) {
-            std::cout << "[GraphWidget::drawDataLine] Not enough data points (< 2), skipping line drawing" << std::endl;
+
             return;
         }
         
@@ -478,8 +472,7 @@ void GraphWidget::drawDataLine(QPainter& painter)
         // Ścieżka linii
         QPainterPath path;
         QPointF firstPoint = dataToScreen(m_dataPoints.first());
-        std::cout << "[GraphWidget::drawDataLine] First point screen coordinates: (" 
-                  << firstPoint.x() << ", " << firstPoint.y() << ")" << std::endl;
+
         path.moveTo(firstPoint);
         
         int validPoints = 0;
@@ -491,23 +484,18 @@ void GraphWidget::drawDataLine(QPainter& painter)
             if (std::isnan(point.x()) || std::isnan(point.y()) || 
                 std::isinf(point.x()) || std::isinf(point.y())) {
                 invalidPoints++;
-                std::cerr << "[GraphWidget::drawDataLine] WARNING: Invalid point at index " << i 
-                          << " (NaN/Inf coordinates), skipping" << std::endl;
+
                 continue;
             }
             
             path.lineTo(point);
             validPoints++;
         }
-        
-        std::cout << "[GraphWidget::drawDataLine] Processed " << validPoints 
-                  << " valid points, " << invalidPoints << " invalid points" << std::endl;
-        
+
         // Rysowanie linii
         painter.setPen(QPen(m_lineColor, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
         painter.drawPath(path);
-        std::cout << "[GraphWidget::drawDataLine] Line path drawn successfully" << std::endl;
-        
+
         // Wypełnienie pod wykresem
         QPainterPath fillPath = path;
         fillPath.lineTo(area.right(), area.bottom());
@@ -517,14 +505,13 @@ void GraphWidget::drawDataLine(QPainter& painter)
         painter.setBrush(m_fillColor);
         painter.setPen(Qt::NoPen);
         painter.drawPath(fillPath);
-        std::cout << "[GraphWidget::drawDataLine] Fill path drawn successfully" << std::endl;
-        
-        std::cout << "[GraphWidget::drawDataLine] END - Data line rendered successfully" << std::endl;
+
+
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::drawDataLine] ERROR: " << e.what() << std::endl;
+
         throw;
     } catch (...) {
-        std::cerr << "[GraphWidget::drawDataLine] ERROR: Unknown exception" << std::endl;
+
         throw;
     }
 }
@@ -532,11 +519,9 @@ void GraphWidget::drawDataLine(QPainter& painter)
 void GraphWidget::drawDataPoints(QPainter& painter)
 {
     try {
-        std::cout << "[GraphWidget::drawDataPoints] START - Drawing data points, total points: " 
-                  << m_dataPoints.size() << std::endl;
-        
+
         if (m_dataPoints.isEmpty()) {
-            std::cout << "[GraphWidget::drawDataPoints] No data points to draw" << std::endl;
+
             return;
         }
         
@@ -550,10 +535,9 @@ void GraphWidget::drawDataPoints(QPainter& painter)
             // Validate point coordinates
             if (std::isnan(lastPoint.x()) || std::isnan(lastPoint.y()) ||
                 std::isinf(lastPoint.x()) || std::isinf(lastPoint.y())) {
-                std::cerr << "[GraphWidget::drawDataPoints] WARNING: Last point has invalid coordinates, skipping" << std::endl;
+
             } else {
-                std::cout << "[GraphWidget::drawDataPoints] Drawing last point at (" 
-                          << lastPoint.x() << ", " << lastPoint.y() << ")" << std::endl;
+
                 painter.drawEllipse(lastPoint, 4, 4);
             }
         }
@@ -564,21 +548,19 @@ void GraphWidget::drawDataPoints(QPainter& painter)
             
             if (std::isnan(hoverPoint.x()) || std::isnan(hoverPoint.y()) ||
                 std::isinf(hoverPoint.x()) || std::isinf(hoverPoint.y())) {
-                std::cerr << "[GraphWidget::drawDataPoints] WARNING: Hovered point has invalid coordinates, skipping highlight" << std::endl;
+
             } else {
-                std::cout << "[GraphWidget::drawDataPoints] Highlighting hovered point at (" 
-                          << hoverPoint.x() << ", " << hoverPoint.y() << ")" << std::endl;
+
                 painter.setBrush(QColor(255, 100, 100));
                 painter.drawEllipse(hoverPoint, 6, 6);
             }
         }
-        
-        std::cout << "[GraphWidget::drawDataPoints] END - Data points drawn successfully" << std::endl;
+
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::drawDataPoints] ERROR: " << e.what() << std::endl;
+
         throw;
     } catch (...) {
-        std::cerr << "[GraphWidget::drawDataPoints] ERROR: Unknown exception" << std::endl;
+
         throw;
     }
 }
@@ -586,8 +568,7 @@ void GraphWidget::drawDataPoints(QPainter& painter)
 void GraphWidget::drawLabels(QPainter& painter)
 {
     try {
-        std::cout << "[GraphWidget::drawLabels] START" << std::endl;
-        
+
         QRectF area = plotArea();
         
         painter.setPen(m_textColor);
@@ -595,7 +576,7 @@ void GraphWidget::drawLabels(QPainter& painter)
         
         // Tytuł
         if (!m_title.isEmpty()) {
-            std::cout << "[GraphWidget::drawLabels] Drawing title: " << m_title.toStdString() << std::endl;
+
             QFont titleFont = painter.font();
             titleFont.setBold(true);
             titleFont.setPointSize(12);
@@ -606,7 +587,7 @@ void GraphWidget::drawLabels(QPainter& painter)
         
         // Etykieta osi Y
         if (!m_yLabel.isEmpty()) {
-            std::cout << "[GraphWidget::drawLabels] Drawing Y-axis label: " << m_yLabel.toStdString() << std::endl;
+
             painter.save();
             painter.translate(10, area.center().y());
             painter.rotate(-90);
@@ -615,15 +596,14 @@ void GraphWidget::drawLabels(QPainter& painter)
         }
         
         // Wartości na osi Y
-        std::cout << "[GraphWidget::drawLabels] Drawing Y-axis values (range: " 
-                  << m_yMin << " to " << m_yMax << ")" << std::endl;
+
         int gridLines = 5;
         for (int i = 0; i <= gridLines; ++i) {
             double value = m_yMax - (m_yMax - m_yMin) * i / gridLines;
             
             // Validate value before displaying
             if (std::isnan(value) || std::isinf(value)) {
-                std::cerr << "[GraphWidget::drawLabels] WARNING: Invalid Y-axis value at index " << i << std::endl;
+
                 continue;
             }
             
@@ -633,8 +613,7 @@ void GraphWidget::drawLabels(QPainter& painter)
         }
         
         // Wartości na osi X (czas)
-        std::cout << "[GraphWidget::drawLabels] Drawing X-axis time labels (time range: " 
-                  << m_timeRangeSeconds << "s)" << std::endl;
+
         int timeSteps = 6;
         QDateTime now = QDateTime::currentDateTime();
         for (int i = 0; i <= timeSteps; ++i) {
@@ -644,13 +623,12 @@ void GraphWidget::drawLabels(QPainter& painter)
             int x = static_cast<int>(area.left() + (area.width() * i / timeSteps));
             painter.drawText(x - 30, static_cast<int>(area.bottom()) + 20, 60, 20, Qt::AlignCenter, label);
         }
-        
-        std::cout << "[GraphWidget::drawLabels] END - Labels drawn successfully" << std::endl;
+
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::drawLabels] ERROR: " << e.what() << std::endl;
+
         throw;
     } catch (...) {
-        std::cerr << "[GraphWidget::drawLabels] ERROR: Unknown exception" << std::endl;
+
         throw;
     }
 }
@@ -658,34 +636,26 @@ void GraphWidget::drawLabels(QPainter& painter)
 void GraphWidget::drawCurrentValue(QPainter& painter)
 {
     try {
-        std::cout << "[GraphWidget::drawCurrentValue] START" << std::endl;
-        
+
         if (m_dataPoints.isEmpty()) {
-            std::cout << "[GraphWidget::drawCurrentValue] No data points, skipping current value display" << std::endl;
+
             return;
         }
         
         const DataPoint& last = m_dataPoints.last();
-        std::cout << "[GraphWidget::drawCurrentValue] Last data point - Value: " << last.value 
-                  << " " << m_unit.toStdString() 
-                  << ", Timestamp: " << last.timestamp.toString().toStdString() << std::endl;
-        
+
         QPointF pos = dataToScreen(last);
         
         // Validate position
         if (std::isnan(pos.x()) || std::isnan(pos.y()) ||
             std::isinf(pos.x()) || std::isinf(pos.y())) {
-            std::cerr << "[GraphWidget::drawCurrentValue] WARNING: Invalid screen position for current value, skipping" << std::endl;
+
             return;
         }
-        
-        std::cout << "[GraphWidget::drawCurrentValue] Screen position: (" 
-                  << pos.x() << ", " << pos.y() << ")" << std::endl;
-        
+
         // Etykieta z wartością
         QString valueText = QString("%1 %2").arg(last.value, 0, 'f', 2).arg(m_unit);
-        std::cout << "[GraphWidget::drawCurrentValue] Value text: " << valueText.toStdString() << std::endl;
-        
+
         painter.setPen(Qt::white);
         painter.setBrush(m_lineColor);
         
@@ -695,13 +665,12 @@ void GraphWidget::drawCurrentValue(QPainter& painter)
         
         painter.drawRoundedRect(textRect, 3, 3);
         painter.drawText(textRect, Qt::AlignCenter, valueText);
-        
-        std::cout << "[GraphWidget::drawCurrentValue] END - Current value label drawn successfully" << std::endl;
+
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::drawCurrentValue] ERROR: " << e.what() << std::endl;
+
         throw;
     } catch (...) {
-        std::cerr << "[GraphWidget::drawCurrentValue] ERROR: Unknown exception" << std::endl;
+
         throw;
     }
 }
@@ -709,15 +678,12 @@ void GraphWidget::drawCurrentValue(QPainter& painter)
 QPointF GraphWidget::dataToScreen(const DataPoint& point) const
 {
     try {
-        std::cout << "[GraphWidget::dataToScreen] Converting data point - Value: " << point.value 
-                  << ", Timestamp: " << point.timestamp.toString().toStdString() << std::endl;
-        
+
         QRectF area = plotArea();
         
         // Validate plot area
         if (area.width() <= 0 || area.height() <= 0) {
-            std::cerr << "[GraphWidget::dataToScreen] ERROR: Invalid plot area (width=" 
-                      << area.width() << ", height=" << area.height() << ")" << std::endl;
+
             return QPointF(0, 0);
         }
         
@@ -728,7 +694,7 @@ QPointF GraphWidget::dataToScreen(const DataPoint& point) const
         
         // Avoid division by zero
         if (msRange <= 0) {
-            std::cerr << "[GraphWidget::dataToScreen] ERROR: Invalid time range (" << msRange << "ms)" << std::endl;
+
             return QPointF(0, 0);
         }
         
@@ -738,8 +704,7 @@ QPointF GraphWidget::dataToScreen(const DataPoint& point) const
         // Avoid division by zero for Y-axis
         double yRange = m_yMax - m_yMin;
         if (std::abs(yRange) < 0.0001) {
-            std::cerr << "[GraphWidget::dataToScreen] WARNING: Very small Y range (" << yRange 
-                      << "), using default" << std::endl;
+
             yRange = 100.0;
         }
         
@@ -751,19 +716,16 @@ QPointF GraphWidget::dataToScreen(const DataPoint& point) const
         
         // Validate result
         if (std::isnan(x) || std::isnan(y) || std::isinf(x) || std::isinf(y)) {
-            std::cerr << "[GraphWidget::dataToScreen] ERROR: Result contains NaN/Inf - x=" 
-                      << x << ", y=" << y << std::endl;
+
             return QPointF(0, 0);
         }
-        
-        std::cout << "[GraphWidget::dataToScreen] Screen coordinates: (" << x << ", " << y << ")" << std::endl;
-        
+
         return QPointF(x, y);
     } catch (const std::exception& e) {
-        std::cerr << "[GraphWidget::dataToScreen] ERROR: " << e.what() << std::endl;
+
         return QPointF(0, 0);
     } catch (...) {
-        std::cerr << "[GraphWidget::dataToScreen] ERROR: Unknown exception" << std::endl;
+
         return QPointF(0, 0);
     }
 }
