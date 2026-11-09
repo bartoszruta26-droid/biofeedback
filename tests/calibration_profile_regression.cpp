@@ -42,6 +42,12 @@ int main()
     const auto reverseConverted = sensor::CalibrationMath::convertRaw(
         76543, 100000.0, *reverseScale);
     assert(reverseConverted && std::abs(*reverseConverted - 9.81) < 1e-9);
+    const auto reverseHalfLoad = sensor::CalibrationMath::convertRaw(
+        88271, 100000.0, *reverseScale);
+    const auto reverseZeroLoad = sensor::CalibrationMath::convertRaw(
+        100000, 100000.0, *reverseScale);
+    assert(reverseHalfLoad && std::abs(*reverseHalfLoad - 4.905) < 1e-9);
+    assert(reverseZeroLoad && std::abs(*reverseZeroLoad) < 1e-12);
     sensor::CalibrationProfile reverseProfile = profile;
     reverseProfile.referenceRaw = 76543;
     reverseProfile.scaleFactor = *reverseScale;
