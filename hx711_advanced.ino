@@ -7,7 +7,7 @@
  * - Cooperative pseudo-threading (non-blocking multitasking)
  * - CRC-8 checksum for data integrity
  * - Tare command via serial
- * - Binary data transmission at 80Hz with timestamp, value, CRC
+ * - Binary data transmission only for fresh HX711 samples with acquisition timestamp, value, CRC
  * - Device identification on command
  * 
  * Connections:
@@ -369,15 +369,15 @@ void processSerialCommand() {
 // PSEUDO-THREADING (Cooperative Multitasking)
 // ============================================================
 
-// Thread: HX711 Reader - reads at 80Hz (every ~12.5ms)
+// Thread: HX711 Reader - polls readiness; actual SPS is set by the HX711 RATE pin.
 void threadHX711() {
-    if (millis() - thread_timer_hx711 >= 12) {  // ~80Hz = 12.5ms interval
+    if (millis() - thread_timer_hx711 >= 12) {  // Poll often; do not assume this sets the ADC conversion rate.
         thread_timer_hx711 = millis();
         
         // Check if HX711 is ready
         pinMode(HX711_DT_PIN, INPUT);
         if (digitalRead(HX711_DT_PIN) == LOW) {
-            // Read single sample at 80Hz
+            // Read only when the converter reports a completed sample.
             long raw = readHX711Raw();
             if (raw != LONG_MIN) {
                 current_weight = static_cast<int32_t>(raw);
