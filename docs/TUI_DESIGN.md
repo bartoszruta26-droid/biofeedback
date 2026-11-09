@@ -1,74 +1,70 @@
-# ⌨️ Biofeedback — projekt interfejsu terminalowego TUI
+# ⌨️ Biofeedback — projekt i stan interfejsu terminalowego TUI
 
-> 📘 Dokumentacja projektu • Język: polski • Nazwy techniczne, identyfikatory API i symbole kodu pozostają oryginalne.
+> 📘 Weryfikacja kodu: 2026-11-09 • Zakres: `src/tui/main.cpp`, `src/tui/TuiModel.cpp`, `MeasurementSerialAdapter`, `HttpApiClient`  
+> Status: działający klient terminalowy z ograniczonym zakresem funkcji; bez pełnego parytetu z Desktop.
 
-## Cel
+## 1. Cel i granice odpowiedzialności
 
-Terminalowy interfejs Biofeedback jest osobnym klientem prezentacyjnym C++17.
-Korzysta z tego samego źródła komunikacji szeregowej co aplikacja Desktop Qt;
-nie tworzy odrębnego parsera danych czujnika.
+TUI jest osobnym klientem C++17 opartym na ncurses. Loguje się do wspólnego API w celu odczytu kart pacjentów i zapisu archiwów, ale obsługuje lokalny port szeregowy bezpośrednio przez `SerialCommunication` i `MeasurementSerialAdapter`. Nie korzysta obecnie z serwerowej `AcquisitionService` do pozyskiwania próbek.
 
-## Moduły
+## 2. Moduły
 
-- Pulpit — status aplikacji, połączenia i ostatniej próbki.
-- Pomiary — podgląd wartości z aktywnego strumienia czujnika.
-- Pacjenci — informacja o stanie integracji wspólnego repozytorium kart.
-- Trening — status sesji treningowej.
-- Urządzenia — wykrywanie portów, wybór portu i połączenie/rozłączenie.
-- Diagnostyka — stan adaptera i interfejsu.
-- Ustawienia — skróty sterowania i parametry transmisji.
+- **Pulpit** — stan połączenia i ostatnia próbka.
+- **Pomiary** — podgląd próbek z lokalnego adaptera; próbki są buforowane do archiwizacji.
+- **Pacjenci** — lista pobrana z API i wybór pacjenta do przypisania archiwum.
+- **Trening** — lokalna detekcja powtórzeń, serie, cel siły, pauza i odpoczynek.
+- **Urządzenia** — skanowanie portów, wybór, połączenie i rozłączenie lokalnego portu szeregowego.
+- **Diagnostyka** — liczby próbek poprawnych/odrzuconych i parametry ostatniego powtórzenia.
+- **Ustawienia** — skróty i stała domyślna prędkość transmisji.
 
-## Sterowanie
+## 3. Przepływ danych i archiwizacja
+
+1. Po uruchomieniu TUI loguje użytkownika przez API i pobiera listę kart z kolekcji `patients`.
+2. W module Pacjenci operator wybiera kartę strzałkami lewo/prawo. Wybór jest opcjonalny; interfejs jawnie dopuszcza archiwizację bez przypisania pacjenta.
+3. Port szeregowy jest otwierany lokalnie przez `SerialCommunication`. Adapter przekazuje próbki do lokalnej instancji `MeasurementEngine`.
+4. Próbki w jednostce skalibrowanej są normalizowane z gramów do kilogramów, a następnie siła do obliczeń treningowych jest wyliczana jako masa × 9,80665 m/s².
+5. Archiwum pomiarowe zawiera próbki i jest wysyłane do kolekcji `measurements` przy rozłączeniu urządzenia lub zamknięciu TUI. Bufor sesji jest ograniczony do 100 000 próbek.
+6. Archiwum treningowe jest wysyłane do `training-sessions`, a podsumowanie do `training-results`. Zapis zawiera `patient_id`, jeśli operator wybrał pacjenta; w przeciwnym razie pole jest puste.
+7. Nieudany zapis pomiaru przywraca próbki do bufora w pamięci. Nie jest to trwała kolejka offline: awaria procesu przed ponowną próbą może utracić niezapisane dane. Nieudany zapis treningu jest komunikowany w statusie, ale nie ma automatycznego mechanizmu ponawiania po restarcie.
+
+## 4. Sterowanie
 
 - Strzałki góra/dół — wybór modułu.
 - Enter — otwarcie wybranego modułu.
-- W module Urządzenia: strzałki lewo/prawo — wybór portu.
-- W module Trening: S — start/stop, P — pauza/wznowienie, + / - — cel siły, [ / ] — serie, , / . — powtórzenia.
-- C — połączenie z wybranym portem przy domyślnej prędkości.
-- D — rozłączenie.
-- R — ponowne skanowanie portów.
+- W module Pacjenci: strzałki lewo/prawo — wybór pacjenta.
+- W module Urządzenia: strzałki lewo/prawo — wybór portu; C — połączenie; D — rozłączenie; R — ponowne skanowanie.
+- W module Trening: S — start/stop; P — pauza/wznowienie; E — wybór zestawu ćwiczeń; + / - — cel siły; [ / ] — liczba serii; , / . — liczba powtórzeń; ; / ' — czas odpoczynku.
 - Q lub Esc — wyjście.
 
-## Tryby bez interfejsu curses
+Domyślny plan treningowy to 3 serie po 8 powtórzeń, cel 50 N i odpoczynek 60 sekund. Zakresy regulacji wynikają z implementacji w `src/tui/main.cpp`.
 
-- biofeedback_tui --status — status procesu TUI.
-- biofeedback_tui --list-ports — lista portów wykrytych przez adapter systemowy.
-- biofeedback_tui --version i --help — informacje o programie.
+## 5. Ograniczenia
 
-## Granice funkcjonalne wersji 0.2
+- TUI nie tworzy ani nie edytuje kart pacjentów.
+- TUI nie implementuje silnika gier ani nie zapisuje wyników gier.
+- Wybór pacjenta nie jest obowiązkowy, więc operator może zapisać archiwum bez przypisania do osoby.
+- Połączenie sprzętowe jest lokalne; TUI nie uruchamia ani nie zatrzymuje serwerowej sesji akwizycji.
+- Bufor pomiarów i historia ostatnich próbek są przechowywane w pamięci procesu; archiwizacja następuje dopiero przy rozłączeniu lub wyjściu.
+- Kalibracja nie jest wykonywana z poziomu opisanego TUI; tor wymaga poprawnie skalibrowanych danych firmware oznaczonych `CAL:1`.
 
-TUI otwiera port szeregowy przez wspólny adapter i wyświetla próbki z HX711.
-Moduł Pomiary pokazuje siłę w N oraz krótki przebieg ostatnich próbek. Moduł
-Trening oferuje sesję 3 x 8 z detekcją powtórzeń opartą na progach aktywacji i
-zwolnienia, podglądem serii oraz regulowanym celem siły. Sterowanie: S — start/
-stop, P — pauza/wznowienie, + / - — zmiana celu. Dane są przetwarzane w pamięci;
-TUI nadal nie tworzy kart pacjentów ani nie zapisuje dokumentacji klinicznej.
-Przed treningiem urządzenie musi być podłączone i skalibrowane, a jednostka
-kalibracji firmware musi odpowiadać założeniu gramów równoważnych.
+## 6. Tryby bez interfejsu curses
 
-## Budowanie
+- `biofeedback_tui --status` — status procesu TUI.
+- `biofeedback_tui --list-ports` — lista portów wykrytych przez adapter systemowy.
+- `biofeedback_tui --version` i `--help` — informacje o programie.
 
-Zainstaluj libncurses-dev, a następnie:
+## 7. Budowanie
 
-    cmake -S . -B build
-    cmake --build build --target biofeedback_tui
-    ./build/biofeedback_tui
+Zainstaluj `libncurses-dev`, a następnie:
+
+```bash
+cmake -S . -B build
+cmake --build build --target biofeedback_tui
+./build/biofeedback_tui
+```
 
 Jeśli ncurses nie jest dostępne, CMake pomija wyłącznie program TUI.
 
-## Sterowanie sesją treningową i historia
+## 8. Weryfikacja
 
-Ekran treningu umożliwia konfigurację przed rozpoczęciem sesji:
-- zestaw ćwiczeń: klawisz E przełącza chwyt dłoni, zgięcie nadgarstka, wyprost nadgarstka i ćwiczenie ogólne;
-- target force: plus/minus in 5 N increments;
-- series count: [ and ];
-- liczba powtórzeń w serii: klawisze przecinka i kropki;
-- czas odpoczynku: średnik zmniejsza, a apostrof zwiększa wartość o 5 sekund (zakres 0–600 sekund).
-
-Po zakończeniu każdej serii TUI wstrzymuje wykrywanie powtórzeń na skonfigurowany czas odpoczynku. Odliczanie odpoczynku jest zawieszone podczas pauzy sesji. Zakończone powtórzenia pozostają w pamięci i są wysyłane jako jeden zasób `training-sessions` do uwierzytelnionego wspólnego API, gdy operator zatrzyma sesję, zamknie aplikację lub zrealizuje cały plan. Rekord obejmuje ćwiczenie, cel, metadane serii i powtórzeń, statystyki siły oraz liczbę próbek dla każdego powtórzenia. Nieudane wysłanie do API jest widoczne w stanie treningu; TUI nie zapisuje po cichu danych zastępczo do oddzielnego lokalnego pliku historii.
-
-Ekran Pacjenci odczytuje przez API wspólną kolekcję `patients` i wyświetla rekordy zwrócone przez serwer. Ekran Diagnostyka prezentuje liczbę próbek poprawnych i odrzuconych, ostatnią klasyfikację jakości próbki oraz siłę szczytową i średnią, czas trwania i czas do maksimum ostatniego powtórzenia. W opisywanej wersji TUI nie wybiera jeszcze pacjenta, dlatego nie dołącza `patient_id` do sesji treningowej. Powiązanie pacjenta z sesją i pełna historia wyników treningowych pozostają kolejnymi etapami integracji.
-
-## Wymagania kalibracji HX711
-
-TUI korzysta ze wspólnego adaptera pomiarowego, którego wejściem są skalibrowane gramy. Zaawansowane firmware informuje, czy kalibracja jest aktywna. Surowe ramki binarne bez potwierdzonego statusu `CAL:1` są oznaczane przez tor jednostek fizycznych jako odrzucone przez czujnik i nie mogą uczestniczyć w wykrywaniu powtórzeń opartych na sile. Po tarowaniu wykonaj kalibrację znaną masą za pomocą `CAL:<grams>`; obecne firmware nie zachowuje tego znacznika po zaniku zasilania.
+W repozytorium znajdują się testy `tui_model_regression`, `measurement_engine_regression`, `repetition_detector_regression`, `training_session_clock_regression` oraz testy integracji akwizycji i protokołu. Testy automatyczne nie potwierdzają poprawności kalibracji fizycznego czujnika ani trwałości niezapisanych buforów TUI.
