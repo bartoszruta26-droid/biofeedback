@@ -960,6 +960,17 @@ void MeasurementTab::setupUI()
     workspaceSplitter->setStretchFactor(0, 3);
     workspaceSplitter->setStretchFactor(1, 1);
     workspaceSplitter->setSizes({900, 300});
+    // The sidebar remains user-resizable, but dragging cannot make it wider
+    // than 25% of the available workspace. QSplitter scales the saved ratio
+    // when the window is resized, so the same limit follows other resolutions.
+    connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
+            [workspaceSplitter](int position, int) {
+        const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
+        const int maxVisualWidth = availableWidth * 3 / 4;
+        if (position > maxVisualWidth) {
+            workspaceSplitter->setSizes({maxVisualWidth, availableWidth - maxVisualWidth});
+        }
+    });
     m_mainLayout->addWidget(workspaceSplitter, 1);
 
     // Sekcja kontrolna w prawej, wąskiej kolumnie.
