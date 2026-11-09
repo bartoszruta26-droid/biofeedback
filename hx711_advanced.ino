@@ -139,9 +139,10 @@ long readHX711Raw() {
     // Wait for data ready (DT pin goes LOW)
     pinMode(HX711_DT_PIN, INPUT);
     
-    unsigned long timeout = millis() + 100;  // 100ms timeout
+    const unsigned long wait_started_at = millis();
     while (digitalRead(HX711_DT_PIN) == HIGH) {
-        if (millis() > timeout) {
+        // Subtraction-based timeout remains correct across millis() rollover.
+        if (millis() - wait_started_at >= 100UL) {
             return LONG_MIN;  // Explicit timeout sentinel; zero is a valid signed sample
         }
         feedWatchdog();
