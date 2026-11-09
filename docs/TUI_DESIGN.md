@@ -58,17 +58,17 @@ Jeśli ncurses nie jest dostępne, CMake pomija wyłącznie program TUI.
 
 ## Sterowanie sesją treningową i historia
 
-The training screen supports configuration before starting:
-- exercise preset: E cycles through hand grip, wrist flexion, wrist extension and generic exercise;
+Ekran treningu umożliwia konfigurację przed rozpoczęciem sesji:
+- zestaw ćwiczeń: klawisz E przełącza chwyt dłoni, zgięcie nadgarstka, wyprost nadgarstka i ćwiczenie ogólne;
 - target force: plus/minus in 5 N increments;
 - series count: [ and ];
-- repetitions per series: comma and period;
-- rest duration: semicolon decreases and apostrophe increases by 5 seconds (0–600 seconds).
+- liczba powtórzeń w serii: klawisze przecinka i kropki;
+- czas odpoczynku: średnik zmniejsza, a apostrof zwiększa wartość o 5 sekund (zakres 0–600 sekund).
 
-After each completed series, the TUI pauses repetition detection during the configured rest interval. The rest countdown is suspended while the session is paused. Completed repetitions are retained in memory and submitted as one `training-sessions` resource to the authenticated shared API when the operator stops the session, exits the application, or completes the plan. The record includes exercise, target, series/repetition metadata, force statistics and per-repetition sample counts. A failed API submission is shown in the training status; TUI does not silently fall back to a separate local history file.
+Po zakończeniu każdej serii TUI wstrzymuje wykrywanie powtórzeń na skonfigurowany czas odpoczynku. Odliczanie odpoczynku jest zawieszone podczas pauzy sesji. Zakończone powtórzenia pozostają w pamięci i są wysyłane jako jeden zasób `training-sessions` do uwierzytelnionego wspólnego API, gdy operator zatrzyma sesję, zamknie aplikację lub zrealizuje cały plan. Rekord obejmuje ćwiczenie, cel, metadane serii i powtórzeń, statystyki siły oraz liczbę próbek dla każdego powtórzenia. Nieudane wysłanie do API jest widoczne w stanie treningu; TUI nie zapisuje po cichu danych zastępczo do oddzielnego lokalnego pliku historii.
 
-The Patients screen reads the shared `patients` collection through the API and displays the records returned by the server. The Diagnostics screen reports valid and rejected sample counts, the last sample-quality classification, and the last repetition's peak and mean force, duration and time-to-peak. The TUI currently does not select a patient and therefore does not yet attach a `patient_id` to a training session. Patient-to-session association and full training-result history are next integration steps.
+Ekran Pacjenci odczytuje przez API wspólną kolekcję `patients` i wyświetla rekordy zwrócone przez serwer. Ekran Diagnostyka prezentuje liczbę próbek poprawnych i odrzuconych, ostatnią klasyfikację jakości próbki oraz siłę szczytową i średnią, czas trwania i czas do maksimum ostatniego powtórzenia. W opisywanej wersji TUI nie wybiera jeszcze pacjenta, dlatego nie dołącza `patient_id` do sesji treningowej. Powiązanie pacjenta z sesją i pełna historia wyników treningowych pozostają kolejnymi etapami integracji.
 
 ## Wymagania kalibracji HX711
 
-The TUI uses the shared measurement adapter with calibrated grams as its input. The advanced firmware reports whether its calibration is active. Raw binary frames without a confirmed `CAL:1` status are marked sensor-rejected by the physical-unit pipeline and cannot contribute to force-based repetitions. Calibrate with a known reference mass using `CAL:<grams>` after tare; the current firmware does not persist this flag through power cycles.
+TUI korzysta ze wspólnego adaptera pomiarowego, którego wejściem są skalibrowane gramy. Zaawansowane firmware informuje, czy kalibracja jest aktywna. Surowe ramki binarne bez potwierdzonego statusu `CAL:1` są oznaczane przez tor jednostek fizycznych jako odrzucone przez czujnik i nie mogą uczestniczyć w wykrywaniu powtórzeń opartych na sile. Po tarowaniu wykonaj kalibrację znaną masą za pomocą `CAL:<grams>`; obecne firmware nie zachowuje tego znacznika po zaniku zasilania.
