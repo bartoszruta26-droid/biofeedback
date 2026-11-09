@@ -71,6 +71,16 @@ void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
         
         // Presentation-only buffer: never allow a delayed GUI to grow without bound.
         constexpr int MaximumGraphPoints = 12000;
+        if (!timestamp.isValid()) {
+            ++m_invalidPointCount;
+            return;
+        }
+        if (!m_dataPoints.isEmpty() &&
+            timestamp < m_dataPoints.constLast().timestamp) {
+            // Keep hover lookup correct even if a device clock is adjusted
+            // or delayed samples arrive out of order.
+            m_timestampsMonotonic = false;
+        }
         m_dataPoints.append(DataPoint(timestamp, value));
         if (m_dataPoints.size() > MaximumGraphPoints) {
             m_dataPoints.remove(0, m_dataPoints.size() - MaximumGraphPoints);
@@ -106,6 +116,7 @@ void GraphWidget::clear()
 {
     m_dataPoints.clear();
     m_samplesSinceAutoScale = 0;
+    m_timestampsMonotonic = true;
     m_yMin = 0.0;
     m_yMax = 100.0;
     m_cacheValid = false;
@@ -353,38 +364,47 @@ void GraphWidget::mouseMoveEvent(QMouseEvent *event)
     QPointF dataPos = screenToData(event->pos());
     m_isHovering = false;
     
-    // Samples are appended in acquisition order. Restrict hit-testing to
-    // the small timestamp interval represented by a five-pixel radius.
-    // This avoids transforming and testing the complete history on every
-    // mouse-move event.
+    // Fast binary-search path is used only while timestamps are monotonic.
+    // If the device clock changes or delayed frames arrive out of order,
+    // fall back to a correct bounded-buffer scan rather than mis-hitting.
     const QRectF area = plotArea();
     if (area.width() > 0.0 && !m_dataPoints.isEmpty()) {
         const qint64 centerMs = static_cast<qint64>(dataPos.x());
         const qint64 radiusMs = qMax<qint64>(
             1, static_cast<qint64>(
                 (5.0 * m_timeRangeSeconds * 1000.0) / area.width()));
-        const auto first = std::lower_bound(
-            m_dataPoints.cbegin(), m_dataPoints.cend(), centerMs - radiusMs,
-            [](const DataPoint& point, qint64 timestampMs) {
-                return point.timestamp.toMSecsSinceEpoch() < timestampMs;
-            });
-        const auto last = std::upper_bound(
-            first, m_dataPoints.cend(), centerMs + radiusMs,
-            [](qint64 timestampMs, const DataPoint& point) {
-                return timestampMs < point.timestamp.toMSecsSinceEpoch();
-            });
 
-        for (auto it = first; it != last; ++it) {
-            const QPointF screenPos = dataToScreen(*it);
+        auto testPoint = [&](const DataPoint& point) {
+            const QPointF screenPos = dataToScreen(point);
             if (QLineF(screenPos, event->pos()).length() < 5.0) {
                 m_isHovering = true;
-                m_hoveredPoint = *it;
-                emit hovered(*it, dataPos);
-                break;
+                m_hoveredPoint = point;
+                emit hovered(point, dataPos);
+                return true;
+            }
+            return false;
+        };
+
+        if (m_timestampsMonotonic) {
+            const auto first = std::lower_bound(
+                m_dataPoints.cbegin(), m_dataPoints.cend(), centerMs - radiusMs,
+                [](const DataPoint& point, qint64 timestampMs) {
+                    return point.timestamp.toMSecsSinceEpoch() < timestampMs;
+                });
+            const auto last = std::upper_bound(
+                first, m_dataPoints.cend(), centerMs + radiusMs,
+                [](qint64 timestampMs, const DataPoint& point) {
+                    return timestampMs < point.timestamp.toMSecsSinceEpoch();
+                });
+            for (auto it = first; it != last; ++it) {
+                if (testPoint(*it)) break;
+            }
+        } else {
+            for (const DataPoint& point : m_dataPoints) {
+                if (testPoint(point)) break;
             }
         }
-    }
-    
+    }    
     if (!m_isHovering) {
         update();
     }
