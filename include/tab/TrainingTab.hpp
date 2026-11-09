@@ -63,6 +63,7 @@ private:
     double m_targetForce;
     double m_currentForce;
     qint64 m_lastLiveUiRefreshMs{-50};
+    qint64 m_lastGameInputRefreshMs{-50};
     int m_sessionTime;
     
     static QColor getForceColorStatic(double current, double target);
