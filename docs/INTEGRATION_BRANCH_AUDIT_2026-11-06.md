@@ -1,4 +1,6 @@
-# Audyt techniczny gałęzi integration/all-work
+# 🔍 Audyt techniczny gałęzi integration/all-work — 2026-11-06
+
+> 🕒 Dokument audytowy / planistyczny • Wnioski i statusy odnoszą się do wskazanej daty, gałęzi i commita; nie są automatycznie bieżącym stanem main.
 
 Data: 2026-11-06
 Repozytorium: bartoszruta26-droid/biofeedback
