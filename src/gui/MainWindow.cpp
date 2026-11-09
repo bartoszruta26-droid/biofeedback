@@ -95,9 +95,14 @@ MainWindow::MainWindow(QWidget *parent)
     m_serialDataCallbackToken = m_serialPort->addDataCallback([this](const sensor::SensorData& data) {
         if (!data.isValid || !data.hasCalibratedValue) return;
         const double forceNewtons = biofeedback::measurement::gramsToNewtons(data.calibratedValue);
-        if (!std::isfinite(forceNewtons) || forceNewtons < 0.0) return;
+        if (!std::isfinite(forceNewtons)) return;
+        // Signed calibration supports either HX711 bridge wiring polarity.
+        // Game controls use tensile magnitude, while recorded physical samples
+        // and their calibrated sign remain unchanged.
+        const double tensileForceNewtons = std::abs(forceNewtons);
         constexpr double gameReferenceForceN = 50.0;
-        const double normalizedGameInput = qBound(0.0, forceNewtons / gameReferenceForceN * 100.0, 100.0);
+        const double normalizedGameInput = qBound(
+            0.0, tensileForceNewtons / gameReferenceForceN * 100.0, 100.0);
         enqueueGameSensorInput(normalizedGameInput);
     });
 
