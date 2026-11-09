@@ -45,7 +45,7 @@ int main(int argc, char** argv)
     QMouseEvent moveEvent(QEvent::MouseMove, QPointF(400.0, 200.0),
                           Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     QApplication::sendEvent(&graph, &moveEvent);
-    if (frame.isNull()) {
+    if (frame.isNull() || frame.pixelColor(0, 0).alpha() == 0) {
         std::cerr << "Graph render produced a null image\n";
         return 3;
     }
