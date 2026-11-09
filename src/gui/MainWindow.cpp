@@ -703,10 +703,10 @@ void MainWindow::toggleSerialConnection()
         const QString error = QString::fromStdString(m_serialPort->getLastError());
         QString detail = tr("Nie udało się otworzyć portu %1.").arg(port);
         if (!error.isEmpty())
-            detail += tr("\\n\\nSzczegóły systemowe: %1").arg(error);
+            detail += tr("\n\nSzczegóły systemowe: %1").arg(error);
 #ifndef _WIN32
         if (error.contains(QStringLiteral("Permission denied"), Qt::CaseInsensitive)) {
-            detail += tr("\\n\\nBrak uprawnień do portu. W Debianie dodaj użytkownika do grupy dialout poleceniem:\\nsudo usermod -aG dialout $USER\\nNastępnie wyloguj się i zaloguj ponownie.");
+            detail += tr("\n\nBrak uprawnień do portu. W Debianie dodaj użytkownika do grupy dialout poleceniem:\nsudo usermod -aG dialout $USER\nNastępnie wyloguj się i zaloguj ponownie.");
         }
 #endif
         QMessageBox::warning(this, tr("Połączenie z urządzeniem"), detail);
