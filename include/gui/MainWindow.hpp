@@ -261,6 +261,7 @@ private:
     // Obszar gry
     QStackedWidget* m_gameStack;
     games::GameEngine* m_currentGame;
+    QDialog* m_gameWindow;
     
     // Elementy panelu sterowania
     QPushButton* m_startButton;
