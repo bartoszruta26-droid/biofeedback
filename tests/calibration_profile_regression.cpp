@@ -37,10 +37,10 @@ int main()
     // A tensile load cell can produce decreasing ADC counts under load.
     // Signed scale preserves polarity and still yields positive reference force.
     const auto reverseScale = sensor::CalibrationMath::scaleFromReference(
-        100000.0, 76543, 9.81);
+        100000.0, 76542, 9.81);
     assert(reverseScale && *reverseScale < 0.0);
     const auto reverseConverted = sensor::CalibrationMath::convertRaw(
-        76543, 100000.0, *reverseScale);
+        76542, 100000.0, *reverseScale);
     assert(reverseConverted && std::abs(*reverseConverted - 9.81) < 1e-9);
     const auto reverseHalfLoad = sensor::CalibrationMath::convertRaw(
         88271, 100000.0, *reverseScale);
@@ -49,7 +49,7 @@ int main()
     assert(reverseHalfLoad && std::abs(*reverseHalfLoad - 4.905) < 1e-9);
     assert(reverseZeroLoad && std::abs(*reverseZeroLoad) < 1e-12);
     sensor::CalibrationProfile reverseProfile = profile;
-    reverseProfile.referenceRaw = 76543;
+    reverseProfile.referenceRaw = 76542;
     reverseProfile.scaleFactor = *reverseScale;
     assert(reverseProfile.isValidFor("device-123"));
     assert(!sensor::CalibrationMath::scaleFromReference(
