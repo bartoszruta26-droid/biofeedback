@@ -1228,7 +1228,10 @@ void TrainingTab::onMeasurementSample(
         m_forceBar->setValue(qBound(0, barValue, 100));
     }
 
-    if (m_currentGame && m_currentGame->isRunning()) {
+    const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
+    if (m_currentGame && m_currentGame->isRunning() &&
+        nowMs - m_lastGameInputRefreshMs >= LiveUiIntervalMs) {
+        m_lastGameInputRefreshMs = nowMs;
         const double gameInput = targetForce > 0.0
             ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
         m_currentGame->handleSensorInput(gameInput);
