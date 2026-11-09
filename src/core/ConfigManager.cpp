@@ -530,6 +530,7 @@ void ConfigManager::setDefaults() {
     m_config["sensor.gain"] = static_cast<int>(sensor::protocol::Hx711Gain);
     m_config["sensor.calibration_enabled"] = false;
     m_config["sensor.calibration_profile"] = std::string("calibration/hx711.json");
+    m_config["sensor.raw_polarity"] = -1;
     m_config["sensor.zero_threshold"] = 0.5;
 
     // Device transport defaults for measurement hardware
