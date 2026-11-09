@@ -254,7 +254,10 @@ void GraphWidget::paintEvent(QPaintEvent *event)
     try {
 
         Q_UNUSED(event);
-        
+        // One time reference for the entire frame prevents horizontal jitter
+        // and avoids repeated system-clock queries for every plotted sample.
+        m_renderNow = QDateTime::currentDateTime();
+
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         
@@ -343,6 +346,9 @@ void GraphWidget::mouseMoveEvent(QMouseEvent *event)
         m_lastMousePos = event->pos();
     }
     
+    // Use one consistent time reference for hit-testing this mouse event.
+    m_renderNow = QDateTime::currentDateTime();
+
     // Detekcja najechania na punkt danych
     QPointF dataPos = screenToData(event->pos());
     m_isHovering = false;
@@ -461,60 +467,84 @@ void GraphWidget::drawAxes(QPainter& painter)
 
 void GraphWidget::drawDataLine(QPainter& painter)
 {
-    try {
-
-        if (m_dataPoints.size() < 2) {
-
-            return;
-        }
-        
-        QRectF area = plotArea();
-        
-        // Ścieżka linii
-        QPainterPath path;
-        QPointF firstPoint = dataToScreen(m_dataPoints.first());
-
-        path.moveTo(firstPoint);
-        
-        int validPoints = 0;
-        int invalidPoints = 0;
-        for (int i = 1; i < m_dataPoints.size(); ++i) {
-            QPointF point = dataToScreen(m_dataPoints[i]);
-            
-            // Check for invalid coordinates
-            if (std::isnan(point.x()) || std::isnan(point.y()) || 
-                std::isinf(point.x()) || std::isinf(point.y())) {
-                invalidPoints++;
-
-                continue;
-            }
-            
-            path.lineTo(point);
-            validPoints++;
-        }
-
-        // Rysowanie linii
-        painter.setPen(QPen(m_lineColor, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        painter.drawPath(path);
-
-        // Wypełnienie pod wykresem
-        QPainterPath fillPath = path;
-        fillPath.lineTo(area.right(), area.bottom());
-        fillPath.lineTo(area.left(), area.bottom());
-        fillPath.closeSubpath();
-        
-        painter.setBrush(m_fillColor);
-        painter.setPen(Qt::NoPen);
-        painter.drawPath(fillPath);
-
-
-    } catch (const std::exception& e) {
-
-        throw;
-    } catch (...) {
-
-        throw;
+    if (m_dataPoints.size() < 2) {
+        return;
     }
+
+    const QRectF area = plotArea();
+    const int bucketCount = qMax(1, static_cast<int>(std::ceil(area.width())));
+    struct PixelBucket {
+        bool valid{false};
+        int minIndex{0};
+        int maxIndex{0};
+        QPointF minPoint;
+        QPointF maxPoint;
+    };
+
+    // Min/max envelope: at most two vertices per horizontal pixel column.
+    // This preserves narrow peaks while avoiding thousands of off-screen
+    // painter path segments when the sample rate exceeds display resolution.
+    QVector<PixelBucket> buckets(bucketCount);
+    for (int i = 0; i < m_dataPoints.size(); ++i) {
+        const QPointF point = dataToScreen(m_dataPoints[i]);
+        if (!std::isfinite(point.x()) || !std::isfinite(point.y())) {
+            continue;
+        }
+
+        const int column = qBound(
+            0, static_cast<int>(point.x() - area.left()), bucketCount - 1);
+        PixelBucket& bucket = buckets[column];
+        if (!bucket.valid) {
+            bucket.valid = true;
+            bucket.minIndex = bucket.maxIndex = i;
+            bucket.minPoint = bucket.maxPoint = point;
+            continue;
+        }
+        if (point.y() < bucket.minPoint.y()) {
+            bucket.minPoint = point;
+            bucket.minIndex = i;
+        }
+        if (point.y() > bucket.maxPoint.y()) {
+            bucket.maxPoint = point;
+            bucket.maxIndex = i;
+        }
+    }
+
+    QPainterPath path;
+    bool started = false;
+    for (const PixelBucket& bucket : buckets) {
+        if (!bucket.valid) {
+            continue;
+        }
+        const bool minFirst = bucket.minIndex <= bucket.maxIndex;
+        const QPointF first = minFirst ? bucket.minPoint : bucket.maxPoint;
+        const QPointF second = minFirst ? bucket.maxPoint : bucket.minPoint;
+        if (!started) {
+            path.moveTo(first);
+            started = true;
+        } else {
+            path.lineTo(first);
+        }
+        if (bucket.minIndex != bucket.maxIndex) {
+            path.lineTo(second);
+        }
+    }
+
+    if (!started) {
+        return;
+    }
+
+    painter.setPen(QPen(m_lineColor, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawPath(path);
+
+    QPainterPath fillPath = path;
+    fillPath.lineTo(area.right(), area.bottom());
+    fillPath.lineTo(area.left(), area.bottom());
+    fillPath.closeSubpath();
+
+    painter.setBrush(m_fillColor);
+    painter.setPen(Qt::NoPen);
+    painter.drawPath(fillPath);
 }
 
 void GraphWidget::drawDataPoints(QPainter& painter)
@@ -688,8 +718,9 @@ QPointF GraphWidget::dataToScreen(const DataPoint& point) const
             return QPointF(0, 0);
         }
         
-        QDateTime now = QDateTime::currentDateTime();
-        qint64 msNow = now.toMSecsSinceEpoch();
+        const QDateTime now = m_renderNow.isValid()
+            ? m_renderNow : QDateTime::currentDateTime();
+        const qint64 msNow = now.toMSecsSinceEpoch();
         qint64 msPoint = point.timestamp.toMSecsSinceEpoch();
         qint64 msRange = m_timeRangeSeconds * 1000;
         
