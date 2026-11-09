@@ -16,26 +16,25 @@ if "m_lastSensorData" not in manual or "readSingleSample(value, m_lastSensorData
 if "if (m_isMeasuring)" not in manual or "AKTYWNY POMIAR ZAPISUJE PRÓBKI AUTOMATYCZNIE" not in manual:
     raise SystemExit("Manual capture must not replay a sample while the asynchronous session is recording")
 
-# Both RAW and calibrated modes now enter the same MeasurementEngine commit path.
-# RAW mode switches the adapter to canonical "count" units; the commit hook
-# journals raw ADC value and device timestamp before any GUI subscriber runs.
-if 'checked ? "count" : "g"' not in source:
-    raise SystemExit("RAW diagnostic mode must switch the adapter to count units")
-if 'record["unit"] = rawMode ? "count" : "N"' not in source or 'record["rawValue"] = sample.rawValue' not in source:
-    raise SystemExit("RAW diagnostic capture must durably archive ADC value and source timestamp")
+# The desktop adapter always commits unmodified ADC counts. The durable journal
+# stores those counts independently of the currently selected presentation unit.
+if '"desktop-hx711", "count"' not in source:
+    raise SystemExit("Desktop acquisition must always use raw count units")
+if 'record["unit"] = "count"' not in source or 'record["rawValue"] = sample.rawValue' not in source:
+    raise SystemExit("Every acquired sample must be durably archived as RAW with its ADC value")
 handler_start = source.index("void MeasurementTab::onMeasurementSample")
 handler_end = source.index("// MeasurementTab - Konwersja jednostek", handler_start)
 handler = source[handler_start:handler_end]
 if "sample.isValid()" not in handler or 'sample.unit != "count"' not in handler:
     raise SystemExit("RAW display must consume valid canonical count samples")
-if 'sample.unit != "kg"' not in handler:
-    raise SystemExit("Calibrated biomechanics must consume canonical mass samples")
-if "standardGravityMetersPerSecondSquared" not in handler:
-    raise SystemExit("Canonical mass must be converted to SI force exactly once")
+if "rawToNewtons(raw, forceNewtons)" not in handler:
+    raise SystemExit("Calibrated display must convert raw counts in the desktop GUI")
+if "CalibrationMath::convertRaw" not in source or "CalibrationProfileStore::load" not in source:
+    raise SystemExit("Desktop calibration must be loaded from the validated configuration profile")
 if "m_measurementEngine->subscribe" not in source:
     raise SystemExit("MeasurementTab must subscribe to the shared measurement engine")
-if "m_showRawValues(false)" not in source:
-    raise SystemExit("Calibrated force in SI units must be the default")
+if "m_showRawValues(true)" not in source or "m_currentUnit(ForceUnit::Raw)" not in source:
+    raise SystemExit("RAW values must be the default desktop presentation")
 if "m_btnToggleRaw->setEnabled(true)" not in source:
     raise SystemExit("RAW diagnostic mode must be selectable while idle")
 if "if (!m_serialPort || !m_serialPort->isConnected())" not in source:
