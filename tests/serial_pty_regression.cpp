@@ -71,6 +71,19 @@ bool readBytes(int fd, std::vector<uint8_t>& bytes, std::size_t expected, int ti
 } // namespace
 
 int main() {
+    // Discovery must be safe in headless CI and return stable, unique device paths.
+    const auto discoveredPorts = sensor::SerialCommunication::scanAvailablePorts();
+    if (!std::is_sorted(discoveredPorts.begin(), discoveredPorts.end()) ||
+        std::adjacent_find(discoveredPorts.begin(), discoveredPorts.end()) != discoveredPorts.end()) {
+        std::cerr << "Serial port discovery returned unsorted or duplicate entries\\n";
+        return 1;
+    }
+    for (const auto& port : discoveredPorts) {
+        if (port.empty() || port.front() != '/') {
+            std::cerr << "Linux serial discovery returned an invalid device path: " << port << '\\n';
+            return 1;
+        }
+    }
     const int master = ::posix_openpt(O_RDWR | O_NOCTTY);
     if (master < 0 || ::grantpt(master) != 0 || ::unlockpt(master) != 0) {
         std::cerr << "Could not create POSIX pseudo-terminal: " << std::strerror(errno) << '\n';
