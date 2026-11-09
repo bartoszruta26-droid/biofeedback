@@ -386,16 +386,15 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
 
     QVector<QPoint> tracePoints;
     tracePoints.reserve(plotWidth * 2);
-    for (const PixelBucket& bucket : buckets) {
+    for (int column = 0; column < plotWidth; ++column) {
+        const PixelBucket& bucket = buckets[static_cast<std::size_t>(column)];
         if (!bucket.valid)
             continue;
 
         const auto toPoint = [&](double force) {
             const double y = margin + plotHeight -
                 ((force + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
-            return QPoint(
-                margin + static_cast<int>(&bucket - buckets.data()),
-                static_cast<int>(y));
+            return QPoint(margin + column, static_cast<int>(y));
         };
 
         if (bucket.minIndex <= bucket.maxIndex) {
