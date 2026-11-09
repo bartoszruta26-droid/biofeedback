@@ -9,11 +9,25 @@ def read(path):
 main = read("src/gui/MainWindow.cpp")
 measurement = read("src/tab/MeasurementTab.cpp")
 training = read("src/tab/TrainingTab.cpp")
+measurement_header = read("include/tab/MeasurementTab.hpp")
 
 assert "if (!std::isfinite(forceNewtons)) return;" in main
 assert "forceNewtons < 0.0" not in main
 assert "std::abs(forceNewtons)" in main
-assert "m_gameWindow->showMaximized();" in main
+assert "m_gameWindow->showFullScreen();" in main
+assert "QShortcut(QKeySequence(Qt::Key_Escape), m_gameWindow)" in main
+assert "trainingMeasurementEngine()->subscribe" in main
+assert "m_measurementTab->hasCalibrationProfile()" in main
+assert "m_measurementTab->trainingMeasurementEngine()" in main
+assert "m_gameWindow->showFullScreen();" in training
+assert "QDialog(this, Qt::Window)" in training
+assert "m_btnOpenGame" in training
+assert "showGameWindow();" in training
+assert 'input.unit = "N";' in measurement
+assert "rawToNewtons(data.value, forceNewtons)" in measurement
+assert "trainingMeasurementEngine()" in measurement_header
+assert 'sample.unit != "N"' in training
+assert "const double force = sample.value;" in training
 assert "selectedGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);" in main
 # Measurement and training use a 3:1 horizontal workspace: visual content
 # remains on the left while configuration is isolated in a scrollable sidebar.
