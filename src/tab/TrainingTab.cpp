@@ -332,6 +332,16 @@ void TrainingTab::setupUI()
     workspaceSplitter->setStretchFactor(0, 3);
     workspaceSplitter->setStretchFactor(1, 1);
     workspaceSplitter->setSizes({900, 300});
+    // Keep manual sidebar resizing available while enforcing a 25% maximum.
+    // QSplitter preserves the relative sizes as the window changes resolution.
+    connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
+            [workspaceSplitter](int position, int) {
+        const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
+        const int maxVisualWidth = availableWidth * 3 / 4;
+        if (position > maxVisualWidth) {
+            workspaceSplitter->setSizes({maxVisualWidth, availableWidth - maxVisualWidth});
+        }
+    });
     m_mainLayout->addWidget(workspaceSplitter, 1);
 
     // Panel konfiguracji w prawej kolumnie.
