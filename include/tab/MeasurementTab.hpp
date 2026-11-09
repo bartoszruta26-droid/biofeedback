@@ -317,6 +317,8 @@ public:
      */
     bool isArduinoConnected() const;
     std::shared_ptr<biofeedback::measurement::MeasurementEngine> measurementEngine() const { return m_measurementEngine; }
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> trainingMeasurementEngine() const { return m_trainingMeasurementEngine; }
+    bool hasCalibrationProfile() const { return m_hasCalibrationProfile; }
     
     /**
      * @brief Dodaje wiadomość do centralnego terminala debugowego (DebugTab)
@@ -495,6 +497,8 @@ private:
     // Połączenie szeregowe z Arduino
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
+    // Calibrated SI force stream shared by training and standalone games.
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_trainingMeasurementEngine;
     std::unique_ptr<sensor::MeasurementSerialAdapter> m_measurementAdapter;
     biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken = 0;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
