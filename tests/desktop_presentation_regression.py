@@ -27,7 +27,10 @@ assert 'input.unit = "N";' in measurement
 assert "rawToNewtons(data.value, forceNewtons)" in measurement
 assert "trainingMeasurementEngine()" in measurement_header
 assert 'sample.unit != "N"' in training
-assert "const double force = sample.value;" in training
+assert "const double force = std::abs(sample.value);" in training
+assert "m_currentGame->handleSensorInput(gameInput);" in training
+assert "m_trainingMeasurementEngine->ingest(input);" in measurement
+assert "m_trainingTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());" in main
 assert "selectedGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);" in main
 # Measurement and training use a 3:1 horizontal workspace: visual content
 # remains on the left while configuration is isolated in a scrollable sidebar.
