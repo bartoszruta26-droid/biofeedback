@@ -154,7 +154,8 @@ private:
     QString m_currentPort;
     int m_baudRate;
     QDateTime m_lastDataTime;
-    
+    QTimer* m_sensorUiTimer{nullptr};
+
     std::mutex m_messageMutex;
 };
 
