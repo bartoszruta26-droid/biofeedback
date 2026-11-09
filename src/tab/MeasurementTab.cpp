@@ -337,7 +337,8 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     const int zeroY = margin + plotHeight / 2;
     painter.drawLine(margin, zeroY, margin + plotWidth, zeroY);
 
-    if (m_targetForce > 0.0 && m_maxForce > 0.0) {
+    // A force target is meaningful only for calibrated force units, not raw ADC counts.
+    if (m_unit != ForceUnit::Raw && m_targetForce > 0.0 && m_maxForce > 0.0) {
         const int targetY = margin + plotHeight - static_cast<int>(
             ((m_targetForce + m_maxForce) / (2.0 * m_maxForce)) * plotHeight);
         painter.setPen(QPen(QColor(255, 100, 100), 2, Qt::DashLine));
