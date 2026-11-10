@@ -1350,12 +1350,24 @@ void OutlineTab::refreshRehabilitationAssessments()
         return;
     }
     QStringList entries;
+    QJsonObject baselineAssessment;
+    QJsonObject latestAssessment;
+    QString latestAssessmentAt;
     for (const QJsonValue& value : assessments) {
         if (!value.isObject()) continue;
         const QJsonObject item = value.toObject();
         if (item.value(QStringLiteral("patient_id")).toString() != m_currentPatientUuid ||
             item.value(QStringLiteral("episode_id")).toString() != m_currentEpisodeUuid)
             continue;
+        const QString assessedAt = item.value(QStringLiteral("assessed_at")).toString();
+        if (item.value(QStringLiteral("assessment_type")).toString() == QStringLiteral("baseline") &&
+            (baselineAssessment.isEmpty() ||
+             assessedAt < baselineAssessment.value(QStringLiteral("assessed_at")).toString()))
+            baselineAssessment = item;
+        if (latestAssessment.isEmpty() || assessedAt > latestAssessmentAt) {
+            latestAssessment = item;
+            latestAssessmentAt = assessedAt;
+        }
         QStringList fields;
         const QString assessmentType = item.value(QStringLiteral("assessment_type")).toString();
         if (assessmentType == QStringLiteral("baseline")) fields << tr("Ocena początkowa");
@@ -1377,6 +1389,36 @@ void OutlineTab::refreshRehabilitationAssessments()
         entries << QStringLiteral("• %1 — %2")
                        .arg(item.value(QStringLiteral("assessed_at")).toString(),
                             fields.join(QStringLiteral("; ")));
+    }
+    if (!baselineAssessment.isEmpty() && !latestAssessment.isEmpty() &&
+        baselineAssessment.value(QStringLiteral("id")).toString() !=
+            latestAssessment.value(QStringLiteral("id")).toString()) {
+        QStringList comparisons;
+        const struct Metric { const char* key; const char* label; const char* unit; };
+        static const Metric metrics[] = {
+            {"pain_nrs", "NRS", "/10"}, {"rom_degrees", "ROM", "°"},
+            {"strength_mrc", "MRC", "/5"}, {"swelling_cm", "Obwód", "cm"}
+        };
+        for (const Metric& metric : metrics) {
+            const QString key = QString::fromLatin1(metric.key);
+            if (!baselineAssessment.contains(key) || !latestAssessment.contains(key)) continue;
+            const double initial = baselineAssessment.value(key).toDouble();
+            const double current = latestAssessment.value(key).toDouble();
+            const double delta = current - initial;
+            comparisons << tr("%1: %2 → %3 %4 (zmiana: %5%6)")
+                .arg(QString::fromLatin1(metric.label),
+                     QString::number(initial, 'g', 5),
+                     QString::number(current, 'g', 5),
+                     QString::fromLatin1(metric.unit),
+                     delta > 0.0 ? QStringLiteral("+") : QString(),
+                     QString::number(delta, 'g', 5));
+        }
+        if (!comparisons.isEmpty()) {
+            entries << QString();
+            entries << tr("Porównanie: ocena początkowa → najnowsza");
+            entries.append(comparisons);
+            entries << tr("Zmiany liczbowe wymagają interpretacji klinicznej; kierunek poprawy zależy od mierzonego parametru.");
+        }
     }
     m_assessmentHistoryBrowser->setPlainText(entries.isEmpty()
         ? tr("Brak zapisanych ocen dla tego epizodu.") : entries.join(QStringLiteral("\n")));
