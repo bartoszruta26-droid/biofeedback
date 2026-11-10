@@ -20,6 +20,7 @@ GalagaGame::GalagaGame(QWidget *parent)
     , m_lives(3)
     , m_wave(1)
     , m_fireHeld(false)
+    , m_backgroundOffset(0.0)
 {
     setFocusPolicy(Qt::StrongFocus);
 }
@@ -50,6 +51,12 @@ int GalagaGame::activeEnemyCount() const
         [](const Enemy& enemy) { return enemy.active; }));
 }
 
+int GalagaGame::activeProjectileCount() const
+{
+    return static_cast<int>(std::count_if(m_projectiles.cbegin(), m_projectiles.cend(),
+        [](const Projectile& shot) { return !shot.rect.isEmpty(); }));
+}
+
 void GalagaGame::initialize()
 {
     m_force = 0.5;
@@ -61,6 +68,7 @@ void GalagaGame::initialize()
     m_lives = 3;
     m_wave = 1;
     m_fireHeld = false;
+    m_backgroundOffset = 0.0;
     m_projectiles.clear();
     m_player = QRectF(width() * 0.5 - 18.0, height() - 58.0, 36.0, 24.0);
     createWave();
@@ -160,7 +168,8 @@ void GalagaGame::firePlayerShot()
 {
     Projectile shot;
     shot.rect = QRectF(m_player.center().x() - 2.0, m_player.top() - 12.0, 4.0, 12.0);
-    shot.velocityY = -460.0;
+    shot.velocityX = 0.0;
+    shot.velocityY = -500.0;
     shot.fromPlayer = true;
     m_projectiles.push_back(shot);
 }
@@ -194,6 +203,7 @@ void GalagaGame::update(double deltaTime)
         return;
     deltaTime = qMin(deltaTime, 0.1);
     m_hitCooldown = qMax(0.0, m_hitCooldown - deltaTime);
+    m_backgroundOffset = std::fmod(m_backgroundOffset + 18.0 * deltaTime, 32.0);
 
     const double sensorX = 18.0 + m_force * qMax(0.0, width() - 36.0 - m_player.width());
     const double keyboardX = m_player.x() + m_keyboardDirection * 360.0 * deltaTime;
@@ -217,7 +227,10 @@ void GalagaGame::update(double deltaTime)
             Projectile shot;
             shot.rect = QRectF(shooter.rect.center().x() - 2.0,
                                shooter.rect.bottom(), 4.0, 10.0);
-            shot.velocityY = 250.0 + m_wave * 8.0;
+            // Mildly aimed hostile fire remains slow enough to dodge.
+            shot.velocityX = qBound(-90.0,
+                (m_player.center().x() - shooter.rect.center().x()) * 0.18, 90.0);
+            shot.velocityY = qMin(390.0, 225.0 + m_wave * 12.0);
             shot.fromPlayer = false;
             m_projectiles.push_back(shot);
             break;
@@ -225,7 +238,7 @@ void GalagaGame::update(double deltaTime)
         m_enemyFireCooldown = qMax(0.45, 1.35 - m_wave * 0.06);
     }
 
-    const double enemySpeed = 24.0 + m_wave * 4.0;
+    const double enemySpeed = qMin(105.0, 24.0 + m_wave * 5.0);
     bool hitEdge = false;
     for (const Enemy& enemy : m_enemies) {
         if (!enemy.active)
@@ -250,8 +263,13 @@ void GalagaGame::update(double deltaTime)
             const bool lostLife = loseLife();
             if (!isRunning())
                 return;
-            if (lostLife)
-                createWave();
+            if (lostLife && isRunning()) {
+                // Breaching the player costs a life, but never silently clears the wave.
+                const double retreat = qMax(28.0, height() * 0.10);
+                for (Enemy& remaining : m_enemies)
+                    if (remaining.active)
+                        remaining.rect.moveTop(qMax(42.0, remaining.rect.top() - retreat));
+            }
             return;
         }
     }
@@ -263,7 +281,7 @@ void GalagaGame::update(double deltaTime)
         // Test the complete swept rectangle, not only the end position. A
         // fast shot can travel farther than an enemy's height in one frame.
         const QRectF previousRect = shot.rect;
-        shot.rect.translate(0.0, shot.velocityY * deltaTime);
+        shot.rect.translate(shot.velocityX * deltaTime, shot.velocityY * deltaTime);
         const QRectF sweptRect = previousRect.united(shot.rect);
 
         if (shot.fromPlayer) {
@@ -290,7 +308,8 @@ void GalagaGame::update(double deltaTime)
 
     m_projectiles.erase(std::remove_if(m_projectiles.begin(), m_projectiles.end(),
         [this](const Projectile& shot) {
-            return shot.rect.isEmpty() || shot.rect.bottom() < 0.0 ||
+            return shot.rect.isEmpty() || shot.rect.right() < 0.0 ||
+                   shot.rect.left() > width() || shot.rect.bottom() < 0.0 ||
                    shot.rect.top() > height();
         }), m_projectiles.end());
 
@@ -309,8 +328,16 @@ void GalagaGame::render(QPainter& painter)
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
 
-    painter.setBrush(QColor(80, 210, 255));
-    painter.drawRoundedRect(m_player, 6.0, 6.0);
+    painter.setBrush(QColor(90, 115, 160, 130));
+    for (int i = 0; i < 28; ++i) {
+        const double x = (i * 97.0 + 31.0) % qMax(1, width());
+        const double y = std::fmod(i * 53.0 + m_backgroundOffset * (1 + i % 3), qMax(1, height()));
+        painter.drawEllipse(QPointF(x, y), i % 5 == 0 ? 1.5 : 0.8, i % 5 == 0 ? 1.5 : 0.8);
+    }
+    if (m_hitCooldown <= 0.0 || static_cast<int>(m_hitCooldown * 12.0) % 2 == 0) {
+        painter.setBrush(QColor(80, 210, 255));
+        painter.drawRoundedRect(m_player, 6.0, 6.0);
+    }
     painter.setBrush(QColor(180, 240, 255));
     painter.drawRect(QRectF(m_player.center().x() - 3.0, m_player.top() - 8.0, 6.0, 9.0));
 
@@ -320,18 +347,31 @@ void GalagaGame::render(QPainter& painter)
         painter.setBrush(enemy.hitPoints > 1 ? QColor(255, 190, 70) : QColor(235, 75, 105));
         painter.drawRoundedRect(enemy.rect, 5.0, 5.0);
     }
-    painter.setBrush(QColor(255, 245, 150));
-    for (const Projectile& shot : m_projectiles)
+    for (const Projectile& shot : m_projectiles) {
+        painter.setBrush(shot.fromPlayer ? QColor(100, 235, 255) : QColor(255, 105, 115));
         painter.drawRoundedRect(shot.rect, 2.0, 2.0);
+    }
 
     painter.setPen(Qt::white);
-    painter.setFont(QFont(QStringLiteral("Arial"), 14, QFont::Bold));
-    painter.drawText(14, 24, QStringLiteral("Wynik: %1").arg(getScore()));
-    painter.drawText(14, 46, QStringLiteral("Fala: %1").arg(m_wave));
-    painter.drawText(width() - 110, 24, QStringLiteral("Życia: %1").arg(m_lives));
-    painter.setFont(QFont(QStringLiteral("Arial"), 10));
-    painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik: pozycja statku | Strzał: przytrzymaj SPACJĘ"));
+    const int hudSize = qBound(9, height() / 30, 14);
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), hudSize, QFont::DemiBold));
+    painter.drawText(QRect(8, 5, width() / 3, hudSize + 10), Qt::AlignLeft | Qt::AlignVCenter,
+                     QStringLiteral("Wynik: %1").arg(getScore()));
+    painter.drawText(QRect(width() / 3, 5, width() / 3, hudSize + 10), Qt::AlignHCenter | Qt::AlignVCenter,
+                     QStringLiteral("Fala: %1").arg(m_wave));
+    painter.drawText(QRect(2 * width() / 3, 5, width() / 3 - 8, hudSize + 10),
+                     Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("Życia: %1").arg(m_lives));
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(7, hudSize - 2, 10)));
+    const QString controls = width() < 300
+        ? QStringLiteral("Czujnik: ruch | A/D: ruch | SPACJA: ogień")
+        : QStringLiteral("Czujnik: pozycja statku  |  A/D lub ←/→: ruch  |  Przytrzymaj SPACJĘ: ogień");
+    painter.drawText(QRect(6, height() - hudSize - 7, width() - 12, hudSize + 4),
+                     Qt::AlignHCenter | Qt::AlignVCenter, controls);
+    if (m_hitCooldown > 0.0) {
+        painter.setPen(QColor(255, 225, 120));
+        painter.drawText(QRect(0, height() / 2 - 18, width(), 36), Qt::AlignHCenter | Qt::AlignVCenter,
+                         QStringLiteral("OSŁONA AKTYWNA"));
+    }
 }
 
 } // namespace games
