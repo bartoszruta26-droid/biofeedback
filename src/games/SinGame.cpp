@@ -31,6 +31,7 @@ SinGame::SinGame(QWidget *parent)
     , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
     , m_calibrationMinimum(0.0)
     , m_calibrationMaximum(100.0)
+    , m_lastRawForce(0.0)
     , m_waveformMode(0)
     , m_automaticDifficulty(false)
     , m_sessionSeconds(0.0)
@@ -143,6 +144,14 @@ void SinGame::keyPressEvent(QKeyEvent* event)
         case Qt::Key_Minus:
         case Qt::Key_Down: setDifficultyLevel(m_difficultyLevel - 1); break;
         case Qt::Key_A: setAutomaticDifficulty(!m_automaticDifficulty); break;
+        case Qt::Key_BracketLeft:
+            if (m_lastRawForce < m_calibrationMaximum)
+                setForceCalibration(m_lastRawForce, m_calibrationMaximum);
+            break;
+        case Qt::Key_BracketRight:
+            if (m_lastRawForce > m_calibrationMinimum)
+                setForceCalibration(m_calibrationMinimum, m_lastRawForce);
+            break;
         default: QWidget::keyPressEvent(event); return;
     }
     event->accept();
@@ -249,6 +258,7 @@ void SinGame::normalizeForceValue(double rawValue)
     if (!std::isfinite(rawValue))
         return;
 
+    m_lastRawForce = rawValue;
     const double span = m_calibrationMaximum - m_calibrationMinimum;
     if (!std::isfinite(span) || span <= 0.0)
         return;
@@ -445,7 +455,7 @@ void SinGame::render(QPainter& painter)
 
     painter.drawText(QRect(margin, h - 52, w - 2 * margin, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("%1 | Kalibracja: %2–%3 | Auto: %4 | 1-3: tryb, +/-: trudność, A: auto")
+        QStringLiteral("%1 | Kalibracja: %2–%3 | Auto: %4 | 1-3: tryb, +/-: trudność, A: auto, [: min, ]: max")
             .arg(modeName)
             .arg(m_calibrationMinimum, 0, 'f', 1)
             .arg(m_calibrationMaximum, 0, 'f', 1)
