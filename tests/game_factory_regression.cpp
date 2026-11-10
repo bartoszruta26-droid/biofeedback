@@ -328,6 +328,7 @@ int main(int argc, char **argv)
     QMouseEvent galagaAimMove(QEvent::MouseMove, QPointF(540.0, 300.0),
                               Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     QApplication::sendEvent(galagaMouseGame, &galagaAimMove);
+    waitForEvents(30); // Ship position is applied by the simulation tick.
     REQUIRE(galagaMouseGame->playerCenterX() > galagaXBeforeMouse);
     QMouseEvent galagaMouseFire(QEvent::MouseButtonPress, QPointF(540.0, 300.0),
                                 Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
