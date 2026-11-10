@@ -1015,7 +1015,7 @@ void SerialCommunication::startAsyncReading() {
     {
         std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
         m_impl->streamParser.reset();
-        const std::string command = "CONT\\n";
+        const std::string command = "CONT\n";
         if (!writeToPort(reinterpret_cast<const uint8_t*>(command.data()), command.size()))
             return;
     }
@@ -1085,7 +1085,7 @@ void SerialCommunication::stopAsyncReading() {
 
     if (m_impl->continuousMode.exchange(false, std::memory_order_acq_rel) &&
         m_impl->isConnected) {
-        const std::string command = "STOP\\n";
+        const std::string command = "STOP\n";
         std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
         (void)writeToPort(reinterpret_cast<const uint8_t*>(command.data()), command.size());
     }
