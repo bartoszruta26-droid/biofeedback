@@ -287,3 +287,8 @@ Pola i zakresy:
 Puste pole oznacza brak pomiaru i jest pomijane w rekordzie. Wartość 0 jest zachowywana jako rzeczywisty wynik, a nie zamieniana na brak danych. Wymagany jest co najmniej jeden oceniony parametr. Zakresy są walidowane zarówno w formularzu, jak i w `JsonResourceRepository`, również dla zapisów spoza GUI.
 
 Ocena zawiera `patient_id`, `episode_id`, typ `baseline` i czas UTC. Historia jest filtrowana po UUID pacjenta i epizodu. Formularz nie stawia rozpoznania i nie podejmuje decyzji terapeutycznych.
+
+
+## Aktualizacja interfejsu — cele terapeutyczne
+
+W `OutlineTab` dodano formularz trwałego zapisu celów do kolekcji `rehabilitation-goals`. Każdy cel jest przypisany do UUID pacjenta i epizodu oraz zawiera nazwę celu funkcjonalnego, wskaźnik/metodę pomiaru, wartość początkową, wartość docelową, jednostkę, status i opcjonalny termin. Termin jest walidowany jako rzeczywista data ISO 8601 `RRRR-MM-DD`. Wartości liczbowe muszą być skończone; repozytorium ponownie waliduje wymagane pola i datę, niezależnie od interfejsu. Lista celów jest filtrowana według bieżącego pacjenta i epizodu. Obecny etap umożliwia zapis i przegląd celów; nie oblicza automatycznie ich realizacji ani nie zmienia zaleceń ćwiczeń.
