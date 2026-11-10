@@ -116,6 +116,12 @@ assert "m_forceGraph->addDataPoint(value, timestamp)" in outline
 assert "m_measurementEngine->subscribe" in outline
 assert "sample.unit != \"N\"" in outline
 assert "m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());" in main
+# User-facing desktop tab names: rehabilitation outlines and games.
+assert 'm_tabWidget->addTab(m_outlineTab, tr("📚 Konspekty"));' in main
+assert 'm_tabWidget->addTab(m_trainingTab, tr("🎮 Gry"));' in main
+assert 'new QPushButton(tr("Gry"), dashboard)' in main
+assert 'tr("🎮 Trening (Gry)")' not in main
+assert 'tr("🎮 Trening (Outline)")' not in main
 # The rehabilitation workspace receives the repository UUID, not the PESEL
 # or the legacy per-patient filesystem path.
 assert "setCurrentPatientContext(const QString& patientUuid" in read("include/tab/OutlineTab.hpp")
