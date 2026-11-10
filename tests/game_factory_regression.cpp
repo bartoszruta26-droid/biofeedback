@@ -153,6 +153,16 @@ int main(int argc, char **argv)
     sinusGame->setForceCalibration(80.0, 20.0); // Invalid ranges must be ignored.
     REQUIRE(std::abs(sinusGame->forceCalibrationMinimum() - 20.0) < 1e-9);
     REQUIRE(std::abs(sinusGame->forceCalibrationMaximum() - 80.0) < 1e-9);
+    sinusGame->handleSensorInput(25.0);
+    QKeyEvent sinusCaptureMin(QEvent::KeyPress, Qt::Key_BracketLeft, Qt::NoModifier);
+    QApplication::sendEvent(sinusGame, &sinusCaptureMin);
+    REQUIRE(std::abs(sinusGame->forceCalibrationMinimum() - 25.0) < 1e-9);
+    sinusGame->handleSensorInput(75.0);
+    QKeyEvent sinusCaptureMax(QEvent::KeyPress, Qt::Key_BracketRight, Qt::NoModifier);
+    QApplication::sendEvent(sinusGame, &sinusCaptureMax);
+    REQUIRE(std::abs(sinusGame->forceCalibrationMaximum() - 75.0) < 1e-9);
+    sinusGame->handleSensorInput(50.0);
+    REQUIRE(std::abs(sinusGame->normalizedForce() - 0.5) < 1e-9);
 
     sinusGame->setWaveformMode(1);
     REQUIRE(sinusGame->waveformMode() == 1);
