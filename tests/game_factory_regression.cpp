@@ -74,9 +74,61 @@ int main(int argc, char **argv)
     REQUIRE(arkanoidGame->getDifficultyLevel() == 5);
     arkanoidGame->setDifficultyLevel(0);
     REQUIRE(arkanoidGame->getDifficultyLevel() == 1);
+    arkanoidGame->resize(640, 480);
     arkanoidGame->start();
-    waitForEvents(1800);
-    REQUIRE(arkanoidGame->getScore() > 0); // Ball must hit at least one brick.
+    REQUIRE(arkanoidGame->livesRemaining() == 3);
+    REQUIRE(arkanoidGame->activeBrickCount() >= 24);
+    REQUIRE(!arkanoidGame->isBallLaunched());
+
+    // No sensor samples: the game must wait without moving or losing lives.
+    const QPointF waitingBall = arkanoidGame->ballPosition();
+    arkanoidGame->update(0.1);
+    REQUIRE(arkanoidGame->livesRemaining() == 3);
+    REQUIRE(std::abs(arkanoidGame->ballPosition().y() - waitingBall.y()) < 1e-6);
+
+    // Force percentage is clamped, smoothed and moves the paddle across the court.
+    arkanoidGame->handleSensorInput(100.0);
+    REQUIRE(arkanoidGame->hasFreshSensorInput());
+    arkanoidGame->update(0.1);
+    const double rightPaddleX = arkanoidGame->paddleX();
+    REQUIRE(arkanoidGame->currentForcePercent() > 50.0);
+    arkanoidGame->handleSensorInput(-20.0);
+    arkanoidGame->update(0.1);
+    REQUIRE(arkanoidGame->currentForcePercent() < 100.0);
+    REQUIRE(arkanoidGame->paddleX() < rightPaddleX);
+
+    // Feed fresh samples throughout the serve and rally. The ball must reach
+    // the brick field and score without relying on a stale sensor value.
+    for (int sample = 0; sample < 36; ++sample) {
+        arkanoidGame->handleSensorInput(50.0);
+        waitForEvents(100);
+    }
+    REQUIRE(arkanoidGame->isBallLaunched());
+    REQUIRE(arkanoidGame->getScore() > 0);
+    REQUIRE(arkanoidGame->activeBrickCount() < 32);
+
+    // Sensor loss freezes the ball and prevents hidden life loss.
+    waitForEvents(550);
+    REQUIRE(!arkanoidGame->hasFreshSensorInput());
+    const QPointF frozenArkanoidBall = arkanoidGame->ballPosition();
+    const int livesAtSensorLoss = arkanoidGame->livesRemaining();
+    arkanoidGame->update(0.05);
+    REQUIRE(std::abs(arkanoidGame->ballPosition().x() - frozenArkanoidBall.x()) < 1e-6);
+    REQUIRE(std::abs(arkanoidGame->ballPosition().y() - frozenArkanoidBall.y()) < 1e-6);
+    REQUIRE(arkanoidGame->livesRemaining() == livesAtSensorLoss);
+
+    // Active playfield geometry remains finite and contained after resizing.
+    arkanoidGame->handleSensorInput(50.0);
+    arkanoidGame->resize(360, 260);
+    waitForEvents(80);
+    REQUIRE(arkanoidGame->paddleX() >= 0.0);
+    REQUIRE(arkanoidGame->paddleX() + 48.0 <= arkanoidGame->width() + 1.0);
+    REQUIRE(std::isfinite(arkanoidGame->ballPosition().x()));
+    REQUIRE(std::isfinite(arkanoidGame->ballPosition().y()));
+    arkanoidGame->resize(640, 480);
+    waitForEvents(80);
+    REQUIRE(std::isfinite(arkanoidGame->ballPosition().x()));
+    REQUIRE(std::isfinite(arkanoidGame->ballPosition().y()));
     arkanoidGame->stop();
 
     std::unique_ptr<games::GameEngine> tan(games::createGame(QStringLiteral("tan")));
