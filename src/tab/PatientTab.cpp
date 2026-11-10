@@ -4,6 +4,11 @@
 #include <QTextStream>
 #include <QDateTime>
 #include <QDir>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QDateTime>
+#include <QJsonObject>
+#include <QJsonArray>
 
 namespace tab {
 
@@ -24,6 +29,7 @@ PatientTab::PatientTab(QWidget *parent)
     , m_editButton(nullptr)
     , m_deleteButton(nullptr)
     , m_clearButton(nullptr)
+    , m_icfButton(nullptr)
     , m_tableGroup(nullptr)
     , m_patientTable(nullptr)
     , m_actionButtonsLayout(nullptr)
@@ -140,6 +146,11 @@ void PatientTab::setupPatientForm()
     m_formButtonsLayout->addWidget(m_editButton);
     m_formButtonsLayout->addWidget(m_deleteButton);
     m_formButtonsLayout->addWidget(m_clearButton);
+    m_icfButton = new QPushButton(tr("Ocena funkcjonalna ICF"), this);
+    m_icfButton->setToolTip(tr("Otwórz ustrukturyzowany wywiad stanu funkcjonalnego według ICF"));
+    m_icfButton->setMinimumHeight(35);
+    m_icfButton->setEnabled(false);
+    m_formButtonsLayout->addWidget(m_icfButton);
     m_formButtonsLayout->addStretch();
 
     m_mainLayout->addLayout(m_formButtonsLayout);
@@ -237,6 +248,162 @@ void PatientTab::createConnections()
             this, &PatientTab::onSelectionChanged);
     connect(m_patientTable, &QTableWidget::cellDoubleClicked,
             this, &PatientTab::onTableRowDoubleClicked);
+    connect(m_icfButton, &QPushButton::clicked, this, &PatientTab::openIcfAssessmentDialog);
+}
+
+void PatientTab::setPatientIcfAssessment(const QString& pesel, const QJsonObject& assessment)
+{
+    const QString key = pesel.trimmed();
+    if (key.isEmpty()) return;
+    if (assessment.isEmpty()) m_icfAssessments.remove(key);
+    else m_icfAssessments.insert(key, assessment);
+}
+
+void PatientTab::openIcfAssessmentDialog()
+{
+    const QString pesel = getCurrentPatientPesel().trimmed();
+    if (pesel.isEmpty()) {
+        QMessageBox::information(this, tr("Ocena ICF"), tr("Najpierw wybierz pacjenta z listy."));
+        return;
+    }
+
+    struct Question { const char* code; const char* label; int domain; };
+    static const Question questions[] = {
+        {"b130", "Energia i napęd (męczliwość, motywacja)", 0},
+        {"b134", "Funkcje snu", 0}, {"b152", "Funkcje emocjonalne", 0},
+        {"b280", "Odczuwanie bólu", 0}, {"b710", "Ruchomość stawów", 0},
+        {"b730", "Siła mięśni", 0}, {"b455", "Tolerancja wysiłku i wydolność", 0},
+        {"d410", "Zmiana podstawowej pozycji ciała (siadanie, wstawanie, leżenie)", 1},
+        {"d415", "Utrzymywanie pozycji ciała", 1}, {"d430", "Podnoszenie i przenoszenie przedmiotów", 1},
+        {"d450", "Chodzenie", 1}, {"d455", "Przemieszczanie się (schody, bieganie i inne sposoby)", 1},
+        {"d510", "Mycie się", 1}, {"d520", "Pielęgnacja części ciała", 1},
+        {"d540", "Ubieranie się", 1}, {"d550", "Jedzenie", 1}, {"d560", "Picie", 1},
+        {"d640", "Wykonywanie prac domowych", 1}, {"d850", "Praca zarobkowa", 1},
+        {"d920", "Rekreacja i wypoczynek", 1},
+        {"e115", "Produkty i technologie do użytku osobistego", 2},
+        {"e120", "Produkty i technologie ułatwiające poruszanie się", 2},
+        {"e150", "Projektowanie i dostępność budynków użyteczności publicznej", 2},
+        {"e310", "Najbliższa rodzina", 2}, {"e355", "Pracownicy ochrony zdrowia", 2},
+        {"e580", "Usługi, systemy i polityka ochrony zdrowia", 2}
+    };
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Ocena stanu funkcjonalnego — ICF"));
+    dialog.resize(820, 760);
+    auto* root = new QVBoxLayout(&dialog);
+    auto* intro = new QLabel(
+        tr("Pytania przesiewowo-opisowe oparte na domenach ICF. Oceń funkcjonowanie pacjenta "
+           "w typowym okresie ostatnich 30 dni, uwzględniając jego własną perspektywę. "
+           "Kwestionariusz wspiera opis kliniczny i nie zastępuje pełnego, standaryzowanego Core Set ICF."),
+        &dialog);
+    intro->setWordWrap(true);
+    root->addWidget(intro);
+
+    auto* scroll = new QScrollArea(&dialog);
+    scroll->setWidgetResizable(true);
+    auto* content = new QWidget(scroll);
+    auto* contentLayout = new QVBoxLayout(content);
+    const QJsonObject previous = m_icfAssessments.value(pesel);
+    const QJsonObject previousResponses = previous.value(QStringLiteral("responses")).toObject();
+    QHash<QString, QComboBox*> qualifiers, capacities, performances;
+
+    auto addDomain = [&](int domain, const QString& title) {
+        auto* group = new QGroupBox(title, content);
+        auto* form = new QFormLayout(group);
+        form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+        contentLayout->addWidget(group);
+        for (const Question& question : questions) {
+            if (question.domain != domain) continue;
+            const QString code = QString::fromLatin1(question.code);
+            const QString label = QStringLiteral("%1 — %2").arg(code, QString::fromUtf8(question.label));
+            const QJsonObject old = previousResponses.value(code).toObject();
+            if (domain == 1) {
+                auto* row = new QWidget(group);
+                auto* rowLayout = new QHBoxLayout(row);
+                rowLayout->setContentsMargins(0, 0, 0, 0);
+                auto* performance = new QComboBox(row);
+                auto* capacity = new QComboBox(row);
+                const QStringList options = {
+                    tr("0 — brak trudności"), tr("1 — trudność niewielka"),
+                    tr("2 — trudność umiarkowana"), tr("3 — trudność znaczna"),
+                    tr("4 — trudność całkowita"), tr("8 — nieokreślona"),
+                    tr("9 — nie dotyczy")
+                };
+                performance->addItems(options);
+                capacity->addItems(options);
+                performance->setCurrentIndex(qBound(0, old.value(QStringLiteral("performance")).toInt(8), 6));
+                capacity->setCurrentIndex(qBound(0, old.value(QStringLiteral("capacity")).toInt(8), 6));
+                rowLayout->addWidget(new QLabel(tr("Wykonanie:"), row));
+                rowLayout->addWidget(performance, 1);
+                rowLayout->addWidget(new QLabel(tr("Zdolność:"), row));
+                rowLayout->addWidget(capacity, 1);
+                form->addRow(label, row);
+                performances.insert(code, performance);
+                capacities.insert(code, capacity);
+            } else {
+                auto* combo = new QComboBox(group);
+                if (domain == 2) {
+                    combo->addItems({tr("0 — neutralny czynnik"), tr("-1 — niewielka bariera"),
+                        tr("-2 — umiarkowana bariera"), tr("-3 — znaczna bariera"),
+                        tr("-4 — całkowita bariera"), tr("+1 — niewielki ułatwiacz"),
+                        tr("+2 — umiarkowany ułatwiacz"), tr("+3 — znaczny ułatwiacz"),
+                        tr("+4 — zasadniczy ułatwiacz"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")});
+                    combo->setCurrentIndex(qBound(0, old.value(QStringLiteral("qualifier")).toInt(9), 10));
+                } else {
+                    combo->addItems({tr("0 — brak problemu"), tr("1 — problem niewielki"),
+                        tr("2 — problem umiarkowany"), tr("3 — problem znaczny"),
+                        tr("4 — problem całkowity"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")});
+                    combo->setCurrentIndex(qBound(0, old.value(QStringLiteral("qualifier")).toInt(8), 6));
+                }
+                form->addRow(label, combo);
+                qualifiers.insert(code, combo);
+            }
+        }
+    };
+    addDomain(0, tr("Funkcje organizmu — kody b"));
+    addDomain(1, tr("Aktywność i uczestniczenie — kody d"));
+    addDomain(2, tr("Czynniki środowiskowe — kody e"));
+
+    auto* notesGroup = new QGroupBox(tr("Kontekst, mocne strony i priorytety pacjenta"), content);
+    auto* notesLayout = new QVBoxLayout(notesGroup);
+    auto* notes = new QTextEdit(notesGroup);
+    notes->setPlaceholderText(tr("Najważniejsze trudności, zasoby, cele, bariery i oczekiwania pacjenta"));
+    notes->setPlainText(previous.value(QStringLiteral("narrative")).toString());
+    notes->setMinimumHeight(90);
+    notesLayout->addWidget(notes);
+    contentLayout->addWidget(notesGroup);
+    contentLayout->addStretch(1);
+    scroll->setWidget(content);
+    root->addWidget(scroll, 1);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    buttons->button(QDialogButtonBox::Save)->setText(tr("Zapisz ocenę"));
+    buttons->button(QDialogButtonBox::Cancel)->setText(tr("Anuluj"));
+    root->addWidget(buttons);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    if (dialog.exec() != QDialog::Accepted) return;
+
+    QJsonObject responses;
+    for (auto it = qualifiers.constBegin(); it != qualifiers.constEnd(); ++it)
+        responses.insert(it.key(), QJsonObject{{QStringLiteral("qualifier"), it.value()->currentIndex()}});
+    for (auto it = performances.constBegin(); it != performances.constEnd(); ++it)
+        responses.insert(it.key(), QJsonObject{
+            {QStringLiteral("performance"), it.value()->currentIndex()},
+            {QStringLiteral("capacity"), capacities.value(it.key())->currentIndex()}
+        });
+
+    const QJsonObject assessment{
+        {QStringLiteral("schema"), QStringLiteral("icf-functional-screening-v1")},
+        {QStringLiteral("assessed_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("reference_period_days"), 30},
+        {QStringLiteral("responses"), responses},
+        {QStringLiteral("narrative"), notes->toPlainText().trimmed()}
+    };
+    m_icfAssessments.insert(pesel, assessment);
+    emit patientIcfAssessmentChanged(pesel, assessment);
+    QMessageBox::information(this, tr("Ocena ICF"),
+        tr("Ocena została przekazana do zapisania w kartotece pacjenta."));
 }
 
 void PatientTab::fillGenderCombo(QComboBox* combo)
