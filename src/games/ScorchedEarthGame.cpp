@@ -330,9 +330,11 @@ void ScorchedEarthGame::render(QPainter& painter)
     painter.drawText(14, 46, QStringLiteral("Twoje HP: %1").arg(m_playerHealth));
     painter.drawText(width() - 150, 24, QStringLiteral("Wróg HP: %1").arg(m_enemyHealth));
     painter.drawText(width() - 150, 46, QStringLiteral("Runda: %1").arg(m_round));
+    painter.drawText(width() / 2 - 65, 24, QStringLiteral("Moc: %1%").arg(qRound(m_power * 100.0)));
+    painter.drawText(width() / 2 - 65, 46, m_playerTurn ? QStringLiteral("TWOJA TURA") : QStringLiteral("RUCH PRZECIWNIKA"));
     painter.setFont(QFont(QStringLiteral("Arial"), 10));
     painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik/kursor: kąt | +/-: siła | SPACJA: strzał | Wiatr: %1")
+        QStringLiteral("Czujnik / mysz: kąt | +/-: moc | Klik / SPACJA: strzał | Wiatr: %1")
             .arg(qRound(m_wind)));
 }
 
