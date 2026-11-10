@@ -214,6 +214,9 @@ assert 'Oceny ICF powiązane z ocenami klinicznymi epizodu' in outline
 assert 'linkedIcfDate' in outline
 assert 'Nie można odczytać obserwacji' in outline
 assert 'QFileInfo(outputPath).size() <= 0' in outline
+assert 'raw.toInt() == -99' in outline
+assert 'return tr("Nie oceniono")' in outline
+
 
 assert 'PDF' in read("docs/rehabilitation/OUTLINE_PATIENT_WORKFLOW.md")
 
