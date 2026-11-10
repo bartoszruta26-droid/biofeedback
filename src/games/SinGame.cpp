@@ -69,7 +69,6 @@ void SinGame::initialize()
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     m_sessionSeconds = 0.0;
     m_timeInTarget = 0.0;
-    m_difficultyCheckSeconds = 0.0;
     m_accuracyWindowSeconds = 0.0;
     m_accuracyWindowHitSeconds = 0.0;
     m_bestStreakSeconds = 0.0;
@@ -179,8 +178,6 @@ void SinGame::updateAutomaticDifficulty(double deltaTime)
 {
     if (!m_automaticDifficulty || m_inputAge > 0.35)
         return;
-    m_difficultyCheckSeconds += deltaTime;
-    m_accuracyWindowSeconds += deltaTime;
     if (m_accuracyWindowSeconds < 12.0)
         return;
     const double ratio = m_accuracyWindowHitSeconds / m_accuracyWindowSeconds;
