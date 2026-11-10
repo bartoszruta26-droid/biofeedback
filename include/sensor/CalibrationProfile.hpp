@@ -16,6 +16,12 @@ public:
     static std::optional<double> convertRaw(int32_t raw,
                                             double zeroOffsetRaw,
                                             double scaleFactor) noexcept;
+    // Converts signed calibration counts into the configured display direction.
+    // The scale magnitude calibrates size; rawPolarity defines tensile-positive orientation.
+    static std::optional<double> convertRawWithPolarity(int32_t raw,
+                                                        double zeroOffsetRaw,
+                                                        double scaleFactor,
+                                                        int rawPolarity) noexcept;
 };
 
 struct CalibrationProfile {
