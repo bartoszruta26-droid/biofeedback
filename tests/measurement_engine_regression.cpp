@@ -34,6 +34,7 @@ int main() {
     assert(grams.unit == "kg");
     assert(std::abs(grams.value - 2.5) < 1e-9);
     assert(grams.timestampUnixMs > 0);
+    assert(grams.ingestMonotonicNs > 0);
     assert(grams.sequence == 1);
 
     MeasurementInput wrappedClockInput = input;
@@ -172,5 +173,95 @@ int main() {
     assert(committedSample.sequence == 1);
     assert(commitEngine.history().size() == 1);
     assert(commitPublications == 1);
+
+    // A slow persistence hook must not hold the state mutex: readers can
+    // inspect the committed history while the producer is waiting on storage.
+    MeasurementEngine lockIsolationEngine;
+    std::mutex hookMutex;
+    std::condition_variable hookEnteredCondition;
+    std::condition_variable releaseHookCondition;
+    std::condition_variable readerFinishedCondition;
+    bool hookEntered = false;
+    bool releaseHook = false;
+    bool readerFinished = false;
+    lockIsolationEngine.setCommitHook([&](const MeasurementSample& candidate) {
+        assert(candidate.sequence == 1);
+        assert(lockIsolationEngine.history().empty());
+        std::unique_lock<std::mutex> lock(hookMutex);
+        hookEntered = true;
+        hookEnteredCondition.notify_one();
+        releaseHookCondition.wait(lock, [&] { return releaseHook; });
+        return true;
+    });
+
+    MeasurementSample isolatedSample;
+    std::thread slowProducer([&] {
+        assert(lockIsolationEngine.ingest(concurrentInput, isolatedSample));
+    });
+    {
+        std::unique_lock<std::mutex> lock(hookMutex);
+        hookEnteredCondition.wait(lock, [&] { return hookEntered; });
+    }
+
+    std::thread historyReader([&] {
+        (void)lockIsolationEngine.history();
+        {
+            std::lock_guard<std::mutex> lock(hookMutex);
+            readerFinished = true;
+        }
+        readerFinishedCondition.notify_one();
+    });
+    bool readerWasUnblocked = false;
+    {
+        std::unique_lock<std::mutex> lock(hookMutex);
+        readerWasUnblocked = readerFinishedCondition.wait_for(
+            lock, std::chrono::milliseconds(500), [&] { return readerFinished; });
+        releaseHook = true;
+    }
+    releaseHookCondition.notify_one();
+    slowProducer.join();
+    historyReader.join();
+    assert(readerWasUnblocked);
+    assert(isolatedSample.sequence == 1);
+    assert(lockIsolationEngine.history().size() == 1);
+
+
+    // Clearing/replacing a commit hook is a lifecycle barrier: it must wait
+    // for a hook already captured by an ingest producer to finish.
+    MeasurementEngine hookBarrierEngine;
+    std::mutex barrierMutex;
+    std::condition_variable barrierEnteredCondition;
+    std::condition_variable barrierReleaseCondition;
+    bool barrierEntered = false;
+    bool barrierRelease = false;
+    std::atomic<bool> hookReplacementReturned{false};
+    hookBarrierEngine.setCommitHook([&](const MeasurementSample&) {
+        std::unique_lock<std::mutex> lock(barrierMutex);
+        barrierEntered = true;
+        barrierEnteredCondition.notify_one();
+        barrierReleaseCondition.wait(lock, [&] { return barrierRelease; });
+        return true;
+    });
+    std::thread barrierProducer([&] { hookBarrierEngine.ingest(concurrentInput); });
+    {
+        std::unique_lock<std::mutex> lock(barrierMutex);
+        barrierEnteredCondition.wait(lock, [&] { return barrierEntered; });
+    }
+    std::thread hookReplacer([&] {
+        hookBarrierEngine.setCommitHook({});
+        hookReplacementReturned.store(true, std::memory_order_release);
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    assert(!hookReplacementReturned.load(std::memory_order_acquire));
+    {
+        std::lock_guard<std::mutex> lock(barrierMutex);
+        barrierRelease = true;
+    }
+    barrierReleaseCondition.notify_one();
+    barrierProducer.join();
+    hookReplacer.join();
+    assert(hookReplacementReturned.load(std::memory_order_acquire));
+    assert(hookBarrierEngine.history().size() == 1);
+
     return 0;
 }

@@ -525,7 +525,7 @@ void MarioGame::renderUI(QPainter& painter)
     
     // Wynik
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 16, QFont::Bold));
+    painter.setFont(QFont("Arial", 10, QFont::Bold));
     painter.drawText(20, 30, QString("Wynik: %1").arg(m_score));
     
     // Poziom
@@ -539,12 +539,12 @@ void MarioGame::renderUI(QPainter& painter)
     painter.fillRect(QRectF(20, 65, progressWidth * progress, progressHeight), Qt::green);
     painter.setPen(Qt::white);
     painter.drawRect(QRectF(20, 65, progressWidth, progressHeight));
-    painter.setFont(QFont("Arial", 10));
+    painter.setFont(QFont("Arial", 7));
     painter.drawText(20, 90, QString("%1/%2").arg(m_obstaclesPassed).arg(m_obstaclesToNextLevel));
     
     // Instrukcja
     if (!m_isRunning) {
-        painter.setFont(QFont("Arial", 14));
+        painter.setFont(QFont("Arial", 9));
         painter.drawText(rect(), Qt::AlignBottom | Qt::AlignHCenter, 
                         "Przytrzymaj tensometr aby naładować skok, puść aby skoczyć!");
     }
@@ -552,7 +552,7 @@ void MarioGame::renderUI(QPainter& painter)
     // Komunikat o braku połączenia z Arduino
     if (m_serialPort && !m_serialPort->isConnected()) {
         painter.setPen(QColor(255, 100, 100));
-        painter.setFont(QFont("Arial", 12, QFont::Bold));
+        painter.setFont(QFont("Arial", 8, QFont::Bold));
         painter.drawText(rect(), Qt::AlignTop | Qt::AlignHCenter,
                         "BRAK POŁĄCZENIA Z ARDUINO NANO HX711");
     }

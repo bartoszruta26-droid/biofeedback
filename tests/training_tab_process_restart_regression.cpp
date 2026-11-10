@@ -152,8 +152,8 @@ private:
         assert(training.m_stateMachine.resume());
         biofeedback::training::RepetitionRecord completed;
         assert(!training.m_repetitionDetector.process(1200, 45.0, true, completed));
-        assert(!training.m_repetitionDetector.process(1400, 60.0, true, completed));
-        assert(training.m_repetitionDetector.process(1600, 0.0, true, completed));
+        assert(!training.m_repetitionDetector.process(1300, 60.0, true, completed));
+        assert(training.m_repetitionDetector.process(1400, 0.0, true, completed));
         training.onRepetitionDetected(completed);
         assert(training.m_exerciseStats[1].completedReps == 1);
         assert(training.m_exerciseStats[1].repetitions.size() == 1);

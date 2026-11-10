@@ -78,8 +78,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     setWindowTitle(tr("Biofeedback - Monitor Wagi"));
     setMinimumSize(1024, 640);
-    QApplication::setFont(QFont("Arial", 9));
-    setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;font-size:9pt;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:8px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:6px 10px;font-size:9pt;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:10px;} QLabel#dashboardValue{color:#14243a;font-size:14pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:6px;padding:6px 10px;font-size:9pt;font-weight:600;} QPushButton:hover{background:#06696c;}");
+    QApplication::setFont(QFont("Arial", 8));
+    setStyleSheet("QMainWindow{background:#f3f6fb;color:#18263a;font-size:8pt;} QWidget{font-size:8pt;} QTabWidget::pane{border:1px solid #dce4ef;background:white;border-radius:8px;} QTabBar::tab{background:#e9eef5;color:#40516a;padding:3px 5px;font-size:8pt;} QTabBar::tab:selected{background:white;color:#087f82;font-weight:700;} QFrame#dashboardCard{background:white;border:1px solid #dce4ef;border-radius:10px;} QLabel#dashboardValue{color:#14243a;font-size:10pt;font-weight:700;} QPushButton{background:#087f82;color:white;border:0;border-radius:6px;padding:3px 5px;font-size:8pt;font-weight:600;} QPushButton:hover{background:#06696c;}");
     
     // Shared serial service; UI tabs subscribe independently to its data stream.
     m_serialPort = std::make_shared<sensor::SerialCommunication>();
@@ -179,7 +179,10 @@ void MainWindow::setupTabs()
                 [this](const biofeedback::measurement::MeasurementSample& sample) {
                     if (!sample.isValid() || sample.unit != "N" || !std::isfinite(sample.value))
                         return;
-                    constexpr double gameReferenceForceN = 50.0;
+                    // Full-scale game input corresponds to approximately 15 kgf.
+                    // 15 kg × standard gravity (9.80665 m/s²) ≈ 147.1 N;
+                    // use a rounded 150 N control range for all games.
+                    constexpr double gameReferenceForceN = 150.0;
                     const double normalized = qBound(
                         0.0, std::abs(sample.value) / gameReferenceForceN * 100.0, 100.0);
                     enqueueGameSensorInput(normalized);
@@ -227,7 +230,7 @@ void MainWindow::setupTabs()
     QVBoxLayout* dashboardLayout = new QVBoxLayout(dashboard);
     dashboardLayout->setContentsMargins(28, 26, 28, 26);
     QLabel* dashboardTitle = new QLabel(tr("Centrum Biofeedback"), dashboard);
-    dashboardTitle->setStyleSheet("font-size:24px;font-weight:700;color:#14243a;");
+    dashboardTitle->setStyleSheet("font-size:12px;font-weight:700;color:#14243a;");
     dashboardLayout->addWidget(dashboardTitle);
     QGridLayout* cards = new QGridLayout();
     cards->setHorizontalSpacing(14);
@@ -239,11 +242,11 @@ void MainWindow::setupTabs()
         QVBoxLayout* cardLayout = new QVBoxLayout(card);
         cardLayout->setContentsMargins(18, 16, 18, 16);
         QLabel* headingLabel = new QLabel(heading, card);
-        headingLabel->setStyleSheet("color:#64748b;font-size:10pt;font-weight:600;");
+        headingLabel->setStyleSheet("color:#64748b;font-size:8pt;font-weight:600;");
         QLabel* valueLabel = new QLabel(value, card);
         valueLabel->setObjectName("dashboardValue");
         QLabel* detailLabel = new QLabel(detail, card);
-        detailLabel->setStyleSheet("color:#74839a;font-size:9pt;");
+        detailLabel->setStyleSheet("color:#74839a;font-size:7pt;");
         cardLayout->addWidget(headingLabel);
         cardLayout->addWidget(valueLabel);
         cardLayout->addWidget(detailLabel);
@@ -260,7 +263,7 @@ void MainWindow::setupTabs()
         tr("Aplikacja desktopowa Qt"), nullptr), 1, 1);
     dashboardLayout->addLayout(cards);
     QLabel* hint = new QLabel(tr("Wybierz moduł, aby przejść do pacjentów, pomiarów lub treningu."), dashboard);
-    hint->setStyleSheet("color:#74839a;font-size:11pt;");
+    hint->setStyleSheet("color:#74839a;font-size:8pt;");
     dashboardLayout->addWidget(hint);
     QHBoxLayout* actions = new QHBoxLayout();
     QPushButton* patientsButton = new QPushButton(tr("Pacjenci"), dashboard);
@@ -270,7 +273,7 @@ void MainWindow::setupTabs()
     dashboardLayout->addLayout(actions);
 
     QLabel* deviceHeading = new QLabel(tr("Połączenie z urządzeniem"), dashboard);
-    deviceHeading->setStyleSheet("font-size:14px;font-weight:700;color:#24364d;");
+    deviceHeading->setStyleSheet("font-size:10px;font-weight:700;color:#24364d;");
     dashboardLayout->addWidget(deviceHeading);
     QHBoxLayout* deviceControls = new QHBoxLayout();
     m_devicePortCombo = new QComboBox(dashboard);
@@ -443,7 +446,7 @@ void MainWindow::showSettingsDialog()
         auto* weightLayout = new QHBoxLayout();
         m_weightLabel = new QLabel(tr("Ostatni odczyt:"), settingsGroup);
         m_weightValue = new QLabel(tr("0,00 N"), settingsGroup);
-        m_weightValue->setStyleSheet("font-size: 16px; font-weight: 700; color: #087f82;");
+        m_weightValue->setStyleSheet("font-size: 12px; font-weight: 700; color: #087f82;");
         m_weightValue->setMinimumWidth(100);
         weightLayout->addWidget(m_weightLabel);
         weightLayout->addWidget(m_weightValue);
@@ -506,7 +509,7 @@ void MainWindow::createGameArea()
     QLabel* placeholderLabel = new QLabel(tr("Gra zostanie uruchomiona po rozpoczęciu sesji treningowej"));
     placeholderLabel->setAlignment(Qt::AlignCenter);
     placeholderLabel->setMinimumHeight(300);
-    placeholderLabel->setStyleSheet("font-size: 18px; color: #666;");
+    placeholderLabel->setStyleSheet("font-size: 12px; color: #666;");
     placeholderLayout->addWidget(placeholderLabel);
     
     m_gameStack->addWidget(placeholder);

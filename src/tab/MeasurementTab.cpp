@@ -1,5 +1,6 @@
 #include "tab/MeasurementTab.hpp"
 #include <utility>
+#include <chrono>
 #include <vector>
 #include "measurement/Units.hpp"
 #include "core/RuntimePaths.hpp"
@@ -30,12 +31,35 @@
 #include "sensor/CalibrationProfile.hpp"
 #include <QScrollArea>
 #include <QSplitter>
+#include <QResizeEvent>
+#include <QTimer>
 #include <memory>
 #include <iostream>
 #include <limits>
 #ifdef Q_OS_UNIX
 #include <unistd.h>
 #endif
+
+namespace {
+
+class ProportionalWorkspaceSplitter final : public QSplitter {
+public:
+    explicit ProportionalWorkspaceSplitter(QWidget* parent = nullptr)
+        : QSplitter(Qt::Horizontal, parent) {}
+
+protected:
+    void resizeEvent(QResizeEvent* event) override
+    {
+        QSplitter::resizeEvent(event);
+        const int availableWidth = width() - handleWidth();
+        if (availableWidth > 0 && count() == 2) {
+            const int visualWidth = availableWidth * 89 / 100;
+            setSizes({visualWidth, availableWidth - visualWidth});
+        }
+    }
+};
+
+} // namespace
 
 namespace tab {
 
@@ -113,7 +137,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     painter.drawLine(margin, margin, margin, margin + plotHeight);
     
     // Etykiety osi Y
-    painter.setFont(QFont("Arial", 8));
+    painter.setFont(QFont("Arial", 7));
     painter.setPen(Qt::black);
     for (int i = 0; i <= 5; ++i) {
         int y = margin + plotHeight - (plotHeight * i / 5);
@@ -158,7 +182,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     }
     
     // Legenda
-    painter.setFont(QFont("Arial", 9, QFont::Bold));
+    painter.setFont(QFont("Arial", 7, QFont::Bold));
     painter.setPen(QColor(0, 100, 200));
     painter.drawText(margin + 10, margin + 15, "Średnia Siła");
     painter.setPen(QColor(200, 50, 50));
@@ -166,7 +190,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     
     // Etykiety
     painter.setPen(Qt::black);
-    painter.setFont(QFont("Arial", 9));
+    painter.setFont(QFont("Arial", 7));
     painter.drawText(margin + plotWidth / 2 - 60, height - 10, "Kolejne Sesje");
     painter.drawText(5, margin - 5, "Siła [N]");
 }
@@ -231,6 +255,11 @@ void ForcePlotWidget::addSample(double force, double time)
     // instead of drawing a backwards segment or corrupting the visible window.
     if (!m_times.empty() && time < m_times.back())
         return;
+
+    // Legacy firmware can repeat or omit device timestamps. Preserve every
+    // accepted sample and keep the display clock strictly increasing.
+    if (!m_times.empty() && time <= m_times.back())
+        time = m_times.back() + (1.0 / 80.0);
 
     m_forces.push_back(force);
     m_times.push_back(time);
@@ -339,7 +368,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     painter.drawLine(margin, margin + plotHeight, margin + plotWidth, margin + plotHeight);
     painter.drawLine(margin, margin, margin, margin + plotHeight);
 
-    painter.setFont(QFont("Arial", 8));
+    painter.setFont(QFont("Arial", 7));
     painter.setPen(Qt::black);
     for (int i = 0; i <= 10; ++i) {
         const int y = margin + plotHeight - (plotHeight * i / 10);
@@ -364,6 +393,17 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
                          QString("Cel [%1]").arg(getUnitLabel()));
     }
 
+    if (m_forces.size() == 1) {
+        const double y = margin + plotHeight -
+            ((m_forces.front() + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0, 100, 200));
+        painter.drawEllipse(QPointF(margin + plotWidth / 2.0, y), 4.0, 4.0);
+        painter.setPen(Qt::black);
+        painter.drawText(margin + plotWidth / 2 - 20, widgetHeight - 15, "Czas [s]");
+        painter.drawText(5, margin - 5, QString("Siła [%1]").arg(getUnitLabel()));
+        return;
+    }
     if (m_forces.size() < 2)
         return;
 
@@ -685,8 +725,9 @@ bool MeasurementTab::commitMeasurementSample(
     record["source"] = QString::fromStdString(sample.source);
     record["quality"] = quality;
 
-    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
-    if (!m_sampleJournalWriter.append(line)) {
+    // Keep JSON serialization off the serial-ingest thread; the bounded writer
+    // queue owns the implicitly-shared object and serializes it in its worker.
+    if (!m_sampleJournalWriter.appendJson(record)) {
         m_sampleJournalFailed = true;
         m_journalAdmission.store(false, std::memory_order_release);
         QMetaObject::invokeMethod(this, [this] {
@@ -937,9 +978,9 @@ void MeasurementTab::setupUI()
     m_mainLayout->setSpacing(4);
     m_mainLayout->setContentsMargins(6, 6, 6, 6);
 
-    // Main workspace: the measurement/analysis area gets 75% of the width;
+    // Main workspace: measurement and analysis use 89% of the width;
     // configuration and file actions remain in a compact right-hand column.
-    auto* workspaceSplitter = new QSplitter(Qt::Horizontal, this);
+    auto* workspaceSplitter = new ProportionalWorkspaceSplitter(this);
     workspaceSplitter->setChildrenCollapsible(false);
     workspaceSplitter->setHandleWidth(5);
 
@@ -957,8 +998,8 @@ void MeasurementTab::setupUI()
     optionsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto* optionsPanel = new QWidget(optionsScroll);
     auto* optionsLayout = new QVBoxLayout(optionsPanel);
-    optionsLayout->setSpacing(8);
-    optionsLayout->setContentsMargins(8, 8, 8, 8);
+    optionsLayout->setSpacing(4);
+    optionsLayout->setContentsMargins(3, 3, 3, 3);
     auto* optionsHeading = new QLabel(tr("STEROWANIE I OPCJE"), optionsPanel);
     optionsHeading->setStyleSheet("font-weight:700;color:#40516a;");
     optionsLayout->addWidget(optionsHeading);
@@ -967,16 +1008,13 @@ void MeasurementTab::setupUI()
     optionsScroll->setWidget(optionsPanel);
     workspaceSplitter->addWidget(visualScroll);
     workspaceSplitter->addWidget(optionsScroll);
-    workspaceSplitter->setStretchFactor(0, 3);
-    workspaceSplitter->setStretchFactor(1, 1);
-    workspaceSplitter->setSizes({900, 300});
-    // The sidebar remains user-resizable, but dragging cannot make it wider
-    // than 25% of the available workspace. QSplitter scales the saved ratio
-    // when the window is resized, so the same limit follows other resolutions.
+    // ProportionalWorkspaceSplitter reapplies the 89:11 layout on every resize.
+    // The right-hand options sidebar is capped at 11% of the workspace.
+    // It remains user-resizable toward a narrower width on large displays.
     connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
             [workspaceSplitter](int position, int) {
         const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
-        const int maxVisualWidth = availableWidth * 3 / 4;
+        const int maxVisualWidth = availableWidth * 89 / 100;
         if (position < maxVisualWidth) {
             workspaceSplitter->setSizes({maxVisualWidth, availableWidth - maxVisualWidth});
         }
@@ -985,45 +1023,54 @@ void MeasurementTab::setupUI()
 
     // Sekcja kontrolna w prawej, wąskiej kolumnie.
     m_controlLayout = new QVBoxLayout();
+    m_controlLayout->setSpacing(3);
+    m_controlLayout->setContentsMargins(2, 2, 2, 2);
     
-    m_btnStartStop = new QPushButton("START POMIARU", this);
-    m_btnStartStop->setMinimumHeight(45);
-    m_btnStartStop->setFont(QFont("Arial", 9, QFont::Bold));
+    m_btnStartStop = new QPushButton("START", this);
+    m_btnStartStop->setMinimumHeight(34);
+    m_btnStartStop->setToolTip(tr("Rozpocznij lub zatrzymaj rejestrację pomiaru"));
+    m_btnStartStop->setFont(QFont("Arial", 7, QFont::Bold));
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     connect(m_btnStartStop, &QPushButton::clicked, this, &MeasurementTab::onToggleMeasurement);
     
-    m_btnReadManual = new QPushButton("WCZYTAJ POJEDYNCZO", this);
-    m_btnReadManual->setMinimumHeight(35);
-    m_btnReadManual->setFont(QFont("Arial", 9));
+    m_btnReadManual = new QPushButton("ODCZYT", this);
+    m_btnReadManual->setMinimumHeight(30);
+    m_btnReadManual->setToolTip(tr("Wczytaj jedną próbkę z czujnika"));
+    m_btnReadManual->setFont(QFont("Arial", 7));
     connect(m_btnReadManual, &QPushButton::clicked, this, &MeasurementTab::onReadSingleSample);
     
     m_btnSave = new QPushButton("ZAPISZ CSV", this);
-    m_btnSave->setMinimumHeight(35);
-    m_btnSave->setFont(QFont("Arial", 9));
+    m_btnSave->setMinimumHeight(30);
+    m_btnSave->setToolTip(tr("Zapisz dane pomiarowe do pliku CSV"));
+    m_btnSave->setFont(QFont("Arial", 7));
     connect(m_btnSave, &QPushButton::clicked, this, &MeasurementTab::onSaveData);
     
     m_btnLoad = new QPushButton("WCZYTAJ CSV", this);
-    m_btnLoad->setMinimumHeight(35);
-    m_btnLoad->setFont(QFont("Arial", 9));
+    m_btnLoad->setMinimumHeight(30);
+    m_btnLoad->setToolTip(tr("Wczytaj dane pomiarowe z pliku CSV"));
+    m_btnLoad->setFont(QFont("Arial", 7));
     connect(m_btnLoad, &QPushButton::clicked, this, &MeasurementTab::onLoadData);
     
-    m_btnSaveJSON = new QPushButton("ZAPISZ POMIAR JSON", this);
-    m_btnSaveJSON->setMinimumHeight(35);
-    m_btnSaveJSON->setFont(QFont("Arial", 9));
+    m_btnSaveJSON = new QPushButton("ZAPISZ JSON", this);
+    m_btnSaveJSON->setMinimumHeight(30);
+    m_btnSaveJSON->setToolTip(tr("Zapisz kompletną sesję pomiarową w formacie JSON"));
+    m_btnSaveJSON->setFont(QFont("Arial", 7));
     connect(m_btnSaveJSON, &QPushButton::clicked, this, &MeasurementTab::onSaveMeasurementJSON);
     
-    m_btnLoadJSON = new QPushButton("OTWÓRZ POMIAR JSON", this);
-    m_btnLoadJSON->setMinimumHeight(35);
-    m_btnLoadJSON->setFont(QFont("Arial", 9));
+    m_btnLoadJSON = new QPushButton("WCZYTAJ JSON", this);
+    m_btnLoadJSON->setMinimumHeight(30);
+    m_btnLoadJSON->setToolTip(tr("Wczytaj kompletną sesję pomiarową z formatu JSON"));
+    m_btnLoadJSON->setFont(QFont("Arial", 7));
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
     // Przełącznik RAW jest dostępny przed pierwszą próbką; tryb jest blokowany, aby nie mieszać jednostek w jednej sesji.
-    m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
+    m_btnToggleRaw = new QPushButton("RAW / SI", this);
     m_btnToggleRaw->setCheckable(true);
     m_btnToggleRaw->setChecked(true); // Domyślnie rejestruj i pokazuj surowe próbki
     m_btnToggleRaw->setEnabled(true);  // Tryb diagnostyczny RAW dostępny poza pomiarem
-    m_btnToggleRaw->setMinimumHeight(35);
-    m_btnToggleRaw->setFont(QFont("Arial", 9));
+    m_btnToggleRaw->setMinimumHeight(30);
+    m_btnToggleRaw->setToolTip(tr("Przełącz wyświetlanie surowych wartości ADC i jednostek skalibrowanych"));
+    m_btnToggleRaw->setFont(QFont("Arial", 7));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
         if (checked) {
             setCurrentUnit(ForceUnit::Raw);
@@ -1037,8 +1084,9 @@ void MeasurementTab::setupUI()
     m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
-    m_btnReset->setMinimumHeight(35);
-    m_btnReset->setFont(QFont("Arial", 9));
+    m_btnReset->setMinimumHeight(30);
+    m_btnReset->setToolTip(tr("Wyczyść bieżącą sesję pomiarową"));
+    m_btnReset->setFont(QFont("Arial", 7));
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
     // Wybór jednostki siły
@@ -1047,17 +1095,19 @@ void MeasurementTab::setupUI()
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
     m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
     m_unitSelector->setCurrentIndex(0);  // Domyślnie RAW; bez kalibracji
-    m_unitSelector->setMinimumHeight(35);
-    m_unitSelector->setFont(QFont("Arial", 9));
+    m_unitSelector->setMinimumHeight(30);
+    m_unitSelector->setToolTip(tr("Wybierz jednostkę prezentacji siły"));
+    m_unitSelector->setFont(QFont("Arial", 7));
     connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
             this, [this](int index) {
         int unitValue = m_unitSelector->itemData(index).toInt();
         setCurrentUnit(static_cast<ForceUnit>(unitValue));
     });
     
-    m_chkShowTrends = new QCheckBox("POKAŻ TRENDY DŁUGOTERMINOWE", this);
-    m_chkShowTrends->setFont(QFont("Arial", 9, QFont::Bold));
-    m_chkShowTrends->setMinimumHeight(35);
+    m_chkShowTrends = new QCheckBox("TRENDY", this);
+    m_chkShowTrends->setFont(QFont("Arial", 7, QFont::Bold));
+    m_chkShowTrends->setMinimumHeight(30);
+    m_chkShowTrends->setToolTip(tr("Pokaż lub ukryj wykresy trendów długoterminowych"));
     connect(m_chkShowTrends, &QCheckBox::toggled, this, &MeasurementTab::onShowTrends);
     
     m_controlLayout->addWidget(m_btnStartStop);
@@ -1075,7 +1125,7 @@ void MeasurementTab::setupUI()
     
     // Panel żywy z wykresem
     m_liveBox = new QGroupBox("Podgląd Na Żywo", this);
-    m_liveBox->setFont(QFont("Arial", 9, QFont::Bold));
+    m_liveBox->setFont(QFont("Arial", 7, QFont::Bold));
     QVBoxLayout* liveLayout = new QVBoxLayout();
     liveLayout->setSpacing(10);
     
@@ -1086,7 +1136,7 @@ void MeasurementTab::setupUI()
     m_forcePlot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     m_lblCurrentForce = new QLabel("Aktualna siła: 0.0 N", this);
-    m_lblCurrentForce->setFont(QFont("Arial", 12, QFont::Bold));
+    m_lblCurrentForce->setFont(QFont("Arial", 8, QFont::Bold));
     m_lblCurrentForce->setAlignment(Qt::AlignCenter);
     m_lblCurrentForce->setMinimumHeight(30);
     
@@ -1097,12 +1147,12 @@ void MeasurementTab::setupUI()
     m_forceBar->setMinimumHeight(25);
     
     m_lblStatus = new QLabel("Status: GOTOWY", this);
-    m_lblStatus->setFont(QFont("Arial", 9, QFont::Bold));
+    m_lblStatus->setFont(QFont("Arial", 7, QFont::Bold));
     m_lblStatus->setStyleSheet("color: blue; font-weight: bold;");
     m_lblStatus->setMinimumHeight(25);
     
     m_lblSeriesInfo = new QLabel("Seria: 0/3 | Powtórzenia: 0/8", this);
-    m_lblSeriesInfo->setFont(QFont("Arial", 9));
+    m_lblSeriesInfo->setFont(QFont("Arial", 7));
     m_lblSeriesInfo->setMinimumHeight(25);
     
     m_seriesProgress = new QProgressBar(this);
@@ -1128,7 +1178,7 @@ void MeasurementTab::setupUI()
     
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki Serii i Powtórzeń", this);
-    m_statsBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_statsBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* statsLayout = new QVBoxLayout();
     
     m_statsTable = new QTableWidget(this);
@@ -1140,7 +1190,7 @@ void MeasurementTab::setupUI()
     });
     m_statsTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_statsTable->setAlternatingRowColors(true);
-    m_statsTable->setFont(QFont("Arial", 9));
+    m_statsTable->setFont(QFont("Arial", 7));
     m_statsTable->setMinimumHeight(200);
     
     statsLayout->addWidget(m_statsTable);
@@ -1149,7 +1199,7 @@ void MeasurementTab::setupUI()
 
     // Pełna tabela 65 wskaźników; status oddziela wynik liczbowy od braku danych.
     m_biomechBox = new QGroupBox("Parametry biomechaniczne (65)", this);
-    m_biomechBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_biomechBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* biomechLayout = new QVBoxLayout();
     QHBoxLayout* calibrationLayout = new QHBoxLayout();
     calibrationLayout->addWidget(new QLabel(tr("Sztywność układu [N/m]:"), this));
@@ -1193,7 +1243,7 @@ void MeasurementTab::setupUI()
     m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
     m_biomechTable->setAlternatingRowColors(true);
     m_biomechTable->setMaximumHeight(480);
-    m_biomechTable->setFont(QFont("Arial", 9));
+    m_biomechTable->setFont(QFont("Arial", 7));
     biomechLayout->addWidget(m_biomechTable);
     m_biomechBox->setLayout(biomechLayout);
     m_visualLayout->addWidget(m_biomechBox);
@@ -1201,7 +1251,7 @@ void MeasurementTab::setupUI()
 
     // Tabela surowych danych
     m_rawBox = new QGroupBox("Surowe Dane (ostatnie 100 próbek)", this);
-    m_rawBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_rawBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* rawLayout = new QVBoxLayout();
     
     m_rawTable = new QTableWidget(this);
@@ -1209,7 +1259,7 @@ void MeasurementTab::setupUI()
     m_rawTable->setHorizontalHeaderLabels({"Czas [s]", "Siła [N]"});
     m_rawTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_rawTable->setMaximumHeight(150);
-    m_rawTable->setFont(QFont("Arial", 9));
+    m_rawTable->setFont(QFont("Arial", 7));
     
     rawLayout->addWidget(m_rawTable);
     m_rawBox->setLayout(rawLayout);
@@ -1232,7 +1282,7 @@ void MeasurementTab::setupTrendsUI()
     QVBoxLayout* contentLayout = new QVBoxLayout(m_trendsContent);
     
     QLabel* lblInfo = new QLabel("Wykresy trendów długoterminowych dla pacjenta: " + m_patientId, this);
-    lblInfo->setFont(QFont("Arial", 11, QFont::Bold));
+    lblInfo->setFont(QFont("Arial", 8, QFont::Bold));
     contentLayout->addWidget(lblInfo);
     
     m_trendsScrollArea->setWidget(m_trendsContent);
@@ -1373,6 +1423,8 @@ void MeasurementTab::startMeasurement()
         m_measurementDrainScheduled = false;
         m_droppedMeasurementSamples = 0;
         m_totalDroppedMeasurementSamples = 0;
+        m_uiDispatchLatencyWindowMs.clear();
+        m_lastDispatchLatencyReportMs = 0;
     }
     ensureCurrentSeriesInitialized();
     m_inContraction = false;
@@ -1396,7 +1448,7 @@ void MeasurementTab::startMeasurement()
         m_btnToggleRaw->setStyleSheet("background-color: #808080; color: #C0C0C0;");  // Szary kolor
     }
     
-    m_btnStartStop->setText("STOP POMIARU");
+    m_btnStartStop->setText("STOP");
     m_btnStartStop->setStyleSheet("background-color: #f44336; color: white;");
     m_lblStatus->setText("Status: REJESTRACJA...");
     m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
@@ -1462,7 +1514,7 @@ void MeasurementTab::stopMeasurement()
         }
     }
     
-    m_btnStartStop->setText("START POMIARU");
+    m_btnStartStop->setText("START");
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     m_lblStatus->setText("Status: ZATRZYMANO");
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
@@ -2629,7 +2681,7 @@ void MeasurementTab::showCurrentMeasurementData()
         m_btnToggleRaw->setChecked(m_showRawValues);
         m_btnToggleRaw->setEnabled(false);
         m_btnToggleRaw->setText(m_showRawValues
-            ? tr("TRYB: WARTOŚCI RAW")
+            ? tr("RAW / SI")
             : tr("TRYB: WARTOŚCI SKALIBROWANE"));
         m_btnToggleRaw->setStyleSheet(m_showRawValues
             ? "background-color: #FF9800; color: white;"
@@ -2745,7 +2797,7 @@ void MeasurementTab::updateTrendsView()
     
     QLabel* lblInfo = new QLabel("Wczytano " + QString::number(m_patientSessions.size()) + 
                                   " sesji pomiarowych dla pacjenta: " + m_patientId, this);
-    lblInfo->setFont(QFont("Arial", 11, QFont::Bold));
+    lblInfo->setFont(QFont("Arial", 8, QFont::Bold));
     layout->addWidget(lblInfo);
     
     QTableWidget* trendsTable = new QTableWidget(this);
@@ -3135,16 +3187,19 @@ void MeasurementTab::enqueueMeasurementSample(
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-        constexpr std::size_t MaximumQueuedSamples = 4096;
+        constexpr std::size_t MaximumQueuedSamples = 64;
         if (!m_measurementQueueAccepting ||
             sessionGeneration != m_measurementSessionGeneration.load(std::memory_order_acquire))
             return;
-        // This queue serves only GUI presentation and derived repetition
-        // analysis. The durable journal has already committed this sample.
+        // The durable journal already holds every acquired sample. This queue
+        // is a low-latency analysis/UI buffer: on overload discard stale queued
+        // frames, keep the newest frame, and reset the repetition detector in
+        // the GUI drain rather than displaying seconds-old force values.
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
-            ++m_droppedMeasurementSamples;
-            ++m_totalDroppedMeasurementSamples;
-            return;
+            const quint64 discarded = static_cast<quint64>(m_measurementQueue.size()) + 1;
+            m_droppedMeasurementSamples += static_cast<std::size_t>(discarded);
+            m_totalDroppedMeasurementSamples += discarded;
+            m_measurementQueue.clear();
         }
         m_measurementQueue.push_back(sample);
         if (!m_measurementDrainScheduled) {
@@ -3168,7 +3223,7 @@ void MeasurementTab::enqueueMeasurementSample(
 
 void MeasurementTab::drainMeasurementSamples()
 {
-    constexpr std::size_t MaximumBatch = 128;
+    constexpr std::size_t MaximumBatch = 16;
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
     quint64 totalDropped = 0;
@@ -3218,6 +3273,44 @@ void MeasurementTab::onMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
     if (!m_isMeasuring) return;
+
+    // Measure software queue age with the same monotonic clock used at engine
+    // ingress. Wall-clock timestamps are deliberately excluded from latency.
+    if (sample.ingestMonotonicNs != 0) {
+        const auto nowNs = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        if (nowNs >= sample.ingestMonotonicNs) {
+            m_uiDispatchLatencyWindowMs.append(
+                static_cast<double>(nowNs - sample.ingestMonotonicNs) / 1.0e6);
+            constexpr int MaximumLatencyWindow = 256;
+            if (m_uiDispatchLatencyWindowMs.size() > MaximumLatencyWindow)
+                m_uiDispatchLatencyWindowMs.remove(
+                    0, m_uiDispatchLatencyWindowMs.size() - MaximumLatencyWindow);
+
+            const qint64 elapsedMs = m_sessionElapsedTimer.elapsed();
+            if (elapsedMs - m_lastDispatchLatencyReportMs >= 5000 &&
+                !m_uiDispatchLatencyWindowMs.isEmpty()) {
+                QVector<double> sorted = m_uiDispatchLatencyWindowMs;
+                std::sort(sorted.begin(), sorted.end());
+                const int count = sorted.size();
+                const auto percentile = [&sorted, count](double fraction) {
+                    const int index = std::min(
+                        count - 1,
+                        std::max(0, static_cast<int>(std::ceil(fraction * count)) - 1));
+                    return sorted.at(index);
+                };
+                addDebugMessage(
+                    QString("Opóźnienie ingest→GUI [ms]: p50=%1, p95=%2, p99=%3")
+                        .arg(percentile(0.50), 0, 'f', 2)
+                        .arg(percentile(0.95), 0, 'f', 2)
+                        .arg(percentile(0.99), 0, 'f', 2),
+                    "LATENCY");
+                m_lastDispatchLatencyReportMs = elapsedMs;
+            }
+        }
+    }
+
     if (!sample.isValid() || sample.unit != "count") {
         m_repetitionDetector.reset();
         return;
@@ -3285,9 +3378,38 @@ bool MeasurementTab::loadCalibrationProfile(QString* error)
     }
 
     QFile profileFile(profilePath);
+    if (!profileFile.exists()) {
+        // Provision a safe, explicit uncalibrated starter profile on first run.
+        // A fabricated scale factor would silently produce false physical forces.
+        const QFileInfo profileInfo(profilePath);
+        QDir().mkpath(profileInfo.absolutePath());
+        QJsonObject starterProfile{
+            {QStringLiteral("schemaVersion"), 1},
+            {QStringLiteral("deviceId"), QStringLiteral("UNASSIGNED-HX711")},
+            {QStringLiteral("firmwareVersion"), QStringLiteral("")},
+            {QStringLiteral("sensorModel"), QStringLiteral("HX711")},
+            {QStringLiteral("unit"), QStringLiteral("g")},
+            {QStringLiteral("zeroOffsetRaw"), 0.0},
+            {QStringLiteral("scaleFactor"), 0.0},
+            {QStringLiteral("referenceValue"), 0.0},
+            {QStringLiteral("referenceRaw"), 0},
+            {QStringLiteral("sampleCount"), 0},
+            {QStringLiteral("createdAtUtc"), QStringLiteral("")},
+            {QStringLiteral("status"), QStringLiteral("uncalibrated")}
+        };
+        QSaveFile starterFile(profilePath);
+        if (starterFile.open(QIODevice::WriteOnly)) {
+            starterFile.write(QJsonDocument(starterProfile).toJson(QJsonDocument::Indented));
+            starterFile.commit();
+        }
+        m_hasCalibrationProfile = false;
+        if (error) *error = tr("Utworzono domyślny plik profilu kalibracji (nie skalibrowano): %1. Wprowadź rzeczywiste wartości wzorcowe przed użyciem N/kg.")
+                                .arg(profilePath);
+        return false;
+    }
     if (!profileFile.open(QIODevice::ReadOnly)) {
         m_hasCalibrationProfile = false;
-        if (error) *error = tr("Nie znaleziono pliku: %1").arg(profilePath);
+        if (error) *error = tr("Nie można otworzyć pliku: %1").arg(profilePath);
         return false;
     }
     QJsonParseError profileParseError;

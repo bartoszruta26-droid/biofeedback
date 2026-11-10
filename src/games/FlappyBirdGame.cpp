@@ -451,12 +451,12 @@ void FlappyBirdGame::render(QPainter &painter) {
     
     // 5. Wynik
     painter.setPen(QPen(Qt::white, 2));
-    painter.setFont(QFont("Arial", 36, QFont::Bold));
+    painter.setFont(QFont("Arial", 18, QFont::Bold));
     QRectF textRect(0, 0, w, 100);
     painter.drawText(textRect, Qt::AlignCenter, QString::number(m_score));
     
     // 6. Informacje
-    painter.setFont(QFont("Arial", 12));
+    painter.setFont(QFont("Arial", 8));
     painter.drawText(10, 20, "Steruj siłą nacisku");
     painter.drawText(10, 40, QString("Siła: %1%").arg(static_cast<int>(m_currentForce * 100)));
     painter.drawText(10, 60, QString("Poziom: %1").arg(m_difficultyLevel));
@@ -488,7 +488,7 @@ void FlappyBirdGame::render(QPainter &painter) {
     // 9. Status połączenia serial
     if (m_serialPort && !m_serialPort->isConnected()) {
         painter.setPen(QPen(Qt::red, 2));
-        painter.setFont(QFont("Arial", 14, QFont::Bold));
+        painter.setFont(QFont("Arial", 9, QFont::Bold));
         painter.drawText(w/2 - 150, 30, "BRAK POŁĄCZENIA Z SENSOREM");
     }
 }

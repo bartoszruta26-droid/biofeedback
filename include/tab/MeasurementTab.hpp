@@ -513,6 +513,8 @@ private:
     bool m_measurementDrainScheduled{false};
     std::size_t m_droppedMeasurementSamples{0};
     quint64 m_totalDroppedMeasurementSamples{0};
+    QVector<double> m_uiDispatchLatencyWindowMs;
+    qint64 m_lastDispatchLatencyReportMs{0};
     std::atomic<bool> m_journalAdmission{false};
     std::atomic<quint64> m_journalNextSequence{1};
     std::atomic<quint64> m_measurementSessionGeneration{0};

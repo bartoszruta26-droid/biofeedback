@@ -93,8 +93,7 @@ int main()
             {QStringLiteral("value"), sample.value},
             {QStringLiteral("unit"), QString::fromStdString(sample.unit)}
         };
-        const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
-        return committedWriter.appendDurably(line);
+        return committedWriter.appendJsonDurably(record);
     });
     engine.subscribe([&](const biofeedback::measurement::MeasurementSample&) {
         // Simulate a GUI presentation queue that cannot display this frame.

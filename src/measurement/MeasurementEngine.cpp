@@ -76,12 +76,18 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
 }
 
 void MeasurementEngine::setCommitHook(CommitHook hook) {
+    // Also wait for any previously captured hook to finish. This is a lifecycle
+    // barrier used when a MeasurementTab closes or switches patient journals.
+    std::lock_guard<std::mutex> ingestLock(m_ingestMutex);
     std::lock_guard<std::mutex> lock(m_mutex);
     m_commitHook = std::move(hook);
 }
 
 bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample& output) {
     MeasurementSample sample;
+    sample.ingestMonotonicNs = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
     sample.timestampUnixMs = nowUnixMilliseconds();
     sample.deviceTimestampMs = input.deviceTimestampMs;
     sample.rawValue = input.rawValue;
@@ -111,7 +117,11 @@ bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample&
         }
     }
 
-    std::vector<std::shared_ptr<CallbackEntry>> callbacks;
+    // Serialize producers independently from the state mutex. The persistence
+    // hook may wait for bounded journal admission, so it must not block readers
+    // of history or subscription management.
+    std::unique_lock<std::mutex> ingestLock(m_ingestMutex);
+    CommitHook commitHook;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         if (m_nextSequence == 0 ||
@@ -120,18 +130,27 @@ bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample&
             return false;
         }
         sample.sequence = m_nextSequence;
-        if (m_commitHook) {
-            bool committed = false;
-            try {
-                committed = m_commitHook(sample);
-            } catch (...) {
-                committed = false;
-            }
-            if (!committed) {
-                output = MeasurementSample{};
-                return false;
-            }
+        commitHook = m_commitHook;
+    }
+
+    if (commitHook) {
+        bool committed = false;
+        try {
+            committed = commitHook(sample);
+        } catch (...) {
+            committed = false;
         }
+        if (!committed) {
+            output = MeasurementSample{};
+            return false;
+        }
+    }
+
+    std::vector<std::shared_ptr<CallbackEntry>> callbacks;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        // m_ingestMutex guarantees that no other producer can consume this
+        // sequence while the commit hook executes outside the state mutex.
         ++m_nextSequence;
         m_history.push_back(sample);
         // Keep the hot ingest path O(1): dropping the oldest sample must not
@@ -141,6 +160,8 @@ bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample&
         callbacks.reserve(m_callbacks.size());
         for (const auto& entry : m_callbacks) callbacks.push_back(entry.second);
     }
+    ingestLock.unlock();
+
     for (const auto& entry : callbacks) {
         SampleCallback callback;
         {

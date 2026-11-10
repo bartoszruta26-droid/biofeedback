@@ -268,6 +268,8 @@ private:
     void enqueueMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
     void drainMeasurementSamples();
     void onMeasurementSample(const biofeedback::measurement::MeasurementSample& sample);
+    void scheduleLiveUiRefresh();
+    void refreshLiveUi();
     void setupUI();
     void updateDisplay();
     void updateProgressWidgets();
@@ -371,6 +373,10 @@ private:
     std::deque<biofeedback::measurement::MeasurementSample> m_measurementQueue;
     bool m_measurementDrainScheduled{false};
     std::size_t m_droppedMeasurementSamples{0};
+    QTimer* m_liveUiTimer{nullptr};
+    QVector<double> m_uiDispatchLatencyWindowMs;
+    qint64 m_lastDispatchLatencyReportMs{0};
+    quint64 m_pendingUiSamples{0};
     
     // Pomocnicze
     QString getExerciseDisplayName(int index) const;

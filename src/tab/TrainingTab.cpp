@@ -1,5 +1,6 @@
 #include "tab/TrainingTab.hpp"
 #include <algorithm>
+#include <chrono>
 #include <vector>
 #include "tab/TrainingAnalyticsWidget.hpp"
 #include "measurement/Units.hpp"
@@ -13,6 +14,8 @@
 #include <QStackedWidget>
 #include <QScrollArea>
 #include <QSplitter>
+#include <QResizeEvent>
+#include <QTimer>
 #include <QDir>
 #include <QGuiApplication>
 #include <QScreen>
@@ -34,6 +37,27 @@
 #include "games/ArkanoidGame.hpp"
 #include "games/GalagaGame.hpp"
 #include "games/GameFactory.hpp"
+
+namespace {
+
+class ProportionalWorkspaceSplitter final : public QSplitter {
+public:
+    explicit ProportionalWorkspaceSplitter(QWidget* parent = nullptr)
+        : QSplitter(Qt::Horizontal, parent) {}
+
+protected:
+    void resizeEvent(QResizeEvent* event) override
+    {
+        QSplitter::resizeEvent(event);
+        const int availableWidth = width() - handleWidth();
+        if (availableWidth > 0 && count() == 2) {
+            const int visualWidth = availableWidth * 89 / 100;
+            setSizes({visualWidth, availableWidth - visualWidth});
+        }
+    }
+};
+
+} // namespace
 
 namespace tab {
 
@@ -133,7 +157,7 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     // Sekcja 1: Ćwiczenie
     QRect exerciseRect(margin, margin, sectionWidth - margin, height() - 2 * margin);
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 10, QFont::Bold));
+    painter.setFont(QFont("Arial", 7, QFont::Bold));
     painter.drawText(exerciseRect, Qt::AlignTop | Qt::AlignHCenter,
                     progressLabel(QStringLiteral("Ćwiczenie"), m_currentExercise, m_totalExercises));
 
@@ -218,7 +242,7 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     
     // Tekst na pasku
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 9, QFont::Bold));
+    painter.setFont(QFont("Arial", 7, QFont::Bold));
     painter.drawText(margin, barY, barWidth, barHeight, Qt::AlignCenter,
                     QString("%1 N").arg(m_currentForce, 0, 'f', 1));
 }
@@ -286,7 +310,12 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_peakForceInRep(0.0)
     , m_serialPort(nullptr)
     , m_measurementEngine(nullptr)
+    , m_liveUiTimer(new QTimer(this))
 {
+    m_liveUiTimer->setSingleShot(true);
+    m_liveUiTimer->setTimerType(Qt::PreciseTimer);
+    m_liveUiTimer->setInterval(16);
+    connect(m_liveUiTimer, &QTimer::timeout, this, &TrainingTab::refreshLiveUi);
     setupUI();
 }
 
@@ -311,9 +340,9 @@ void TrainingTab::setupUI()
     m_mainLayout->setSpacing(4);
     m_mainLayout->setContentsMargins(6, 6, 6, 6);
 
-    // Keep the training display, progress and analytics on the left (75%).
+    // Keep the training display, progress and analytics on the left (89%).
     // The exercise plan and its parameters live in a scrollable right column.
-    auto* workspaceSplitter = new QSplitter(Qt::Horizontal, this);
+    auto* workspaceSplitter = new ProportionalWorkspaceSplitter(this);
     workspaceSplitter->setChildrenCollapsible(false);
     workspaceSplitter->setHandleWidth(5);
 
@@ -322,7 +351,7 @@ void TrainingTab::setupUI()
     visualScroll->setFrameShape(QFrame::NoFrame);
     auto* visualPanel = new QWidget(visualScroll);
     auto* visualLayout = new QVBoxLayout(visualPanel);
-    visualLayout->setSpacing(8);
+    visualLayout->setSpacing(5);
     visualLayout->setContentsMargins(4, 4, 4, 4);
 
     auto* optionsScroll = new QScrollArea(workspaceSplitter);
@@ -331,8 +360,8 @@ void TrainingTab::setupUI()
     optionsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto* optionsPanel = new QWidget(optionsScroll);
     auto* optionsLayout = new QVBoxLayout(optionsPanel);
-    optionsLayout->setSpacing(8);
-    optionsLayout->setContentsMargins(8, 8, 8, 8);
+    optionsLayout->setSpacing(4);
+    optionsLayout->setContentsMargins(3, 3, 3, 3);
     auto* optionsHeading = new QLabel(tr("KONFIGURACJA TRENINGU"), optionsPanel);
     optionsHeading->setStyleSheet("font-weight:700;color:#40516a;");
     optionsLayout->addWidget(optionsHeading);
@@ -341,15 +370,13 @@ void TrainingTab::setupUI()
     optionsScroll->setWidget(optionsPanel);
     workspaceSplitter->addWidget(visualScroll);
     workspaceSplitter->addWidget(optionsScroll);
-    workspaceSplitter->setStretchFactor(0, 3);
-    workspaceSplitter->setStretchFactor(1, 1);
-    workspaceSplitter->setSizes({900, 300});
-    // Keep manual sidebar resizing available while enforcing a 25% maximum.
-    // QSplitter preserves the relative sizes as the window changes resolution.
+    // ProportionalWorkspaceSplitter reapplies the 89:11 layout on every resize.
+    // The right-hand options sidebar is capped at 11% of the workspace.
+    // It remains user-resizable toward a narrower width on large displays.
     connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
             [workspaceSplitter](int position, int) {
         const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
-        const int maxVisualWidth = availableWidth * 3 / 4;
+        const int maxVisualWidth = availableWidth * 89 / 100;
         if (position < maxVisualWidth) {
             workspaceSplitter->setSizes({maxVisualWidth, availableWidth - maxVisualWidth});
         }
@@ -358,14 +385,15 @@ void TrainingTab::setupUI()
 
     // Panel konfiguracji w prawej kolumnie.
     m_configBox = new QGroupBox("Konfiguracja ćwiczenia", optionsPanel);
-    m_configBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_configBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* configLayout = new QVBoxLayout(m_configBox);
-    configLayout->setSpacing(10);
+    configLayout->setSpacing(4);
     
     m_exerciseSelector = new QComboBox(this);
-    m_exerciseSelector->setMinimumWidth(200);
+    m_exerciseSelector->setMinimumWidth(0);
+    m_exerciseSelector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_exerciseSelector->setMinimumHeight(35);
-    m_exerciseSelector->setFont(QFont("Arial", 10));
+    m_exerciseSelector->setFont(QFont("Arial", 7));
     configLayout->addWidget(new QLabel("Ćwiczenie:", this));
     configLayout->addWidget(m_exerciseSelector);
     
@@ -375,7 +403,7 @@ void TrainingTab::setupUI()
     m_targetForceSpin->setValue(50.0);
     m_targetForceSpin->setDecimals(1);
     m_targetForceSpin->setMinimumHeight(35);
-    m_targetForceSpin->setFont(QFont("Arial", 10));
+    m_targetForceSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_targetForceSpin);
     
     configLayout->addWidget(new QLabel("Serie:", this));
@@ -383,7 +411,7 @@ void TrainingTab::setupUI()
     m_seriesSpin->setRange(1, 20);
     m_seriesSpin->setValue(3);
     m_seriesSpin->setMinimumHeight(35);
-    m_seriesSpin->setFont(QFont("Arial", 10));
+    m_seriesSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_seriesSpin);
     
     configLayout->addWidget(new QLabel("Powtórzenia:", this));
@@ -391,7 +419,7 @@ void TrainingTab::setupUI()
     m_repsSpin->setRange(1, 50);
     m_repsSpin->setValue(8);
     m_repsSpin->setMinimumHeight(35);
-    m_repsSpin->setFont(QFont("Arial", 10));
+    m_repsSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_repsSpin);
     
     configLayout->addWidget(new QLabel("Odpoczynek [s]:", this));
@@ -399,7 +427,7 @@ void TrainingTab::setupUI()
     m_restTimeSpin->setRange(0, 300);
     m_restTimeSpin->setValue(60);
     m_restTimeSpin->setMinimumHeight(35);
-    m_restTimeSpin->setFont(QFont("Arial", 10));
+    m_restTimeSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_restTimeSpin);
     
     configLayout->addWidget(new QLabel("Gra:", this));
@@ -415,19 +443,19 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Scorched Earth", "scorched_earth");
     m_gameTypeCombo->addItem("Car Race", "car_race");
     m_gameTypeCombo->setMinimumHeight(35);
-    m_gameTypeCombo->setFont(QFont("Arial", 10));
+    m_gameTypeCombo->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_gameTypeCombo);
     
     m_btnAddExercise = new QPushButton("Dodaj", this);
     m_btnAddExercise->setMaximumWidth(80);
     m_btnAddExercise->setMinimumHeight(35);
-    m_btnAddExercise->setFont(QFont("Arial", 10, QFont::Bold));
+    m_btnAddExercise->setFont(QFont("Arial", 7, QFont::Bold));
     configLayout->addWidget(m_btnAddExercise);
     
     m_btnRemoveExercise = new QPushButton("Usuń", this);
     m_btnRemoveExercise->setMaximumWidth(80);
     m_btnRemoveExercise->setMinimumHeight(35);
-    m_btnRemoveExercise->setFont(QFont("Arial", 10));
+    m_btnRemoveExercise->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_btnRemoveExercise);
     
     optionsLayout->addWidget(m_configBox);
@@ -438,28 +466,28 @@ void TrainingTab::setupUI()
     
     m_btnStartStop = new QPushButton("Start", this);
     m_btnStartStop->setMinimumHeight(45);
-    m_btnStartStop->setFont(QFont("Arial", 12, QFont::Bold));
+    m_btnStartStop->setFont(QFont("Arial", 8, QFont::Bold));
     m_controlLayout->addWidget(m_btnStartStop);
     
     m_btnPauseResume = new QPushButton("Pauza", this);
     m_btnPauseResume->setMinimumHeight(40);
-    m_btnPauseResume->setFont(QFont("Arial", 12));
+    m_btnPauseResume->setFont(QFont("Arial", 8));
     m_btnPauseResume->setEnabled(false);
     m_controlLayout->addWidget(m_btnPauseResume);
     
     m_btnSave = new QPushButton("Zapisz wyniki", this);
     m_btnSave->setMinimumHeight(35);
-    m_btnSave->setFont(QFont("Arial", 10));
+    m_btnSave->setFont(QFont("Arial", 7));
     m_controlLayout->addWidget(m_btnSave);
     
     m_btnLoad = new QPushButton("Wczytaj plan", this);
     m_btnLoad->setMinimumHeight(35);
-    m_btnLoad->setFont(QFont("Arial", 10));
+    m_btnLoad->setFont(QFont("Arial", 7));
     m_controlLayout->addWidget(m_btnLoad);
     
     m_btnExport = new QPushButton("Eksportuj plan", this);
     m_btnExport->setMinimumHeight(35);
-    m_btnExport->setFont(QFont("Arial", 10));
+    m_btnExport->setFont(QFont("Arial", 7));
     m_controlLayout->addWidget(m_btnExport);
     
     visualLayout->addLayout(m_controlLayout);
@@ -483,7 +511,7 @@ void TrainingTab::setupUI()
     infoLayout->addWidget(m_lblCurrentRep);
     
     m_lblTimer = new QLabel("Czas: 00:00", this);
-    m_lblTimer->setFont(QFont("Arial", 14, QFont::Bold));
+    m_lblTimer->setFont(QFont("Arial", 7, QFont::Bold));
     infoLayout->addWidget(m_lblTimer);
     
     progressLayout->addLayout(infoLayout);
@@ -492,7 +520,7 @@ void TrainingTab::setupUI()
     forceLayout->addWidget(new QLabel("Aktualna siła:", this));
     
     m_lblCurrentForce = new QLabel("0.0 N", this);
-    m_lblCurrentForce->setFont(QFont("Arial", 12, QFont::Bold));
+    m_lblCurrentForce->setFont(QFont("Arial", 8, QFont::Bold));
     forceLayout->addWidget(m_lblCurrentForce);
     
     forceLayout->addWidget(new QLabel("Cel:", this));
@@ -506,7 +534,7 @@ void TrainingTab::setupUI()
     forceLayout->addWidget(m_forceBar);
     
     m_lblRestTimer = new QLabel("", this);
-    m_lblRestTimer->setFont(QFont("Arial", 12, QFont::Bold));
+    m_lblRestTimer->setFont(QFont("Arial", 8, QFont::Bold));
     m_lblRestTimer->setStyleSheet("color: yellow;");
     forceLayout->addWidget(m_lblRestTimer);
     
@@ -674,6 +702,8 @@ void TrainingTab::startTraining()
     m_lastCheckpointSeconds = -1;
     m_trainingClock.reset();
     m_sessionClock.start();
+    m_uiDispatchLatencyWindowMs.clear();
+    m_lastDispatchLatencyReportMs = 0;
     m_progressWidget->clearForceHistory();
     m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_sessionStartedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
@@ -731,6 +761,8 @@ void TrainingTab::stopTraining(bool completed)
     }
 
     m_repetitionDetector.reset();
+    if (m_liveUiTimer) m_liveUiTimer->stop();
+    m_pendingUiSamples = 0;
     
     // Aktualizacja UI
     m_btnStartStop->setText("Start");
@@ -1275,7 +1307,7 @@ void TrainingTab::enqueueMeasurementSample(
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-        constexpr std::size_t MaximumQueuedSamples = 4096;
+        constexpr std::size_t MaximumQueuedSamples = 64;
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
             m_droppedMeasurementSamples += m_measurementQueue.size() + 1;
             m_measurementQueue.clear();
@@ -1301,7 +1333,7 @@ void TrainingTab::enqueueMeasurementSample(
 
 void TrainingTab::drainMeasurementSamples()
 {
-    constexpr std::size_t MaximumBatch = 128;
+    constexpr std::size_t MaximumBatch = 16;
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
     bool scheduleAgain = false;
@@ -1340,10 +1372,78 @@ void TrainingTab::drainMeasurementSamples()
     }
 }
 
+void TrainingTab::scheduleLiveUiRefresh()
+{
+    if (m_liveUiTimer && !m_liveUiTimer->isActive())
+        m_liveUiTimer->start();
+}
+
+void TrainingTab::refreshLiveUi()
+{
+    if (m_pendingUiSamples == 0 || !m_stateMachine.running())
+        return;
+
+    m_pendingUiSamples = 0;
+    const double force = m_currentForce;
+    const double targetForce = (m_currentExerciseIndex >= 0 &&
+                                m_currentExerciseIndex < m_exercisePlan.size())
+        ? m_exercisePlan[m_currentExerciseIndex].targetForce : 0.0;
+
+    // A GUI frame consumes the newest state only. The repetition detector
+    // still receives every acquired sample in onMeasurementSample().
+    m_progressWidget->setCurrentForce(force);
+    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
+    const int barValue = targetForce > 0.0
+        ? static_cast<int>((force / targetForce) * 100.0) : 0;
+    m_forceBar->setValue(qBound(0, barValue, 100));
+
+    if (m_currentGame && m_currentGame->isRunning() && !m_currentGame->isPaused()) {
+        const double gameInput = targetForce > 0.0
+            ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
+        m_currentGame->handleSensorInput(gameInput);
+    }
+}
+
 void TrainingTab::onMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
     if (!m_stateMachine.running()) return;
+
+    // Measure the actual ingest-to-training-GUI queue age with a monotonic clock.
+    if (sample.ingestMonotonicNs != 0) {
+        const auto nowNs = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        if (nowNs >= sample.ingestMonotonicNs) {
+            m_uiDispatchLatencyWindowMs.append(
+                static_cast<double>(nowNs - sample.ingestMonotonicNs) / 1.0e6);
+            constexpr int MaximumLatencyWindow = 256;
+            if (m_uiDispatchLatencyWindowMs.size() > MaximumLatencyWindow)
+                m_uiDispatchLatencyWindowMs.remove(
+                    0, m_uiDispatchLatencyWindowMs.size() - MaximumLatencyWindow);
+
+            const qint64 elapsedMs = m_sessionClock.elapsed();
+            if (elapsedMs - m_lastDispatchLatencyReportMs >= 5000 &&
+                !m_uiDispatchLatencyWindowMs.isEmpty()) {
+                QVector<double> sorted = m_uiDispatchLatencyWindowMs;
+                std::sort(sorted.begin(), sorted.end());
+                const int count = sorted.size();
+                const auto percentile = [&sorted, count](double fraction) {
+                    const int index = std::min(
+                        count - 1,
+                        std::max(0, static_cast<int>(std::ceil(fraction * count)) - 1));
+                    return sorted.at(index);
+                };
+                addDebugMessage(
+                    QString("Opóźnienie ingest→GUI treningu [ms]: p50=%1, p95=%2, p99=%3")
+                        .arg(percentile(0.50), 0, 'f', 2)
+                        .arg(percentile(0.95), 0, 'f', 2)
+                        .arg(percentile(0.99), 0, 'f', 2),
+                    "LATENCY");
+                m_lastDispatchLatencyReportMs = elapsedMs;
+            }
+        }
+    }
 
     // Training consumes only the calibrated SI force stream published by
     // MeasurementTab. Raw ADC counts are never treated as force values.
@@ -1360,27 +1460,12 @@ void TrainingTab::onMeasurementSample(
         m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
         return;
     }
+    // Preserve every sample for analysis; coalesce only presentation and
+    // game-control work onto a 60 Hz newest-value refresh.
     m_currentForce = force;
-
-    // Update the lightweight force trace model for every acquired sample;
-    // QWidget::update() coalesces paints to the display refresh cadence.
-    m_progressWidget->setCurrentForce(force);
-
-    // Every real acquisition sample reaches the training display and game.
-    // QWidget::update() coalesces paints; throttling by host-clock time here
-    // used to discard later samples when a queued batch was drained at once.
-    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
-
-    const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
-    const int barValue = targetForce > 0.0
-        ? static_cast<int>((force / targetForce) * 100.0) : 0;
-    m_forceBar->setValue(qBound(0, barValue, 100));
-
-    if (m_currentGame && m_currentGame->isRunning()) {
-        const double gameInput = targetForce > 0.0
-            ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
-        m_currentGame->handleSensorInput(gameInput);
-    }
+    if (m_pendingUiSamples < std::numeric_limits<quint64>::max())
+        ++m_pendingUiSamples;
+    scheduleLiveUiRefresh();
 
     biofeedback::training::RepetitionRecord repetition;
     if (m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition))

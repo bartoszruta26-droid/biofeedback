@@ -300,12 +300,12 @@ void PongGame::render(QPainter &painter) {
     
     // 6. Wyniki
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 36, QFont::Bold));
+    painter.setFont(QFont("Arial", 18, QFont::Bold));
     painter.drawText(w / 4, 50, QString::number(m_playerScore));
     painter.drawText(3 * w / 4, 50, QString::number(m_aiScore));
     
     // 7. Informacje
-    painter.setFont(QFont("Arial", 12));
+    painter.setFont(QFont("Arial", 8));
     painter.drawText(10, 20, "Steruj siłą nacisku");
     painter.drawText(10, 40, QString("Siła: %1%").arg(static_cast<int>(m_currentForce * 100)));
     painter.drawText(10, 60, QString("Poziom: %1").arg(m_difficultyLevel));
@@ -326,7 +326,7 @@ void PongGame::render(QPainter &painter) {
     // 9. Status połączenia serial
     if (m_serialPort && !m_serialPort->isConnected()) {
         painter.setPen(QPen(Qt::red, 2));
-        painter.setFont(QFont("Arial", 14, QFont::Bold));
+        painter.setFont(QFont("Arial", 9, QFont::Bold));
         painter.drawText(w/2 - 100, 30, "BRAK POŁĄCZENIA Z SENSOREM");
     }
 }

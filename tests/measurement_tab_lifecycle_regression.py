@@ -4,6 +4,8 @@ from pathlib import Path
 
 source = Path("src/tab/MeasurementTab.cpp").read_text(encoding="utf-8")
 header = Path("include/tab/MeasurementTab.hpp").read_text(encoding="utf-8")
+training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
+training_header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
 
 for label, content in (("implementation", source), ("header", header)):
     if "connectToArduinoAsync" in content:
@@ -36,8 +38,11 @@ for required in (
     "m_recordedSamples.append(recorded)",
     "bool MeasurementTab::openSampleJournal()",
     "SampleJournalWriter m_sampleJournalWriter",
-    "m_sampleJournalWriter.append(line)",
+    "m_sampleJournalWriter.appendJson(record)",
     "m_totalDroppedMeasurementSamples",
+    "sample.ingestMonotonicNs",
+    "m_uiDispatchLatencyWindowMs",
+    "Opóźnienie ingest→GUI [ms]: p50=%1, p95=%2, p99=%3",
     "dziennik trwały zachowuje pełny pomiar",
     "m_sampleJournalWriter.finish()",
     "m_sampleJournalWriter.isAccepting()",
@@ -94,9 +99,11 @@ writer_source = Path("src/tab/SampleJournalWriter.cpp").read_text(encoding="utf-
 for required in (
     "std::thread(&SampleJournalWriter::run, this)",
     "m_queue.size() >= m_capacity",
-    "m_queue.push_back(PendingRecord{line, ticket, durable})",
+    "m_queue.push_back(std::move(pending))",
+    "pending.jsonObject = record",
+    "pending.isJsonObject = true",
     "m_changed.wait(lock",
-    "file.write(record.line)",
+    "file.write(line)",
     "syncParentDirectory(m_path, error)",
     "::fsync(directoryFd)",
     "flushDurably(file, error)",
@@ -158,14 +165,73 @@ if "MaximumQueuedInputs" in game_source or "scheduleAgain" in game_source:
 
 # Failed Qt event scheduling must release the scheduled flag and account for
 # the discarded UI backlog, both on initial enqueue and on batch rescheduling.
-for label, content in (("MeasurementTab", source), ("TrainingTab", training_source)):
-    if content.count("const bool queued = QMetaObject::invokeMethod") < 2:
-        raise SystemExit(f"{label}: initial and follow-up drain scheduling must check invokeMethod")
-    if content.count("m_measurementQueue.clear();") < 2:
-        raise SystemExit(f"{label}: failed scheduling must clear stranded UI backlog")
-    if content.count("m_measurementDrainScheduled = false;") < 2:
-        raise SystemExit(f"{label}: failed scheduling must release the drain flag")
+# MeasurementTab still has two checked invokeMethod scheduling sites.
+if source.count("const bool queued = QMetaObject::invokeMethod") < 2:
+    raise SystemExit("MeasurementTab: initial and follow-up drain scheduling must check invokeMethod")
+if source.count("m_measurementQueue.clear();") < 2:
+    raise SystemExit("MeasurementTab: failed scheduling must clear stranded UI backlog")
+if source.count("m_measurementDrainScheduled = false;") < 2:
+    raise SystemExit("MeasurementTab: failed scheduling must release the drain flag")
 
+# GUI queues are deliberately short: at 80 SPS, 64 frames cap stale
+# presentation backlog at 800 ms. The durable journal remains lossless.
+if "MaximumQueuedSamples = 64" not in source:
+    raise SystemExit("MeasurementTab GUI backlog must be capped at 64 samples")
+if "MaximumQueuedSamples = 64" not in training_source:
+    raise SystemExit("TrainingTab GUI backlog must be capped at 64 samples")
+if "m_measurementQueue.clear();" not in source[source.index("void MeasurementTab::enqueueMeasurementSample("):]:
+    raise SystemExit("MeasurementTab overload must discard stale frames to preserve freshness")
+
+# TrainingTab retains bounded FIFO batches so Qt can service other events.
+training_drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
+training_drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", training_drain_start)
+training_drain = training_source[training_drain_start:training_drain_end]
+if "constexpr std::size_t MaximumBatch = 16;" not in training_drain:
+    raise SystemExit("TrainingTab must keep GUI analysis batches bounded")
+if "scheduleAgain" not in training_drain or "QMetaObject::invokeMethod" not in training_drain:
+    raise SystemExit("TrainingTab must reschedule remaining FIFO work without dropping it")
+
+# The training detector receives every real sample; only the visible UI and
+# game control are refreshed from the latest value at a bounded 60 Hz cadence.
+for required in (
+    "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
+    "m_liveUiTimer->setInterval(16)",
+    "m_liveUiTimer->setTimerType(Qt::PreciseTimer)",
+    "sample.ingestMonotonicNs",
+    "Opóźnienie ingest→GUI treningu [ms]: p50=%1, p95=%2, p99=%3",
+    "void TrainingTab::scheduleLiveUiRefresh()",
+    "void TrainingTab::refreshLiveUi()",
+    "m_progressWidget->setCurrentForce(force)",
+    "m_lblCurrentForce->setText(QString(\"%1 N\").arg(force, 0, 'f', 2));",
+    "m_currentGame->handleSensorInput(gameInput)",
+):
+    if required not in training_source:
+        raise SystemExit(f"Missing low-latency training invariant: {required}")
+if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
+    raise SystemExit("TrainingTab live UI timer state is missing")
+
+
+# Training's detector consumes each frame; visible widgets and game input
+# are updated from the latest-value snapshot by a precise 60 Hz timer.
+
+drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
+drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", drain_start)
+drain_body = training_source[drain_start:drain_end]
+if "MaximumBatch = 16" not in drain_body or "scheduleAgain" not in drain_body:
+    raise SystemExit("Training analysis must preserve bounded FIFO batches")
+for required in (
+    "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
+    "m_liveUiTimer->setInterval(16)",
+    "m_liveUiTimer->setTimerType(Qt::PreciseTimer)",
+    "void TrainingTab::scheduleLiveUiRefresh()",
+    "void TrainingTab::refreshLiveUi()",
+    "m_lblCurrentForce->setText(QString(\"%1 N\").arg(force, 0, 'f', 2));",
+    "m_currentGame->handleSensorInput(gameInput)",
+):
+    if required not in training_source:
+        raise SystemExit(f"Missing latest-value training invariant: {required}")
+if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
+    raise SystemExit("Training live refresh timer declaration missing")
 
 # ForcePlotWidget must keep the visible-window trace in O(1)-amortized append
 # and expiry time; per-sample full-window scans and QVector front shifts add lag.
@@ -190,6 +256,7 @@ if "removeFirst()" in add_sample_body or "for (double sample : m_forces)" in add
 
 # Journal queue admission precedes publication to the lossy GUI queue; fsync is batched.
 engine_source = Path("src/measurement/MeasurementEngine.cpp").read_text(encoding="utf-8")
+journal_writer_source = Path("src/tab/SampleJournalWriter.cpp").read_text(encoding="utf-8")
 for required in (
     "m_measurementEngine->setCommitHook",
     "m_measurementEngine->setCommitHook({})",
@@ -197,7 +264,7 @@ for required in (
     "m_journalAdmission.store(false",
     "m_measurementSessionGeneration.fetch_add(1",
     "sessionGeneration != m_measurementSessionGeneration.load",
-    "m_sampleJournalWriter.append(line)",
+    "m_sampleJournalWriter.appendJson(record)",
     "m_journalNextSequence.store(sequence + 1",
     "bool MeasurementTab::restoreSampleJournalIntoSession()",
     "expectedSequence != m_journalNextSequence.load",
@@ -207,24 +274,39 @@ for required in (
 ):
     if required not in source:
         raise SystemExit(f"Missing durable acquisition commit invariant: {required}")
-commit_start = engine_source.index("if (m_commitHook)")
-history_start = engine_source.index("m_history.push_back(sample)", commit_start)
-if commit_start > history_start:
-    raise SystemExit("MeasurementEngine must durably commit before adding to history")
-if engine_source.index("m_commitHook(sample)") > history_start:
-    raise SystemExit("MeasurementEngine must invoke the commit hook before publication")
+# The ingest gate preserves commit/sequence order, while the state mutex is
+# released before invoking the potentially blocking persistence hook.
+for required in (
+    "std::unique_lock<std::mutex> ingestLock(m_ingestMutex)",
+    "CommitHook commitHook",
+    "commitHook = m_commitHook",
+    "committed = commitHook(sample)",
+):
+    if required not in engine_source:
+        raise SystemExit(f"Missing serialized out-of-lock commit invariant: {required}")
+lock_end = engine_source.index("\n    }\n\n    if (commitHook)")
+hook_start = engine_source.index("if (commitHook)", lock_end)
+hook_call = engine_source.index("committed = commitHook(sample)", hook_start)
+history_start = engine_source.index("m_history.push_back(sample)", hook_call)
+if not (lock_end < hook_start < hook_call < history_start):
+    raise SystemExit("Commit hook must run outside the state mutex and before history publication")
+if "QJsonDocument(record.jsonObject).toJson(QJsonDocument::Compact)" not in journal_writer_source:
+    raise SystemExit("Journal JSON serialization must run on the writer thread")
 
-# The bounded GUI queue may drop derived/presentation frames, but it must never
-# block the serial acquisition callback after the durable commit has succeeded.
+# The bounded presentation/analysis queue must never block the serial reader.
+# The durable journal remains lossless; when the short GUI buffer saturates,
+# stale queued frames are discarded and the detector is reset.
 for required in (
     "bool m_measurementQueueAccepting{true}",
-    "MaximumQueuedSamples = 4096",
+    "MaximumQueuedSamples = 64",
     "if (m_measurementQueue.size() >= MaximumQueuedSamples)",
-    "++m_droppedMeasurementSamples",
+    "m_droppedMeasurementSamples += static_cast<std::size_t>(discarded)",
+    "m_measurementQueue.clear()",
+    "m_totalDroppedMeasurementSamples += discarded",
     "m_measurementQueueAccepting = false",
 ):
     if required not in source and required not in header:
-        raise SystemExit(f"Missing lossy GUI queue invariant: {required}")
+        raise SystemExit(f"Missing bounded analysis-queue invariant: {required}")
 enqueue_start = source.index("void MeasurementTab::enqueueMeasurementSample(")
 enqueue_end = source.index("void MeasurementTab::drainMeasurementSamples(", enqueue_start)
 enqueue_body = source[enqueue_start:enqueue_end]
@@ -268,12 +350,12 @@ if "Qt::PreciseTimer" not in game_engine_source:
     raise SystemExit("Game frame timer must use precise scheduling")
 if "QPainterPath tracePath;" not in source or "QPointF point(x, y);" not in source:
     raise SystemExit("Measurement trace must retain subpixel coordinates for smooth rendering")
-if "tracePath.lineTo(point);" not in source:
+if "path.lineTo(point);" not in source or "appendAt(time, interpolate(segment, time), tracePath, started)" not in source:
     raise SystemExit("Measurement trace must render the interpolated 120 Hz points")
 if "m_forcePlot->addSample(forceValue, currentTime)" not in source:
     raise SystemExit("Measurement plot must receive every acquired sample")
 if "m_progressWidget->setCurrentForce(force);" not in training_source:
-    raise SystemExit("Training live force trace must receive every acquired sample")
+    raise SystemExit("Training live force trace must receive the latest acquired sample")
 training_header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
 if "std::deque<double> m_forceHistory" not in training_header or "MaximumTraceSamples = 600" not in training_source:
     raise SystemExit("Training live trace must retain a bounded six-second sample window")
@@ -286,20 +368,21 @@ if "LiveUiIntervalMs" in training_source:
 
 print("Measurement, training and game realtime dispatch regression passed")
 
-# The live sensor path must retain all samples while coalescing GUI work.
+# Measurement analysis must process every sample in order. Only the
+# presentation-facing controls are coalesced to the newest value.
 sample_start = source.index("void MeasurementTab::readSingleSample(")
 sample_end = source.index("void MeasurementTab::updateRawTableBatch(", sample_start)
 sample_body = source[sample_start:sample_end]
-if "static constexpr qint64 LiveUiIntervalMs = 16" not in sample_body:
-    raise SystemExit("Live UI updates must target approximately 60 Hz")
 if "m_recordedSamples.append(recorded)" not in sample_body:
     raise SystemExit("Full measurement samples must still be retained")
-if "m_rawBox->setTitle" in sample_body and "LiveUiIntervalMs" not in sample_body:
-    raise SystemExit("Raw-table title update is not protected by the bounded live UI cadence")
-ui_gate = sample_body.find("if (elapsedMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs)")
-title_update = sample_body.find("m_rawBox->setTitle")
-if title_update >= 0 and (ui_gate < 0 or title_update < ui_gate):
-    raise SystemExit("Raw-table title update must remain inside the throttled UI block")
+if "m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)" not in sample_body:
+    raise SystemExit("Every acquired sample must reach repetition analysis")
+if "m_forcePlot->addSample(forceValue, currentTime)" not in sample_body:
+    raise SystemExit("The live plot must retain every real sensor sample")
+if "updateLiveDisplay(forceValue)" not in sample_body:
+    raise SystemExit("The latest sample must update the live numeric display")
+if "updateRawTableBatch()" not in sample_body:
+    raise SystemExit("The raw table must use its bounded batch update")
 
 
 # Every-frame status callbacks must not flood the GUI event queue.

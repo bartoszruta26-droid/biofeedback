@@ -294,7 +294,7 @@ void GraphWidget::paintEvent(QPaintEvent *event)
             // Wyświetl komunikat o braku danych
 
             painter.setPen(m_textColor);
-            painter.setFont(QFont("Arial", 14));
+            painter.setFont(QFont("Arial", 8));
             painter.drawText(rect(), Qt::AlignCenter, tr("Brak danych"));
             return;
         }
@@ -658,17 +658,17 @@ void GraphWidget::drawLabels(QPainter& painter)
         QRectF area = plotArea();
         
         painter.setPen(m_textColor);
-        painter.setFont(QFont("Arial", 9));
+        painter.setFont(QFont("Arial", 7));
         
         // Tytuł
         if (!m_title.isEmpty()) {
 
             QFont titleFont = painter.font();
             titleFont.setBold(true);
-            titleFont.setPointSize(12);
+            titleFont.setPointSize(8);
             painter.setFont(titleFont);
             painter.drawText(area.left(), area.top() - 10, m_title);
-            painter.setFont(QFont("Arial", 9));
+            painter.setFont(QFont("Arial", 7));
         }
         
         // Etykieta osi Y

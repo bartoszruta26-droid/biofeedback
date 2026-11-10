@@ -36,6 +36,8 @@ if "!sample.isValid()" not in training or 'sample.unit != "N"' not in training:
     raise SystemExit("TrainingTab must reject invalid or non-mass canonical samples")
 if "if (!m_serialPort || !m_serialPort->isConnected())" not in training:
     raise SystemExit("Training must refuse to start without a connected sensor")
+if "gameReferenceForceN = 150.0" not in main:
+    raise SystemExit("All games must normalize calibrated force against the 150 N (approximately 15 kgf) full-scale input")
 if "m_sensorThreshold(30.0)" not in Path("src/games/MarioGame.cpp").read_text(encoding="utf-8"):
     raise SystemExit("Mario input threshold must match 0-100 normalized game input")
 print("Centralized game sensor ownership regression passed")

@@ -364,7 +364,7 @@ void GameEngine::paintEvent(QPaintEvent* event)
     } else {
         // Ekran startowy/końcowy
         painter.setPen(Qt::white);
-        painter.setFont(QFont("Arial", 24, QFont::Bold));
+        painter.setFont(QFont("Arial", 12, QFont::Bold));
         painter.drawText(rect(), Qt::AlignCenter, 
                         m_score > 0 ? QString("Koniec Gry!\nWynik: %1").arg(m_score) 
                                     : "Naciśnij Start aby rozpocząć");

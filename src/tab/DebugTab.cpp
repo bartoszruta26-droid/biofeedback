@@ -127,7 +127,7 @@ void DebugTab::setupUI()
     // ============================================
     m_debugTerminal = new QTextEdit(this);
     m_debugTerminal->setReadOnly(true);
-    m_debugTerminal->setFont(QFont("Courier New", 9));
+    m_debugTerminal->setFont(QFont("Courier New", 7));
     m_debugTerminal->setStyleSheet(
         "QTextEdit { "
         "    background-color: #1e1e1e; "
