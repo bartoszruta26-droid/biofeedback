@@ -194,6 +194,31 @@ if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
     raise SystemExit("TrainingTab live UI timer state is missing")
 
 
+# Training's detector must consume each frame; visible widgets and game input
+# are updated from the latest-value snapshot by a precise 60 Hz timer.
+training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
+training_header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
+drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
+drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", drain_start)
+drain_body = training_source[drain_start:drain_end]
+if "while (!m_measurementQueue.empty())" not in drain_body:
+    raise SystemExit("Training analysis FIFO must be drained in order")
+if "MaximumBatch" in drain_body or "scheduleAgain" in drain_body:
+    raise SystemExit("Training analysis must not requeue stale 128-sample batches")
+for required in (
+    "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
+    "m_liveUiTimer->setInterval(16)",
+    "m_liveUiTimer->setTimerType(Qt::PreciseTimer)",
+    "void TrainingTab::scheduleLiveUiRefresh()",
+    "void TrainingTab::refreshLiveUi()",
+    "m_lblCurrentForce->setText(QString(\"%1 N\").arg(force, 0, 'f', 2));",
+    "m_currentGame->handleSensorInput(gameInput)",
+):
+    if required not in training_source:
+        raise SystemExit(f"Missing latest-value training invariant: {required}")
+if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
+    raise SystemExit("Training live refresh timer declaration missing")
+
 # ForcePlotWidget must keep the visible-window trace in O(1)-amortized append
 # and expiry time; per-sample full-window scans and QVector front shifts add lag.
 plot_header = header
