@@ -118,6 +118,12 @@ int main(int argc, char **argv)
     REQUIRE(std::abs(arkanoidGame->ballPosition().y() - frozenArkanoidBall.y()) < 1e-6);
     REQUIRE(arkanoidGame->livesRemaining() == livesAtSensorLoss);
 
+    // Manual keyboard fallback must still move the paddle after sensor timeout.
+    const double paddleBeforeKeyboard = arkanoidGame->paddleX();
+    QKeyEvent arkanoidLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+    QApplication::sendEvent(arkanoidGame, &arkanoidLeft);
+    REQUIRE(arkanoidGame->paddleX() < paddleBeforeKeyboard);
+
     // Active playfield geometry remains finite and contained after resizing.
     arkanoidGame->handleSensorInput(50.0);
     arkanoidGame->resize(360, 260);
