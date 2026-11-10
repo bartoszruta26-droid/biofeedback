@@ -262,7 +262,7 @@ for required in (
     "m_journalAdmission.store(false",
     "m_measurementSessionGeneration.fetch_add(1",
     "sessionGeneration != m_measurementSessionGeneration.load",
-    "m_sampleJournalWriter.append(line)",
+    "m_sampleJournalWriter.appendJson(record)",
     "m_journalNextSequence.store(sequence + 1",
     "bool MeasurementTab::restoreSampleJournalIntoSession()",
     "expectedSequence != m_journalNextSequence.load",
