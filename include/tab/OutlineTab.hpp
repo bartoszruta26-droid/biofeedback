@@ -247,6 +247,8 @@ private:
     void createRehabilitationEpisode();
     void refreshRehabilitationAssessments();
     void createRehabilitationAssessment();
+    void refreshRehabilitationGoals();
+    void createRehabilitationGoal();
 
     // Główne widgety
     QVBoxLayout* m_mainLayout;
@@ -270,6 +272,15 @@ private:
     QPushButton* m_saveAssessmentButton{nullptr};
     QLabel* m_assessmentStatusLabel{nullptr};
     QTextBrowser* m_assessmentHistoryBrowser{nullptr};
+    QLineEdit* m_goalTitleEdit{nullptr};
+    QLineEdit* m_goalMetricEdit{nullptr};
+    QLineEdit* m_goalBaselineEdit{nullptr};
+    QLineEdit* m_goalTargetEdit{nullptr};
+    QLineEdit* m_goalUnitEdit{nullptr};
+    QLineEdit* m_goalTargetDateEdit{nullptr};
+    QPushButton* m_createGoalButton{nullptr};
+    QLabel* m_goalStatusLabel{nullptr};
+    QTextBrowser* m_goalHistoryBrowser{nullptr};
     QTextBrowser* m_clinicalProtocolBrowser{nullptr};
     
     // Sekcja wyboru konspektu
