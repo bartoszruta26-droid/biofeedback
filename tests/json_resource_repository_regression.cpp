@@ -129,10 +129,20 @@ int main(int argc, char** argv) {
     QJsonObject assessmentPayload{
         {QStringLiteral("patient_id"), id},
         {QStringLiteral("episode_id"), episodeId},
-        {QStringLiteral("assessment_type"), QStringLiteral("baseline")}
+        {QStringLiteral("assessment_type"), QStringLiteral("baseline")},
+        {QStringLiteral("pain_nrs"), 0},
+        {QStringLiteral("rom_degrees"), 0}
     };
     QJsonObject assessment;
     assert(restarted.create(QStringLiteral("rehabilitation-assessments"), assessmentPayload, assessment, &error));
+    assert(assessment.value(QStringLiteral("pain_nrs")).toInt(-1) == 0);
+    assert(assessment.value(QStringLiteral("rom_degrees")).toInt(-1) == 0);
+    QJsonObject invalidAssessment = assessmentPayload;
+    invalidAssessment.insert(QStringLiteral("pain_nrs"), 11);
+    QJsonObject rejectedAssessment;
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), invalidAssessment,
+                             rejectedAssessment, &error));
+    assert(error == QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_OUT_OF_RANGE"));
 
     QJsonObject goalPayload{
         {QStringLiteral("patient_id"), id},
