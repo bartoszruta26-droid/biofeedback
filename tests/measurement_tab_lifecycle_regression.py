@@ -322,7 +322,7 @@ if "Qt::PreciseTimer" not in game_engine_source:
     raise SystemExit("Game frame timer must use precise scheduling")
 if "QPainterPath tracePath;" not in source or "QPointF point(x, y);" not in source:
     raise SystemExit("Measurement trace must retain subpixel coordinates for smooth rendering")
-if "tracePath.lineTo(point);" not in source:
+if "path.lineTo(point);" not in source or "appendAt(time, interpolate(segment, time), tracePath, started)" not in source:
     raise SystemExit("Measurement trace must render the interpolated 120 Hz points")
 if "m_forcePlot->addSample(forceValue, currentTime)" not in source:
     raise SystemExit("Measurement plot must receive every acquired sample")
