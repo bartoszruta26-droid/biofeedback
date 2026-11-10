@@ -1,0 +1,83 @@
+{
+  "id": "rehab-meniscus-knee-adult-v1",
+  "name": "Rehabilitacja po uszkodzeniu łąkotki kolana",
+  "description": "Program ramowy dla dorosłych po kwalifikacji klinicznej. Rozdziela leczenie zachowawcze, okres po meniscektomii i ochronę po szyciu łąkotki.",
+  "author": "Biofeedback — protokół kliniczny",
+  "category": "Rehabilitacja ortopedyczna",
+  "estimatedDurationMinutes": 55,
+  "clinicalProtocolHtml": "<h2>Cel programu</h2><p>Kontrola wysięku i bólu, odzyskanie wyprostu i funkcjonalnego zgięcia, aktywacja czworogłowego, siła kończyny oraz kontrola jednonóż.</p><h3>Przed rozpoczęciem</h3><p>Ustal typ pęknięcia, lokalizację, stabilność, leczenie operacyjne i zalecenia dotyczące obciążania oraz zakresu ruchu. Po szyciu łąkotki obowiązują ograniczenia operatora; nie stosuj schematu po meniscektomii.</p><h3>Bezpieczeństwo</h3><p>Przerwij przy blokowaniu, gwałtownym wysięku, niemożności obciążenia, narastającym bólu, gorącym zaczerwienionym stawie, bólu/obrzęku łydki lub nowych zaburzeniach neurologicznych.</p><h3>Dawkowanie</h3><p>Rozpoczynaj od zakresu tolerowanego. Przykładowo 2–3 serie po 8–15 powtórzeń, RPE 3–5/10. Progresuj przy stabilnej technice i bez pogorszenia objawów w ciągu 24 godzin. Po naprawie łąkotki głębokie przysiady, skoki i rotacje pod obciążeniem są ograniczane przez okres gojenia, zwykle co najmniej 4 miesiące, według typu naprawy i zaleceń operatora.</p><h3>Ocena</h3><p>NPRS, KOOS/IKDC, wysięk, ROM, siła czworogłowego, chód, step-down, kontrola jednonóż i testy funkcjonalne na późnym etapie.</p>",
+  "exercises": [
+    {
+      "id": "knee-01",
+      "name": "Izometria mięśnia czworogłowego",
+      "description": "Leżenie z wyprostowanym kolanem. Napnij przód uda, dociśnij tył kolana do podłoża bez wstrzymywania oddechu. Utrzymaj 5–10 sekund. Wykonuj w dozwolonym zakresie pooperacyjnym.",
+      "durationSeconds": 120,
+      "targetRepetitions": 10,
+      "difficulty": "easy",
+      "gameId": ""
+    },
+    {
+      "id": "knee-02",
+      "name": "Ślizg pięty — kontrolowane zgięcie",
+      "description": "W leżeniu przesuń piętę w stronę pośladka tylko do zakresu dozwolonego i komfortowego. Powoli wróć. Po szyciu przestrzegaj limitu zgięcia zaleconego przez operatora.",
+      "durationSeconds": 120,
+      "targetRepetitions": 10,
+      "difficulty": "easy",
+      "gameId": ""
+    },
+    {
+      "id": "knee-03",
+      "name": "Unoszenie wyprostowanej kończyny",
+      "description": "Napnij czworogłowy, utrzymaj kolano w wyproście i unieś kończynę. Przerwij, jeśli pojawia się lag wyprostny lub ból. Nie wykonywać bez kontroli wyprostu.",
+      "durationSeconds": 150,
+      "targetRepetitions": 8,
+      "difficulty": "easy",
+      "gameId": ""
+    },
+    {
+      "id": "knee-04",
+      "name": "Most biodrowy",
+      "description": "Leżenie tyłem, stopy na podłożu. Unieś miednicę bez przeprostu lędźwi. Utrzymuj równomierne obciążenie stóp.",
+      "durationSeconds": 150,
+      "targetRepetitions": 10,
+      "difficulty": "easy",
+      "gameId": ""
+    },
+    {
+      "id": "knee-05",
+      "name": "Wstawanie z podwyższenia",
+      "description": "Wstań z wysokiego krzesła, kontrolując tor kolana nad stopą. Dostosuj wysokość i zakres do wysięku, bólu i ograniczeń pooperacyjnych.",
+      "durationSeconds": 180,
+      "targetRepetitions": 8,
+      "difficulty": "medium",
+      "gameId": ""
+    },
+    {
+      "id": "knee-06",
+      "name": "Step-up na niskim stopniu",
+      "description": "Wejdź na niski stopień, utrzymując kontrolę miednicy i kolana. Zejdź powoli. Wysokość zwiększaj dopiero po opanowaniu techniki.",
+      "durationSeconds": 180,
+      "targetRepetitions": 8,
+      "difficulty": "medium",
+      "gameId": ""
+    },
+    {
+      "id": "knee-07",
+      "name": "Równowaga jednonóż z asekuracją",
+      "description": "Stań na jednej kończynie przy stabilnym podparciu. Utrzymaj miednicę poziomo i kolano w osi stopy. Stosuj tylko wtedy, gdy obciążanie jest dozwolone.",
+      "durationSeconds": 120,
+      "targetRepetitions": 3,
+      "difficulty": "medium",
+      "gameId": ""
+    },
+    {
+      "id": "knee-08",
+      "name": "Kontrolowany step-down",
+      "description": "Z niskiego stopnia powoli dotknij piętą drugiej kończyny podłoża. Kontroluj kolano, miednicę i tempo. Ćwiczenie dla późniejszej fazy po spełnieniu kryteriów.",
+      "durationSeconds": 180,
+      "targetRepetitions": 6,
+      "difficulty": "hard",
+      "gameId": ""
+    }
+  ]
+}
