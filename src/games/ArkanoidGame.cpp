@@ -37,6 +37,9 @@ void ArkanoidGame::keyPressEvent(QKeyEvent *event){
  QWidget::keyPressEvent(event);
 }
 void ArkanoidGame::keyReleaseEvent(QKeyEvent *event){
+ // Auto-repeat release events are part of the operating system's key-repeat
+ // sequence, not a physical key-up. Ignore them to avoid intermittent stops.
+ if(event->isAutoRepeat()){event->accept();return;}
  if(event->key()==Qt::Key_Left||event->key()==Qt::Key_A){m_moveLeft=false;event->accept();return;}
  if(event->key()==Qt::Key_Right||event->key()==Qt::Key_D){m_moveRight=false;event->accept();return;}
  QWidget::keyReleaseEvent(event);
