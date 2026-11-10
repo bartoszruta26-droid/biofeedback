@@ -1405,14 +1405,18 @@ void OutlineTab::createRehabilitationAssessment()
     QJsonObject patientRecord;
     QString patientReadError;
     bool linkedIcfAssessment = false;
-    if (m_resourceRepository->get(QStringLiteral("patients"), m_currentPatientUuid,
-                                  patientRecord, &patientReadError)) {
-        const QJsonObject currentIcf = patientRecord.value(QStringLiteral("icf_assessment")).toObject();
-        const QString icfTimestamp = currentIcf.value(QStringLiteral("assessed_at")).toString().trimmed();
-        if (!icfTimestamp.isEmpty()) {
-            payload.insert(QStringLiteral("icf_assessment_ref"), icfTimestamp);
-            linkedIcfAssessment = true;
-        }
+    if (!m_resourceRepository->get(QStringLiteral("patients"), m_currentPatientUuid,
+                                   patientRecord, &patientReadError)) {
+        m_assessmentStatusLabel->setText(
+            tr("Nie można odczytać kartoteki pacjenta. Ocena nie została zapisana: %1")
+                .arg(patientReadError));
+        return;
+    }
+    const QJsonObject currentIcf = patientRecord.value(QStringLiteral("icf_assessment")).toObject();
+    const QString icfTimestamp = currentIcf.value(QStringLiteral("assessed_at")).toString().trimmed();
+    if (!icfTimestamp.isEmpty()) {
+        payload.insert(QStringLiteral("icf_assessment_ref"), icfTimestamp);
+        linkedIcfAssessment = true;
     }
 
     auto parseOptionalNumber = [this, &payload](QLineEdit* field, const QString& key,
