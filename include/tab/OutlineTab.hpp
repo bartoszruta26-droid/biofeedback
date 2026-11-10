@@ -270,6 +270,7 @@ private:
     QComboBox* m_episodeSelector{nullptr};
     QPushButton* m_createEpisodeButton{nullptr};
     QLabel* m_episodeStatusLabel{nullptr};
+    QComboBox* m_assessmentTypeCombo{nullptr};
     QLineEdit* m_assessmentPainNrsEdit{nullptr};
     QLineEdit* m_assessmentRomEdit{nullptr};
     QLineEdit* m_assessmentStrengthEdit{nullptr};
