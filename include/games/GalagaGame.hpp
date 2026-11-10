@@ -30,6 +30,7 @@ public:
     double hitProtectionRemaining() const { return m_hitCooldown; }
     double playerCenterX() const { return m_player.center().x(); }
     double normalizedForce() const { return m_force; }
+    int activeProjectileCount() const { return m_projectiles.size(); }
 
 protected:
     void initialize() override;
