@@ -17,6 +17,18 @@ if "std::thread" in source or ".detach()" in source:
 if "processSample(data)" in source:
     raise SystemExit("MeasurementTab must not ingest a sample already ingested by its adapter")
 
+# A connected sensor must remain visible on the live plot before a
+# recording session is started; preview samples must use the device clock.
+for required in (
+    "if (!m_isMeasuring) {",
+    "m_hasPreviewTimestampOrigin",
+    "m_forcePlot->addSample(previewValue",
+    "PODGLĄD NA ŻYWO",
+    "ADC — brak kalibracji",
+):
+    if required not in source and required not in header:
+        raise SystemExit(f"Missing idle live-preview invariant: {required}")
+
 if "MeasurementSerialAdapter" not in source:
     raise SystemExit("MeasurementTab must retain the shared measurement adapter")
 if "m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)" not in source:
