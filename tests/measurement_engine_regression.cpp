@@ -34,6 +34,7 @@ int main() {
     assert(grams.unit == "kg");
     assert(std::abs(grams.value - 2.5) < 1e-9);
     assert(grams.timestampUnixMs > 0);
+    assert(grams.ingestMonotonicNs > 0);
     assert(grams.sequence == 1);
 
     MeasurementInput wrappedClockInput = input;
