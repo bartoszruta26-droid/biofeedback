@@ -938,7 +938,7 @@ void MeasurementTab::setupUI()
     m_mainLayout->setSpacing(4);
     m_mainLayout->setContentsMargins(6, 6, 6, 6);
 
-    // Main workspace: the measurement/analysis area gets 75% of the width;
+    // Main workspace: measurement and analysis use 89% of the width;
     // configuration and file actions remain in a compact right-hand column.
     auto* workspaceSplitter = new QSplitter(Qt::Horizontal, this);
     workspaceSplitter->setChildrenCollapsible(false);
