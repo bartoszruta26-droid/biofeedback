@@ -26,6 +26,7 @@
 #include <cmath>
 #include <limits>
 #include <utility>
+#include <limits>
 #include "games/PongGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
@@ -286,7 +287,12 @@ TrainingTab::TrainingTab(QWidget *parent)
     , m_peakForceInRep(0.0)
     , m_serialPort(nullptr)
     , m_measurementEngine(nullptr)
+    , m_liveUiTimer(new QTimer(this))
 {
+    m_liveUiTimer->setSingleShot(true);
+    m_liveUiTimer->setTimerType(Qt::PreciseTimer);
+    m_liveUiTimer->setInterval(16);
+    connect(m_liveUiTimer, &QTimer::timeout, this, &TrainingTab::refreshLiveUi);
     setupUI();
 }
 
@@ -1328,6 +1334,38 @@ void TrainingTab::drainMeasurementSamples()
         onMeasurementSample(sample);
 }
 
+void TrainingTab::scheduleLiveUiRefresh()
+{
+    if (m_liveUiTimer && !m_liveUiTimer->isActive())
+        m_liveUiTimer->start();
+}
+
+void TrainingTab::refreshLiveUi()
+{
+    if (m_pendingUiSamples == 0 || !m_stateMachine.running())
+        return;
+
+    m_pendingUiSamples = 0;
+    const double force = m_currentForce;
+    const double targetForce = (m_currentExerciseIndex >= 0 &&
+                                m_currentExerciseIndex < m_exercisePlan.size())
+        ? m_exercisePlan[m_currentExerciseIndex].targetForce : 0.0;
+
+    // A GUI frame consumes the newest state only. The repetition detector
+    // still receives every acquired sample in onMeasurementSample().
+    m_progressWidget->setCurrentForce(force);
+    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
+    const int barValue = targetForce > 0.0
+        ? static_cast<int>((force / targetForce) * 100.0) : 0;
+    m_forceBar->setValue(qBound(0, barValue, 100));
+
+    if (m_currentGame && m_currentGame->isRunning() && !m_currentGame->isPaused()) {
+        const double gameInput = targetForce > 0.0
+            ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
+        m_currentGame->handleSensorInput(gameInput);
+    }
+}
+
 void TrainingTab::onMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
@@ -1348,27 +1386,12 @@ void TrainingTab::onMeasurementSample(
         m_repetitionDetector.process(sample.deviceTimestampMs, 0.0, false, discarded);
         return;
     }
+    // Preserve every sample for analysis; coalesce only presentation and
+    // game-control work onto a 60 Hz newest-value refresh.
     m_currentForce = force;
-
-    // Update the lightweight force trace model for every acquired sample;
-    // QWidget::update() coalesces paints to the display refresh cadence.
-    m_progressWidget->setCurrentForce(force);
-
-    // Every real acquisition sample reaches the training display and game.
-    // QWidget::update() coalesces paints; throttling by host-clock time here
-    // used to discard later samples when a queued batch was drained at once.
-    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
-
-    const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
-    const int barValue = targetForce > 0.0
-        ? static_cast<int>((force / targetForce) * 100.0) : 0;
-    m_forceBar->setValue(qBound(0, barValue, 100));
-
-    if (m_currentGame && m_currentGame->isRunning()) {
-        const double gameInput = targetForce > 0.0
-            ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
-        m_currentGame->handleSensorInput(gameInput);
-    }
+    if (m_pendingUiSamples < std::numeric_limits<quint64>::max())
+        ++m_pendingUiSamples;
+    scheduleLiveUiRefresh();
 
     biofeedback::training::RepetitionRecord repetition;
     if (m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition))
