@@ -17,7 +17,6 @@ namespace games {
 namespace {
 constexpr double kSensorTimeoutMs = 500.0;
 constexpr double kForceSmoothingSeconds = 0.065;
-constexpr double kPaddleResponseSeconds = 0.025;
 constexpr double kServeDelaySeconds = 0.85;
 constexpr double kMaximumDelta = 0.1;
 constexpr double kPhysicsStep = 1.0 / 120.0;
@@ -319,7 +318,7 @@ void ArkanoidGame::updatePaddle(double deltaTime)
         static_cast<double>(width()) - 12.0 - m_paddle.width());
     const double desiredX = 12.0 + m_currentForce *
         qMax(0.0, static_cast<double>(width()) - 24.0 - m_paddle.width());
-    const double alpha = 1.0 - std::exp(-deltaTime / kPaddleResponseSeconds);
+    const double alpha = 1.0 - std::exp(-deltaTime / 0.025);
     m_paddle.moveLeft(qBound(12.0,
         m_paddle.left() + (desiredX - m_paddle.left()) * alpha, maxX));
     if (!m_ballLaunched)
