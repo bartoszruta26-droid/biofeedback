@@ -100,6 +100,7 @@ for required in (
     "syncParentDirectory(m_path, error)",
     "::fsync(directoryFd)",
     "flushDurably(file, error)",
+    "pendingSinceSync >= 8",
     "::fsync(file.handle())",
 ):
     if required not in writer_source:
