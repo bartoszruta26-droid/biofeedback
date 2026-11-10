@@ -21,6 +21,9 @@
 #include <QProgressBar>
 #include <QSplitter>
 #include <QTextBrowser>
+#include <QLineEdit>
+#include <QSignalBlocker>
+#include "data/JsonResourceRepository.hpp"
 #include <memory>
 #include "sensor/SerialCommunication.hpp"
 #include "measurement/MeasurementEngine.hpp"
@@ -240,6 +243,8 @@ private:
     void finishCurrentExercise();
     void moveToNextExercise();
     void endSession();
+    void refreshRehabilitationEpisodes();
+    void createRehabilitationEpisode();
 
     // Główne widgety
     QVBoxLayout* m_mainLayout;
@@ -248,6 +253,13 @@ private:
     gui::GraphWidget* m_forceGraph{nullptr};
     QLabel* m_patientContextLabel{nullptr};
     QString m_currentPatientUuid;
+    QString m_currentEpisodeUuid;
+    std::shared_ptr<biofeedback::data::JsonResourceRepository> m_resourceRepository;
+    QLineEdit* m_episodeDiagnosisEdit{nullptr};
+    QComboBox* m_episodePathwayCombo{nullptr};
+    QComboBox* m_episodeSelector{nullptr};
+    QPushButton* m_createEpisodeButton{nullptr};
+    QLabel* m_episodeStatusLabel{nullptr};
     QTextBrowser* m_clinicalProtocolBrowser{nullptr};
     
     // Sekcja wyboru konspektu
@@ -348,6 +360,7 @@ public:
     void setMeasurementEngine(std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine);
     // UUID from the canonical shared patient repository; never a PESEL.
     void setCurrentPatientContext(const QString& patientUuid, const QString& displayName);
+    void setResourceRepository(std::shared_ptr<biofeedback::data::JsonResourceRepository> repository);
     QString currentPatientUuid() const { return m_currentPatientUuid; }
     
     /**
