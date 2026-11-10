@@ -686,7 +686,7 @@ bool MeasurementTab::commitMeasurementSample(
     record["quality"] = quality;
 
     const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
-    if (!m_sampleJournalWriter.appendDurably(line)) {
+    if (!m_sampleJournalWriter.append(line)) {
         m_sampleJournalFailed = true;
         m_journalAdmission.store(false, std::memory_order_release);
         QMetaObject::invokeMethod(this, [this] {
@@ -1630,7 +1630,8 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     recorded.source = "desktop-hx711";
     recorded.quality = "valid";
     m_recordedSamples.append(recorded);
-    // The acquisition CommitHook has already durably journaled this sample.
+    // The acquisition CommitHook has admitted this sample to the bounded journal queue;
+    // the writer batches fsync operations to avoid blocking the 80 SPS reader.
 
     // Keep the acquisition path free of per-sample widget mutations.
     // The table is refreshed in updateRawTableBatch() at a bounded 10 Hz.
