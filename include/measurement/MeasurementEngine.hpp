@@ -64,8 +64,9 @@ public:
     using SampleCallback = std::function<void(const MeasurementSample&)>;
     using CallbackToken = std::uint64_t;
     // A commit hook must durably accept a sample before it enters history or
-    // reaches subscribers. It runs under the engine mutex and must not re-enter
-    // this engine. Returning false (or throwing) rejects the sample.
+    // reaches subscribers. It runs outside the state mutex but within the
+    // serialized ingest gate; it must not call ingest recursively. Returning
+    // false (or throwing) rejects the sample.
     using CommitHook = std::function<bool(const MeasurementSample&)>;
 
     explicit MeasurementEngine(MeasurementEngineConfig config = {});
@@ -84,6 +85,8 @@ public:
 private:
     MeasurementEngineConfig m_config;
     mutable std::mutex m_mutex;
+    // Preserves sequence/commit order while keeping slow persistence outside m_mutex.
+    std::mutex m_ingestMutex;
     std::deque<MeasurementSample> m_history;
     struct CallbackEntry {
         explicit CallbackEntry(SampleCallback value) : callback(std::move(value)) {}
