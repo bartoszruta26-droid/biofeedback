@@ -1467,8 +1467,8 @@ void OutlineTab::createRehabilitationAssessment()
          QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
     };
 
-    // Link the rehabilitation assessment to the exact immutable ICF assessment version.
-    // Only its UUID is stored; the ICF response set stays in the patient chart.
+    // Link the rehabilitation assessment to the exact ICF assessment version.
+    // New records use UUID; legacy assessments without UUID retain timestamp compatibility.
     QJsonObject patientRecord;
     QString patientReadError;
     bool linkedIcfAssessment = false;
@@ -1480,9 +1480,11 @@ void OutlineTab::createRehabilitationAssessment()
         return;
     }
     const QJsonObject currentIcf = patientRecord.value(QStringLiteral("icf_assessment")).toObject();
-    const QString icfAssessmentId = currentIcf.value(QStringLiteral("id")).toString().trimmed();
-    if (!icfAssessmentId.isEmpty()) {
-        payload.insert(QStringLiteral("icf_assessment_ref"), icfAssessmentId);
+    QString icfAssessmentReference = currentIcf.value(QStringLiteral("id")).toString().trimmed();
+    if (icfAssessmentReference.isEmpty())
+        icfAssessmentReference = currentIcf.value(QStringLiteral("assessed_at")).toString().trimmed();
+    if (!icfAssessmentReference.isEmpty()) {
+        payload.insert(QStringLiteral("icf_assessment_ref"), icfAssessmentReference);
         linkedIcfAssessment = true;
     }
 
