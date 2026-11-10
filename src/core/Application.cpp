@@ -438,6 +438,29 @@ void Application::setupConnections()
         return false;
     };
 
+    // Route the selected patient chart to Outline using its canonical repository UUID.
+    // PESEL is used only for lookup and is never stored in rehabilitation records.
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            this, [this, findPatientByPesel](const QString& pesel, const QString&) {
+                if (!m_outlineTab) return;
+                if (pesel.isEmpty()) {
+                    m_outlineTab->setCurrentPatientContext(QString(), QString());
+                    return;
+                }
+                QJsonObject patient;
+                QString lookupError;
+                if (!findPatientByPesel(pesel, patient, &lookupError)) {
+                    m_outlineTab->setCurrentPatientContext(QString(), QString());
+                    if (!lookupError.isEmpty() && m_logger)
+                        m_logger->warning("Outline patient context lookup failed.");
+                    return;
+                }
+                m_outlineTab->setCurrentPatientContext(
+                    patient.value(QStringLiteral("id")).toString(),
+                    patient.value(QStringLiteral("firstName")).toString() + QStringLiteral(" ") +
+                    patient.value(QStringLiteral("lastName")).toString());
+            });
+
     if (m_mainWindow && m_mainWindow->trainingTab()) {
         tab::TrainingTab* trainingTab = m_mainWindow->trainingTab();
         connect(trainingTab, &tab::TrainingTab::trainingStopped,
