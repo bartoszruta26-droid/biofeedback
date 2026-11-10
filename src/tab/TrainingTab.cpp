@@ -1308,10 +1308,8 @@ void TrainingTab::enqueueMeasurementSample(
 
 void TrainingTab::drainMeasurementSamples()
 {
-    // Training analysis is order-dependent: process every acquired sample in
-    // sequence, but do not yield one Qt event per 128 samples. The acquisition
-    // producer only schedules the first drain; this consumer takes the FIFO
-    // and finishes the backlog in one bounded-by-queue operation.
+    // Training analysis is order-dependent. Detach the ordered FIFO once per
+    // Qt event so a backlog does not require repeated event-loop turns.
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
     {
