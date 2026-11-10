@@ -91,10 +91,30 @@ int main(int argc, char** argv) {
     assert(!restarted.create(QStringLiteral("patients"), duplicatePatient, rejectedDuplicate, &error));
     assert(error == QStringLiteral("DUPLICATE_PATIENT_REFERENCE"));
 
+    const QString currentIcfTimestamp = QStringLiteral("2026-11-10T10:00:00.000Z");
+    const QString historicalIcfTimestamp = QStringLiteral("2026-10-10T10:00:00.000Z");
+    const QJsonObject currentIcfAssessment{
+        {QStringLiteral("schema"), QStringLiteral("icf-functional-screening-v1")},
+        {QStringLiteral("assessed_at"), currentIcfTimestamp},
+        {QStringLiteral("responses"), QJsonObject{
+            {QStringLiteral("b280"), QJsonObject{{QStringLiteral("qualifier"), 2}}}
+        }}
+    };
+    const QJsonObject historicalIcfAssessment{
+        {QStringLiteral("schema"), QStringLiteral("icf-functional-screening-v1")},
+        {QStringLiteral("assessed_at"), historicalIcfTimestamp},
+        {QStringLiteral("responses"), QJsonObject{
+            {QStringLiteral("d450"), QJsonObject{{QStringLiteral("performance"), 1},
+                                                  {QStringLiteral("capacity"), 2}}}
+        }}
+    };
     QJsonObject updatePayload{
         {QStringLiteral("firstName"), QStringLiteral("Updated")},
         {QStringLiteral("lastName"), QStringLiteral("Patient")},
-        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-001")}
+        {QStringLiteral("pesel"), QStringLiteral("TEST-PATIENT-001")},
+        {QStringLiteral("icf_assessment"), currentIcfAssessment},
+        {QStringLiteral("icf_assessment_history"), QJsonArray{historicalIcfAssessment,
+                                                               currentIcfAssessment}}
     };
     QJsonObject updated;
     assert(restarted.update(QStringLiteral("patients"), id, 1, updatePayload, updated, &error));
@@ -130,6 +150,7 @@ int main(int argc, char** argv) {
         {QStringLiteral("patient_id"), id},
         {QStringLiteral("episode_id"), episodeId},
         {QStringLiteral("assessment_type"), QStringLiteral("baseline")},
+        {QStringLiteral("icf_assessment_ref"), currentIcfTimestamp},
         {QStringLiteral("pain_nrs"), 0},
         {QStringLiteral("rom_degrees"), 0}
     };
@@ -137,6 +158,20 @@ int main(int argc, char** argv) {
     assert(restarted.create(QStringLiteral("rehabilitation-assessments"), assessmentPayload, assessment, &error));
     assert(assessment.value(QStringLiteral("pain_nrs")).toInt(-1) == 0);
     assert(assessment.value(QStringLiteral("rom_degrees")).toInt(-1) == 0);
+    assert(assessment.value(QStringLiteral("icf_assessment_ref")).toString() == currentIcfTimestamp);
+
+    QJsonObject historicalAssessmentPayload = assessmentPayload;
+    historicalAssessmentPayload.insert(QStringLiteral("icf_assessment_ref"), historicalIcfTimestamp);
+    QJsonObject historicalLinkedAssessment;
+    assert(restarted.create(QStringLiteral("rehabilitation-assessments"), historicalAssessmentPayload,
+                            historicalLinkedAssessment, &error));
+    QJsonObject invalidIcfReferencePayload = assessmentPayload;
+    invalidIcfReferencePayload.insert(QStringLiteral("icf_assessment_ref"),
+                                      QStringLiteral("2025-01-01T00:00:00.000Z"));
+    QJsonObject rejectedIcfReference;
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), invalidIcfReferencePayload,
+                             rejectedIcfReference, &error));
+    assert(error == QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
     QJsonObject invalidAssessment = assessmentPayload;
     invalidAssessment.insert(QStringLiteral("pain_nrs"), 11);
     QJsonObject rejectedAssessment;
@@ -274,6 +309,8 @@ int main(int argc, char** argv) {
                             completedRehabSession.value(QStringLiteral("version")).toInt(), &error));
     assert(restarted.remove(QStringLiteral("rehabilitation-goals"),
                             goal.value(QStringLiteral("id")).toString(), 1, &error));
+    assert(restarted.remove(QStringLiteral("rehabilitation-assessments"),
+                            historicalLinkedAssessment.value(QStringLiteral("id")).toString(), 1, &error));
     assert(restarted.remove(QStringLiteral("rehabilitation-assessments"),
                             assessment.value(QStringLiteral("id")).toString(), 1, &error));
     assert(restarted.remove(QStringLiteral("rehabilitation-episodes"), episodeId, 1, &error));
