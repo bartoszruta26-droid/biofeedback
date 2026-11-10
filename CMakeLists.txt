@@ -108,6 +108,14 @@ add_executable(training_session_clock_regression tests/training_session_clock_re
 target_include_directories(training_session_clock_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
 add_test(NAME training_session_clock_regression COMMAND training_session_clock_regression)
 
+# Deterministic, safety-first rehabilitation progression decision rules.
+add_executable(rehabilitation_progression_rules_regression
+    tests/rehabilitation_progression_rules_regression.cpp)
+target_include_directories(rehabilitation_progression_rules_regression PRIVATE
+    ${CMAKE_SOURCE_DIR}/include)
+add_test(NAME rehabilitation_progression_rules_regression
+    COMMAND rehabilitation_progression_rules_regression)
+
 add_executable(measurement_engine_regression tests/measurement_engine_regression.cpp)
 target_link_libraries(measurement_engine_regression PRIVATE biofeedback_measurement Threads::Threads)
 add_test(NAME measurement_engine_regression COMMAND measurement_engine_regression)
