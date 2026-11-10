@@ -81,16 +81,12 @@ private:
     bool m_automaticDifficulty;
     double m_sessionSeconds;
     double m_timeInTarget;
-    double m_difficultyCheckSeconds;
     double m_accuracyWindowSeconds;
     double m_accuracyWindowHitSeconds;
     double m_bestStreakSeconds;
 
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     bool m_ownSerial;
-
-    const double m_minForce = 0.0;
-    const double m_maxForce = 100.0; // TrainingTab sends 0..100% of target force.
 
     void calculateTargetY(double x);
     QColor getDifficultyColor() const;
