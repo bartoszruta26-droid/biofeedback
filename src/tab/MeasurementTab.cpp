@@ -968,8 +968,8 @@ void MeasurementTab::setupUI()
     optionsScroll->setWidget(optionsPanel);
     workspaceSplitter->addWidget(visualScroll);
     workspaceSplitter->addWidget(optionsScroll);
-    workspaceSplitter->setStretchFactor(0, 89);
-    workspaceSplitter->setStretchFactor(1, 11);
+    workspaceSplitter->setStretchFactor(0, 1);
+    workspaceSplitter->setStretchFactor(1, 1);
     workspaceSplitter->setSizes({89, 11});
     // The right-hand options sidebar is capped at 11% of the workspace.
     // It remains user-resizable toward a narrower width on large displays.
