@@ -11,6 +11,7 @@
 #include <QUuid>
 
 #include <limits>
+#include <cmath>
 #include <utility>
 
 namespace biofeedback::data {
@@ -394,6 +395,56 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
                 setError(error, QStringLiteral("REHABILITATION_SESSION_CONTEXT_MISMATCH"));
                 return false;
             }
+        }
+    }
+
+    if (collection == QStringLiteral("rehabilitation-assessments")) {
+        const QStringList numericFields = {
+            QStringLiteral("pain_nrs"), QStringLiteral("rom_degrees"),
+            QStringLiteral("strength_mrc"), QStringLiteral("swelling_cm")
+        };
+        bool hasClinicalValue = false;
+        for (const QString& field : numericFields) {
+            if (!payload.contains(field)) continue;
+            hasClinicalValue = true;
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble())) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_ASSESSMENT_VALUE"));
+                return false;
+            }
+            const double number = value.toDouble();
+            double minimum = 0.0;
+            double maximum = 0.0;
+            bool integerOnly = false;
+            if (field == QStringLiteral("pain_nrs")) {
+                maximum = 10.0;
+                integerOnly = true;
+            } else if (field == QStringLiteral("rom_degrees")) {
+                maximum = 360.0;
+            } else if (field == QStringLiteral("strength_mrc")) {
+                maximum = 5.0;
+                integerOnly = true;
+            } else {
+                maximum = 100.0;
+            }
+            if (number < minimum || number > maximum ||
+                (integerOnly && std::floor(number) != number)) {
+                setError(error, QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_OUT_OF_RANGE"));
+                return false;
+            }
+        }
+        const QJsonValue functionalTest = payload.value(QStringLiteral("functional_test"));
+        if (!functionalTest.isUndefined()) {
+            if (!functionalTest.isString() || functionalTest.toString().trimmed().isEmpty() ||
+                functionalTest.toString().size() > 500) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_FUNCTIONAL_TEST"));
+                return false;
+            }
+            hasClinicalValue = true;
+        }
+        if (!hasClinicalValue) {
+            setError(error, QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_REQUIRED"));
+            return false;
         }
     }
 
