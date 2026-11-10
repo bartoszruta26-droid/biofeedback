@@ -292,3 +292,8 @@ Ocena zawiera `patient_id`, `episode_id`, typ `baseline` i czas UTC. Historia je
 ## Aktualizacja interfejsu — cele terapeutyczne
 
 W `OutlineTab` dodano formularz trwałego zapisu celów do kolekcji `rehabilitation-goals`. Każdy cel jest przypisany do UUID pacjenta i epizodu oraz zawiera nazwę celu funkcjonalnego, wskaźnik/metodę pomiaru, wartość początkową, wartość docelową, jednostkę, status i opcjonalny termin. Termin jest walidowany jako rzeczywista data ISO 8601 `RRRR-MM-DD`. Wartości liczbowe muszą być skończone; repozytorium ponownie waliduje wymagane pola i datę, niezależnie od interfejsu. Lista celów jest filtrowana według bieżącego pacjenta i epizodu. Obecny etap umożliwia zapis i przegląd celów; nie oblicza automatycznie ich realizacji ani nie zmienia zaleceń ćwiczeń.
+
+
+## Aktualizacja interfejsu — przebieg sesji i kontrola po 24 godzinach
+
+W `OutlineTab` dodano trwały cykl sesji rehabilitacyjnej w kolekcji `rehabilitation-sessions`. Rozpoczęcie sesji wymaga wpisania bólu przed sesją w skali NRS 0–10. Zakończenie zapisuje ból po sesji, czas zakończenia i stan `awaiting_24h`. Po kontroli pacjenta zapisuje się `pain_at_24h_nrs`, czas kontroli i stan `completed`. Otwarta sesja jest odtwarzana po ponownym wybraniu epizodu, ponieważ jej stan jest pobierany z repozytorium. Repozytorium waliduje zakresy wszystkich trzech wartości NRS i dopuszczalne stany sesji. Ten mechanizm zapisuje ból na poziomie całej sesji; rejestrowanie bólu dla poszczególnych ćwiczeń i serii pozostaje osobnym, kolejnym etapem.
