@@ -145,6 +145,33 @@ int main(int argc, char **argv)
     for (int frame = 0; frame < 60; ++frame)
         sinusGame->update(sinusDt);
     REQUIRE(sinusGame->getScore() == scoreAfterSignalTimeout);
+
+    // Calibration maps the configured physical input interval to 0..100%.
+    sinusGame->setForceCalibration(20.0, 80.0);
+    sinusGame->handleSensorInput(50.0);
+    REQUIRE(std::abs(sinusGame->normalizedForce() - 0.5) < 1e-9);
+    sinusGame->setForceCalibration(80.0, 20.0); // Invalid ranges must be ignored.
+    REQUIRE(std::abs(sinusGame->forceCalibrationMinimum() - 20.0) < 1e-9);
+    REQUIRE(std::abs(sinusGame->forceCalibrationMaximum() - 80.0) < 1e-9);
+
+    sinusGame->setWaveformMode(1);
+    REQUIRE(sinusGame->waveformMode() == 1);
+    sinusGame->setWaveformMode(2);
+    REQUIRE(sinusGame->waveformMode() == 2);
+    sinusGame->setWaveformMode(99);
+    REQUIRE(sinusGame->waveformMode() == 2); // Mode selection is bounded.
+
+    const int scoreBeforeControls = sinusGame->getScore();
+    sinusGame->setDifficultyLevel(3);
+    REQUIRE(sinusGame->getDifficultyLevel() == 3);
+    REQUIRE(sinusGame->getScore() == scoreBeforeControls); // Difficulty changes preserve progress.
+    QKeyEvent sinusEasier(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
+    QApplication::sendEvent(sinusGame, &sinusEasier);
+    REQUIRE(sinusGame->getDifficultyLevel() == 2);
+    QKeyEvent sinusAuto(QEvent::KeyPress, Qt::Key_A, Qt::NoModifier);
+    QApplication::sendEvent(sinusGame, &sinusAuto);
+    REQUIRE(sinusGame->automaticDifficulty());
+    sinusGame->setAutomaticDifficulty(false);
     sinusGame->stop();
 
     std::unique_ptr<games::GameEngine> flappy(games::createGame(QStringLiteral("flappy")));
