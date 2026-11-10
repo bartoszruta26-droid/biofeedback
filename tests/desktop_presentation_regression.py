@@ -17,6 +17,12 @@ assert 'icf-functional-screening-v1' in patient
 assert '"b280"' in patient and '"b710"' in patient and '"b730"' in patient
 assert '"d410"' in patient and '"d450"' in patient and '"d850"' in patient
 assert '"e310"' in patient and '"e580"' in patient
+assert '"s730"' in patient and '"s750"' in patient and '"s760"' in patient and '"s770"' in patient
+assert '"Nie oceniono"' in patient
+assert '"-8 — bariera, stopień nieokreślony"' in patient
+assert '"+8 — ułatwiacz, stopień nieokreślony"' in patient
+assert 'const QList<int> values = {-99, 0, -1, -2, -3, -4, 1, 2, 3, 4, -8, 8, 9}' in patient
+
 assert 'currentData().toInt()' in patient
 assert 'patientIcfAssessmentChanged' in patient
 assert 'patientIcfAssessmentChanged' in application
