@@ -142,6 +142,39 @@ void OutlineTab::setupUI()
     m_patientContextLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     m_leftLayout->addWidget(m_patientContextLabel);
 
+    auto* episodeGroup = new QGroupBox(tr("Epizod rehabilitacji"), visualPanel);
+    auto* episodeLayout = new QVBoxLayout(episodeGroup);
+    m_episodeSelector = new QComboBox(episodeGroup);
+    m_episodeSelector->setObjectName(QStringLiteral("rehabilitationEpisodeSelector"));
+    m_episodeDiagnosisEdit = new QLineEdit(episodeGroup);
+    m_episodeDiagnosisEdit->setPlaceholderText(tr("Rozpoznanie / problem kliniczny"));
+    m_episodePathwayCombo = new QComboBox(episodeGroup);
+    m_episodePathwayCombo->addItem(tr("Postępowanie zachowawcze"), QStringLiteral("conservative"));
+    m_episodePathwayCombo->addItem(tr("Po meniscektomii"), QStringLiteral("post_meniscectomy"));
+    m_episodePathwayCombo->addItem(tr("Po naprawie / szyciu"), QStringLiteral("post_repair"));
+    m_episodePathwayCombo->addItem(tr("Inna ścieżka"), QStringLiteral("other"));
+    m_createEpisodeButton = new QPushButton(tr("Utwórz epizod"), episodeGroup);
+    m_episodeStatusLabel = new QLabel(tr("Wybierz pacjenta, aby zarządzać epizodami."), episodeGroup);
+    m_episodeStatusLabel->setWordWrap(true);
+    episodeLayout->addWidget(m_episodeSelector);
+    episodeLayout->addWidget(m_episodeDiagnosisEdit);
+    episodeLayout->addWidget(m_episodePathwayCombo);
+    episodeLayout->addWidget(m_createEpisodeButton);
+    episodeLayout->addWidget(m_episodeStatusLabel);
+    m_leftLayout->addWidget(episodeGroup);
+
+    connect(m_episodeSelector, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this](int index) {
+                m_currentEpisodeUuid = index >= 0
+                    ? m_episodeSelector->itemData(index).toString() : QString();
+            });
+    connect(m_createEpisodeButton, &QPushButton::clicked,
+            this, &OutlineTab::createRehabilitationEpisode);
+    m_episodeSelector->setEnabled(false);
+    m_episodeDiagnosisEdit->setEnabled(false);
+    m_episodePathwayCombo->setEnabled(false);
+    m_createEpisodeButton->setEnabled(false);
+
     setupOutlineSelector();
     setupExerciseView();
     setupControlPanel();
@@ -1008,12 +1041,105 @@ void OutlineTab::setCurrentPatientContext(const QString& patientUuid, const QStr
     if (m_currentPatientUuid.isEmpty()) {
         if (m_patientContextLabel)
             m_patientContextLabel->setText(tr("Pacjent: nie wybrano"));
+        m_currentEpisodeUuid.clear();
+        refreshRehabilitationEpisodes();
         return;
     }
     const QString safeName = displayName.trimmed().isEmpty()
         ? tr("Pacjent bez nazwy") : displayName.trimmed();
     if (m_patientContextLabel)
         m_patientContextLabel->setText(tr("Pacjent: %1").arg(safeName));
+    refreshRehabilitationEpisodes();
+}
+
+void OutlineTab::setResourceRepository(
+    std::shared_ptr<biofeedback::data::JsonResourceRepository> repository)
+{
+    m_resourceRepository = std::move(repository);
+    refreshRehabilitationEpisodes();
+}
+
+void OutlineTab::refreshRehabilitationEpisodes()
+{
+    if (!m_episodeSelector) return;
+    const QSignalBlocker blocker(m_episodeSelector);
+    m_episodeSelector->clear();
+    m_currentEpisodeUuid.clear();
+    const bool canUseRepository = m_resourceRepository && !m_currentPatientUuid.isEmpty();
+    m_episodeSelector->setEnabled(canUseRepository);
+    m_episodeDiagnosisEdit->setEnabled(canUseRepository);
+    m_episodePathwayCombo->setEnabled(canUseRepository);
+    m_createEpisodeButton->setEnabled(canUseRepository);
+    if (!canUseRepository) {
+        if (m_episodeStatusLabel)
+            m_episodeStatusLabel->setText(tr("Wybierz pacjenta, aby zarządzać epizodami."));
+        return;
+    }
+    QString error;
+    const QJsonArray episodes = m_resourceRepository->list(
+        QStringLiteral("rehabilitation-episodes"), &error);
+    if (!error.isEmpty()) {
+        m_episodeStatusLabel->setText(tr("Nie udało się odczytać epizodów rehabilitacji."));
+        m_episodeSelector->setEnabled(false);
+        m_createEpisodeButton->setEnabled(false);
+        return;
+    }
+    for (const QJsonValue& value : episodes) {
+        if (!value.isObject()) continue;
+        const QJsonObject episode = value.toObject();
+        if (episode.value(QStringLiteral("patient_id")).toString().compare(
+                m_currentPatientUuid, Qt::CaseInsensitive) != 0) continue;
+        const QString diagnosis = episode.value(QStringLiteral("diagnosis_code")).toString();
+        const QString pathway = episode.value(QStringLiteral("care_pathway")).toString();
+        const QString label = diagnosis.isEmpty() ? pathway : diagnosis + QStringLiteral(" — ") + pathway;
+        m_episodeSelector->addItem(label, episode.value(QStringLiteral("id")).toString());
+    }
+    if (m_episodeSelector->count() > 0) {
+        m_episodeSelector->setCurrentIndex(0);
+        m_currentEpisodeUuid = m_episodeSelector->currentData().toString();
+        m_episodeStatusLabel->setText(tr("Wybrano istniejący epizod. Możesz utworzyć kolejny."));
+    } else {
+        m_episodeStatusLabel->setText(tr("Brak epizodów. Wprowadź rozpoznanie i utwórz epizod."));
+    }
+}
+
+void OutlineTab::createRehabilitationEpisode()
+{
+    if (!m_resourceRepository || m_currentPatientUuid.isEmpty()) {
+        QMessageBox::warning(this, tr("Epizod rehabilitacji"),
+                             tr("Najpierw wybierz pacjenta."));
+        return;
+    }
+    const QString diagnosis = m_episodeDiagnosisEdit->text().trimmed();
+    if (diagnosis.isEmpty()) {
+        QMessageBox::warning(this, tr("Epizod rehabilitacji"),
+                             tr("Wprowadź rozpoznanie lub problem kliniczny."));
+        m_episodeDiagnosisEdit->setFocus();
+        return;
+    }
+    const QJsonObject payload{
+        {QStringLiteral("patient_id"), m_currentPatientUuid},
+        {QStringLiteral("diagnosis_code"), diagnosis},
+        {QStringLiteral("care_pathway"), m_episodePathwayCombo->currentData().toString()},
+        {QStringLiteral("status"), QStringLiteral("active")}
+    };
+    QJsonObject created;
+    QString error;
+    if (!m_resourceRepository->create(QStringLiteral("rehabilitation-episodes"),
+                                      payload, created, &error)) {
+        QMessageBox::critical(this, tr("Epizod rehabilitacji"),
+                              tr("Nie udało się zapisać epizodu. Kod błędu: %1").arg(error));
+        return;
+    }
+    m_episodeDiagnosisEdit->clear();
+    refreshRehabilitationEpisodes();
+    const QString createdId = created.value(QStringLiteral("id")).toString();
+    const int index = m_episodeSelector->findData(createdId);
+    if (index >= 0) {
+        m_episodeSelector->setCurrentIndex(index);
+        m_currentEpisodeUuid = createdId;
+    }
+    m_episodeStatusLabel->setText(tr("Epizod zapisany w repozytorium."));
 }
 
 void OutlineTab::setMeasurementEngine(
