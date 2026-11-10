@@ -233,7 +233,7 @@ if "MaximumBatch = 16" not in drain_body or "scheduleAgain" not in drain_body:
     raise SystemExit("Training analysis must preserve bounded FIFO batches")
 for required in (
     "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
-    "m_liveUiTimer->setInterval(16)",
+    "m_liveUiTimer->setInterval(8)",
     "m_liveUiTimer->setTimerType(Qt::PreciseTimer)",
     "void TrainingTab::scheduleLiveUiRefresh()",
     "void TrainingTab::refreshLiveUi()",
