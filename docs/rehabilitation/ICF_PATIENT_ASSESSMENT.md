@@ -4,7 +4,7 @@
 
 Karta pacjenta udostępnia formularz „Ocena funkcjonalna ICF”. Jest to ustrukturyzowany wywiad przesiewowo-opisowy oparty na wybranych domenach Międzynarodowej Klasyfikacji Funkcjonowania, Niepełnosprawności i Zdrowia (ICF). Nie jest to pełny, standaryzowany kwestionariusz ani kompletny ICF Core Set.
 
-Ocena odnosi się domyślnie do typowego funkcjonowania w ostatnich 30 dniach. Należy uwzględniać perspektywę pacjenta, jego środowisko, zasoby i cele.
+Ocena odnosi się domyślnie do typowego funkcjonowania w ostatnich 30 dniach. Należy uwzględniać perspektywę pacjenta, jego środowisko, zasoby i cele. Formularz zawiera bezpośrednie pytania wywiadu. Kategoria „Nie oceniono” pozostaje stanem roboczym, a nie kwalifikatorem ICF.
 
 ## Zakres domen
 
@@ -17,6 +17,13 @@ Ocena odnosi się domyślnie do typowego funkcjonowania w ostatnich 30 dniach. N
 - b710 — ruchomość stawów
 - b730 — siła mięśni
 - b455 — tolerancja wysiłku i wydolność
+
+### Struktury ciała — kody s
+
+- s730 — struktura kończyny górnej
+- s750 — struktura kończyny dolnej
+- s760 — struktura tułowia
+- s770 — dodatkowe struktury układu mięśniowo-szkieletowego
 
 ### Aktywność i uczestniczenie — kody d
 
@@ -59,11 +66,14 @@ Dla funkcji organizmu oraz aktywności i uczestniczenia:
 
 Dla czynników środowiskowych:
 
-- 0 — czynnik neutralny
+- 0 — brak bariery i ułatwienia
 - -1 do -4 — bariera o narastającym nasileniu
 - +1 do +4 — ułatwiacz o narastającym nasileniu
-- 8 — nieokreślony
+- -8 — wiadomo, że czynnik jest barierą, ale stopień jest nieokreślony
+- +8 — wiadomo, że czynnik jest ułatwiaczem, ale stopień jest nieokreślony
 - 9 — nie dotyczy
+
+Wartość techniczna `-99` oznacza „nie oceniono”; nie jest kwalifikatorem ICF i nie może być interpretowana jako wynik kliniczny. Jest odróżniona od kwalifikatora `-1`, który oznacza niewielką barierę środowiskową.
 
 W bazie zapisywane są wartości kwalifikatorów, a nie indeksy pozycji listy rozwijanej. Brak oceny nie jest automatycznie zamieniany na brak problemu.
 
