@@ -307,6 +307,8 @@ Formularz pozwala zapisywać obserwacje wyłącznie podczas aktywnej sesji. Hist
 
 Obecny formularz zapisuje wykonane parametry, ale nie stanowi jeszcze pełnego systemu recept ćwiczeń: nie definiuje planowanej dawki, strony ciała, obciążenia ani wersjonowanej instrukcji. Nie wylicza automatycznie progresji i nie modyfikuje zaleceń klinicznych. Kontrola bólu po 24 godzinach na poziomie pojedynczego ćwiczenia jest zapisywana, jeśli została już zebrana; odrębny mechanizm przypomnienia i późniejszego uzupełnienia obserwacji będzie kolejnym etapem.
 
+Ocena rehabilitacyjna ma jawny typ: `baseline` (początkowa), `follow_up` (kontrolna) albo `final` (końcowa). Repozytorium odrzuca nieznane wartości, a historia w interfejsie pokazuje typ każdej oceny. Typ opisuje etap dokumentowania i sam w sobie nie stanowi kryterium progresji.
+
 ## Powiązanie oceny ICF z oceną rehabilitacyjną
 
 Ocena rehabilitacyjna może zawierać opcjonalne pole `icf_assessment_ref`. Jest to dokładna wartość `assessed_at` oceny ICF zapisanej w kartotece tego samego pacjenta. Repozytorium sprawdza, czy wskazana ocena występuje jako bieżące `icf_assessment` albo w `icf_assessment_history`. Dzięki temu odwołanie pozostaje poprawne także po wykonaniu kolejnej oceny ICF i przeniesieniu poprzedniej wersji do historii.
