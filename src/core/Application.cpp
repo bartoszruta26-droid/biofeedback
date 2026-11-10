@@ -438,6 +438,8 @@ void Application::setupConnections()
         return false;
     };
 
+    if (m_outlineTab) m_outlineTab->setResourceRepository(m_sharedResources);
+
     // Route the selected patient chart to Outline using its canonical repository UUID.
     // PESEL is used only for lookup and is never stored in rehabilitation records.
     connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
