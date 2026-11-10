@@ -183,12 +183,36 @@ int main(int argc, char** argv) {
     QJsonObject rehabSessionPayload{
         {QStringLiteral("patient_id"), id},
         {QStringLiteral("episode_id"), episodeId},
-        {QStringLiteral("session_type"), QStringLiteral("treatment")}
+        {QStringLiteral("session_type"), QStringLiteral("treatment")},
+        {QStringLiteral("session_status"), QStringLiteral("active")},
+        {QStringLiteral("pre_session_pain_nrs"), 0}
     };
     QJsonObject rehabSession;
     assert(restarted.create(QStringLiteral("rehabilitation-sessions"), rehabSessionPayload,
                             rehabSession, &error));
     const QString rehabSessionId = rehabSession.value(QStringLiteral("id")).toString();
+    assert(rehabSession.value(QStringLiteral("pre_session_pain_nrs")).toInt(-1) == 0);
+    rehabSessionPayload.insert(QStringLiteral("post_session_pain_nrs"), 3);
+    rehabSessionPayload.insert(QStringLiteral("session_status"), QStringLiteral("awaiting_24h"));
+    QJsonObject updatedRehabSession;
+    assert(restarted.update(QStringLiteral("rehabilitation-sessions"), rehabSessionId,
+                            rehabSession.value(QStringLiteral("version")).toInt(),
+                            rehabSessionPayload, updatedRehabSession, &error));
+    assert(updatedRehabSession.value(QStringLiteral("post_session_pain_nrs")).toInt(-1) == 3);
+    updatedRehabSession.insert(QStringLiteral("pain_at_24h_nrs"), 2);
+    updatedRehabSession.insert(QStringLiteral("session_status"), QStringLiteral("completed"));
+    QJsonObject completedRehabSession;
+    assert(restarted.update(QStringLiteral("rehabilitation-sessions"), rehabSessionId,
+                            updatedRehabSession.value(QStringLiteral("version")).toInt(),
+                            updatedRehabSession, completedRehabSession, &error));
+    assert(completedRehabSession.value(QStringLiteral("pain_at_24h_nrs")).toInt(-1) == 2);
+    QJsonObject invalidPainSession = completedRehabSession;
+    invalidPainSession.insert(QStringLiteral("pain_at_24h_nrs"), 11);
+    QJsonObject rejectedSession;
+    assert(!restarted.update(QStringLiteral("rehabilitation-sessions"), rehabSessionId,
+                             completedRehabSession.value(QStringLiteral("version")).toInt(),
+                             invalidPainSession, rejectedSession, &error));
+    assert(error == QStringLiteral("INVALID_REHABILITATION_SESSION_PAIN_NRS"));
 
     QJsonObject observationPayload{
         {QStringLiteral("patient_id"), id},
