@@ -969,9 +969,10 @@ void MeasurementTab::setupUI()
     optionsScroll->setWidget(optionsPanel);
     workspaceSplitter->addWidget(visualScroll);
     workspaceSplitter->addWidget(optionsScroll);
-    // Preserve the 89:11 ratio when the top-level window is resized.
-    workspaceSplitter->setStretchFactor(0, 89);
-    workspaceSplitter->setStretchFactor(1, 11);
+    // Qt scales each stretch factor by the widget's initial size. Equal
+    // factors therefore preserve the 89:11 ratio established by setSizes().
+    workspaceSplitter->setStretchFactor(0, 1);
+    workspaceSplitter->setStretchFactor(1, 1);
     // Initialize the actual pixel sizes after the splitter receives its layout width.
     // QSplitter::setSizes({89, 11}) here would mean 89 and 11 pixels, not percentages.
     QTimer::singleShot(0, workspaceSplitter, [workspaceSplitter] {
