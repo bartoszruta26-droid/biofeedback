@@ -104,6 +104,7 @@ private:
     QString getUnitLabel() const;
     void scheduleRepaint();
     QTimer m_repaintTimer;
+    QElapsedTimer m_lastSampleArrival; // arrival clock for bounded 120 Hz display interpolation
 };
 
 /**
