@@ -11,6 +11,18 @@ application = read("src/core/Application.cpp")
 measurement = read("src/tab/MeasurementTab.cpp")
 training = read("src/tab/TrainingTab.cpp")
 patient = read("src/tab/PatientTab.cpp")
+assert 'Ocena funkcjonalna ICF' in patient
+assert 'openIcfAssessmentDialog()' in patient
+assert 'icf-functional-screening-v1' in patient
+assert '"b280"' in patient and '"b710"' in patient and '"b730"' in patient
+assert '"d410"' in patient and '"d450"' in patient and '"d850"' in patient
+assert '"e310"' in patient and '"e580"' in patient
+assert 'currentData().toInt()' in patient
+assert 'patientIcfAssessmentChanged' in patient
+assert 'patientIcfAssessmentChanged' in application
+assert 'icf_assessment' in application
+assert 'setPatientIcfAssessment(' in application
+
 outline = read("src/tab/OutlineTab.cpp")
 debug = read("src/tab/DebugTab.cpp")
 graph = read("src/gui/GraphWidget.cpp")
