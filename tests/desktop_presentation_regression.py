@@ -32,6 +32,14 @@ assert 'assessmentHistory.size() > 100' in application
 assert 'icf_assessment_history' in application
 
 assert 'setPatientIcfAssessment(' in application
+assert 'Historia ICF' in patient
+assert 'openIcfAssessmentHistoryDialog()' in patient
+assert 'm_icfAssessmentHistories' in patient
+assert 'icf_assessment_history' in application
+assert 'patient.value(QStringLiteral("icf_assessment_history")).toArray()' in application
+assert 'm_patientTab->setPatientIcfAssessment(pesel, assessment, assessmentHistory)' in application
+assert 'capacity != -99' in patient
+
 
 outline = read("src/tab/OutlineTab.cpp")
 debug = read("src/tab/DebugTab.cpp")
