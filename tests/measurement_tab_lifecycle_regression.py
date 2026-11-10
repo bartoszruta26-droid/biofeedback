@@ -214,8 +214,9 @@ if commit_start > history_start:
 if engine_source.index("m_commitHook(sample)") > history_start:
     raise SystemExit("MeasurementEngine must invoke the commit hook before publication")
 
-# The bounded GUI queue may drop derived/presentation frames, but it must never
-# block the serial acquisition callback after the durable commit has succeeded.
+# The bounded presentation queue must never block the serial reader. It
+# preserves FIFO order for the lossless analysis consumer while the UI display
+# is coalesced separately; saturation must be visible as an incomplete analysis.
 for required in (
     "bool m_measurementQueueAccepting{true}",
     "MaximumQueuedSamples = 4096",
@@ -224,7 +225,7 @@ for required in (
     "m_measurementQueueAccepting = false",
 ):
     if required not in source and required not in header:
-        raise SystemExit(f"Missing lossy GUI queue invariant: {required}")
+        raise SystemExit(f"Missing bounded analysis-queue invariant: {required}")
 enqueue_start = source.index("void MeasurementTab::enqueueMeasurementSample(")
 enqueue_end = source.index("void MeasurementTab::drainMeasurementSamples(", enqueue_start)
 enqueue_body = source[enqueue_start:enqueue_end]
@@ -286,20 +287,21 @@ if "LiveUiIntervalMs" in training_source:
 
 print("Measurement, training and game realtime dispatch regression passed")
 
-# The live sensor path must retain all samples while coalescing GUI work.
+# Measurement analysis must process every sample in order. Only the
+# presentation-facing controls are coalesced to the newest value.
 sample_start = source.index("void MeasurementTab::readSingleSample(")
 sample_end = source.index("void MeasurementTab::updateRawTableBatch(", sample_start)
 sample_body = source[sample_start:sample_end]
-if "static constexpr qint64 LiveUiIntervalMs = 16" not in sample_body:
-    raise SystemExit("Live UI updates must target approximately 60 Hz")
 if "m_recordedSamples.append(recorded)" not in sample_body:
     raise SystemExit("Full measurement samples must still be retained")
-if "m_rawBox->setTitle" in sample_body and "LiveUiIntervalMs" not in sample_body:
-    raise SystemExit("Raw-table title update is not protected by the bounded live UI cadence")
-ui_gate = sample_body.find("if (elapsedMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs)")
-title_update = sample_body.find("m_rawBox->setTitle")
-if title_update >= 0 and (ui_gate < 0 or title_update < ui_gate):
-    raise SystemExit("Raw-table title update must remain inside the throttled UI block")
+if "m_repetitionDetector.process(deviceTimestampMs, forceValue, true, repetition)" not in sample_body:
+    raise SystemExit("Every acquired sample must reach repetition analysis")
+if "m_forcePlot->addSample(forceValue, currentTime)" not in sample_body:
+    raise SystemExit("The live plot must retain every real sensor sample")
+if "updateLiveDisplay(forceValue)" not in sample_body:
+    raise SystemExit("The latest sample must update the live numeric display")
+if "updateRawTableBatch()" not in sample_body:
+    raise SystemExit("The raw table must use its bounded batch update")
 
 
 # Every-frame status callbacks must not flood the GUI event queue.
