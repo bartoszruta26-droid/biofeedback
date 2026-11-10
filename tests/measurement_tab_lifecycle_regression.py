@@ -101,7 +101,7 @@ for required in (
     "m_queue.size() >= m_capacity",
     "m_queue.push_back(PendingRecord{line, ticket, durable})",
     "m_changed.wait(lock",
-    "file.write(record.line)",
+    "file.write(line)",
     "syncParentDirectory(m_path, error)",
     "::fsync(directoryFd)",
     "flushDurably(file, error)",
