@@ -339,7 +339,7 @@ void TanGame::render(QPainter& painter)
         const double angle = std::remainder(
             static_cast<double>(x) * m_frequency + m_phase, kPi);
         const double cosine = std::cos(angle);
-        const double normalized = qBound(-1.0, tangentWave(angle), 1.0);
+        const double normalized = qBound(-1.0, tangentWave(angle, m_tangentSharpness), 1.0);
         const double y = centerY - normalized * amplitude;
         const bool branchPositive = cosine >= 0.0;
 
