@@ -1,6 +1,7 @@
 #include "rehabilitation/ProgressionRules.hpp"
 
 #include <cassert>
+#include <limits>
 using namespace biofeedback::rehabilitation;
 
 int main() {
@@ -67,6 +68,18 @@ int main() {
     auto invalidPolicy = policy;
     invalidPolicy.minimumCompletedDoseRatio = 2.0;
     assert(ProgressionRules::evaluate(good, 5, invalidPolicy).decision ==
+           ProgressionDecision::NotEvaluable);
+    invalidPolicy.minimumCompletedDoseRatio = std::numeric_limits<double>::quiet_NaN();
+    assert(ProgressionRules::evaluate(good, 5, invalidPolicy).decision ==
+           ProgressionDecision::NotEvaluable);
+
+    auto invalidEvidence = good;
+    invalidEvidence.completedDoseRatio = std::numeric_limits<double>::quiet_NaN();
+    assert(ProgressionRules::evaluate(invalidEvidence, 5, policy).decision ==
+           ProgressionDecision::NotEvaluable);
+    invalidEvidence = good;
+    invalidEvidence.painAfter = -2;
+    assert(ProgressionRules::evaluate(invalidEvidence, 5, policy).decision ==
            ProgressionDecision::NotEvaluable);
     return 0;
 }
