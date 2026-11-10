@@ -235,22 +235,28 @@ destructor_body = source[destructor_start:destructor_end]
 if destructor_body.index("m_measurementEngine->setCommitHook({})") > destructor_body.index("closeSampleJournal()"):
     raise SystemExit("Teardown must disable and synchronize commit hook before closing journal")
 
-# Presentation cadence is intentionally faster than acquisition analysis:
-# the sensor stream remains lossless while visible plots/game input target 60 Hz.
+# Acquisition runs at 80 SPS; the plot uses a separate 120 Hz interpolated presentation clock.
+# Training labels/game input remain bounded to approximately 60 Hz.
 training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
 game_engine_source = Path("src/games/GameEngine.cpp").read_text(encoding="utf-8")
 if "static constexpr qint64 LiveUiIntervalMs = 16;" not in training_source:
     raise SystemExit("Training live widgets/game input must target approximately 60 Hz")
-if "m_repaintTimer.setInterval(16);" not in source:
-    raise SystemExit("Measurement force plot repaint must target approximately 60 Hz")
+if "m_repaintTimer.setInterval(8);" not in source:
+    raise SystemExit("Measurement force plot repaint must target approximately 120 Hz")
+if "constexpr double displayStepSeconds = 1.0 / 120.0;" not in source:
+    raise SystemExit("Measurement force plot must interpolate on a 120 Hz display grid")
+if "Fritsch-Carlson limiter" not in source or "qBound(qMin(y0, y1), value, qMax(y0, y1))" not in source:
+    raise SystemExit("Measurement plot must use bounded shape-preserving interpolation")
+if "m_lastSampleArrival.elapsed() > 250" not in source:
+    raise SystemExit("120 Hz repaint timer must stop after the sensor stream becomes idle")
 if "m_repaintTimer.setTimerType(Qt::PreciseTimer);" not in source:
     raise SystemExit("Measurement force plot must use precise timer scheduling")
 if "Qt::PreciseTimer" not in game_engine_source:
     raise SystemExit("Game frame timer must use precise scheduling")
-if "QPainterPath tracePath;" not in source or "QPointF(margin + column, y)" not in source:
+if "QPainterPath tracePath;" not in source or "QPointF point(x, y);" not in source:
     raise SystemExit("Measurement trace must retain subpixel coordinates for smooth rendering")
-if "tracePath.cubicTo(control1, control2, p2);" not in source:
-    raise SystemExit("Measurement trace must use shape-preserving cubic interpolation")
+if "tracePath.lineTo(point);" not in source:
+    raise SystemExit("Measurement trace must render the interpolated 120 Hz points")
 if "m_forcePlot->addSample(forceValue, currentTime)" not in source:
     raise SystemExit("Measurement plot must receive every acquired sample")
 if "m_progressWidget->setCurrentForce(force);" not in training_source:
@@ -294,3 +300,32 @@ if "m_sensorUiTimer->setInterval(100)" not in debug_source:
     raise SystemExit("DebugTab status refresh must be bounded to 10 Hz")
 if "m_sensorSnapshotMutex" not in debug_header:
     raise SystemExit("DebugTab latest sensor snapshot must be synchronized")
+
+# Serial acquisition is continuous (not one DATA request per sample), and the
+# Nano firmware configures the HX711 RATE input for its physical 80 SPS mode.
+serial_source = Path("src/sensor/SerialCommunication.cpp").read_text(encoding="utf-8")
+serial_test = Path("tests/serial_pty_regression.cpp").read_text(encoding="utf-8")
+firmware = Path("hx711_advanced.ino").read_text(encoding="utf-8")
+async_start = serial_source.index("void SerialCommunication::startAsyncReading()")
+async_end = serial_source.index("void SerialCommunication::stopAsyncReading()", async_start)
+async_body = serial_source[async_start:async_end]
+if '"CONT\\n"' not in async_body or "streamParser.feed(buffer" not in async_body:
+    raise SystemExit("Async serial acquisition must enable and parse the persistent continuous stream")
+if "readDataBatch(100)" in async_body:
+    raise SystemExit("Async acquisition must not poll DATA at 10 Hz")
+if '"CONT\\n"' not in serial_test or "callbackCount.load" not in serial_test:
+    raise SystemExit("PTY regression must verify multiple continuous frames")
+for required in (
+    "#define HX711_RATE_PIN A0",
+    "digitalWrite(HX711_RATE_PIN, HIGH)",
+    "#define HX711_THREAD_INTERVAL 1",
+):
+    if required not in firmware:
+        raise SystemExit(f"HX711 firmware missing 80 SPS configuration: {required}")
+
+detector_header = Path("include/training/RepetitionDetector.hpp").read_text(encoding="utf-8")
+detector_test = Path("tests/repetition_detector_regression.cpp").read_text(encoding="utf-8")
+if "minimumDurationMs{120}" not in detector_header or "maximumSampleGapMs{100}" not in detector_header:
+    raise SystemExit("Repetition detector defaults must be tuned for the 80 SPS stream")
+if "fastRepetitions.size() == 3" not in detector_test:
+    raise SystemExit("Repetition detector must be regression-tested with three 80 SPS tubing cycles")
