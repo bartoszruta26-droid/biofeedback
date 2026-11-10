@@ -85,14 +85,19 @@
 - **Wskaźniki:** wynik i aktualny kąt celowania.
 - **Wskazówka:** uwzględnij tor balistyczny strzały i ruch celu. Nie oceniaj kierunku wyłącznie na podstawie chwilowego położenia celu.
 
-### 9. Galaga
+### 9. Galaga Force Trainer
 
-**Cel:** poruszaj statkiem, niszcz fale przeciwników i unikaj wrogich pocisków.
+**Cel:** niszcz kolejne formacje przeciwników, unikaj pocisków i nie dopuść, aby formacja dotarła do dolnej części planszy.
 
-- **Tensometr:** ustawia poziome położenie statku w obrębie planszy.
-- **Klawiatura:** `←` lub `A` — ruch w lewo; `→` lub `D` — ruch w prawo; przytrzymanie `SPACJI` — ciągły ogień.
-- **Wskaźniki:** wynik, numer fali i pozostałe życia.
-- **Wskazówka:** obserwuj położenie pocisków przeciwników i utrzymuj statek w takim miejscu, aby móc szybko zmienić kierunek.
+- **Tensometr / HX711:** steruje poziomym położeniem statku w całym polu gry. Zakres wejściowy 0–100% odpowiada położeniu od lewej do prawej strony planszy.
+- **Klawiatura:** `←` lub `A` — ruch w lewo; `→` lub `D` — ruch w prawo. Ruch klawiaturą działa podczas przytrzymania klawisza i zastępuje w tym czasie pozycjonowanie z tensometru. Po zwolnieniu klawisza sterowanie wraca do wartości czujnika.
+- **Ogień:** przytrzymaj `SPACJĘ`, aby prowadzić ogień automatyczny. Kolejne pociski są wystrzeliwane co około 240 ms. Zwolnienie klawisza zatrzymuje strzelanie.
+- **Przeciwnicy:** czerwoni przeciwnicy wymagają jednego trafienia, a żółci — dwóch. Formacja porusza się poziomo, przy krawędzi zmienia kierunek i schodzi niżej. Z każdą falą rośnie liczba wierszy, szybkość i intensywność ostrzału.
+- **Pociski:** turkusowe pociski należą do gracza, czerwone do przeciwników. Pociski przeciwników mogą korygować tor w stronę aktualnej pozycji statku — obserwuj ich ruch i zmieniaj pas.
+- **Życia i osłona:** gracz rozpoczyna z trzema życiami. Po trafieniu otrzymuje 1,2 s ochrony, a statek wraca w okolice środka planszy. Osłona jest sygnalizowana miganiem statku i komunikatem na ekranie. Utrata życia po dotarciu formacji do statku nie zeruje fali ani nie przyznaje punktów za pozostałych przeciwników.
+- **Punktacja:** zniszczenie przeciwnika daje 10 punktów; trafienie przeciwnika wymagającego dwóch pocisków daje 3 punkty za pierwsze trafienie; ukończenie fali daje dodatkowe 50 punktów.
+- **Zmiana rozmiaru:** układ przeciwników i pozycja statku są dopasowywane do wymiarów okna. Przy małych oknach liczba kolumn i rozmiary przeciwników są ograniczane, aby zachować czytelność.
+- **Wskazówka:** utrzymuj statek w ruchu, obserwuj czerwone pociski i wykorzystuj chwile, gdy przeciwnicy ustawiają się w jednej kolumnie.
 
 ### 10. Scorched Earth
 
@@ -115,7 +120,7 @@
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
 | Archer | kąt celowania | `W`/`↑`, `S`/`↓`, `SPACJA` |
-| Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, przytrzymaj `SPACJĘ` |
+| Galaga | pozycja pozioma 0–100%: lewo–prawo | `←`/`A`, `→`/`D`; przytrzymaj `SPACJĘ` dla ognia automatycznego |
 | Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
 
 ## Uwaga o wersjach i rozszerzeniach
