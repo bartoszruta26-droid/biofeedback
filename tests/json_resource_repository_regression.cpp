@@ -117,6 +117,88 @@ int main(int argc, char** argv) {
     assert(!restarted.get(QStringLiteral("patients"), QStringLiteral("../../users"), loaded, &error));
     assert(error == QStringLiteral("INVALID_RESOURCE_ID"));
 
+    QJsonObject episodePayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("diagnosis_code"), QStringLiteral("M23.2")},
+        {QStringLiteral("care_pathway"), QStringLiteral("conservative")}
+    };
+    QJsonObject episode;
+    assert(restarted.create(QStringLiteral("rehabilitation-episodes"), episodePayload, episode, &error));
+    const QString episodeId = episode.value(QStringLiteral("id")).toString();
+
+    QJsonObject assessmentPayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("episode_id"), episodeId},
+        {QStringLiteral("assessment_type"), QStringLiteral("baseline")}
+    };
+    QJsonObject assessment;
+    assert(restarted.create(QStringLiteral("rehabilitation-assessments"), assessmentPayload, assessment, &error));
+
+    QJsonObject goalPayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("episode_id"), episodeId},
+        {QStringLiteral("metric"), QStringLiteral("knee_flexion_rom")}
+    };
+    QJsonObject goal;
+    assert(restarted.create(QStringLiteral("rehabilitation-goals"), goalPayload, goal, &error));
+
+    QJsonObject rehabSessionPayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("episode_id"), episodeId},
+        {QStringLiteral("session_type"), QStringLiteral("treatment")}
+    };
+    QJsonObject rehabSession;
+    assert(restarted.create(QStringLiteral("rehabilitation-sessions"), rehabSessionPayload,
+                            rehabSession, &error));
+    const QString rehabSessionId = rehabSession.value(QStringLiteral("id")).toString();
+
+    QJsonObject observationPayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("episode_id"), episodeId},
+        {QStringLiteral("session_id"), rehabSessionId},
+        {QStringLiteral("pain_before"), 4},
+        {QStringLiteral("pain_after"), 2}
+    };
+    QJsonObject observation;
+    assert(restarted.create(QStringLiteral("rehabilitation-observations"), observationPayload,
+                            observation, &error));
+
+    QJsonObject decisionPayload{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("episode_id"), episodeId},
+        {QStringLiteral("session_id"), rehabSessionId},
+        {QStringLiteral("decision"), QStringLiteral("HOLD")},
+        {QStringLiteral("clinician_approval_required"), true}
+    };
+    QJsonObject decision;
+    assert(restarted.create(QStringLiteral("rehabilitation-decisions"), decisionPayload,
+                            decision, &error));
+
+    QJsonObject invalidEpisodeContext{
+        {QStringLiteral("patient_id"), QStringLiteral("00000000-0000-4000-8000-000000000002")},
+        {QStringLiteral("episode_id"), episodeId}
+    };
+    QJsonObject rejectedContext;
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), invalidEpisodeContext,
+                             rejectedContext, &error));
+    assert(error == QStringLiteral("PATIENT_NOT_FOUND"));
+
+    assert(!restarted.remove(QStringLiteral("rehabilitation-episodes"), episodeId, 1, &error));
+    assert(error == QStringLiteral("REHABILITATION_EPISODE_HAS_REFERENCES"));
+    assert(!restarted.remove(QStringLiteral("rehabilitation-sessions"), rehabSessionId, 1, &error));
+    assert(error == QStringLiteral("REHABILITATION_SESSION_HAS_REFERENCES"));
+
+    assert(restarted.remove(QStringLiteral("rehabilitation-decisions"),
+                            decision.value(QStringLiteral("id")).toString(), 1, &error));
+    assert(restarted.remove(QStringLiteral("rehabilitation-observations"),
+                            observation.value(QStringLiteral("id")).toString(), 1, &error));
+    assert(restarted.remove(QStringLiteral("rehabilitation-sessions"), rehabSessionId, 1, &error));
+    assert(restarted.remove(QStringLiteral("rehabilitation-goals"),
+                            goal.value(QStringLiteral("id")).toString(), 1, &error));
+    assert(restarted.remove(QStringLiteral("rehabilitation-assessments"),
+                            assessment.value(QStringLiteral("id")).toString(), 1, &error));
+    assert(restarted.remove(QStringLiteral("rehabilitation-episodes"), episodeId, 1, &error));
+
     assert(restarted.remove(QStringLiteral("patients"), id, 2, &error));
     assert(!restarted.get(QStringLiteral("patients"), id, loaded, &error));
     assert(error == QStringLiteral("RESOURCE_NOT_FOUND"));
