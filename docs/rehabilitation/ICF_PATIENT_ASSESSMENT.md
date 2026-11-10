@@ -25,6 +25,13 @@ Ocena odnosi się domyślnie do typowego funkcjonowania w ostatnich 30 dniach. N
 - s760 — struktura tułowia
 - s770 — dodatkowe struktury układu mięśniowo-szkieletowego
 
+Dla struktur ciała formularz rejestruje trzy odrębne kwalifikatory zgodne z modelem ICF:
+- zakres uszkodzenia (0–4, 8, 9),
+- charakter zmiany (brak części, część dodatkowa, nieprawidłowy wymiar, przerwanie ciągłości, przemieszczenie, odchylenie położenia lub zmiana jakościowa),
+- lokalizacja (obszar wielokrotny, strona prawa/lewa/obustronna, przód/tył, położenie bliższe/dalsze).
+
+Każdy z trzech kwalifikatorów ma osobny stan „Nie oceniono”.
+
 ### Aktywność i uczestniczenie — kody d
 
 Dla każdej domeny rejestruje się osobno wykonanie w rzeczywistym środowisku oraz zdolność w warunkach standaryzowanych.
