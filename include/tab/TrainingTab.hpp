@@ -362,8 +362,6 @@ private:
     std::vector<biofeedback::training::RepetitionRecord> m_currentSeriesRepetitions;
 
     double m_currentForce;
-    qint64 m_lastLiveUiRefreshMs{-50};
-    qint64 m_lastGameInputRefreshMs{-50};
     double m_peakForceInRep;
     
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
