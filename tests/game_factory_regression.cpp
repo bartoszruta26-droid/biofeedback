@@ -200,6 +200,30 @@ int main(int argc, char **argv)
     REQUIRE(galagaHitGame->hitProtectionRemaining() < protectionAtHit);
     galagaHitGame->stop();
 
+    // Archer keyboard aim is continuous while held, stops on release,
+    // and the HUD counters are backed by deterministic game state.
+    std::unique_ptr<games::GameEngine> archerControls(games::createGame(QStringLiteral("archer")));
+    auto* archerControlsGame = dynamic_cast<games::ArcherGame*>(archerControls.get());
+    REQUIRE(archerControlsGame != nullptr);
+    archerControlsGame->resize(640, 480);
+    archerControlsGame->start();
+    archerControlsGame->handleSensorInput(50.0);
+    const double archerSensorAngle = archerControlsGame->aimAngle();
+    QKeyEvent archerAimUp(QEvent::KeyPress, Qt::Key_Up, Qt::NoModifier);
+    QKeyEvent archerAimUpRelease(QEvent::KeyRelease, Qt::Key_Up, Qt::NoModifier);
+    QApplication::sendEvent(archerControlsGame, &archerAimUp);
+    archerControlsGame->update(0.1);
+    const double archerKeyboardAngle = archerControlsGame->aimAngle();
+    REQUIRE(archerKeyboardAngle < archerSensorAngle);
+    QApplication::sendEvent(archerControlsGame, &archerAimUpRelease);
+    archerControlsGame->update(0.1);
+    REQUIRE(std::abs(archerControlsGame->aimAngle() - archerKeyboardAngle) < 1e-6);
+    QKeyEvent archerControlFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(archerControlsGame, &archerControlFire);
+    REQUIRE(archerControlsGame->shotsFired() == 1);
+    REQUIRE(archerControlsGame->activeArrowCount() == 1);
+    archerControlsGame->stop();
+
     std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
     auto* archerGame = dynamic_cast<games::ArcherGame*>(archer.get());
     REQUIRE(archerGame != nullptr);
