@@ -358,6 +358,28 @@ int main() {
         ::close(master);
         return 1;
     }
+    // Text commands must pause the binary stream, drain stale frames and
+    // restart continuous acquisition without losing command responses.
+    serial.startAsyncReading();
+    std::thread tareDevice([&]() {
+        std::string receivedCommand;
+        if (!readLine(master, receivedCommand, 1000) || receivedCommand != "CONT\\n") return;
+        if (!readLine(master, receivedCommand, 1000) || receivedCommand != "STOP\\n") return;
+        if (!readLine(master, receivedCommand, 1000) || receivedCommand != "TARE\\n") return;
+        const std::string tareResponse = "Taring...\\r\\nTare set!\\r\\n";
+        (void)::write(master, tareResponse.data(), tareResponse.size());
+        (void)readLine(master, receivedCommand, 1000); // resumed CONT
+    });
+    const std::string tareResponse = serial.sendCommand("TARE", true);
+    tareDevice.join();
+    if (tareResponse.find("Tare set!") == std::string::npos) {
+        std::cerr << "TARE response was lost while pausing the continuous stream\\n";
+        serial.stopAsyncReading();
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
+
     std::atomic<bool> callbackDisconnected{false};
     std::atomic<int> callbackCount{0};
     serial.addDataCallback([&](const sensor::SensorData& data) {
