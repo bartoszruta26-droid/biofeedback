@@ -87,7 +87,7 @@ void TrainingProgressWidget::setCurrentForce(double force)
     if (!std::isfinite(force))
         return;
     m_currentForce = force;
-    constexpr std::size_t MaximumTraceSamples = 600; // 6 s at 100 samples/s
+    constexpr std::size_t MaximumTraceSamples = 600; // 7.5 s at 80 SPS
     m_forceHistory.push_back(force);
     while (m_forceHistory.size() > MaximumTraceSamples)
         m_forceHistory.pop_front();
