@@ -367,7 +367,7 @@ void PatientTab::openIcfAssessmentDialog()
                         tr("4 — problem całkowity"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")};
                     const QList<int> values = {-99, 0, 1, 2, 3, 4, 8, 9};
                     for (int i = 0; i < labels.size(); ++i) combo->addItem(labels.at(i), values.at(i));
-                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(8)));
+                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(-99)));
                 }
                 form->addRow(label, combo);
                 qualifiers.insert(code, combo);
