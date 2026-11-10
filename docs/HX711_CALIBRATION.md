@@ -4,7 +4,7 @@
 
 ## Kierunek wskazań czujnika rozciąganego
 
-Niektóre mostki tensometryczne przy rozciąganiu zmniejszają, zamiast zwiększać, podpisany odczyt ADC. Dla bieżącej konfiguracji desktop GUI domyślnie odwraca wyłącznie kierunek prezentacji (`sensor.raw_polarity: -1`), aby rozciąganie było pokazywane jako wzrost dodatni. Surowa próbka sprzętowa pozostaje zapisana bez zmian ze swoim znakiem. Ustawienie `sensor.raw_polarity: 1` przywraca natywny kierunek prezentacji. To nie jest kalibracja i nie zmienia firmware.
+Niektóre mostki tensometryczne przy rozciąganiu zmniejszają, zamiast zwiększać, podpisany odczyt ADC. Dla bieżącej konfiguracji desktop GUI domyślnie odwraca kierunek prezentacji (`sensor.raw_polarity: -1`), aby rozciąganie było pokazywane jako wzrost dodatni. Ta sama polaryzacja musi obowiązywać zarówno RAW, jak i wartości przeliczone na N/kgf. Surowa próbka sprzętowa pozostaje zapisana bez zmian ze swoim znakiem. Ustawienie `sensor.raw_polarity: 1` przywraca natywny kierunek prezentacji. To ustawienie określa znak wskazania; wartość bezwzględna współczynnika kalibracji określa skalę.
 
 ## Domyślny tryb desktop GUI: RAW
 
@@ -18,9 +18,11 @@ Domyślna ścieżka profilu:
 Można ją zmienić kluczem `sensor.calibration_profile` w pliku `QStandardPaths::AppConfigLocation/config.json` (na Linuksie zwykle `~/.config/Biofeedback/config.json`). Ścieżka względna jest liczona od katalogu konfiguracji aplikacji. Profil musi być poprawnym dokumentem `CalibrationProfile`, zawierać własne `deviceId`, jednostkę `g`, `zeroOffsetRaw` oraz dodatni `scaleFactor`. Współczynnik oznacza gramy na jeden zliczony krok RAW. Bez poprawnego profilu GUI pozostaje w trybie RAW i nie pozwala prezentować wartości jako N/kg.
 
 Przeliczenie w GUI:
-`masa_g = (raw - zeroOffsetRaw) * scaleFactor`
+`masa_g = (raw - zeroOffsetRaw) * abs(scaleFactor) * raw_polarity`
 `masa_kg = masa_g / 1000`
 `siła_N = masa_kg * 9.80665`
+
+Znak współczynnika w profilu nie może samodzielnie odwracać kierunku wskazania. Kierunek wybiera `sensor.raw_polarity`; dzięki temu profil utworzony z obciążeniem ściskającym nie pokaże ujemnej siły podczas rozciągania tensometru.
 
 Wewnętrzne buforowanie siły i analiza biomechaniczna pozostają w jednostkach SI. Wartość RAW jest zawsze zachowana niezależnie od wybranej jednostki prezentacji.
 
