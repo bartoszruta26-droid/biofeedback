@@ -69,7 +69,7 @@ void SinGame::setDifficultyLevel(int level)
     // the current viewport so it always shows the same number of cycles.
     m_scrollSpeed = 90.0 + m_difficultyLevel * 25.0;
     const double toleranceRatio = 0.11 - (m_difficultyLevel - 1) * 0.012;
-    m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, height()) * toleranceRatio));
+    m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, static_cast<double>(height())) * toleranceRatio));
     m_frequency = width() > 0
         ? (2.0 * 3.14159265358979323846 * 1.5 / static_cast<double>(width())) : 0.0;
     setScore(0);
