@@ -6,6 +6,9 @@
 #include <QString>
 #include <memory>
 
+class QKeyEvent;
+class QResizeEvent;
+
 namespace games {
 
 class TanGame final : public GameEngine
@@ -19,6 +22,15 @@ public:
     QString gameName() const override;
     void setDifficultyLevel(int level);
     int getDifficultyLevel() const;
+
+    void setForceCalibration(double minimum, double maximum);
+    double forceCalibrationMinimum() const;
+    double forceCalibrationMaximum() const;
+    double normalizedForce() const;
+    void setAutomaticDifficulty(bool enabled);
+    bool automaticDifficulty() const;
+    void setTangentSharpness(double sharpness);
+    double tangentSharpness() const;
     void update(double deltaTime) override;
 
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
@@ -27,15 +39,22 @@ public:
 
 protected:
     void initialize() override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
 
 private:
     void calculateTargetY(double x);
     void updateSpatialFrequency();
+    void updateAutomaticDifficulty(double deltaTime);
     QColor getDifficultyColor() const;
 
     double m_currentForce;
+    double m_calibrationMinimum;
+    double m_calibrationMaximum;
+    double m_lastRawForce;
+    double m_tangentSharpness;
     double m_targetY;
     double m_phase;
     double m_cursorY;
@@ -49,6 +68,11 @@ private:
     double m_inputAge;
     double m_scoreFraction;
     double m_trackingSeconds;
+    double m_sessionSeconds;
+    double m_timeInTarget;
+    double m_accuracyWindowSeconds;
+    double m_accuracyWindowHitSeconds;
+    bool m_automaticDifficulty;
     int m_combo;
     QString m_feedbackText;
 
