@@ -23,8 +23,9 @@ GameEngine::GameEngine(QWidget *parent)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Konfiguracja timera gry - 60 FPS (ok. 16ms)
-    m_gameTimer->setInterval(16);
+    // Drive the presentation at up to 120 Hz. Sensor acquisition remains
+    // independent; fixed-step physics and latest-value input coalescing bound work.
+    m_gameTimer->setInterval(8);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
@@ -33,8 +34,9 @@ GameEngine::GameEngine(QWidget *parent)
     // Ustawienie fokusa dla obsługi klawiatury
     setFocusPolicy(Qt::StrongFocus);
     
-    // Tło widgetu
-    setAutoFillBackground(true);
+    // The game paints every pixel itself; avoid an extra QWidget background pass.
+    setAttribute(Qt::WA_OpaquePaintEvent, true);
+    setAutoFillBackground(false);
 }
 
 GameEngine::~GameEngine()
