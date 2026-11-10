@@ -203,7 +203,7 @@ assert 'Eksportuj raport epizodu do PDF' in outline
 assert 'QPdfWriter writer(&pdfFile)' in outline
 assert 'rehabilitation-assessments' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
 assert 'rehabilitation-observations' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
-assert 'icfResponses.constBegin()' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'responses.constBegin()' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
 assert 'resolveIcfReference' in outline
 assert 'icfHistory = patient.value(QStringLiteral("icf_assessment_history"))' in outline
 assert 'Oceny ICF powiązane z ocenami klinicznymi epizodu' in outline
