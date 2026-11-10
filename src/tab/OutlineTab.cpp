@@ -1253,7 +1253,7 @@ void OutlineTab::createRehabilitationAssessment()
         {QStringLiteral("assessed_at"),
          QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
     };
-    auto parseOptionalNumber = [this](QLineEdit* field, const QString& key,
+    auto parseOptionalNumber = [this, &payload](QLineEdit* field, const QString& key,
                                       double minimum, double maximum,
                                       bool integerOnly, QString& error) -> bool {
         const QString text = field->text().trimmed();
@@ -1265,15 +1265,16 @@ void OutlineTab::createRehabilitationAssessment()
             error = tr("Nieprawidłowa wartość pola: %1").arg(key);
             return false;
         }
-        payload.insert(key, number);
+        payload.insert(key, integerOnly ? QJsonValue(static_cast<int>(number))
+                                           : QJsonValue(number));
         return true;
     };
 
     QString validationError;
-    if (!parseOptionalNumber(m_assessmentPainNrsEdit, QStringLiteral("NRS"), 0, 10, true, validationError) ||
-        !parseOptionalNumber(m_assessmentRomEdit, QStringLiteral("ROM"), 0, 360, false, validationError) ||
-        !parseOptionalNumber(m_assessmentStrengthEdit, QStringLiteral("MRC"), 0, 5, true, validationError) ||
-        !parseOptionalNumber(m_assessmentSwellingEdit, QStringLiteral("obrzęk"), 0, 100, false, validationError)) {
+    if (!parseOptionalNumber(m_assessmentPainNrsEdit, QStringLiteral("pain_nrs"), 0, 10, true, validationError) ||
+        !parseOptionalNumber(m_assessmentRomEdit, QStringLiteral("rom_degrees"), 0, 360, false, validationError) ||
+        !parseOptionalNumber(m_assessmentStrengthEdit, QStringLiteral("strength_mrc"), 0, 5, true, validationError) ||
+        !parseOptionalNumber(m_assessmentSwellingEdit, QStringLiteral("swelling_cm"), 0, 100, false, validationError)) {
         m_assessmentStatusLabel->setText(validationError);
         return;
     }
