@@ -173,5 +173,57 @@ int main() {
     assert(committedSample.sequence == 1);
     assert(commitEngine.history().size() == 1);
     assert(commitPublications == 1);
+
+    // A slow persistence hook must not hold the state mutex: readers can
+    // inspect the committed history while the producer is waiting on storage.
+    MeasurementEngine lockIsolationEngine;
+    std::mutex hookMutex;
+    std::condition_variable hookEnteredCondition;
+    std::condition_variable releaseHookCondition;
+    std::condition_variable readerFinishedCondition;
+    bool hookEntered = false;
+    bool releaseHook = false;
+    bool readerFinished = false;
+    lockIsolationEngine.setCommitHook([&](const MeasurementSample& candidate) {
+        assert(candidate.sequence == 1);
+        assert(lockIsolationEngine.history().empty());
+        std::unique_lock<std::mutex> lock(hookMutex);
+        hookEntered = true;
+        hookEnteredCondition.notify_one();
+        releaseHookCondition.wait(lock, [&] { return releaseHook; });
+        return true;
+    });
+
+    MeasurementSample isolatedSample;
+    std::thread slowProducer([&] {
+        assert(lockIsolationEngine.ingest(concurrentInput, isolatedSample));
+    });
+    {
+        std::unique_lock<std::mutex> lock(hookMutex);
+        hookEnteredCondition.wait(lock, [&] { return hookEntered; });
+    }
+
+    std::thread historyReader([&] {
+        (void)lockIsolationEngine.history();
+        {
+            std::lock_guard<std::mutex> lock(hookMutex);
+            readerFinished = true;
+        }
+        readerFinishedCondition.notify_one();
+    });
+    bool readerWasUnblocked = false;
+    {
+        std::unique_lock<std::mutex> lock(hookMutex);
+        readerWasUnblocked = readerFinishedCondition.wait_for(
+            lock, std::chrono::milliseconds(500), [&] { return readerFinished; });
+        releaseHook = true;
+    }
+    releaseHookCondition.notify_one();
+    slowProducer.join();
+    historyReader.join();
+    assert(readerWasUnblocked);
+    assert(isolatedSample.sequence == 1);
+    assert(lockIsolationEngine.history().size() == 1);
+
     return 0;
 }
