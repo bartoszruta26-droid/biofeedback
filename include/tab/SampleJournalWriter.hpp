@@ -37,6 +37,8 @@ public:
     bool append(const QByteArray& line);
     // Enqueues an implicitly-shared JSON object; compact serialization runs on the writer thread.
     bool appendJson(const QJsonObject& record);
+    // Durable variant for callers that require an fsync acknowledgement.
+    bool appendJsonDurably(const QJsonObject& record);
     // Blocks the acquisition producer until this record has been fsynced.
     bool appendDurably(const QByteArray& line);
     // Stops admission, drains accepted records, flushes/fsyncs and joins the worker.
