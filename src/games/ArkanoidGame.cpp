@@ -170,9 +170,15 @@ void ArkanoidGame::updatePhysicsStep(double deltaTime)
 
     const double maxPaddleX = qMax(10.0,
         static_cast<double>(width()) - 10.0 - m_paddle.width());
-    const double desiredPaddleX = 10.0 +
-        m_currentForce * qMax(0.0, static_cast<double>(width()) - 20.0 - m_paddle.width());
-    m_paddle.moveLeft(qBound(10.0, desiredPaddleX, maxPaddleX));
+    const double desiredPaddleX = qBound(10.0, 10.0 +
+        m_currentForce * qMax(0.0, static_cast<double>(width()) - 20.0 - m_paddle.width()),
+        maxPaddleX);
+    // Interpolate between 80 SPS sensor updates at the 120 Hz game cadence.
+    // A short 25 ms time constant removes visible stepping without a long control lag.
+    const double paddleResponse = 1.0 - std::exp(-deltaTime / 0.025);
+    const double smoothedPaddleX = m_paddle.left() +
+        (desiredPaddleX - m_paddle.left()) * paddleResponse;
+    m_paddle.moveLeft(qBound(10.0, smoothedPaddleX, maxPaddleX));
 
     const QPointF previousPosition = m_ballPosition;
     m_ballPosition += m_ballVelocity * deltaTime;
