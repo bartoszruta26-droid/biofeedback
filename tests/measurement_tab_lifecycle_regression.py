@@ -172,7 +172,7 @@ if source.count("m_measurementDrainScheduled = false;") < 2:
 training_drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
 training_drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", training_drain_start)
 training_drain = training_source[training_drain_start:training_drain_end]
-if "constexpr std::size_t MaximumBatch = 128;" not in training_drain:
+if "constexpr std::size_t MaximumBatch = 16;" not in training_drain:
     raise SystemExit("TrainingTab must keep GUI analysis batches bounded")
 if "scheduleAgain" not in training_drain or "QMetaObject::invokeMethod" not in training_drain:
     raise SystemExit("TrainingTab must reschedule remaining FIFO work without dropping it")
@@ -201,7 +201,7 @@ if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
 drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
 drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", drain_start)
 drain_body = training_source[drain_start:drain_end]
-if "MaximumBatch = 128" not in drain_body or "scheduleAgain" not in drain_body:
+if "MaximumBatch = 16" not in drain_body or "scheduleAgain" not in drain_body:
     raise SystemExit("Training analysis must preserve bounded FIFO batches")
 for required in (
     "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
