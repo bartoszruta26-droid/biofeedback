@@ -58,7 +58,7 @@ void PatientTab::setupUI()
 void PatientTab::setupPatientForm()
 {
     m_formGroup = new QGroupBox(tr("Dane Pacjenta"), this);
-    m_formGroup->setFont(QFont("Arial", 11, QFont::Bold));
+    m_formGroup->setFont(QFont("Arial", 8, QFont::Bold));
     m_formLayout = new QFormLayout();
     m_formLayout->setSpacing(12);
     m_formLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
@@ -69,35 +69,35 @@ void PatientTab::setupPatientForm()
     m_peselEdit->setMaxLength(11);
     m_peselEdit->setPlaceholderText(tr("11 cyfr"));
     m_peselEdit->setMinimumHeight(30);
-    m_peselEdit->setFont(QFont("Arial", 10));
+    m_peselEdit->setFont(QFont("Arial", 7));
     
     m_firstNameEdit = new QLineEdit(this);
     m_firstNameEdit->setPlaceholderText(tr("Imię"));
     m_firstNameEdit->setMinimumHeight(30);
-    m_firstNameEdit->setFont(QFont("Arial", 10));
+    m_firstNameEdit->setFont(QFont("Arial", 7));
     
     m_lastNameEdit = new QLineEdit(this);
     m_lastNameEdit->setPlaceholderText(tr("Nazwisko"));
     m_lastNameEdit->setMinimumHeight(30);
-    m_lastNameEdit->setFont(QFont("Arial", 10));
+    m_lastNameEdit->setFont(QFont("Arial", 7));
     
     m_birthDateEdit = new QDateEdit(this);
     m_birthDateEdit->setCalendarPopup(true);
     m_birthDateEdit->setDisplayFormat("yyyy-MM-dd");
     m_birthDateEdit->setDate(QDate::currentDate().addYears(-18));
     m_birthDateEdit->setMinimumHeight(30);
-    m_birthDateEdit->setFont(QFont("Arial", 10));
+    m_birthDateEdit->setFont(QFont("Arial", 7));
     
     m_genderCombo = new QComboBox(this);
     fillGenderCombo(m_genderCombo);
     m_genderCombo->setMinimumHeight(30);
-    m_genderCombo->setFont(QFont("Arial", 10));
+    m_genderCombo->setFont(QFont("Arial", 7));
     
     m_notesEdit = new QTextEdit(this);
     m_notesEdit->setMaximumHeight(80);
     m_notesEdit->setMinimumHeight(60);
     m_notesEdit->setPlaceholderText(tr("Dodatkowe uwagi (opcjonalne)"));
-    m_notesEdit->setFont(QFont("Arial", 10));
+    m_notesEdit->setFont(QFont("Arial", 7));
 
     // Dodawanie pól do layoutu
     m_formLayout->addRow(tr("PESEL:"), m_peselEdit);
@@ -117,24 +117,24 @@ void PatientTab::setupPatientForm()
     m_addButton = new QPushButton(tr("Dodaj"), this);
     m_addButton->setToolTip(tr("Dodaj nowego pacjenta"));
     m_addButton->setMinimumHeight(35);
-    m_addButton->setFont(QFont("Arial", 10, QFont::Bold));
+    m_addButton->setFont(QFont("Arial", 7, QFont::Bold));
     
     m_editButton = new QPushButton(tr("Edytuj"), this);
     m_editButton->setToolTip(tr("Edytuj wybranego pacjenta"));
     m_editButton->setEnabled(false);
     m_editButton->setMinimumHeight(35);
-    m_editButton->setFont(QFont("Arial", 10));
+    m_editButton->setFont(QFont("Arial", 7));
     
     m_deleteButton = new QPushButton(tr("Usuń"), this);
     m_deleteButton->setToolTip(tr("Usuń wybranego pacjenta"));
     m_deleteButton->setEnabled(false);
     m_deleteButton->setMinimumHeight(35);
-    m_deleteButton->setFont(QFont("Arial", 10));
+    m_deleteButton->setFont(QFont("Arial", 7));
     
     m_clearButton = new QPushButton(tr("Wyczyść"), this);
     m_clearButton->setToolTip(tr("Wyczyść formularz"));
     m_clearButton->setMinimumHeight(35);
-    m_clearButton->setFont(QFont("Arial", 10));
+    m_clearButton->setFont(QFont("Arial", 7));
 
     m_formButtonsLayout->addWidget(m_addButton);
     m_formButtonsLayout->addWidget(m_editButton);
@@ -148,7 +148,7 @@ void PatientTab::setupPatientForm()
 void PatientTab::setupPatientTable()
 {
     m_tableGroup = new QGroupBox(tr("Lista Pacjentów"), this);
-    m_tableGroup->setFont(QFont("Arial", 11, QFont::Bold));
+    m_tableGroup->setFont(QFont("Arial", 8, QFont::Bold));
     
     m_patientTable = new QTableWidget(this);
     m_patientTable->setColumnCount(6);
@@ -156,7 +156,7 @@ void PatientTab::setupPatientTable()
         tr("PESEL"), tr("Imię"), tr("Nazwisko"), 
         tr("Data ur."), tr("Płeć"), tr("Uwagi")
     });
-    m_patientTable->setFont(QFont("Arial", 10));
+    m_patientTable->setFont(QFont("Arial", 7));
     
     // Konfiguracja tabeli
     m_patientTable->setSelectionBehavior(QAbstractItemView::SelectRows);
@@ -191,17 +191,17 @@ void PatientTab::setupButtons()
     m_exportButton = new QPushButton(tr("Eksportuj CSV"), this);
     m_exportButton->setToolTip(tr("Eksportuj dane pacjentów do pliku CSV"));
     m_exportButton->setMinimumHeight(35);
-    m_exportButton->setFont(QFont("Arial", 10));
+    m_exportButton->setFont(QFont("Arial", 7));
     
     m_importButton = new QPushButton(tr("Importuj CSV"), this);
     m_importButton->setToolTip(tr("Importuj dane pacjentów z pliku CSV"));
     m_importButton->setMinimumHeight(35);
-    m_importButton->setFont(QFont("Arial", 10));
+    m_importButton->setFont(QFont("Arial", 7));
     
     m_refreshButton = new QPushButton(tr("Odśwież"), this);
     m_refreshButton->setToolTip(tr("Odśwież widok"));
     m_refreshButton->setMinimumHeight(35);
-    m_refreshButton->setFont(QFont("Arial", 10));
+    m_refreshButton->setFont(QFont("Arial", 7));
 
     m_actionButtonsLayout->addWidget(m_exportButton);
     m_actionButtonsLayout->addWidget(m_importButton);
