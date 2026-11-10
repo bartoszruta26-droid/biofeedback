@@ -83,18 +83,18 @@ int main(int argc, char **argv)
 
     // No sensor samples: the game must wait without moving or losing lives.
     const QPointF waitingBall = arkanoidGame->ballPosition();
-    arkanoidGame->update(0.1);
+    waitForEvents(100);
     REQUIRE(arkanoidGame->livesRemaining() == 3);
     REQUIRE(std::abs(arkanoidGame->ballPosition().y() - waitingBall.y()) < 1e-6);
 
     // Force percentage is clamped, smoothed and moves the paddle across the court.
     arkanoidGame->handleSensorInput(100.0);
     REQUIRE(arkanoidGame->hasFreshSensorInput());
-    arkanoidGame->update(0.1);
+    waitForEvents(100);
     const double rightPaddleX = arkanoidGame->paddleX();
     REQUIRE(arkanoidGame->currentForcePercent() > 50.0);
     arkanoidGame->handleSensorInput(-20.0);
-    arkanoidGame->update(0.1);
+    waitForEvents(100);
     REQUIRE(arkanoidGame->currentForcePercent() < 100.0);
     REQUIRE(arkanoidGame->paddleX() < rightPaddleX);
 
@@ -113,7 +113,7 @@ int main(int argc, char **argv)
     REQUIRE(!arkanoidGame->hasFreshSensorInput());
     const QPointF frozenArkanoidBall = arkanoidGame->ballPosition();
     const int livesAtSensorLoss = arkanoidGame->livesRemaining();
-    arkanoidGame->update(0.05);
+    waitForEvents(50);
     REQUIRE(std::abs(arkanoidGame->ballPosition().x() - frozenArkanoidBall.x()) < 1e-6);
     REQUIRE(std::abs(arkanoidGame->ballPosition().y() - frozenArkanoidBall.y()) < 1e-6);
     REQUIRE(arkanoidGame->livesRemaining() == livesAtSensorLoss);
