@@ -115,7 +115,7 @@
 | Sinus | pionowe położenie kursora względem celu | brak skrótów gry |
 | Tangens | pionowe położenie kursora względem celu | brak skrótów gry |
 | Pong | pionowe położenie lewej paletki | brak skrótów gry |
-| Arkanoid | poziome położenie paletki | brak skrótów gry |
+| Arkanoid | poziome położenie paletki | `←`/`A`, `→`/`D` (przytrzymaj, sterowanie czujnikiem wraca po zwolnieniu) |
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
