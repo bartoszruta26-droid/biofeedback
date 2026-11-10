@@ -12,6 +12,7 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QStringList>
 #include <cstdio>
 #include <cstdlib>
@@ -300,6 +301,55 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->playerHealth() == 100);
     REQUIRE(scorchedGame->enemyHealth() == 100);
     REQUIRE(scorchedGame->currentRound() == 1);
+
+    // Mouse fallback: aim by pointer and fire with a single left click.
+    std::unique_ptr<games::GameEngine> archerMouse(games::createGame(QStringLiteral("archer")));
+    auto* archerMouseGame = dynamic_cast<games::ArcherGame*>(archerMouse.get());
+    REQUIRE(archerMouseGame != nullptr);
+    archerMouseGame->resize(640, 480);
+    archerMouseGame->start();
+    const double archerAimBeforeMouse = archerMouseGame->aimAngleRadians();
+    QMouseEvent archerAimMove(QEvent::MouseMove, QPointF(500.0, 190.0),
+                              Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(archerMouseGame, &archerAimMove);
+    REQUIRE(std::abs(archerMouseGame->aimAngleRadians() - archerAimBeforeMouse) > 0.05);
+    QMouseEvent archerMouseFire(QEvent::MouseButtonPress, QPointF(500.0, 190.0),
+                                Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(archerMouseGame, &archerMouseFire);
+    REQUIRE(archerMouseGame->activeArrowCount() == 1);
+    archerMouseGame->stop();
+
+    std::unique_ptr<games::GameEngine> galagaMouse(games::createGame(QStringLiteral("galaga")));
+    auto* galagaMouseGame = dynamic_cast<games::GalagaGame*>(galagaMouse.get());
+    REQUIRE(galagaMouseGame != nullptr);
+    galagaMouseGame->resize(640, 480);
+    galagaMouseGame->start();
+    const double galagaXBeforeMouse = galagaMouseGame->playerCenterX();
+    QMouseEvent galagaAimMove(QEvent::MouseMove, QPointF(540.0, 300.0),
+                              Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(galagaMouseGame, &galagaAimMove);
+    REQUIRE(galagaMouseGame->playerCenterX() > galagaXBeforeMouse);
+    QMouseEvent galagaMouseFire(QEvent::MouseButtonPress, QPointF(540.0, 300.0),
+                                Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(galagaMouseGame, &galagaMouseFire);
+    REQUIRE(galagaMouseGame->activeProjectileCount() == 1);
+    galagaMouseGame->stop();
+
+    std::unique_ptr<games::GameEngine> scorchedMouse(games::createGame(QStringLiteral("scorched_earth")));
+    auto* scorchedMouseGame = dynamic_cast<games::ScorchedEarthGame*>(scorchedMouse.get());
+    REQUIRE(scorchedMouseGame != nullptr);
+    scorchedMouseGame->resize(640, 480);
+    scorchedMouseGame->start();
+    const double scorchedAimBeforeMouse = scorchedMouseGame->aimDegrees();
+    QMouseEvent scorchedAimMove(QEvent::MouseMove, QPointF(500.0, 170.0),
+                                Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+    QApplication::sendEvent(scorchedMouseGame, &scorchedAimMove);
+    REQUIRE(scorchedMouseGame->aimDegrees() > scorchedAimBeforeMouse);
+    QMouseEvent scorchedMouseFire(QEvent::MouseButtonPress, QPointF(500.0, 170.0),
+                                  Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(scorchedMouseGame, &scorchedMouseFire);
+    REQUIRE(scorchedMouseGame->activeProjectileCount() == 1);
+    scorchedMouseGame->stop();
 
     std::unique_ptr<games::GameEngine> legacyScoredEarth(
         games::createGame(QStringLiteral("scored_earth")));
