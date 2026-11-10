@@ -261,6 +261,53 @@ void OutlineTab::setupUI()
     m_sessionPainAfterEdit->setEnabled(false);
     m_sessionPain24hEdit->setEnabled(false);
 
+
+    auto* observationGroup = new QGroupBox(tr("Obserwacja wykonania ćwiczenia"), visualPanel);
+    auto* observationLayout = new QVBoxLayout(observationGroup);
+    auto addObservationField = [observationGroup, observationLayout](const QString& label,
+                                                                      QLineEdit*& field,
+                                                                      const QString& placeholder) {
+        observationLayout->addWidget(new QLabel(label, observationGroup));
+        field = new QLineEdit(observationGroup);
+        field->setPlaceholderText(placeholder);
+        observationLayout->addWidget(field);
+    };
+    addObservationField(tr("Ćwiczenie"), m_observationExerciseEdit, tr("Nazwa ćwiczenia"));
+    addObservationField(tr("Wykonane serie"), m_observationSetsEdit, tr("Liczba całkowita"));
+    addObservationField(tr("Wykonane powtórzenia"), m_observationRepetitionsEdit, tr("Łączna liczba powtórzeń"));
+    addObservationField(tr("Czas wykonania (sekundy)"), m_observationDurationEdit, tr("Opcjonalnie"));
+    addObservationField(tr("Odczuwalny wysiłek — RPE (0–10)"), m_observationRpeEdit, tr("Opcjonalnie"));
+    observationLayout->addWidget(new QLabel(tr("Jakość ruchu"), observationGroup));
+    m_observationMovementQualityCombo = new QComboBox(observationGroup);
+    m_observationMovementQualityCombo->addItem(tr("Nie oceniono"), QStringLiteral("not_assessed"));
+    m_observationMovementQualityCombo->addItem(tr("Prawidłowa"), QStringLiteral("acceptable"));
+    m_observationMovementQualityCombo->addItem(tr("Nieprawidłowa"), QStringLiteral("unacceptable"));
+    observationLayout->addWidget(m_observationMovementQualityCombo);
+    addObservationField(tr("Ból przed ćwiczeniem — NRS (0–10)"), m_observationPainBeforeEdit,
+                        tr("Wartość wymagana"));
+    addObservationField(tr("Ból po ćwiczeniu — NRS (0–10)"), m_observationPainAfterEdit,
+                        tr("Wartość wymagana"));
+    addObservationField(tr("Ból po 24 godzinach — NRS (0–10)"), m_observationPain24hEdit,
+                        tr("Opcjonalnie, po kontroli"));
+    m_saveObservationButton = new QPushButton(tr("Zapisz obserwację ćwiczenia"), observationGroup);
+    m_observationStatusLabel = new QLabel(tr("Wymagana aktywna sesja rehabilitacyjna."), observationGroup);
+    m_observationStatusLabel->setWordWrap(true);
+    m_observationHistoryBrowser = new QTextBrowser(observationGroup);
+    m_observationHistoryBrowser->setMaximumHeight(160);
+    m_observationHistoryBrowser->setOpenExternalLinks(false);
+    observationLayout->addWidget(m_saveObservationButton);
+    observationLayout->addWidget(m_observationStatusLabel);
+    observationLayout->addWidget(m_observationHistoryBrowser);
+    m_leftLayout->addWidget(observationGroup);
+    connect(m_saveObservationButton, &QPushButton::clicked,
+            this, &OutlineTab::createRehabilitationObservation);
+    m_saveObservationButton->setEnabled(false);
+    for (QLineEdit* field : {m_observationExerciseEdit, m_observationSetsEdit,
+                             m_observationRepetitionsEdit, m_observationDurationEdit,
+                             m_observationRpeEdit, m_observationPainBeforeEdit,
+                             m_observationPainAfterEdit, m_observationPain24hEdit})
+        field->setEnabled(false);
+
     connect(m_createGoalButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationGoal);
     m_createGoalButton->setEnabled(false);
@@ -284,6 +331,7 @@ void OutlineTab::setupUI()
                 refreshRehabilitationAssessments();
                 refreshRehabilitationGoals();
                 refreshRehabilitationSession();
+                refreshRehabilitationObservations();
             });
     connect(m_createEpisodeButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationEpisode);
@@ -1224,6 +1272,7 @@ void OutlineTab::refreshRehabilitationEpisodes()
     refreshRehabilitationAssessments();
     refreshRehabilitationGoals();
     refreshRehabilitationSession();
+    refreshRehabilitationObservations();
 }
 
 void OutlineTab::createRehabilitationEpisode()
