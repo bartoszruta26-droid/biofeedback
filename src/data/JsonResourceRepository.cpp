@@ -399,6 +399,33 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
         }
     }
 
+    if (collection == QStringLiteral("rehabilitation-sessions")) {
+        const QStringList painFields = {
+            QStringLiteral("pre_session_pain_nrs"),
+            QStringLiteral("post_session_pain_nrs"),
+            QStringLiteral("pain_at_24h_nrs")
+        };
+        for (const QString& field : painFields) {
+            if (!payload.contains(field)) continue;
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble()) ||
+                value.toDouble() < 0.0 || value.toDouble() > 10.0 ||
+                std::floor(value.toDouble()) != value.toDouble()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_SESSION_PAIN_NRS"));
+                return false;
+            }
+        }
+        const QString status = payload.value(QStringLiteral("session_status")).toString();
+        if (!status.isEmpty() &&
+            status != QStringLiteral("active") &&
+            status != QStringLiteral("awaiting_24h") &&
+            status != QStringLiteral("completed") &&
+            status != QStringLiteral("paused")) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_SESSION_STATUS"));
+            return false;
+        }
+    }
+
     if (collection == QStringLiteral("rehabilitation-assessments")) {
         const QStringList numericFields = {
             QStringLiteral("pain_nrs"), QStringLiteral("rom_degrees"),
