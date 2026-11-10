@@ -481,6 +481,13 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
     }
 
     if (collection == QStringLiteral("rehabilitation-assessments")) {
+        const QString assessmentType = payload.value(QStringLiteral("assessment_type")).toString();
+        if (assessmentType != QStringLiteral("baseline") &&
+            assessmentType != QStringLiteral("follow_up") &&
+            assessmentType != QStringLiteral("final")) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_ASSESSMENT_TYPE"));
+            return false;
+        }
         const QString icfReference = payload.value(QStringLiteral("icf_assessment_ref")).toString().trimmed();
         if (payload.contains(QStringLiteral("icf_assessment_ref"))) {
             if (icfReference.isEmpty()) {
