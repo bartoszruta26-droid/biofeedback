@@ -19,7 +19,7 @@ Po zmianie należy ponownie wgrać `hx711_advanced.ino` do Nano. Po uruchomieniu
 
 Wykres desktopowy odświeża się z docelową częstotliwością 120 Hz i oblicza punkty pośrednie metodą monotonicznej interpolacji sześciennej Hermite'a (ogranicznik Fritscha–Carlsona). Interpolacja jest ograniczona do przedziału pomiędzy sąsiednimi pomiarami, aby nie tworzyć sztucznych szczytów ani minimów.
 
-Punkty interpolowane służą wyłącznie do rysowania. Dziennik, analiza biomechaniczna, detekcja powtórzeń, serie i sterowanie grą otrzymują wyłącznie rzeczywiste próbki z urządzenia.
+Punkty interpolowane służą wyłącznie do rysowania. Dziennik, analiza biomechaniczna, detekcja powtórzeń, serie i sterowanie grą otrzymują wyłącznie rzeczywiste próbki z urządzenia. Zapis dziennika przyjmuje próbki nieblokująco do ograniczonej kolejki; synchronizacja z dyskiem jest grupowana co 8 próbek i przy zamykaniu sesji, aby pojedynczy fsync nie zatrzymywał odbioru UART.
 
 ## Detekcja powtórzeń i postęp
 
