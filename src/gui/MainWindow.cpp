@@ -179,7 +179,10 @@ void MainWindow::setupTabs()
                 [this](const biofeedback::measurement::MeasurementSample& sample) {
                     if (!sample.isValid() || sample.unit != "N" || !std::isfinite(sample.value))
                         return;
-                    constexpr double gameReferenceForceN = 50.0;
+                    // Full-scale game input corresponds to approximately 15 kgf.
+                    // 15 kg × standard gravity (9.80665 m/s²) ≈ 147.1 N;
+                    // use a rounded 150 N control range for all games.
+                    constexpr double gameReferenceForceN = 150.0;
                     const double normalized = qBound(
                         0.0, std::abs(sample.value) / gameReferenceForceN * 100.0, 100.0);
                     enqueueGameSensorInput(normalized);
