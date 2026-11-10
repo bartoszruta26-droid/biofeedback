@@ -136,7 +136,13 @@ void MarioGame::resizeEvent(QResizeEvent* event)
 
 void MarioGame::initPlayer()
 {
-    m_player.body = QRectF(50, height() * GROUND_Y_RATIO - 40, 32, 40);
+    const double viewWidth = qMax(1, width());
+    const double viewHeight = qMax(1, height());
+    const double playerWidth = qMin(32.0, viewWidth);
+    const double playerHeight = qMin(40.0, viewHeight * 0.5);
+    const double playerX = qBound(0.0, viewWidth * 0.08, viewWidth - playerWidth);
+    m_player.body = QRectF(playerX, qMax(0.0, viewHeight * GROUND_Y_RATIO - playerHeight),
+                           playerWidth, playerHeight);
     m_player.velocityY = 0.0;
     m_player.isJumping = false;
     m_player.isOnGround = true;
@@ -242,11 +248,16 @@ void MarioGame::updatePlayer(double deltaTime)
         }
     }
 
-    const bool landed = !wasGrounded && (landedOnPlatform || (!overGap && m_player.body.bottom() >= groundY));
+    const bool crossedGroundTop = previousBody.bottom() <= groundY &&
+                                  m_player.body.bottom() >= groundY;
+    const bool supportedByGround = !overGap &&
+        ((wasGrounded && previousBody.bottom() >= groundY - 1.0 &&
+          previousBody.bottom() <= groundY + 1.0) || crossedGroundTop);
+    const bool landed = !wasGrounded && (landedOnPlatform || supportedByGround);
     if (landedOnPlatform) {
         m_player.isOnGround = true;
         m_player.isJumping = false;
-    } else if (!overGap && m_player.body.bottom() >= groundY) {
+    } else if (supportedByGround) {
         m_player.body.setBottom(groundY);
         m_player.velocityY = 0.0;
         m_player.isJumping = false;
