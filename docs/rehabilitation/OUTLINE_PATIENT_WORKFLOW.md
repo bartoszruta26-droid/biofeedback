@@ -22,6 +22,7 @@ Dane osobowe pozostają w istniejącym module pacjentów. Sesja rehabilitacyjna 
 
 Pola powiązania:
 - patient_id: UUID wymagany;
+- icf_assessment_ref: UUID konkretnej, niezmiennej wersji oceny ICF; bez kopiowania odpowiedzi ICF do epizodu.
 - created_at, updated_at: UTC ISO-8601;
 - record_version: dodatnia liczba całkowita;
 - consent_status i consent_recorded_at: stan zgody oraz data, jeśli ma zastosowanie;
