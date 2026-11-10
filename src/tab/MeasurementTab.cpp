@@ -256,6 +256,11 @@ void ForcePlotWidget::addSample(double force, double time)
     if (!m_times.empty() && time < m_times.back())
         return;
 
+    // Legacy firmware can repeat or omit device timestamps. Preserve every
+    // accepted sample and keep the display clock strictly increasing.
+    if (!m_times.empty() && time <= m_times.back())
+        time = m_times.back() + (1.0 / 80.0);
+
     m_forces.push_back(force);
     m_times.push_back(time);
     m_lastSampleArrival.restart();
@@ -388,6 +393,17 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
                          QString("Cel [%1]").arg(getUnitLabel()));
     }
 
+    if (m_forces.size() == 1) {
+        const double y = margin + plotHeight -
+            ((m_forces.front() + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0, 100, 200));
+        painter.drawEllipse(QPointF(margin + plotWidth / 2.0, y), 4.0, 4.0);
+        painter.setPen(Qt::black);
+        painter.drawText(margin + plotWidth / 2 - 20, widgetHeight - 15, "Czas [s]");
+        painter.drawText(5, margin - 5, QString("Siła [%1]").arg(getUnitLabel()));
+        return;
+    }
     if (m_forces.size() < 2)
         return;
 
@@ -3362,9 +3378,38 @@ bool MeasurementTab::loadCalibrationProfile(QString* error)
     }
 
     QFile profileFile(profilePath);
+    if (!profileFile.exists()) {
+        // Provision a safe, explicit uncalibrated starter profile on first run.
+        // A fabricated scale factor would silently produce false physical forces.
+        const QFileInfo profileInfo(profilePath);
+        QDir().mkpath(profileInfo.absolutePath());
+        QJsonObject starterProfile{
+            {QStringLiteral("schemaVersion"), 1},
+            {QStringLiteral("deviceId"), QStringLiteral("UNASSIGNED-HX711")},
+            {QStringLiteral("firmwareVersion"), QStringLiteral("")},
+            {QStringLiteral("sensorModel"), QStringLiteral("HX711")},
+            {QStringLiteral("unit"), QStringLiteral("g")},
+            {QStringLiteral("zeroOffsetRaw"), 0.0},
+            {QStringLiteral("scaleFactor"), 0.0},
+            {QStringLiteral("referenceValue"), 0.0},
+            {QStringLiteral("referenceRaw"), 0},
+            {QStringLiteral("sampleCount"), 0},
+            {QStringLiteral("createdAtUtc"), QStringLiteral("")},
+            {QStringLiteral("status"), QStringLiteral("uncalibrated")}
+        };
+        QSaveFile starterFile(profilePath);
+        if (starterFile.open(QIODevice::WriteOnly)) {
+            starterFile.write(QJsonDocument(starterProfile).toJson(QJsonDocument::Indented));
+            starterFile.commit();
+        }
+        m_hasCalibrationProfile = false;
+        if (error) *error = tr("Utworzono domyślny plik profilu kalibracji (nie skalibrowano): %1. Wprowadź rzeczywiste wartości wzorcowe przed użyciem N/kg.")
+                                .arg(profilePath);
+        return false;
+    }
     if (!profileFile.open(QIODevice::ReadOnly)) {
         m_hasCalibrationProfile = false;
-        if (error) *error = tr("Nie znaleziono pliku: %1").arg(profilePath);
+        if (error) *error = tr("Nie można otworzyć pliku: %1").arg(profilePath);
         return false;
     }
     QJsonParseError profileParseError;
