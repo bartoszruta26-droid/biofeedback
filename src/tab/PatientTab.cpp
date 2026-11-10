@@ -323,16 +323,21 @@ void PatientTab::openIcfAssessmentDialog()
                 rowLayout->setContentsMargins(0, 0, 0, 0);
                 auto* performance = new QComboBox(row);
                 auto* capacity = new QComboBox(row);
-                const QStringList options = {
+                const QStringList optionLabels = {
                     tr("0 — brak trudności"), tr("1 — trudność niewielka"),
                     tr("2 — trudność umiarkowana"), tr("3 — trudność znaczna"),
                     tr("4 — trudność całkowita"), tr("8 — nieokreślona"),
                     tr("9 — nie dotyczy")
                 };
-                performance->addItems(options);
-                capacity->addItems(options);
-                performance->setCurrentIndex(qBound(0, old.value(QStringLiteral("performance")).toInt(8), 6));
-                capacity->setCurrentIndex(qBound(0, old.value(QStringLiteral("capacity")).toInt(8), 6));
+                const QList<int> optionValues = {0, 1, 2, 3, 4, 8, 9};
+                for (int i = 0; i < optionLabels.size(); ++i) {
+                    performance->addItem(optionLabels.at(i), optionValues.at(i));
+                    capacity->addItem(optionLabels.at(i), optionValues.at(i));
+                }
+                performance->setCurrentIndex(performance->findData(
+                    old.value(QStringLiteral("performance")).toInt(8)));
+                capacity->setCurrentIndex(capacity->findData(
+                    old.value(QStringLiteral("capacity")).toInt(8)));
                 rowLayout->addWidget(new QLabel(tr("Wykonanie:"), row));
                 rowLayout->addWidget(performance, 1);
                 rowLayout->addWidget(new QLabel(tr("Zdolność:"), row));
@@ -343,17 +348,21 @@ void PatientTab::openIcfAssessmentDialog()
             } else {
                 auto* combo = new QComboBox(group);
                 if (domain == 2) {
-                    combo->addItems({tr("0 — neutralny czynnik"), tr("-1 — niewielka bariera"),
+                    const QStringList labels = {tr("0 — neutralny czynnik"), tr("-1 — niewielka bariera"),
                         tr("-2 — umiarkowana bariera"), tr("-3 — znaczna bariera"),
                         tr("-4 — całkowita bariera"), tr("+1 — niewielki ułatwiacz"),
                         tr("+2 — umiarkowany ułatwiacz"), tr("+3 — znaczny ułatwiacz"),
-                        tr("+4 — zasadniczy ułatwiacz"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")});
-                    combo->setCurrentIndex(qBound(0, old.value(QStringLiteral("qualifier")).toInt(9), 10));
+                        tr("+4 — zasadniczy ułatwiacz"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")};
+                    const QList<int> values = {0, -1, -2, -3, -4, 1, 2, 3, 4, 8, 9};
+                    for (int i = 0; i < labels.size(); ++i) combo->addItem(labels.at(i), values.at(i));
+                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(8)));
                 } else {
-                    combo->addItems({tr("0 — brak problemu"), tr("1 — problem niewielki"),
+                    const QStringList labels = {tr("0 — brak problemu"), tr("1 — problem niewielki"),
                         tr("2 — problem umiarkowany"), tr("3 — problem znaczny"),
-                        tr("4 — problem całkowity"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")});
-                    combo->setCurrentIndex(qBound(0, old.value(QStringLiteral("qualifier")).toInt(8), 6));
+                        tr("4 — problem całkowity"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")};
+                    const QList<int> values = {0, 1, 2, 3, 4, 8, 9};
+                    for (int i = 0; i < labels.size(); ++i) combo->addItem(labels.at(i), values.at(i));
+                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(8)));
                 }
                 form->addRow(label, combo);
                 qualifiers.insert(code, combo);
@@ -386,11 +395,11 @@ void PatientTab::openIcfAssessmentDialog()
 
     QJsonObject responses;
     for (auto it = qualifiers.constBegin(); it != qualifiers.constEnd(); ++it)
-        responses.insert(it.key(), QJsonObject{{QStringLiteral("qualifier"), it.value()->currentIndex()}});
+        responses.insert(it.key(), QJsonObject{{QStringLiteral("qualifier"), it.value()->currentData().toInt()}});
     for (auto it = performances.constBegin(); it != performances.constEnd(); ++it)
         responses.insert(it.key(), QJsonObject{
-            {QStringLiteral("performance"), it.value()->currentIndex()},
-            {QStringLiteral("capacity"), capacities.value(it.key())->currentIndex()}
+            {QStringLiteral("performance"), it.value()->currentData().toInt()},
+            {QStringLiteral("capacity"), capacities.value(it.key())->currentData().toInt()}
         });
 
     const QJsonObject assessment{
