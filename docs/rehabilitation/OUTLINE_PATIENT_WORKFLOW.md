@@ -244,3 +244,12 @@ Porównanie musi zestawiać tę samą stronę, pozycję, metodę, urządzenie/pr
 - Raport pokazuje porównywalne pomiary, ich różnicę, metodę i brakujące dane.
 - Testy potwierdzają izolację danych pacjentów, ochronę przed konfliktami wersji i brak danych osobowych w logach.
 - Testy nie używają rzeczywistych danych pacjentów.
+
+## Status implementacji w repozytorium
+
+Pierwszy element wykonawczy został dodany:
+- `include/rehabilitation/ProgressionRules.hpp` — niezależny od GUI, deterministyczny silnik oceny kryteriów;
+- `tests/rehabilitation_progression_rules_regression.cpp` — testy braku danych, zakresów NRS, nieprawidłowych wartości liczbowych, jakości ruchu, dawki, zdarzeń niepożądanych, czerwonych flag, konfliktu ograniczeń pooperacyjnych i zatwierdzania przez terapeutę;
+- test zarejestrowany w CMake jako `rehabilitation_progression_rules_regression`.
+
+Silnik zwraca wyłącznie rekomendację. Nie zapisuje danych, nie zmienia recepty ćwiczenia i nie wykonuje progresji. Zatwierdzenie wymaga uwierzytelnionego terapeuty oraz jawnej akceptacji; warstwa aplikacyjna musi dopisać do tego trwały ślad audytowy. Interfejs, trwały model epizodu, rejestracja bólu i raport porównawczy pozostają kolejnymi etapami.
