@@ -105,3 +105,16 @@ Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie
 - [x] Drugi przebieg kompilacji wykazał niejednorodne typy argumentów Qt `qBound/qMax` (float/double) w nowym ograniczeniu kąta Pong oraz istniejącym przeliczaniu luki Flappy Bird. Ujednolicono obliczenia do `double` przed konwersją wyniku do stanu gry. Commity: `57b28c12f35891bba176299064b820b2a24f21c5`, `f5b64697f2d87c863ddcff420683fb465998f214`. Wymagana ponowna kompilacja aktualnego HEAD.
 - [x] Test `game_factory_regression` wykrył przypadek zmiany rozmiaru ukrytego widgetu: Qt może przekazać nieprawidłowy `oldSize`, przez co pozycja ptaka była jedynie przycinana do nowego widoku (w małym oknie tuż przy ziemi). Flappy Bird przechowuje teraz ostatni znany rozmiar logiczny, ustawia go podczas inicjalizacji, a przy braku poprawnego rozmiaru odtwarza proporcje pozycji początkowej. Usunięto też skalowanie bazowych parametrów luk, aby trudność nie zależała od historii zmian okna. Commity: `c4d4031e6649f3e667139fd4f41d2508e81a91e3`, `9b0cd8cd0ac1368f7773b27c06e64fc7d974dc93`. Wymagane ponowne uruchomienie kompilacji i testów.
 - [x] Kolejny przebieg potwierdził, że test nadal nie przechodzi, ponieważ ukryty widget może w ogóle nie otrzymać `resizeEvent()` przed następną klatką. Przeniesiono dopasowanie geometrii do wspólnej metody `adaptToSize()`, wywoływanej zarówno z `resizeEvent()`, jak i defensywnie z `update()` przy wykryciu zmiany rzeczywistych wymiarów. Dzięki temu zmiana rozmiaru jest obsługiwana również dla niewidocznych widgetów. Commity: `fd30a1479c076130080ec07c086f36216da5f2e4`, `4df128b2ea3478bfb3c1a315950a1a2b63bc9eae`. Oczekuje na ponowną kompilację i testy.
+
+
+## Flappy Bird — audyt użyteczności i sterowania
+
+- [x] Dodano sterowanie alternatywne: spacja, strzałka w górę, W oraz kliknięcie lewym przyciskiem myszy; widget otrzymuje fokus klawiatury.
+- [x] Impuls machnięcia jest kolejkowany do kroku symulacji. Utrzymanie nacisku/klawisza nie może stale nadpisywać grawitacji.
+- [x] Wejście tensometru odrzuca NaN/Inf i korzysta z histerezy progu aktywacji, ograniczającej wielokrotne wyzwalanie przez szum.
+- [x] Zachowano proporcjonalną siłę impulsu; sterowanie ręczne bez aktywnego sensora używa bezpiecznej siły domyślnej.
+- [x] Zachowano resztę czasu generatora przeszkód zamiast zerować timer po każdym spawnie.
+- [x] Po zakończeniu gry wyświetlana jest instrukcja ponownego uruchomienia; spacja lub kliknięcie rozpoczyna nową sesję.
+- [x] Dodano regresje dla impulsu z tensometru, histerezy, nieprawidłowych próbek, sterowania klawiaturą/myszą oraz ponownego uruchomienia.
+- [ ] Wymagana pełna kompilacja Qt5 i testy CI dla aktualnego SHA tej gałęzi.
+- [ ] Wymagany test praktyczny z Arduino Nano/HX711; CI nie potwierdza jakości kalibracji ani odczuć użytkownika.
