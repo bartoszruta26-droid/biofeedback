@@ -170,6 +170,7 @@ void MainWindow::setupTabs()
     if (m_serialPort) {
         m_measurementTab->setSerialConnection(m_serialPort);
         m_outlineTab->setSerialConnection(m_serialPort);
+        m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());
         m_trainingTab->setSerialConnection(m_serialPort);
         m_trainingTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());
         m_trainingTab->setSensorCalibrationReady(m_measurementTab->hasCalibrationProfile());
