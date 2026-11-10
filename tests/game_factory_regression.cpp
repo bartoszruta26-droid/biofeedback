@@ -175,6 +175,10 @@ int main(int argc, char **argv)
     flappyManualGame->update(1.0 / 60.0);
     REQUIRE(flappyManualGame->birdVerticalVelocity() < 0.0);
     flappyManualGame->stop();
+    QKeyEvent flappyRestart(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(flappyManualGame, &flappyRestart);
+    REQUIRE(flappyManualGame->isRunning());
+    flappyManualGame->stop();
 
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
