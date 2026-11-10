@@ -253,3 +253,21 @@ Pierwszy element wykonawczy został dodany:
 - test zarejestrowany w CMake jako `rehabilitation_progression_rules_regression`.
 
 Silnik zwraca wyłącznie rekomendację. Nie zapisuje danych, nie zmienia recepty ćwiczenia i nie wykonuje progresji. Zatwierdzenie wymaga uwierzytelnionego terapeuty oraz jawnej akceptacji; warstwa aplikacyjna musi dopisać do tego trwały ślad audytowy. Interfejs, trwały model epizodu, rejestracja bólu i raport porównawczy pozostają kolejnymi etapami.
+
+
+## Aktualizacja implementacji — trwały magazyn danych rehabilitacyjnych
+
+Wspólny `JsonResourceRepository` udostępnia teraz następujące kolekcje:
+
+- `rehabilitation-episodes` — epizody rehabilitacyjne;
+- `rehabilitation-assessments` — oceny początkowe, kontrolne i końcowe;
+- `rehabilitation-goals` — cele terapeutyczne;
+- `rehabilitation-sessions` — sesje rehabilitacyjne;
+- `rehabilitation-observations` — obserwacje ćwiczeń, w tym ból i dawka;
+- `rehabilitation-decisions` — oceny reguł progresji i decyzje wymagające zatwierdzenia.
+
+Każdy rekord rehabilitacyjny wymaga istniejącego `patient_id` będącego UUID rekordu w kolekcji `patients`. Rekordy zależne wymagają `episode_id`; obserwacje i decyzje wymagają również `session_id`. Repozytorium weryfikuje zgodność pacjenta i epizodu pomiędzy powiązanymi rekordami. Usunięcie pacjenta, epizodu lub sesji jest blokowane, gdy istnieją rekordy zależne. Dane nadal przechodzą przez dotychczasowy mechanizm szyfrowania, ograniczenia dostępu do plików i wersjonowania optymistycznego.
+
+Test regresyjny repozytorium obejmuje tworzenie i usuwanie sześciu rodzajów rekordów, odrzucanie nieistniejącego pacjenta oraz ochronę relacji przed osieroceniem.
+
+**Ograniczenie integracyjne:** obecny `PatientTab` emituje PESEL i ścieżkę lokalną, a nie UUID z `JsonResourceRepository`. Dlatego nie należy jeszcze łączyć go bezpośrednio z nowymi rekordami rehabilitacyjnymi ani traktować PESEL jako `patient_id`. Następnym wymaganym etapem jest ujednolicenie źródła tożsamości pacjenta i migracja/odczyt istniejących kartotek do wspólnego repozytorium, zanim zostanie udostępniony formularz kliniczny w `OutlineTab`.
