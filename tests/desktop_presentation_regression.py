@@ -9,6 +9,10 @@ def read(path):
 main = read("src/gui/MainWindow.cpp")
 measurement = read("src/tab/MeasurementTab.cpp")
 training = read("src/tab/TrainingTab.cpp")
+patient = read("src/tab/PatientTab.cpp")
+outline = read("src/tab/OutlineTab.cpp")
+debug = read("src/tab/DebugTab.cpp")
+graph = read("src/gui/GraphWidget.cpp")
 measurement_header = read("include/tab/MeasurementTab.hpp")
 
 assert "if (!sample.isValid() || sample.unit != \"N\"" in main
@@ -62,6 +66,16 @@ assert "optionsLayout->addLayout(m_controlLayout);" in measurement
 assert "QApplication::setFont(QFont(\"Arial\", 8));" in main
 assert "QWidget{font-size:8pt;}" in main
 assert "m_exerciseSelector->setMinimumWidth(0);" in training
+# No secondary tab or custom graph may reintroduce oversized explicit fonts.
+for source in (patient, outline, debug, graph):
+    assert 'QFont("Arial", 10' not in source
+    assert 'QFont("Arial", 11' not in source
+    assert 'QFont("Arial", 12' not in source
+    assert 'QFont("Arial", 14' not in source
+assert 'QFont("Sans Serif", 12' not in outline
+assert 'QFont("Sans Serif", 14' not in outline
+assert 'QFont("Courier New", 9' not in debug
+assert "titleFont.setPointSize(12);" not in graph
 assert "m_visualLayout->addWidget(m_liveBox, 3);" in measurement
 assert "m_visualLayout->addWidget(m_statsBox);" in measurement
 assert "m_visualLayout->addWidget(m_biomechBox);" in measurement
