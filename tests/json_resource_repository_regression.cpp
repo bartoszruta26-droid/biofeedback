@@ -247,7 +247,8 @@ int main(int argc, char** argv) {
 
     assert(!restarted.remove(QStringLiteral("rehabilitation-episodes"), episodeId, 1, &error));
     assert(error == QStringLiteral("REHABILITATION_EPISODE_HAS_REFERENCES"));
-    assert(!restarted.remove(QStringLiteral("rehabilitation-sessions"), rehabSessionId, 1, &error));
+    assert(!restarted.remove(QStringLiteral("rehabilitation-sessions"), rehabSessionId,
+                            completedRehabSession.value(QStringLiteral("version")).toInt(), &error));
     assert(error == QStringLiteral("REHABILITATION_SESSION_HAS_REFERENCES"));
 
     assert(restarted.remove(QStringLiteral("rehabilitation-decisions"),
