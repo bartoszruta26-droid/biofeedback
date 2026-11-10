@@ -34,7 +34,7 @@ for required in (
     "m_recordedSamples.append(recorded)",
     "bool MeasurementTab::openSampleJournal()",
     "SampleJournalWriter m_sampleJournalWriter",
-    "m_sampleJournalWriter.appendDurably(line)",
+    "m_sampleJournalWriter.append(line)",
     "m_totalDroppedMeasurementSamples",
     "dziennik trwały zachowuje pełny pomiar",
     "m_sampleJournalWriter.finish()",
@@ -185,7 +185,7 @@ if "removeFirst()" in add_sample_body or "for (double sample : m_forces)" in add
     raise SystemExit("ForcePlotWidget must not shift or rescan the full visible trace per sample")
 
 
-# Durable acquisition commits precede publication to the lossy GUI queue.
+# Journal queue admission precedes publication to the lossy GUI queue; fsync is batched.
 engine_source = Path("src/measurement/MeasurementEngine.cpp").read_text(encoding="utf-8")
 for required in (
     "m_measurementEngine->setCommitHook",
@@ -194,7 +194,7 @@ for required in (
     "m_journalAdmission.store(false",
     "m_measurementSessionGeneration.fetch_add(1",
     "sessionGeneration != m_measurementSessionGeneration.load",
-    "m_sampleJournalWriter.appendDurably(line)",
+    "m_sampleJournalWriter.append(line)",
     "m_journalNextSequence.store(sequence + 1",
     "bool MeasurementTab::restoreSampleJournalIntoSession()",
     "expectedSequence != m_journalNextSequence.load",
