@@ -175,6 +175,10 @@ assert "m_currentEpisodeUuid = m_episodeSelector->currentData().toString();" in 
 assert "rehabilitation-assessments" in outline
 assert "createRehabilitationAssessment()" in read("include/tab/OutlineTab.hpp")
 assert 'QStringLiteral("pain_nrs")' in outline
+assert 'QStringLiteral("icf_assessment_ref")' in outline
+assert 'Link the rehabilitation assessment to the exact ICF assessment version.' in outline
+assert 'REHABILITATION_ICF_ASSESSMENT_NOT_FOUND' in read("src/data/JsonResourceRepository.cpp")
+assert 'icf_assessment_history' in read("src/data/JsonResourceRepository.cpp")
 assert 'QStringLiteral("rom_degrees")' in outline
 assert 'QStringLiteral("strength_mrc")' in outline
 assert 'QStringLiteral("swelling_cm")' in outline
