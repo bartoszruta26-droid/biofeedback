@@ -1756,8 +1756,11 @@ void OutlineTab::exportRehabilitationReportPdf()
         html += QStringLiteral("<table><tr><th>Domena ICF</th><th>Kwalifikator</th><th>Wykonanie</th><th>Zdolność</th><th>Zakres</th><th>Charakter</th><th>Lokalizacja</th></tr>");
         for (auto it = responses.constBegin(); it != responses.constEnd(); ++it) {
             const QJsonObject response = it.value().toObject();
-            const auto valueFor = [&response](const QString& key) {
-                return response.contains(key) ? response.value(key).toVariant().toString() : QString();
+            const auto valueFor = [this, &response](const QString& key) {
+                if (!response.contains(key)) return QString();
+                const QJsonValue raw = response.value(key);
+                if (raw.isDouble() && raw.toInt() == -99) return tr("Nie oceniono");
+                return raw.toVariant().toString();
             };
             html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td></tr>")
                 .arg(safe(it.key()), safe(valueFor(QStringLiteral("qualifier"))),
