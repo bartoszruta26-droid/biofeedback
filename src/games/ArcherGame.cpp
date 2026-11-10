@@ -1,5 +1,6 @@
 #include "games/ArcherGame.hpp"
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
@@ -18,6 +19,7 @@ ArcherGame::ArcherGame(QWidget *parent)
     , m_fireCooldown(0.0)
 {
     setFocusPolicy(Qt::StrongFocus);
+    setMouseTracking(true);
 }
 
 QString ArcherGame::gameName() const
@@ -73,6 +75,8 @@ void ArcherGame::repositionTarget()
 
 bool ArcherGame::handleInput(double value)
 {
+    if (!std::isfinite(value))
+        return false;
     m_force = qBound(0.0, value / 100.0, 1.0);
     // Low force aims lower; high force raises the bow.
     m_aimAngle = 0.55 - m_force * 1.45;
@@ -104,6 +108,28 @@ void ArcherGame::keyPressEvent(QKeyEvent* event)
         m_aimAngle = qMin(0.85, m_aimAngle + 0.06);
     else
         GameEngine::keyPressEvent(event);
+}
+
+void ArcherGame::mouseMoveEvent(QMouseEvent* event)
+{
+    const QPointF origin(72.0, height() - 72.0);
+    const QPointF cursor = event->localPos();
+    const double dx = cursor.x() - origin.x();
+    const double dy = cursor.y() - origin.y();
+    if (dx > 1.0)
+        m_aimAngle = qBound(-1.25, std::atan2(dy, dx), 0.85);
+    event->accept();
+}
+
+void ArcherGame::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        setFocus(Qt::MouseFocusReason);
+        fireArrow();
+        event->accept();
+        return;
+    }
+    QWidget::mousePressEvent(event);
 }
 
 void ArcherGame::update(double deltaTime)
