@@ -1394,7 +1394,7 @@ void OutlineTab::refreshRehabilitationAssessments()
         baselineAssessment.value(QStringLiteral("id")).toString() !=
             latestAssessment.value(QStringLiteral("id")).toString()) {
         QStringList comparisons;
-        const struct Metric { const char* key; const char* label; const char* unit; };
+        struct Metric { const char* key; const char* label; const char* unit; };
         static const Metric metrics[] = {
             {"pain_nrs", "NRS", "/10"}, {"rom_degrees", "ROM", "°"},
             {"strength_mrc", "MRC", "/5"}, {"swelling_cm", "Obwód", "cm"}
