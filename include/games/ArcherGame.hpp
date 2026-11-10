@@ -20,6 +20,10 @@ public:
     QString gameName() const override;
     double targetSpeed() const { return m_targetSpeed; }
     int activeArrowCount() const;
+    int shotsFired() const { return m_shotsFired; }
+    int successfulHits() const { return m_successfulHits; }
+    int missedShots() const { return m_missedShots; }
+    double aimAngle() const { return m_aimAngle; }
 
 protected:
     void initialize() override;
@@ -27,6 +31,7 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void keyReleaseEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -47,6 +52,11 @@ private:
     double m_targetSpeed;
     double m_gravity;
     double m_fireCooldown;
+    int m_shotsFired{0};
+    int m_successfulHits{0};
+    int m_missedShots{0};
+    bool m_aimUp{false};
+    bool m_aimDown{false};
 };
 
 } // namespace games
