@@ -33,12 +33,17 @@
 
 ### 3. Pong Force Trainer
 
-**Cel:** odbijaj piłkę lewą paletką i zdobywaj punkty przeciwko paletce sterowanej przez komputer.
+**Cel:** odbijaj piłkę lewą paletką, zdobywaj punkty i utrzymuj możliwie długą wymianę z przeciwnikiem sterowanym przez komputer.
 
-- **Tensometr:** zmienia pionowe położenie lewej paletki. Reguluj nacisk, aby ustawić paletkę na torze piłki.
-- **Wskaźniki:** wynik gracza i przeciwnika, siła wejściowa oraz poziom trudności.
-- **Klawiatura:** w wersji bazowej brak odrębnego sterowania paletką klawiszami.
-- **Punktacja:** punkt gracza jest naliczany po tym, gdy piłka minie stronę przeciwnika; odbicia od paletek i ścian nie są punktami.
+- **Tensometr / HX711:** steruje pionowym położeniem lewej paletki. Wejście jest interpretowane jako skalibrowana siła w zakresie **0–100%**: 0% ustawia paletkę przy dolnej krawędzi, a 100% przy górnej. Wartości spoza zakresu są ograniczane do 0–100%.
+- **Płynność sterowania:** sygnał siły jest wygładzany z czasem charakterystycznym 75 ms. Dzięki temu krótkie skoki odczytu nie powodują gwałtownych ruchów paletki.
+- **Brak sygnału:** jeżeli przez 350 ms nie nadejdzie świeża próbka czujnika, wymiana zostaje zatrzymana. Piłka nie porusza się i wynik nie zmienia się do czasu wznowienia strumienia pomiarowego.
+- **Serwis:** po każdym punkcie następuje 650 ms przerwy. Piłka rozpoczyna kolejną wymianę w stronę gracza, który stracił punkt.
+- **Przeciwnik AI:** porusza paletką z prędkością zależną od poziomu trudności 1–5. Gdy piłka leci w stronę gracza, komputer wraca w okolice środka zamiast stale śledzić piłkę.
+- **Zmiana rozmiaru:** paletki i piłka są dopasowywane do aktualnych wymiarów okna; pozycje paletek pozostają w granicach pola gry.
+- **Wskaźniki:** wynik gracza i komputera, bieżąca siła, poziom trudności, pasek siły oraz status oczekiwania na sygnał czujnika.
+- **Klawiatura:** ta wersja nie udostępnia osobnych klawiszy do przesuwania paletki, serwisu ani strzału. Start, pauza, wznowienie, zatrzymanie i reset obsługuje interfejs treningowy.
+- **Punktacja:** punkt gracza jest naliczany, gdy cała piłka opuści pole gry po stronie przeciwnika; analogicznie punkt komputera jest naliczany po opuszczeniu pola po stronie gracza. Odbicia od paletek i ścian nie dają punktów.
 
 ### 4. Arkanoid
 
@@ -109,7 +114,7 @@
 |---|---|---|
 | Sinus | pionowe położenie kursora względem celu | brak skrótów gry |
 | Tangens | pionowe położenie kursora względem celu | brak skrótów gry |
-| Pong | pionowe położenie lewej paletki | brak skrótów gry |
+| Pong | siła 0–100%: dół–góra; wygładzanie 75 ms; zatrzymanie wymiany po 350 ms bez próbki | brak skrótów gry |
 | Arkanoid | poziome położenie paletki | brak skrótów gry |
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
