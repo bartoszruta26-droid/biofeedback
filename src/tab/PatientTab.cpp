@@ -333,15 +333,15 @@ void PatientTab::openIcfAssessmentDialog()
                     tr("4 — trudność całkowita"), tr("8 — nieokreślona"),
                     tr("9 — nie dotyczy")
                 };
-                const QList<int> optionValues = {-1, 0, 1, 2, 3, 4, 8, 9};
+                const QList<int> optionValues = {-99, 0, 1, 2, 3, 4, 8, 9};
                 for (int i = 0; i < optionLabels.size(); ++i) {
                     performance->addItem(optionLabels.at(i), optionValues.at(i));
                     capacity->addItem(optionLabels.at(i), optionValues.at(i));
                 }
                 performance->setCurrentIndex(performance->findData(
-                    old.value(QStringLiteral("performance")).toInt(-1)));
+                    old.value(QStringLiteral("performance")).toInt(-99)));
                 capacity->setCurrentIndex(capacity->findData(
-                    old.value(QStringLiteral("capacity")).toInt(-1)));
+                    old.value(QStringLiteral("capacity")).toInt(-99)));
                 rowLayout->addWidget(new QLabel(tr("Wykonanie:"), row));
                 rowLayout->addWidget(performance, 1);
                 rowLayout->addWidget(new QLabel(tr("Zdolność:"), row));
@@ -358,14 +358,14 @@ void PatientTab::openIcfAssessmentDialog()
                         tr("+2 — umiarkowany ułatwiacz"), tr("+3 — znaczny ułatwiacz"),
                         tr("+4 — zasadniczy ułatwiacz"), tr("-8 — bariera, stopień nieokreślony"),
                         tr("+8 — ułatwiacz, stopień nieokreślony"), tr("9 — nie dotyczy")};
-                    const QList<int> values = {-1, 0, -1, -2, -3, -4, 1, 2, 3, 4, -8, 8, 9};
+                    const QList<int> values = {-99, 0, -1, -2, -3, -4, 1, 2, 3, 4, -8, 8, 9};
                     for (int i = 0; i < labels.size(); ++i) combo->addItem(labels.at(i), values.at(i));
-                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(-1)));
+                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(-99)));
                 } else {
                     const QStringList labels = {tr("Nie oceniono"), tr("0 — brak problemu"), tr("1 — problem niewielki"),
                         tr("2 — problem umiarkowany"), tr("3 — problem znaczny"),
                         tr("4 — problem całkowity"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")};
-                    const QList<int> values = {-1, 0, 1, 2, 3, 4, 8, 9};
+                    const QList<int> values = {-99, 0, 1, 2, 3, 4, 8, 9};
                     for (int i = 0; i < labels.size(); ++i) combo->addItem(labels.at(i), values.at(i));
                     combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(8)));
                 }
