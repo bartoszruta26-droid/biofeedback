@@ -304,7 +304,8 @@ void MarioGame::generateObstacles(double deltaTime)
         } else if (rand < 45) {
             // Rurka (25%)
             obstacle.type = Obstacle::PIPE;
-            int pipeHeight = 40 + (m_currentLevel * 10);
+            const int maximumPipeHeight = qMax(40, static_cast<int>(height() * 0.45));
+            int pipeHeight = qMin(maximumPipeHeight, 40 + (m_currentLevel * 8));
             obstacle.rect = QRectF(width(), groundY - pipeHeight, 50, pipeHeight);
         } else if (rand < 60 && m_currentLevel >= 2) {
             // Platforma (15%, od poziomu 2)
@@ -313,7 +314,9 @@ void MarioGame::generateObstacles(double deltaTime)
         } else if (rand < 75 && m_currentLevel >= 3) {
             // Dziura (15%, od poziomu 3)
             obstacle.type = Obstacle::GAP;
-            obstacle.rect = QRectF(width(), groundY, 60 + (m_currentLevel * 10), height() - groundY);
+            const double maximumGapWidth = qMax(40.0, width() * 0.25);
+            const double gapWidth = qMin(maximumGapWidth, 60.0 + (m_currentLevel * 8.0));
+            obstacle.rect = QRectF(width(), groundY, gapWidth, height() - groundY);
         } else {
             // Domyślnie kolce
             obstacle.type = Obstacle::SPIKE;
