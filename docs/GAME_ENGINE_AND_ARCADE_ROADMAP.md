@@ -123,7 +123,7 @@ Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie
 
 ## Rozszerzenie Sinus Force Trainer — trening progresywny
 
-- [x] Kalibracja wejścia: dowolny poprawny przedział minimum–maksimum jest mapowany na zakres sterowania 0–100%; niepoprawny przedział nie zmienia aktywnej kalibracji.
+- [x] Kalibracja wejścia: dowolny poprawny przedział minimum–maksimum jest mapowany na zakres sterowania 0–100%; niepoprawny przedział nie zmienia aktywnej kalibracji. Klawisze `[` i `]` zapisują bieżący odczyt jako odpowiednio minimum i maksimum.
 - [x] Trzy profile przebiegu celu: sinusoidalny (1), trójkątny (2) i łagodny plateau (3), przełączane klawiszami 1–3.
 - [x] Regulacja trudności w trakcie ćwiczenia klawiszami +/− lub strzałkami góra/dół; zmiana poziomu nie zeruje wyniku.
 - [x] Opcjonalna adaptacja trudności klawiszem A: analiza 12-sekundowego okna, podniesienie poziomu przy utrzymaniu celu przez co najmniej 82% czasu i obniżenie przy wyniku poniżej 42%.
