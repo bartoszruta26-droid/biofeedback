@@ -3,6 +3,7 @@
 
 #include "games/GameEngine.hpp"
 #include "sensor/SerialCommunication.hpp"
+#include <QString>
 #include <memory>
 
 namespace games {
@@ -16,11 +17,8 @@ public:
     ~TanGame() override = default;
 
     QString gameName() const override;
-
     void setDifficultyLevel(int level);
     int getDifficultyLevel() const;
-
-    // Public for parity with SinGame and deterministic regression coverage.
     void update(double deltaTime) override;
 
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
@@ -34,6 +32,7 @@ protected:
 
 private:
     void calculateTargetY(double x);
+    void updateSpatialFrequency();
     QColor getDifficultyColor() const;
 
     double m_currentForce;
@@ -41,15 +40,20 @@ private:
     double m_phase;
     double m_cursorY;
     bool m_isHit;
+    bool m_nearAsymptote;
 
     int m_difficultyLevel;
-    double m_scrollSpeed; // piksele na sekundę
-    double m_tolerance;   // tolerancja trafienia w pikselach
-    double m_frequency;   // radiany na piksel
+    double m_scrollSpeed;
+    double m_tolerance;
+    double m_frequency;
+    double m_inputAge;
+    double m_scoreFraction;
+    double m_trackingSeconds;
+    int m_combo;
+    QString m_feedbackText;
 
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
 
-    static constexpr double MIN_FORCE = 0.0;
     static constexpr double MAX_FORCE = 100.0;
 };
 
