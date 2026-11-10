@@ -369,8 +369,8 @@ int main() {
     });
     serial.startAsyncReading();
     serial.startAsyncReading(); // idempotent while the worker is active
-    if (!readLine(master, command, 1000) || command != "CONT\\n") {
-        std::cerr << "Async reader did not enable continuous stream mode\\n";
+    if (!readLine(master, command, 1000) || command != "CONT\n") {
+        std::cerr << "Async reader did not enable continuous stream mode\n";
         serial.stopAsyncReading();
         serial.disconnect();
         ::close(master);
@@ -399,7 +399,7 @@ int main() {
     }
     if (::write(master, callbackFrames.data(), callbackFrames.size()) !=
         static_cast<ssize_t>(callbackFrames.size())) {
-        std::cerr << "Could not provide continuous PTY frames for async callback check\\n";
+        std::cerr << "Could not provide continuous PTY frames for async callback check\n";
         serial.stopAsyncReading();
         serial.disconnect();
         ::close(master);
@@ -414,7 +414,7 @@ int main() {
     serial.stopAsyncReading(); // reap the worker after its callback requested disconnect
     if (!callbackDisconnected.load(std::memory_order_acquire) ||
         callbackCount.load(std::memory_order_acquire) != 2 || serial.isConnected()) {
-        std::cerr << "Continuous async stream did not deliver two valid frames safely\\n";
+        std::cerr << "Continuous async stream did not deliver two valid frames safely\n";
         serial.disconnect();
         ::close(master);
         return 1;
