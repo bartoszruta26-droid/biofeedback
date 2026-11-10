@@ -171,7 +171,7 @@ void FlappyBirdGame::onSensorDataReceived(const sensor::SensorData& data) {
         return;
     }
     
-    normalizeForceValue(data.calibratedValue);
+    handleSensorInput(data.calibratedValue);
 }
 
 void FlappyBirdGame::onConnectionStatusChanged(bool connected, const std::string& message) {
@@ -304,6 +304,18 @@ void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
             static_cast<double>(obstacle.xPosition),
             static_cast<double>(newSize.width())));
     }
+}
+
+void FlappyBirdGame::paintEvent(QPaintEvent* event) {
+    if (isRunning()) {
+        GameEngine::paintEvent(event);
+        return;
+    }
+    Q_UNUSED(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.fillRect(rect(), Qt::black);
+    render(painter);
 }
 
 void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
