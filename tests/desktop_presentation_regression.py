@@ -192,6 +192,10 @@ assert 'Nie oceniono' in patient
 assert 'refreshRehabilitationAssessments();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
 assert 'refreshRehabilitationGoals();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
 assert 'arg(assessmentCount)' in outline
+assert 'const bool hasClinicalValue' in outline
+assert 'payload.contains(QStringLiteral("functional_test"))' in outline
+assert 'Powiązano z konkretną wersją oceny ICF' in outline
+
 
 
 assert 'rehabilitationAssessmentType' in outline
