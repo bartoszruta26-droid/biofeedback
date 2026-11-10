@@ -1190,36 +1190,69 @@ std::string SerialCommunication::sendCommand(const std::string& cmd, bool waitFo
         }
     }
     if (!m_impl->isConnected) return "";
-    std::lock_guard<std::mutex> lock(m_impl->readMutex);
-    std::string toSend = cmd + "\n";
-if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size())) {
+
+    // A synchronous command must not steal binary samples from the continuous
+    // reader. Pause the stream, transact on a clean line-oriented channel, then
+    // resume acquisition so tare/calibration commands do not create GUI gaps.
+    bool calledFromReader = false;
+    {
+        std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
+        calledFromReader = m_impl->asyncWorkerId == std::this_thread::get_id();
+    }
+    const bool resumeStream = m_impl->continuousMode.load(std::memory_order_acquire);
+    if (resumeStream && calledFromReader) {
+        m_impl->setLastError("Synchronous serial command rejected from acquisition callback");
         return "";
     }
-    m_impl->markActivity();
-    if (!waitForResponse) return "";
-    constexpr size_t MaxResponseBytes = 4096;
-    std::string resp;
-    resp.reserve(512);
-    uint8_t buf[256];
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    while (resp.size() < MaxResponseBytes &&
-           std::chrono::steady_clock::now() < deadline) {
-        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-            deadline - std::chrono::steady_clock::now());
-        const int rd = readFromPort(buf, std::min(sizeof(buf), MaxResponseBytes - resp.size()),
-                                    static_cast<int>(std::max<int64_t>(1, remaining.count())));
-        if (rd < 0) break;
-        if (rd > 0) {
-            resp.append(reinterpret_cast<const char*>(buf), static_cast<size_t>(rd));
-            if (resp.find("[DATA_SENT]") != std::string::npos ||
-                resp.find("OK") != std::string::npos ||
-                resp.find("FORCE:") != std::string::npos) break;
-        }
-    }
-    if (m_impl->verbose && !resp.empty()) std::cout << "[SerialComm] " << resp << std::endl;
-    return resp;
-}
+    if (resumeStream) stopAsyncReading();
 
+    const auto transact = [&]() -> std::string {
+        std::lock_guard<std::mutex> lock(m_impl->readMutex);
+        uint8_t discard[256];
+        // Discard frames and the STOP acknowledgement left in the UART buffer
+        // before switching from binary streaming to the text command protocol.
+        for (int attempt = 0; attempt < 32; ++attempt) {
+            const int discarded = readFromPort(discard, sizeof(discard), 0);
+            if (discarded <= 0) break;
+        }
+
+        const std::string toSend = cmd + "\n";
+        if (!writeToPort(reinterpret_cast<const uint8_t*>(toSend.data()), toSend.size()))
+            return "";
+        m_impl->markActivity();
+        if (!waitForResponse) return "";
+
+        constexpr size_t MaxResponseBytes = 4096;
+        std::string response;
+        response.reserve(512);
+        uint8_t buffer[256];
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (response.size() < MaxResponseBytes &&
+               std::chrono::steady_clock::now() < deadline) {
+            const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                deadline - std::chrono::steady_clock::now());
+            const int rd = readFromPort(buffer,
+                std::min(sizeof(buffer), MaxResponseBytes - response.size()),
+                static_cast<int>(std::max<int64_t>(1, remaining.count())));
+            if (rd < 0) break;
+            if (rd > 0) {
+                response.append(reinterpret_cast<const char*>(buffer), static_cast<size_t>(rd));
+                if (response.find("[DATA_SENT]") != std::string::npos ||
+                    response.find("OK") != std::string::npos ||
+                    response.find("FORCE:") != std::string::npos ||
+                    response.find("Tare set!") != std::string::npos ||
+                    response.find("Calibrated!") != std::string::npos) break;
+            }
+        }
+        if (m_impl->verbose && !response.empty())
+            std::cout << "[SerialComm] " << response << std::endl;
+        return response;
+    };
+
+    const std::string response = transact();
+    if (resumeStream && m_impl->isConnected) startAsyncReading();
+    return response;
+}
 
 bool SerialCommunication::sendRawData(const uint8_t* data, size_t len) {
     std::lock_guard<std::mutex> lock(m_impl->readMutex);
