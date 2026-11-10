@@ -450,6 +450,8 @@ private:
     QElapsedTimer m_sessionElapsedTimer;
     std::uint32_t m_deviceTimestampOriginMs{0};
     bool m_hasDeviceTimestampOrigin{false};
+    std::uint32_t m_previewTimestampOriginMs{0};
+    bool m_hasPreviewTimestampOrigin{false};
     double m_sessionElapsedOffsetSeconds{0.0};
     
     // Bufory danych
