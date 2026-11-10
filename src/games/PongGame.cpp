@@ -1,15 +1,23 @@
 #include "games/PongGame.hpp"
-#include <QPainter>
-#include <QPaintEvent>
-#include <QDebug>
-#include <QPen>
+
 #include <QBrush>
+#include <QDebug>
 #include <QFont>
-#include <QRectF>
-#include <cmath>
+#include <QPainter>
+#include <QPen>
+#include <QResizeEvent>
 #include <QRandomGenerator>
+#include <algorithm>
+#include <cmath>
 
 namespace games {
+
+namespace {
+constexpr double kSensorTimeoutMs = 350.0;
+constexpr double kForceSmoothingSeconds = 0.075;
+constexpr double kServeDelaySeconds = 0.65;
+constexpr double kPhysicsStep = 1.0 / 120.0;
+}
 
 PongGame::PongGame(QWidget *parent)
     : GameEngine(parent)
@@ -21,107 +29,106 @@ PongGame::PongGame(QWidget *parent)
     , m_playerScore(0)
     , m_aiScore(0)
     , m_difficultyLevel(1)
-    , m_aiSpeed(200.0f)
-    , m_ballSpeed(300.0f)
+    , m_aiSpeed(165.0f)
+    , m_ballSpeed(315.0f)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
-    , m_currentForce(0.0)
+    , m_paddleWidth(15.0f)
+    , m_paddleHeight(80.0f)
+    , m_paddleMargin(20.0f)
+    , m_currentForce(50.0)
+    , m_targetForce(50.0)
+    , m_hasSensorSample(false)
+    , m_serveDelayRemaining(kServeDelaySeconds)
 {
+    setMinimumSize(180, 120);
 }
 
-PongGame::~PongGame() {
+PongGame::~PongGame()
+{
     disconnectSerial();
 }
 
-QString PongGame::gameName() const {
-    return "Pong Force Trainer";
+QString PongGame::gameName() const
+{
+    return QStringLiteral("Pong Force Trainer");
 }
 
-void PongGame::initialize() {
-    setDifficultyLevel(1);
-    m_currentForce = 0.0;
+void PongGame::initialize()
+{
+    m_currentForce = 50.0;
+    m_targetForce = 50.0;
+    m_hasSensorSample = false;
+    m_sensorClock.invalidate();
     m_playerScore = 0;
     m_aiScore = 0;
-    
-    // Inicjalizacja paletki gracza (lewa strona)
-    m_leftPaddle.setWidth(m_paddleWidth);
-    m_leftPaddle.setHeight(m_paddleHeight);
-    m_leftPaddle.setX(m_paddleMargin);
-    m_leftPaddleY = height() / 2.0f - m_paddleHeight / 2.0f;
-    m_leftPaddle.setY(m_leftPaddleY);
-    
-    // Inicjalizacja paletki AI (prawa strona)
-    m_rightPaddle.setWidth(m_paddleWidth);
-    m_rightPaddle.setHeight(m_paddleHeight);
-    m_rightPaddle.setX(width() - m_paddleMargin - m_paddleWidth);
-    m_rightPaddleY = height() / 2.0f - m_paddleHeight / 2.0f;
-    m_rightPaddle.setY(m_rightPaddleY);
-    
-    // Reset piłki
+    m_serveDelayRemaining = kServeDelaySeconds;
+    m_lastSize = QSize();
+    setScore(0);
+    adaptToSize();
     resetBall();
-    
-    // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
-
 }
 
-void PongGame::setDifficultyLevel(int level) {
+void PongGame::setDifficultyLevel(int level)
+{
     m_difficultyLevel = qBound(1, level, 5);
-    
-    // Skalowanie trudności
-    // Poziom 1: wolne AI, wolna piłka
-    // Poziom 5: szybkie AI, szybka piłka
-    m_aiSpeed = 150.0f + (m_difficultyLevel * 80.0f);
-    m_ballSpeed = 250.0f + (m_difficultyLevel * 70.0f);
-    
+    // The AI is deliberately slower than the ball at the easiest level.
+    m_aiSpeed = 110.0f + static_cast<float>(m_difficultyLevel) * 55.0f;
+    m_ballSpeed = 260.0f + static_cast<float>(m_difficultyLevel) * 55.0f;
     m_playerScore = 0;
     m_aiScore = 0;
     setScore(0);
+    resetBall();
+    m_serveDelayRemaining = kServeDelaySeconds;
+    QWidget::update();
 }
 
-int PongGame::getDifficultyLevel() const {
+int PongGame::getDifficultyLevel() const
+{
     return m_difficultyLevel;
 }
 
-void PongGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial) {
+void PongGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
+{
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
     }
-    
-    m_serialPort = serial;
+
+    m_serialPort = std::move(serial);
     m_ownSerial = false;
-    
-    if (m_serialPort && m_serialPort->isConnected()) {
+
+    if (m_serialPort && m_serialPort->isConnected())
         emit serialConnected();
-    }
 }
 
-void PongGame::disconnectSerial() {
+void PongGame::disconnectSerial()
+{
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
-        m_serialPort = nullptr;
+    }
+    if (m_serialPort) {
+        m_serialPort.reset();
         m_ownSerial = false;
         emit serialDisconnected();
-    } else if (m_serialPort) {
-        m_serialPort = nullptr;
-        emit serialDisconnected();
     }
 }
 
-bool PongGame::isSerialConnected() const {
+bool PongGame::isSerialConnected() const
+{
     return m_serialPort && m_serialPort->isConnected();
 }
 
-void PongGame::onSensorDataReceived(const sensor::SensorData& data) {
-    if (!data.isValid) {
+void PongGame::onSensorDataReceived(const sensor::SensorData& data)
+{
+    if (!data.isValid || !std::isfinite(data.calibratedValue))
         return;
-    }
-    
     normalizeForceValue(data.calibratedValue);
 }
 
-void PongGame::onConnectionStatusChanged(bool connected, const std::string& message) {
+void PongGame::onConnectionStatusChanged(bool connected, const std::string& message)
+{
     if (connected) {
         qDebug() << "PongGame: Połączono z sensorem:" << QString::fromStdString(message);
         emit serialConnected();
@@ -132,212 +139,291 @@ void PongGame::onConnectionStatusChanged(bool connected, const std::string& mess
     }
 }
 
-void PongGame::normalizeForceValue(double rawValue) {
-    double normalizedForce = rawValue / m_maxForce;
-    m_currentForce = qBound(0.0, normalizedForce, 1.0);
+void PongGame::normalizeForceValue(double rawValue)
+{
+    // The serial sensor path reports calibrated force in the configured 0–100 range.
+    acceptForcePercent(rawValue);
 }
 
-bool PongGame::handleInput(double value) {
-    normalizeForceValue(value);
+void PongGame::acceptForcePercent(double percent)
+{
+    if (!std::isfinite(percent))
+        return;
+    m_targetForce = qBound(0.0, percent, 100.0);
+    m_hasSensorSample = true;
+    m_sensorClock.restart();
+}
+
+bool PongGame::handleInput(double value)
+{
+    if (!std::isfinite(value))
+        return false;
+    acceptForcePercent(value);
     return true;
 }
 
-void PongGame::resetBall() {
-    // Reset pozycji piłki na środek
-    m_ballPos.setX(width() / 2.0f);
-    m_ballPos.setY(height() / 2.0f);
-    
-    // Losowy kierunek startu (w lewo lub w prawo)
-    float dirX = (QRandomGenerator::global()->bounded(2) == 0) ? 1.0f : -1.0f;
-    float dirY = (QRandomGenerator::global()->bounded(2) == 0) ? 0.5f : -0.5f;
-    
-    // Normalizacja wektora kierunku
-    float length = std::sqrt(dirX * dirX + dirY * dirY);
-    dirX /= length;
-    dirY /= length;
-    
-    m_ballVel.setX(dirX * m_ballSpeed);
-    m_ballVel.setY(dirY * m_ballSpeed);
+bool PongGame::sensorInputFresh() const
+{
+    return m_hasSensorSample && m_sensorClock.isValid() &&
+           static_cast<double>(m_sensorClock.elapsed()) <= kSensorTimeoutMs;
 }
 
-void PongGame::updateAIPaddle(double deltaTime) {
-    // AI próbuje podążać za piłką
-    float targetY = m_ballPos.y() - m_paddleHeight / 2.0f;
-    
-    // Ograniczenie prędkości AI
-    float deltaY = targetY - m_rightPaddleY;
-    float maxMove = m_aiSpeed * deltaTime;
-    
-    if (std::abs(deltaY) > maxMove) {
-        if (deltaY > 0) {
-            m_rightPaddleY += maxMove;
-        } else {
-            m_rightPaddleY -= maxMove;
-        }
+double PongGame::currentForcePercent() const
+{
+    return m_currentForce;
+}
+
+bool PongGame::hasFreshSensorInput() const
+{
+    return sensorInputFresh();
+}
+
+double PongGame::playerPaddleY() const
+{
+    return m_leftPaddleY;
+}
+
+double PongGame::aiPaddleY() const
+{
+    return m_rightPaddleY;
+}
+
+QPointF PongGame::ballPosition() const
+{
+    return m_ballPos;
+}
+
+int PongGame::playerMatchScore() const
+{
+    return m_playerScore;
+}
+
+int PongGame::aiMatchScore() const
+{
+    return m_aiScore;
+}
+
+void PongGame::adaptToSize()
+{
+    const QSize newSize = size();
+    if (newSize.width() < 2 || newSize.height() < 2)
+        return;
+
+    if (m_lastSize.width() > 1 && m_lastSize.height() > 1) {
+        const double sx = static_cast<double>(newSize.width()) / m_lastSize.width();
+        const double sy = static_cast<double>(newSize.height()) / m_lastSize.height();
+        m_ballPos.setX(m_ballPos.x() * sx);
+        m_ballPos.setY(m_ballPos.y() * sy);
+        m_ballVel.setX(m_ballVel.x() * sx);
+        m_ballVel.setY(m_ballVel.y() * sy);
+        m_leftPaddleY = static_cast<float>(m_leftPaddleY * sy);
+        m_rightPaddleY = static_cast<float>(m_rightPaddleY * sy);
     } else {
-        m_rightPaddleY = targetY;
+        m_ballPos = QPointF(newSize.width() / 2.0, newSize.height() / 2.0);
+        m_leftPaddleY = (newSize.height() - m_paddleHeight) / 2.0f;
+        m_rightPaddleY = m_leftPaddleY;
     }
-    
-    // Ograniczenie do obszaru gry
-    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, qMax(0.0f, static_cast<float>(height()) - m_paddleHeight));
-    m_rightPaddle.setY(m_rightPaddleY);
+
+    m_paddleHeight = qBound(36.0f, static_cast<float>(newSize.height()) * 0.18f, 90.0f);
+    m_paddleWidth = qBound(8.0f, static_cast<float>(newSize.width()) * 0.022f, 16.0f);
+    m_paddleMargin = qBound(8.0f, static_cast<float>(newSize.width()) * 0.035f, 24.0f);
+    m_ballRadius = qBound(4.0f, static_cast<float>(qMin(newSize.width(), newSize.height())) * 0.018f, 10.0f);
+
+    const float maxPaddleY = qMax(0.0f, static_cast<float>(newSize.height()) - m_paddleHeight);
+    m_leftPaddleY = qBound(0.0f, m_leftPaddleY, maxPaddleY);
+    m_rightPaddleY = qBound(0.0f, m_rightPaddleY, maxPaddleY);
+
+    m_leftPaddle = QRectF(m_paddleMargin, m_leftPaddleY, m_paddleWidth, m_paddleHeight);
+    m_rightPaddle = QRectF(newSize.width() - m_paddleMargin - m_paddleWidth,
+                           m_rightPaddleY, m_paddleWidth, m_paddleHeight);
+    m_lastSize = newSize;
 }
 
-void PongGame::checkCollisions() {
-    // Aktualizacja pozycji paletki gracza na podstawie siły
+void PongGame::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    adaptToSize();
+    QWidget::update();
+}
+
+void PongGame::resetBall(int horizontalDirection)
+{
+    m_ballPos = QPointF(width() / 2.0, height() / 2.0);
+    const int direction = horizontalDirection == 0
+        ? (QRandomGenerator::global()->bounded(2) == 0 ? -1 : 1)
+        : (horizontalDirection < 0 ? -1 : 1);
+    double vertical = QRandomGenerator::global()->bounded(2) == 0 ? -0.42 : 0.42;
+    const double length = std::hypot(1.0, vertical);
+    m_ballVel.setX(direction * m_ballSpeed / length);
+    m_ballVel.setY(vertical * m_ballSpeed / length);
+}
+
+void PongGame::updateAIPaddle(double deltaTime)
+{
+    const float centre = (height() - m_paddleHeight) / 2.0f;
+    const float targetY = m_ballVel.x() > 0.0
+        ? static_cast<float>(m_ballPos.y() - m_paddleHeight / 2.0)
+        : centre;
+    const float deltaY = targetY - m_rightPaddleY;
+    const float maxMove = m_aiSpeed * static_cast<float>(deltaTime);
+    if (std::abs(deltaY) > maxMove)
+        m_rightPaddleY += deltaY > 0.0f ? maxMove : -maxMove;
+    else
+        m_rightPaddleY = targetY;
+
+    m_rightPaddleY = qBound(0.0f, m_rightPaddleY,
+                            qMax(0.0f, static_cast<float>(height()) - m_paddleHeight));
+    m_rightPaddle.moveTop(m_rightPaddleY);
+}
+
+void PongGame::checkCollisions()
+{
     const float maxPaddleY = qMax(0.0f, static_cast<float>(height()) - m_paddleHeight);
-    m_leftPaddleY = (1.0f - static_cast<float>(m_currentForce)) * maxPaddleY;
-    m_leftPaddle.setY(m_leftPaddleY);
-    
-    // Kolizja piłki z górną i dolną krawędzią
-    if (m_ballPos.y() - m_ballRadius <= 0 || m_ballPos.y() + m_ballRadius >= height()) {
+    m_leftPaddleY = static_cast<float>((1.0 - m_currentForce / 100.0) * maxPaddleY);
+    m_leftPaddleY = qBound(0.0f, m_leftPaddleY, maxPaddleY);
+    m_leftPaddle.moveTop(m_leftPaddleY);
+
+    if (m_ballPos.y() - m_ballRadius <= 0.0 ||
+        m_ballPos.y() + m_ballRadius >= height()) {
+        m_ballPos.setY(qBound(static_cast<double>(m_ballRadius), m_ballPos.y(),
+                               static_cast<double>(height()) - m_ballRadius));
         m_ballVel.setY(-m_ballVel.y());
-        m_ballPos.setY(qMax(static_cast<qreal>(m_ballRadius), qMin(static_cast<qreal>(m_ballPos.y()), static_cast<qreal>(height() - m_ballRadius))));
     }
-    
-    // Kolizja z lewą paletką (gracz). Uwzględnij cały obrys piłki,
-    // a nie wyłącznie jej środek; kierunek ruchu zapobiega ponownemu
-    // naliczaniu kontaktu po odbiciu.
+
     if (m_ballVel.x() < 0.0 &&
         m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
         m_ballPos.x() + m_ballRadius >= m_leftPaddle.left() &&
         m_ballPos.y() + m_ballRadius >= m_leftPaddle.top() &&
         m_ballPos.y() - m_ballRadius <= m_leftPaddle.bottom()) {
-        
-        // Odbicie piłki z lekkim przyspieszeniem
-        // Zachowaj ograniczoną prędkość całkowitą i wyznacz oba składniki
-        // wektora z jednego kąta odbicia (bez niekontrolowanego przyspieszania).
-        const double hitPos = qBound(0.0,
-            (m_ballPos.y() - m_leftPaddle.top()) /
-                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
-        const float angle = (hitPos - 0.5f) * 1.5f;
-        const double speed = qMin(
-            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
-            static_cast<double>(m_ballSpeed) * 2.0);
-        m_ballVel.setX(std::cos(angle) * speed); // W prawo
-        m_ballVel.setY(std::sin(angle) * speed);
-        
+        const double hitOffset = (m_ballPos.y() - m_leftPaddle.center().y()) /
+                                 qMax(1.0, m_paddleHeight / 2.0);
+        const double angle = qBound(-0.95, hitOffset, 0.95) * 1.05;
+        const double speed = qMin(std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.035,
+                                  static_cast<double>(m_ballSpeed) * 1.8);
+        m_ballVel = QPointF(std::cos(angle) * speed, std::sin(angle) * speed);
         m_ballPos.setX(m_leftPaddle.right() + m_ballRadius);
     }
-    
-    // Analogiczna kolizja dla paletki AI.
+
     if (m_ballVel.x() > 0.0 &&
         m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
         m_ballPos.x() - m_ballRadius <= m_rightPaddle.right() &&
         m_ballPos.y() + m_ballRadius >= m_rightPaddle.top() &&
         m_ballPos.y() - m_ballRadius <= m_rightPaddle.bottom()) {
-        
-        const double hitPos = qBound(0.0,
-            (m_ballPos.y() - m_rightPaddle.top()) /
-                qMax(1.0, static_cast<double>(m_paddleHeight)), 1.0);
-        const float angle = (hitPos - 0.5f) * 1.5f;
-        const double speed = qMin(
-            std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.05,
-            static_cast<double>(m_ballSpeed) * 2.0);
-        m_ballVel.setX(-std::cos(angle) * speed); // W lewo
-        m_ballVel.setY(std::sin(angle) * speed);
-        
+        const double hitOffset = (m_ballPos.y() - m_rightPaddle.center().y()) /
+                                 qMax(1.0, m_paddleHeight / 2.0);
+        const double angle = qBound(-0.95, hitOffset, 0.95) * 1.05;
+        const double speed = qMin(std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.025,
+                                  static_cast<double>(m_ballSpeed) * 1.8);
+        m_ballVel = QPointF(-std::cos(angle) * speed, std::sin(angle) * speed);
         m_ballPos.setX(m_rightPaddle.left() - m_ballRadius);
     }
-    
-    // Punktacja - piłka poza ekranem
-    if (m_ballPos.x() + m_ballRadius < 0) {
-        // Punkt dla AI
-        m_aiScore++;
-        resetBall();
+
+    // A point is awarded only after the complete ball has left the court.
+    if (m_ballPos.x() + m_ballRadius < 0.0) {
+        ++m_aiScore;
+        resetBall(1); // Serve toward the player who conceded the point.
+        m_serveDelayRemaining = kServeDelaySeconds;
     } else if (m_ballPos.x() - m_ballRadius > width()) {
-        // Punkt dla gracza
-        m_playerScore++;
-        addScore(10); // 10 punktów za każde trafienie
-        resetBall();
+        ++m_playerScore;
+        addScore(10);
+        resetBall(-1);
+        m_serveDelayRemaining = kServeDelaySeconds;
     }
 }
 
-void PongGame::update(double deltaTime) {
-    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0) return;
+void PongGame::update(double deltaTime)
+{
+    if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
+        return;
 
-    // Match GameEngine's stall policy before converting the step count to int.
-    // The normal GameEngine path already supplies fixed 1/120 s steps; this
-    // subdivision is a defensive guard for direct callers with larger deltas.
+    adaptToSize();
+    if (!sensorInputFresh())
+        return; // Freeze the rally instead of scoring against a missing sensor.
+
     deltaTime = qMin(deltaTime, 0.1);
-    constexpr double maxPhysicsStep = 1.0 / 120.0;
-    const int steps = qMax(1, static_cast<int>(std::ceil(deltaTime / maxPhysicsStep)));
+    const int steps = qMax(1, static_cast<int>(std::ceil(deltaTime / kPhysicsStep)));
     const double stepTime = deltaTime / steps;
 
     for (int step = 0; step < steps && isRunning(); ++step) {
-        m_ballPos.setX(m_ballPos.x() + m_ballVel.x() * stepTime);
-        m_ballPos.setY(m_ballPos.y() + m_ballVel.y() * stepTime);
+        const double alpha = 1.0 - std::exp(-stepTime / kForceSmoothingSeconds);
+        m_currentForce += (m_targetForce - m_currentForce) * alpha;
+
+        if (m_serveDelayRemaining > 0.0) {
+            m_serveDelayRemaining = qMax(0.0, m_serveDelayRemaining - stepTime);
+            const float maxPaddleY = qMax(0.0f, static_cast<float>(height()) - m_paddleHeight);
+            m_leftPaddleY = static_cast<float>((1.0 - m_currentForce / 100.0) * maxPaddleY);
+            m_leftPaddle.moveTop(qBound(0.0f, m_leftPaddleY, maxPaddleY));
+            updateAIPaddle(stepTime);
+            continue;
+        }
+
+        m_ballPos += m_ballVel * stepTime;
         updateAIPaddle(stepTime);
         checkCollisions();
     }
 }
 
-void PongGame::render(QPainter &painter) {
-    painter.setRenderHint(QPainter::Antialiasing);
-    
-    int w = width();
-    int h = height();
-    
-    // 1. Tło
-    painter.fillRect(rect(), QColor(10, 10, 30));
-    
-    // 2. Linia środkowa
-    painter.setPen(QPen(Qt::white, 2, Qt::DashLine));
-    painter.drawLine(w / 2, 0, w / 2, h);
-    
-    // 3. Paletka gracza (lewa) - kolor zależny od trudności
-    painter.setBrush(QBrush(getDifficultyColor()));
-    painter.setPen(Qt::NoPen);
-    painter.drawRect(m_leftPaddle.toRect());
-    
-    // 4. Paletka AI (prawa)
-    painter.setBrush(QBrush(Qt::red));
-    painter.drawRect(m_rightPaddle.toRect());
-    
-    // 5. Piłka
-    painter.setBrush(QBrush(Qt::white));
-    painter.drawEllipse(m_ballPos, m_ballRadius, m_ballRadius);
-    
-    // 6. Wyniki
-    painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 18, QFont::Bold));
-    painter.drawText(w / 4, 50, QString::number(m_playerScore));
-    painter.drawText(3 * w / 4, 50, QString::number(m_aiScore));
-    
-    // 7. Informacje
-    painter.setFont(QFont("Arial", 8));
-    painter.drawText(10, 20, "Steruj siłą nacisku");
-    painter.drawText(10, 40, QString("Siła: %1%").arg(static_cast<int>(m_currentForce * 100)));
-    painter.drawText(10, 60, QString("Poziom: %1").arg(m_difficultyLevel));
-    
-    // 8. Pasek siły
-    int barW = 20;
-    int barH = h - 40;
-    int barX = w - 30;
-    int barY = 20;
-    
-    painter.setPen(Qt::white);
-    painter.drawRect(barX, barY, barW, barH);
-    
-    int fillH = static_cast<int>(m_currentForce * barH);
-    painter.setBrush(QBrush(Qt::yellow));
-    painter.drawRect(barX, barY + barH - fillH, barW, fillH);
-    
-    // 9. Status połączenia serial
-    if (m_serialPort && !m_serialPort->isConnected()) {
-        painter.setPen(QPen(Qt::red, 2));
-        painter.setFont(QFont("Arial", 9, QFont::Bold));
-        painter.drawText(w/2 - 100, 30, "BRAK POŁĄCZENIA Z SENSOREM");
+QColor PongGame::getDifficultyColor() const
+{
+    switch (m_difficultyLevel) {
+        case 1: return QColor(75, 205, 130);
+        case 2: return QColor(65, 190, 220);
+        case 3: return QColor(235, 205, 75);
+        case 4: return QColor(235, 145, 65);
+        default: return QColor(230, 85, 85);
     }
 }
 
-QColor PongGame::getDifficultyColor() const {
-    switch (m_difficultyLevel) {
-        case 1: return Qt::green;
-        case 2: return Qt::cyan;
-        case 3: return Qt::yellow;
-        case 4: return QColorConstants::Svg::orange;
-        default: return Qt::red;
+void PongGame::render(QPainter &painter)
+{
+    adaptToSize();
+    const int w = width();
+    const int h = height();
+    painter.fillRect(rect(), QColor(10, 16, 30));
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    painter.setPen(QPen(QColor(85, 105, 135), 1, Qt::DashLine));
+    painter.drawLine(w / 2, 8, w / 2, h - 8);
+
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(getDifficultyColor());
+    painter.drawRoundedRect(m_leftPaddle, 4, 4);
+    painter.setBrush(QColor(235, 100, 100));
+    painter.drawRoundedRect(m_rightPaddle, 4, 4);
+
+    painter.setBrush(Qt::white);
+    painter.drawEllipse(m_ballPos, m_ballRadius, m_ballRadius);
+
+    const int scoreFont = qBound(10, h / 17, 22);
+    painter.setPen(Qt::white);
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), scoreFont, QFont::DemiBold));
+    painter.drawText(QRect(8, 5, w / 2 - 16, scoreFont + 8), Qt::AlignHCenter,
+                     QString::number(m_playerScore));
+    painter.drawText(QRect(w / 2 + 8, 5, w / 2 - 16, scoreFont + 8), Qt::AlignHCenter,
+                     QString::number(m_aiScore));
+
+    const int hudFont = qBound(7, h / 35, 11);
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), hudFont));
+    painter.setPen(QColor(205, 215, 230));
+    const QString status = !sensorInputFresh()
+        ? QStringLiteral("Oczekiwanie na sygnał z czujnika")
+        : (m_serveDelayRemaining > 0.0
+            ? QStringLiteral("Przygotuj się do odbicia")
+            : QStringLiteral("Siła: %1%  |  Poziom: %2")
+                .arg(qRound(m_currentForce)).arg(m_difficultyLevel));
+    painter.drawText(QRect(8, h - hudFont - 8, w - 16, hudFont + 6),
+                     Qt::AlignHCenter | Qt::AlignVCenter, status);
+
+    if (sensorInputFresh()) {
+        const int meterWidth = qBound(35, w / 5, 90);
+        const int meterHeight = 5;
+        const QRect meterRect((w - meterWidth) / 2, h - hudFont - 17, meterWidth, meterHeight);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(65, 75, 95));
+        painter.drawRoundedRect(meterRect, 2, 2);
+        painter.setBrush(getDifficultyColor());
+        painter.drawRoundedRect(QRect(meterRect.x(), meterRect.y(),
+            qRound(meterWidth * m_currentForce / 100.0), meterHeight), 2, 2);
     }
 }
 
