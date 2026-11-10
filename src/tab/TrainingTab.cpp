@@ -1283,7 +1283,7 @@ void TrainingTab::enqueueMeasurementSample(
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-        constexpr std::size_t MaximumQueuedSamples = 4096;
+        constexpr std::size_t MaximumQueuedSamples = 128;
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
             m_droppedMeasurementSamples += m_measurementQueue.size() + 1;
             m_measurementQueue.clear();
@@ -1309,7 +1309,7 @@ void TrainingTab::enqueueMeasurementSample(
 
 void TrainingTab::drainMeasurementSamples()
 {
-    constexpr std::size_t MaximumBatch = 128;
+    constexpr std::size_t MaximumBatch = 16;
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
     bool scheduleAgain = false;
