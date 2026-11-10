@@ -29,6 +29,9 @@ assert 'patientIcfAssessmentChanged' in application
 assert 'icf_assessment' in application
 assert 'icf_assessment_history' in application
 assert 'assessmentHistory.size() > 100' in application
+assert 'previousAlreadyArchived' in application
+assert 'assessmentHistory.append(previousAssessment)' in application
+
 assert 'icf_assessment_history' in application
 
 assert 'setPatientIcfAssessment(' in application
