@@ -182,6 +182,9 @@ assert 'QStringLiteral("pain_nrs")' in outline
 assert 'QStringLiteral("icf_assessment_ref")' in outline
 assert 'QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)' in patient
 assert 'currentIcf.value(QStringLiteral("id"))' in outline
+assert 'icfAssessmentReference = currentIcf.value(QStringLiteral("assessed_at"))' in outline
+assert 'legacy assessments without UUID retain timestamp compatibility' in outline
+
 assert 'currentIcf.value(QStringLiteral("id"))' in outline
 assert 'currentIcf.value(QStringLiteral("assessed_at")).toString() == reference' in outline
 assert 'historicalId == icfReference' in read("src/data/JsonResourceRepository.cpp")
