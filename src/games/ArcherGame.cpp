@@ -207,11 +207,11 @@ void ArcherGame::render(QPainter& painter)
     painter.setPen(Qt::white);
     painter.setFont(QFont(QStringLiteral("Arial"), 14, QFont::Bold));
     painter.drawText(14, 24, QStringLiteral("Wynik: %1").arg(getScore()));
-    painter.drawText(14, 46, QStringLiteral("Celowanie: %1°")
-        .arg(qRound(m_aimAngle * 180.0 / 3.14159265358979323846)));
+    painter.drawText(14, 46, QStringLiteral("Celowanie: %1°").arg(qRound(m_aimAngle * 180.0 / 3.14159265358979323846)));
+    painter.drawText(width() - 150, 24, QStringLiteral("Prędkość celu: %1").arg(qRound(m_targetSpeed)));
     painter.setFont(QFont(QStringLiteral("Arial"), 10));
     painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik reguluje kąt | SPACJA: strzał | W/S: korekta"));
+        QStringLiteral("Czujnik lub mysz: celowanie | Klik / SPACJA: strzał | W/S lub strzałki: korekta"));
 }
 
 } // namespace games
