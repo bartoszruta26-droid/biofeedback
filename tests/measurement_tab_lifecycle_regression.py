@@ -281,7 +281,7 @@ for required in (
 ):
     if required not in engine_source:
         raise SystemExit(f"Missing serialized out-of-lock commit invariant: {required}")
-lock_end = engine_source.index("\\n    }\\n\\n    if (commitHook)")
+lock_end = engine_source.index("\n    }\n\n    if (commitHook)")
 hook_start = engine_source.index("if (commitHook)", lock_end)
 hook_call = engine_source.index("committed = commitHook(sample)", hook_start)
 history_start = engine_source.index("m_history.push_back(sample)", hook_call)
