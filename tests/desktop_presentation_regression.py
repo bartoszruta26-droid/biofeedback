@@ -206,6 +206,9 @@ assert 'QStringLiteral("completed_repetitions")' in outline
 assert 'QStringLiteral("pain_at_24h")' in outline
 assert "refreshRehabilitationObservations()" in outline
 assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-assessments\")" in outline
+assert "if (!m_resourceRepository->get(QStringLiteral(\"patients\"), m_currentPatientUuid," in outline
+assert "Ocena nie została zapisana" in outline
+
 assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
 import json
