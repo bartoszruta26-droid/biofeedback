@@ -116,3 +116,8 @@ Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie
 - HUD pokazuje wynik, poziom, życia, siłę i stan czujnika bez zasłaniania pola gry.
 - Rozszerzono `game_factory_regression` o oczekiwanie na sygnał, ograniczanie i wygładzanie siły, sterowanie paletką, trafienie klocka, zamrożenie po utracie sygnału oraz zmianę rozmiaru.
 - Poprawki wymagają kompilacji Qt5 i pełnego CI dla aktualnego HEAD. Testy symulacyjne nie zastępują sprawdzenia z Arduino Nano/HX711.
+
+
+- [x] Dodatkowo naprawiono błąd kompilacji testów: test wywoływał chronioną metodę update() bezpośrednio; zastąpiono to obserwacją rzeczywistej pętli Qt.
+- [x] Dodano sterowanie klawiaturą lewo/prawo (A/D) jako tryb awaryjny, działający także po utracie świeżości sygnału tensometru.
+- [x] Dodano regresję potwierdzającą ruch paletki klawiaturą po przekroczeniu limitu czasu próbek sensora.
