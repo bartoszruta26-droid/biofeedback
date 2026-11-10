@@ -1611,8 +1611,40 @@ void OutlineTab::exportRehabilitationReportPdf()
         ? m_patientContextLabel->text() : tr("Pacjent");
     const QString diagnosis = episode.value(QStringLiteral("diagnosis_code")).toString();
     const QString pathway = episode.value(QStringLiteral("care_pathway")).toString();
-    const QJsonObject icf = patient.value(QStringLiteral("icf_assessment")).toObject();
-    const QJsonObject icfResponses = icf.value(QStringLiteral("responses")).toObject();
+    const QJsonObject currentIcf = patient.value(QStringLiteral("icf_assessment")).toObject();
+    const QJsonArray icfHistory = patient.value(QStringLiteral("icf_assessment_history")).toArray();
+    auto resolveIcfReference = [&currentIcf, &icfHistory](const QString& reference) {
+        if (reference.isEmpty()) return QJsonObject();
+        const QString currentId = currentIcf.value(QStringLiteral("id")).toString();
+        if (currentId == reference ||
+            (currentId.isEmpty() && currentIcf.value(QStringLiteral("assessed_at")).toString() == reference))
+            return currentIcf;
+        for (const QJsonValue& value : icfHistory) {
+            const QJsonObject historical = value.toObject();
+            const QString historicalId = historical.value(QStringLiteral("id")).toString();
+            if (historicalId == reference ||
+                (historicalId.isEmpty() &&
+                 historical.value(QStringLiteral("assessed_at")).toString() == reference))
+                return historical;
+        }
+        return QJsonObject();
+    };
+    QJsonArray linkedIcfAssessments;
+    for (const QJsonValue& value : assessments) {
+        const QString reference = value.toObject().value(QStringLiteral("icf_assessment_ref")).toString();
+        const QJsonObject linked = resolveIcfReference(reference);
+        if (linked.isEmpty()) continue;
+        bool alreadyIncluded = false;
+        for (const QJsonValue& existing : linkedIcfAssessments) {
+            const QJsonObject item = existing.toObject();
+            if (item.value(QStringLiteral("id")).toString() == linked.value(QStringLiteral("id")).toString() &&
+                item.value(QStringLiteral("assessed_at")).toString() == linked.value(QStringLiteral("assessed_at")).toString()) {
+                alreadyIncluded = true;
+                break;
+            }
+        }
+        if (!alreadyIncluded) linkedIcfAssessments.append(linked);
+    }
 
     QString html;
     html += QStringLiteral("<html><head><meta charset='utf-8'><style>"
@@ -1649,10 +1681,13 @@ void OutlineTab::exportRehabilitationReportPdf()
         if (type == QStringLiteral("baseline")) type = tr("Początkowa");
         else if (type == QStringLiteral("follow_up")) type = tr("Kontrolna");
         else if (type == QStringLiteral("final")) type = tr("Końcowa");
+        const QJsonObject linkedIcf = resolveIcfReference(
+            item.value(QStringLiteral("icf_assessment_ref")).toString());
+        const QString linkedIcfDate = linkedIcf.value(QStringLiteral("assessed_at")).toString();
         html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
             .arg(safe(item.value(QStringLiteral("assessed_at")).toString()),
                  safe(type), safe(results.join(QStringLiteral("; "))),
-                 item.contains(QStringLiteral("icf_assessment_ref")) ? tr("Tak") : tr("Brak"));
+                 safe(linkedIcfDate.isEmpty() ? tr("Brak") : linkedIcfDate));
     }
     html += QStringLiteral("</table>");
 
@@ -1705,25 +1740,28 @@ void OutlineTab::exportRehabilitationReportPdf()
     }
     html += QStringLiteral("</table>");
 
-    html += QStringLiteral("<h2>Ocena ICF</h2>");
-    if (icf.isEmpty()) {
-        html += QStringLiteral("<p>Brak aktualnej oceny ICF w kartotece pacjenta.</p>");
-    } else {
-        html += QStringLiteral("<p>Data oceny: %1<br>Liczba zapisanych domen: %2<br>Opis: %3</p>")
+    html += QStringLiteral("<h2>Oceny ICF powiązane z ocenami klinicznymi epizodu</h2>");
+    if (linkedIcfAssessments.isEmpty()) {
+        html += QStringLiteral("<p>Brak powiązanych wersji oceny ICF.</p>");
+    }
+    for (const QJsonValue& value : linkedIcfAssessments) {
+        const QJsonObject icf = value.toObject();
+        const QJsonObject responses = icf.value(QStringLiteral("responses")).toObject();
+        html += QStringLiteral("<h3>Ocena z dnia %1</h3><p>Liczba domen: %2<br>Opis: %3</p>")
             .arg(safe(icf.value(QStringLiteral("assessed_at")).toString()),
-                 QString::number(icfResponses.size()),
+                 QString::number(responses.size()),
                  safe(icf.value(QStringLiteral("narrative")).toString()));
         html += QStringLiteral("<table><tr><th>Domena ICF</th><th>Kwalifikator</th><th>Wykonanie</th><th>Zdolność</th><th>Zakres</th><th>Charakter</th><th>Lokalizacja</th></tr>");
-        for (auto it = icfResponses.constBegin(); it != icfResponses.constEnd(); ++it) {
+        for (auto it = responses.constBegin(); it != responses.constEnd(); ++it) {
             const QJsonObject response = it.value().toObject();
-            const auto value = [&response](const QString& key) {
+            const auto valueFor = [&response](const QString& key) {
                 return response.contains(key) ? response.value(key).toVariant().toString() : QString();
             };
             html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td></tr>")
-                .arg(safe(it.key()), safe(value(QStringLiteral("qualifier"))),
-                     safe(value(QStringLiteral("performance"))), safe(value(QStringLiteral("capacity"))),
-                     safe(value(QStringLiteral("extent"))), safe(value(QStringLiteral("nature"))),
-                     safe(value(QStringLiteral("location"))));
+                .arg(safe(it.key()), safe(valueFor(QStringLiteral("qualifier"))),
+                     safe(valueFor(QStringLiteral("performance"))), safe(valueFor(QStringLiteral("capacity"))),
+                     safe(valueFor(QStringLiteral("extent"))), safe(valueFor(QStringLiteral("nature"))),
+                     safe(valueFor(QStringLiteral("location"))));
         }
         html += QStringLiteral("</table>");
     }
