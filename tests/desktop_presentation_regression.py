@@ -176,6 +176,9 @@ assert "rehabilitation-assessments" in outline
 assert "createRehabilitationAssessment()" in read("include/tab/OutlineTab.hpp")
 assert 'QStringLiteral("pain_nrs")' in outline
 assert 'QStringLiteral("icf_assessment_ref")' in outline
+assert 'rehabilitationAssessmentType' in outline
+assert 'QStringLiteral("follow_up")' in outline and 'QStringLiteral("final")' in outline
+assert 'INVALID_REHABILITATION_ASSESSMENT_TYPE' in read("src/data/JsonResourceRepository.cpp")
 assert 'Link the rehabilitation assessment to the exact ICF assessment version.' in outline
 assert 'REHABILITATION_ICF_ASSESSMENT_NOT_FOUND' in read("src/data/JsonResourceRepository.cpp")
 assert 'icf_assessment_history' in read("src/data/JsonResourceRepository.cpp")
