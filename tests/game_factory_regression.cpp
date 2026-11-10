@@ -97,6 +97,44 @@ int main(int argc, char **argv)
     tanGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     tanGame->handleSensorInput(std::numeric_limits<double>::infinity());
     REQUIRE(tanGame->isRunning());
+
+    // Follow the tangent branch with calibrated 0..100% target force.
+    // The singularity guard deliberately pauses scoring around asymptotes.
+    tanGame->stop();
+    tanGame->setDifficultyLevel(1);
+    tanGame->start();
+    constexpr double tanDt = 1.0 / 120.0;
+    constexpr double tanPi = 3.14159265358979323846;
+    constexpr double tanWidth = 640.0;
+    constexpr double tanHeight = 480.0;
+    constexpr double tanWaveNumber = tanPi * 1.5 / tanWidth;
+    constexpr double tanGateX = tanWidth * 0.72;
+    constexpr double tanAmplitude = tanHeight * 0.38;
+    constexpr double tanSpeed = 105.0;
+    double tanPhase = 0.0;
+    for (int frame = 0; frame < 720; ++frame) {
+        tanPhase = std::remainder(tanPhase - tanSpeed * tanWaveNumber * tanDt, tanPi);
+        const double angle = std::remainder(tanGateX * tanWaveNumber + tanPhase, tanPi);
+        if (std::abs(std::cos(angle)) < 0.10) {
+            tanGame->update(tanDt);
+            continue;
+        }
+        const double normalized = (2.0 / tanPi) * std::atan(0.70 * std::tan(angle));
+        const double targetY = tanHeight * 0.5 - normalized * tanAmplitude;
+        const double forcePercent = (tanHeight - targetY) / tanHeight * 100.0;
+        tanGame->handleSensorInput(forcePercent);
+        QApplication::processEvents();
+        tanGame->update(tanDt);
+    }
+    REQUIRE(tanGame->getScore() > 0);
+
+    // Once sensor samples become stale, the game must stop awarding points.
+    for (int frame = 0; frame < 60; ++frame)
+        tanGame->update(tanDt);
+    const int tanScoreAfterTimeout = tanGame->getScore();
+    for (int frame = 0; frame < 60; ++frame)
+        tanGame->update(tanDt);
+    REQUIRE(tanGame->getScore() == tanScoreAfterTimeout);
     tanGame->stop();
 
     std::unique_ptr<games::GameEngine> sinus(games::createGame(QStringLiteral("sin_game")));
