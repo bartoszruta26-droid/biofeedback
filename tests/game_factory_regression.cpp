@@ -106,6 +106,12 @@ int main(int argc, char **argv)
     tanGame->setTangentSharpness(9.0);
     REQUIRE(std::abs(tanGame->tangentSharpness() - 1.5) < 1e-9);
     tanGame->setTangentSharpness(0.70);
+    QKeyEvent tanSharper(QEvent::KeyPress, Qt::Key_Period, Qt::NoModifier);
+    QApplication::sendEvent(tanGame, &tanSharper);
+    REQUIRE(std::abs(tanGame->tangentSharpness() - 0.75) < 1e-9);
+    QKeyEvent tanSofter(QEvent::KeyPress, Qt::Key_Comma, Qt::NoModifier);
+    QApplication::sendEvent(tanGame, &tanSofter);
+    REQUIRE(std::abs(tanGame->tangentSharpness() - 0.70) < 1e-9);
     tanGame->setDifficultyLevel(3);
     const int scoreBeforeDifficultyChange = tanGame->getScore();
     QKeyEvent tanEasier(QEvent::KeyPress, Qt::Key_Down, Qt::NoModifier);
