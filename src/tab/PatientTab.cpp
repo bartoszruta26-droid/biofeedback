@@ -269,22 +269,26 @@ void PatientTab::openIcfAssessmentDialog()
 
     struct Question { const char* code; const char* label; int domain; };
     static const Question questions[] = {
-        {"b130", "Energia i napęd (męczliwość, motywacja)", 0},
-        {"b134", "Funkcje snu", 0}, {"b152", "Funkcje emocjonalne", 0},
-        {"b280", "Odczuwanie bólu", 0}, {"b710", "Ruchomość stawów", 0},
-        {"b730", "Siła mięśni", 0}, {"b455", "Tolerancja wysiłku i wydolność", 0},
-        {"d410", "Zmiana podstawowej pozycji ciała (siadanie, wstawanie, leżenie)", 1},
-        {"d415", "Utrzymywanie pozycji ciała", 1}, {"d430", "Podnoszenie i przenoszenie przedmiotów", 1},
-        {"d450", "Chodzenie", 1}, {"d455", "Przemieszczanie się (schody, bieganie i inne sposoby)", 1},
-        {"d510", "Mycie się", 1}, {"d520", "Pielęgnacja części ciała", 1},
-        {"d540", "Ubieranie się", 1}, {"d550", "Jedzenie", 1}, {"d560", "Picie", 1},
-        {"d640", "Wykonywanie prac domowych", 1}, {"d850", "Praca zarobkowa", 1},
-        {"d920", "Rekreacja i wypoczynek", 1},
-        {"e115", "Produkty i technologie do użytku osobistego", 2},
-        {"e120", "Produkty i technologie ułatwiające poruszanie się", 2},
-        {"e150", "Projektowanie i dostępność budynków użyteczności publicznej", 2},
-        {"e310", "Najbliższa rodzina", 2}, {"e355", "Pracownicy ochrony zdrowia", 2},
-        {"e580", "Usługi, systemy i polityka ochrony zdrowia", 2}
+        {"b130", "Czy występuje obniżenie energii, napędu lub zwiększona męczliwość?", 0},
+        {"b134", "Czy sen jest zaburzony i wpływa na codzienne funkcjonowanie?", 0}, {"b152", "Czy występują trudności w regulacji emocji?", 0},
+        {"b280", "Czy pacjent odczuwa ból? Jak często i jak silny?", 0}, {"b710", "Czy zakres lub płynność ruchu stawów są ograniczone?", 0},
+        {"b730", "Czy osłabienie siły mięśni utrudnia czynności?", 0}, {"b455", "Czy wysiłek powoduje nadmierną duszność, zmęczenie lub ograniczenie aktywności?", 0},
+        {"d410", "Czy pacjent samodzielnie zmienia pozycję: siada, wstaje, kładzie się?", 1},
+        {"d415", "Czy pacjent utrzymuje pozycję siedzącą i stojącą bez podparcia?", 1}, {"d430", "Czy podnosi i przenosi przedmioty codziennego użytku?", 1},
+        {"d450", "Czy chodzi po domu i poza domem? Jaki dystans pokonuje?", 1}, {"d455", "Czy pokonuje schody, wzniesienia i inne przeszkody?", 1},
+        {"d510", "Czy samodzielnie myje całe ciało?", 1}, {"d520", "Czy samodzielnie wykonuje codzienną pielęgnację ciała?", 1},
+        {"d540", "Czy samodzielnie zakłada i zdejmuje ubranie oraz obuwie?", 1}, {"d550", "Czy samodzielnie spożywa posiłki?", 1}, {"d560", "Czy samodzielnie przyjmuje napoje?", 1},
+        {"d640", "Czy wykonuje typowe prace domowe i obowiązki?", 1}, {"d850", "Czy stan zdrowia ogranicza wykonywanie pracy zarobkowej?", 1},
+        {"d920", "Czy uczestniczy w rekreacji, hobby i życiu społecznym?", 1},
+        {"e115", "Czy sprzęt i technologie codziennego użytku pomagają, czy utrudniają funkcjonowanie?", 2},
+        {"e120", "Czy dostępne pomoce do przemieszczania się są odpowiednie i dostępne?", 2},
+        {"e150", "Czy bariery architektoniczne ograniczają dostęp do budynków i usług?", 2},
+        {"e310", "Czy rodzina zapewnia potrzebne wsparcie?", 2}, {"e355", "Czy personel ochrony zdrowia zapewnia dostępne i odpowiednie wsparcie?", 2},
+        {"e580", "Czy dostęp do świadczeń zdrowotnych wspiera proces leczenia i rehabilitacji?", 2},
+        {"s730", "Czy występują zmiany struktury kończyny górnej?", 3},
+        {"s750", "Czy występują zmiany struktury kończyny dolnej?", 3},
+        {"s760", "Czy występują zmiany struktury tułowia lub kręgosłupa?", 3},
+        {"s770", "Czy występują inne zmiany struktur układu mięśniowo-szkieletowego?", 3}
     };
 
     QDialog dialog(this);
@@ -324,20 +328,20 @@ void PatientTab::openIcfAssessmentDialog()
                 auto* performance = new QComboBox(row);
                 auto* capacity = new QComboBox(row);
                 const QStringList optionLabels = {
-                    tr("0 — brak trudności"), tr("1 — trudność niewielka"),
+                    tr("Nie oceniono"), tr("0 — brak trudności"), tr("1 — trudność niewielka"),
                     tr("2 — trudność umiarkowana"), tr("3 — trudność znaczna"),
                     tr("4 — trudność całkowita"), tr("8 — nieokreślona"),
                     tr("9 — nie dotyczy")
                 };
-                const QList<int> optionValues = {0, 1, 2, 3, 4, 8, 9};
+                const QList<int> optionValues = {-1, 0, 1, 2, 3, 4, 8, 9};
                 for (int i = 0; i < optionLabels.size(); ++i) {
                     performance->addItem(optionLabels.at(i), optionValues.at(i));
                     capacity->addItem(optionLabels.at(i), optionValues.at(i));
                 }
                 performance->setCurrentIndex(performance->findData(
-                    old.value(QStringLiteral("performance")).toInt(8)));
+                    old.value(QStringLiteral("performance")).toInt(-1)));
                 capacity->setCurrentIndex(capacity->findData(
-                    old.value(QStringLiteral("capacity")).toInt(8)));
+                    old.value(QStringLiteral("capacity")).toInt(-1)));
                 rowLayout->addWidget(new QLabel(tr("Wykonanie:"), row));
                 rowLayout->addWidget(performance, 1);
                 rowLayout->addWidget(new QLabel(tr("Zdolność:"), row));
@@ -348,19 +352,20 @@ void PatientTab::openIcfAssessmentDialog()
             } else {
                 auto* combo = new QComboBox(group);
                 if (domain == 2) {
-                    const QStringList labels = {tr("0 — neutralny czynnik"), tr("-1 — niewielka bariera"),
+                    const QStringList labels = {tr("Nie oceniono"), tr("0 — brak bariery i ułatwienia"), tr("-1 — niewielka bariera"),
                         tr("-2 — umiarkowana bariera"), tr("-3 — znaczna bariera"),
                         tr("-4 — całkowita bariera"), tr("+1 — niewielki ułatwiacz"),
                         tr("+2 — umiarkowany ułatwiacz"), tr("+3 — znaczny ułatwiacz"),
-                        tr("+4 — zasadniczy ułatwiacz"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")};
-                    const QList<int> values = {0, -1, -2, -3, -4, 1, 2, 3, 4, 8, 9};
+                        tr("+4 — zasadniczy ułatwiacz"), tr("-8 — bariera, stopień nieokreślony"),
+                        tr("+8 — ułatwiacz, stopień nieokreślony"), tr("9 — nie dotyczy")};
+                    const QList<int> values = {-1, 0, -1, -2, -3, -4, 1, 2, 3, 4, -8, 8, 9};
                     for (int i = 0; i < labels.size(); ++i) combo->addItem(labels.at(i), values.at(i));
-                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(8)));
+                    combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(-1)));
                 } else {
-                    const QStringList labels = {tr("0 — brak problemu"), tr("1 — problem niewielki"),
+                    const QStringList labels = {tr("Nie oceniono"), tr("0 — brak problemu"), tr("1 — problem niewielki"),
                         tr("2 — problem umiarkowany"), tr("3 — problem znaczny"),
                         tr("4 — problem całkowity"), tr("8 — nieokreślony"), tr("9 — nie dotyczy")};
-                    const QList<int> values = {0, 1, 2, 3, 4, 8, 9};
+                    const QList<int> values = {-1, 0, 1, 2, 3, 4, 8, 9};
                     for (int i = 0; i < labels.size(); ++i) combo->addItem(labels.at(i), values.at(i));
                     combo->setCurrentIndex(combo->findData(old.value(QStringLiteral("qualifier")).toInt(8)));
                 }
@@ -372,11 +377,12 @@ void PatientTab::openIcfAssessmentDialog()
     addDomain(0, tr("Funkcje organizmu — kody b"));
     addDomain(1, tr("Aktywność i uczestniczenie — kody d"));
     addDomain(2, tr("Czynniki środowiskowe — kody e"));
+    addDomain(3, tr("Struktury ciała — kody s"));
 
     auto* notesGroup = new QGroupBox(tr("Kontekst, mocne strony i priorytety pacjenta"), content);
     auto* notesLayout = new QVBoxLayout(notesGroup);
     auto* notes = new QTextEdit(notesGroup);
-    notes->setPlaceholderText(tr("Najważniejsze trudności, zasoby, cele, bariery i oczekiwania pacjenta"));
+    notes->setPlaceholderText(tr("Czynniki osobiste (np. wiek, nawyki, motywacja), priorytety, cele, zasoby i oczekiwania pacjenta"));
     notes->setPlainText(previous.value(QStringLiteral("narrative")).toString());
     notes->setMinimumHeight(90);
     notesLayout->addWidget(notes);
