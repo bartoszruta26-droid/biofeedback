@@ -230,7 +230,7 @@ Porównanie musi zestawiać tę samą stronę, pozycję, metodę, urządzenie/pr
 
 ### Eksport raportu PDF — implementacja
 
-W `OutlineTab` dostępny jest jawny przycisk eksportu raportu bieżącego epizodu. Raport pobiera dane z repozytorium i obejmuje oceny początkowe/kontrolne/końcowe, cele terapeutyczne, sesje, obserwacje ćwiczeń oraz aktualną ocenę ICF wraz z zapisanymi kwalifikatorami domen. Eksport jest przerywany, jeżeli nie można odczytać któregokolwiek wymaganego zbioru danych; aplikacja nie tworzy raportu częściowego jako kompletnego. Brak pomiaru pozostaje pusty, a nie jest zamieniany na zero. Raport zawiera nazwę wyświetlaną pacjenta i identyfikator epizodu, ale nie PESEL. Wersja zanonimizowana, podpis elektroniczny, niezmienny snapshot i ślad audytowy eksportu wymagają dalszej implementacji.
+W `OutlineTab` dostępny jest jawny przycisk eksportu raportu bieżącego epizodu. Raport pobiera dane z repozytorium i obejmuje oceny początkowe/kontrolne/końcowe, cele terapeutyczne, sesje, obserwacje ćwiczeń oraz dokładne wersje ocen ICF wskazane przez odwołania z ocen klinicznych, wraz z zapisanymi kwalifikatorami domen. Eksport jest przerywany, jeżeli nie można odczytać któregokolwiek wymaganego zbioru danych; aplikacja nie tworzy raportu częściowego jako kompletnego. Brak pomiaru pozostaje pusty, a nie jest zamieniany na zero. Raport zawiera nazwę wyświetlaną pacjenta i identyfikator epizodu, ale nie PESEL. Wersja zanonimizowana, podpis elektroniczny, niezmienny snapshot i ślad audytowy eksportu wymagają dalszej implementacji.
 
 ### Etap 5 — raport i walidacja
 - raport porównawczy z wykresami;
