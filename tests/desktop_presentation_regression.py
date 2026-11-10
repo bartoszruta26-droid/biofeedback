@@ -135,6 +135,11 @@ assert 'QStringLiteral("rom_degrees")' in outline
 assert 'QStringLiteral("strength_mrc")' in outline
 assert 'QStringLiteral("swelling_cm")' in outline
 assert "Missing measurement is not zero" in outline
+assert "rehabilitation-goals" in outline
+assert "createRehabilitationGoal()" in read("include/tab/OutlineTab.hpp")
+assert 'QStringLiteral("baseline_value")' in outline
+assert 'QStringLiteral("target_value")' in outline
+assert "refreshRehabilitationGoals()" in outline
 assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-assessments\")" in outline
 assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
