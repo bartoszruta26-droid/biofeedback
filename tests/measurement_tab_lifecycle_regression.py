@@ -271,12 +271,22 @@ for required in (
 ):
     if required not in source:
         raise SystemExit(f"Missing durable acquisition commit invariant: {required}")
-commit_start = engine_source.index("if (m_commitHook)")
-history_start = engine_source.index("m_history.push_back(sample)", commit_start)
-if commit_start > history_start:
-    raise SystemExit("MeasurementEngine must durably commit before adding to history")
-if engine_source.index("m_commitHook(sample)") > history_start:
-    raise SystemExit("MeasurementEngine must invoke the commit hook before publication")
+# The ingest gate preserves commit/sequence order, while the state mutex is
+# released before invoking the potentially blocking persistence hook.
+for required in (
+    "std::unique_lock<std::mutex> ingestLock(m_ingestMutex)",
+    "CommitHook commitHook",
+    "commitHook = m_commitHook",
+    "committed = commitHook(sample)",
+):
+    if required not in engine_source:
+        raise SystemExit(f"Missing serialized out-of-lock commit invariant: {required}")
+lock_end = engine_source.index("\\n    }\\n\\n    if (commitHook)")
+hook_start = engine_source.index("if (commitHook)", lock_end)
+hook_call = engine_source.index("committed = commitHook(sample)", hook_start)
+history_start = engine_source.index("m_history.push_back(sample)", hook_call)
+if not (lock_end < hook_start < hook_call < history_start):
+    raise SystemExit("Commit hook must run outside the state mutex and before history publication")
 
 # The bounded presentation/analysis queue must never block the serial reader.
 # The durable journal remains lossless; when the short GUI buffer saturates,
