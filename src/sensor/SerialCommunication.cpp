@@ -197,6 +197,10 @@ public:
     // Serialize complete open/close state transitions, separately from I/O.
     std::mutex connectionMutex;
     std::mutex readMutex;
+    // Persistent parser for the device's continuous binary stream. Keeping parser
+    // state across reads preserves frames split across USB/UART transactions.
+    ProtocolParser streamParser;
+    std::atomic<bool> continuousMode{false};
     mutable std::mutex errorMutex;
     std::string lastError;
     std::atomic<bool> verbose{false};
@@ -995,18 +999,27 @@ void SerialCommunication::startAsyncReading() {
     }
 
     std::lock_guard<std::mutex> lifecycleLock(m_impl->asyncLifecycleMutex);
-    // Repeated starts while the worker is active are idempotent.
     if (m_impl->asyncReading.load(std::memory_order_acquire)) return;
 
-    // Reap a completed worker before assigning a new std::thread.
     std::thread previousWorker;
     {
         std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
         if (m_impl->asyncThread.joinable()) previousWorker = std::move(m_impl->asyncThread);
     }
     if (previousWorker.joinable()) previousWorker.join();
-
     if (!m_impl->isConnected) return;
+
+    // Switch the firmware to push mode once. The previous implementation sent
+    // DATA and waited for DATA_SENT on every iteration, limiting acquisition
+    // to roughly 10 Hz and adding a transaction timeout to every sample.
+    {
+        std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
+        m_impl->streamParser.reset();
+        const std::string command = "CONT\\n";
+        if (!writeToPort(reinterpret_cast<const uint8_t*>(command.data()), command.size()))
+            return;
+    }
+    m_impl->continuousMode.store(true, std::memory_order_release);
     m_impl->asyncReading.store(true, std::memory_order_release);
     {
         std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
@@ -1015,18 +1028,38 @@ void SerialCommunication::startAsyncReading() {
                 std::lock_guard<std::mutex> workerLock(m_impl->asyncThreadMutex);
                 m_impl->asyncWorkerId = std::this_thread::get_id();
             }
+
+            uint8_t buffer[128];
             while (m_impl->asyncReading.load(std::memory_order_acquire) &&
                    m_impl->isConnected) {
-                const auto samples = readDataBatch(100);
-                for (const auto& sample : samples) {
-                    if (sample.hasFrame) notifyDataCallbacks(sample);
+                int bytesRead = 0;
+                {
+                    std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
+                    bytesRead = readFromPort(buffer, sizeof(buffer), 20);
                 }
-                // readData() already waits on the serial response with a bounded
-                // deadline. An additional fixed sleep throttles the acquisition
-                // loop (and adds up to 12 ms to every sample) without improving
-                // readiness or reducing busy-waiting.
 
+                if (bytesRead > 0) {
+                    m_impl->markActivity();
+                    m_impl->streamParser.feed(buffer, static_cast<std::size_t>(bytesRead));
+                    while (const auto frame = m_impl->streamParser.takeFrame()) {
+                        SensorData sample;
+                        sample.timestamp = frame->timestampMs;
+                        sample.hasTimestamp = true;
+                        sample.value = frame->rawValue;
+                        sample.crc = frame->crc;
+                        sample.isValid = true;
+                        sample.hasFrame = true;
+                        notifyDataCallbacks(sample);
+                    }
+                } else if (bytesRead < 0) {
+                    // A disconnected/failed descriptor must not turn the reader
+                    // into a hot loop. External stop() still reaps this worker.
+                    if (!m_impl->isConnected) break;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+                }
             }
+
+            m_impl->asyncReading.store(false, std::memory_order_release);
             {
                 std::lock_guard<std::mutex> workerLock(m_impl->asyncThreadMutex);
                 m_impl->asyncWorkerId = std::thread::id{};
@@ -1037,8 +1070,6 @@ void SerialCommunication::startAsyncReading() {
 
 void SerialCommunication::stopAsyncReading() {
     m_impl->asyncReading.store(false, std::memory_order_release);
-    // A callback may request stop/disconnect from this worker. Never join self;
-    // leave the joinable handle for the next external stop, restart, or destructor.
     {
         std::lock_guard<std::mutex> threadLock(m_impl->asyncThreadMutex);
         if (m_impl->asyncWorkerId == std::this_thread::get_id()) return;
@@ -1051,6 +1082,13 @@ void SerialCommunication::stopAsyncReading() {
         if (m_impl->asyncThread.joinable()) worker = std::move(m_impl->asyncThread);
     }
     if (worker.joinable()) worker.join();
+
+    if (m_impl->continuousMode.exchange(false, std::memory_order_acq_rel) &&
+        m_impl->isConnected) {
+        const std::string command = "STOP\\n";
+        std::lock_guard<std::mutex> ioLock(m_impl->readMutex);
+        (void)writeToPort(reinterpret_cast<const uint8_t*>(command.data()), command.size());
+    }
 }
 
 void SerialCommunication::configureWatchdog(int timeoutMs, bool enabled) {
