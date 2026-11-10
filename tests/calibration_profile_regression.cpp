@@ -53,7 +53,7 @@ int main()
     // the sign of a profile that may have been calibrated in compression.
     const auto tensileFromPositiveScale =
         sensor::CalibrationMath::convertRawWithPolarity(76542, 100000.0,
-            std::abs(*scale), -1);
+            std::abs(*reverseScale), -1);
     const auto tensileFromNegativeScale =
         sensor::CalibrationMath::convertRawWithPolarity(76542, 100000.0,
             *reverseScale, -1);
