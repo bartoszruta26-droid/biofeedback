@@ -76,6 +76,9 @@ MeasurementSample MeasurementEngine::ingest(const MeasurementInput& input) {
 }
 
 void MeasurementEngine::setCommitHook(CommitHook hook) {
+    // Also wait for any previously captured hook to finish. This is a lifecycle
+    // barrier used when a MeasurementTab closes or switches patient journals.
+    std::lock_guard<std::mutex> ingestLock(m_ingestMutex);
     std::lock_guard<std::mutex> lock(m_mutex);
     m_commitHook = std::move(hook);
 }
