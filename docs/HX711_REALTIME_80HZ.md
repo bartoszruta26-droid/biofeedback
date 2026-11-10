@@ -27,7 +27,7 @@ Domyślna konfiguracja detektora dla strumienia 80 SPS:
 - minimalny czas powtórzenia: 120 ms,
 - maksymalna dopuszczalna przerwa pomiędzy próbkami: 100 ms,
 - próg aktywacji: 20% siły docelowej, nie mniej niż 2 N,
-- próg zwolnienia: 10% progu aktywacji.
+- próg zwolnienia: 10% siły docelowej (czyli 50% progu aktywacji przy domyślnych proporcjach).
 
 Każde powtórzenie jest zaliczane po powrocie siły poniżej progu zwolnienia. To zapewnia rozdzielenie kolejnych naciągnięć i ogranicza wielokrotne zaliczanie jednego utrzymywanego skurczu. Po ukończeniu zadanej liczby powtórzeń aktualizowane są statystyki serii i kursor postępu treningu.
 
