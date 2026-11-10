@@ -18,6 +18,7 @@
 #include <QComboBox>
 #include <QGroupBox>
 #include <QScrollArea>
+#include <QJsonObject>
 
 namespace tab {
 
@@ -101,6 +102,7 @@ signals:
                               const QString& lastName, const QDate& birthDate,
                               const QString& gender, const QString& notes);
     void patientRecordDeleted(const QString& pesel);
+    void patientIcfAssessmentChanged(const QString& pesel, const QJsonObject& assessment);
 
     /**
      * @brief Sygnał emitowany gdy wybrano pacjenta z tabeli
@@ -164,6 +166,7 @@ public slots:
 private slots:
     void onSelectionChanged();
     void onTableRowDoubleClicked(int row, int column);
+    void openIcfAssessmentDialog();
 
 private:
     void setupUI();
@@ -197,6 +200,7 @@ private:
     QPushButton* m_editButton;
     QPushButton* m_deleteButton;
     QPushButton* m_clearButton;
+    QPushButton* m_icfButton;
     
     // Tabela pacjentów
     QGroupBox* m_tableGroup;
