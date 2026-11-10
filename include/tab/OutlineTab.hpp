@@ -253,6 +253,8 @@ private:
     void startRehabilitationSession();
     void finishRehabilitationSession();
     void recordRehabilitation24HourFollowUp();
+    void createRehabilitationObservation();
+    void refreshRehabilitationObservations();
 
     // Główne widgety
     QVBoxLayout* m_mainLayout;
@@ -293,6 +295,18 @@ private:
     QPushButton* m_finishRehabilitationSessionButton{nullptr};
     QPushButton* m_saveRehabilitation24hButton{nullptr};
     QLabel* m_rehabilitationSessionStatusLabel{nullptr};
+    QLineEdit* m_observationExerciseEdit{nullptr};
+    QLineEdit* m_observationSetsEdit{nullptr};
+    QLineEdit* m_observationRepetitionsEdit{nullptr};
+    QLineEdit* m_observationDurationEdit{nullptr};
+    QLineEdit* m_observationRpeEdit{nullptr};
+    QLineEdit* m_observationPainBeforeEdit{nullptr};
+    QLineEdit* m_observationPainAfterEdit{nullptr};
+    QLineEdit* m_observationPain24hEdit{nullptr};
+    QComboBox* m_observationMovementQualityCombo{nullptr};
+    QPushButton* m_saveObservationButton{nullptr};
+    QLabel* m_observationStatusLabel{nullptr};
+    QTextBrowser* m_observationHistoryBrowser{nullptr};
     QTextBrowser* m_clinicalProtocolBrowser{nullptr};
     
     // Sekcja wyboru konspektu
