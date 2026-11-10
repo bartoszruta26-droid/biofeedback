@@ -1358,6 +1358,9 @@ void OutlineTab::refreshRehabilitationAssessments()
             fields << tr("Obwód: %1 cm").arg(item.value(QStringLiteral("swelling_cm")).toDouble());
         if (item.contains(QStringLiteral("functional_test")))
             fields << item.value(QStringLiteral("functional_test")).toString();
+        if (item.contains(QStringLiteral("icf_assessment_ref")))
+            fields << tr("Powiązana ocena ICF: %1")
+                          .arg(item.value(QStringLiteral("icf_assessment_ref")).toString());
         entries << QStringLiteral("• %1 — %2")
                        .arg(item.value(QStringLiteral("assessed_at")).toString(),
                             fields.join(QStringLiteral("; ")));
