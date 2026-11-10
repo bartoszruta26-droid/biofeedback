@@ -204,6 +204,13 @@ assert 'QPdfWriter writer(&pdfFile)' in outline
 assert 'rehabilitation-assessments' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
 assert 'rehabilitation-observations' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
 assert 'icfResponses.constBegin()' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'resolveIcfReference' in outline
+assert 'icfHistory = patient.value(QStringLiteral("icf_assessment_history"))' in outline
+assert 'Oceny ICF powiązane z ocenami klinicznymi epizodu' in outline
+assert 'linkedIcfDate' in outline
+assert 'Nie można odczytać obserwacji' in outline
+assert 'QFileInfo(outputPath).size() <= 0' in outline
+
 assert 'PDF' in read("docs/rehabilitation/OUTLINE_PATIENT_WORKFLOW.md")
 
 
