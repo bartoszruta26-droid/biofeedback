@@ -350,7 +350,8 @@ int main(int argc, char** argv) {
                             assessment.value(QStringLiteral("id")).toString(), 1, &error));
     assert(restarted.remove(QStringLiteral("rehabilitation-episodes"), episodeId, 1, &error));
 
-    assert(restarted.remove(QStringLiteral("patients"), id, 2, &error));
+    assert(restarted.remove(QStringLiteral("patients"), id,
+                             collisionUpdate.value(QStringLiteral("version")).toInt(), &error));
     assert(!restarted.get(QStringLiteral("patients"), id, loaded, &error));
     assert(error == QStringLiteral("RESOURCE_NOT_FOUND"));
 
