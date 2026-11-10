@@ -101,6 +101,8 @@ void TanGame::setDifficultyLevel(int level)
     m_trackingSeconds = 0.0;
     m_combo = 0;
     m_scoreFraction = 0.0;
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
 }
 
 int TanGame::getDifficultyLevel() const
