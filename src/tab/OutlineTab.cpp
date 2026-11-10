@@ -163,10 +163,51 @@ void OutlineTab::setupUI()
     episodeLayout->addWidget(m_episodeStatusLabel);
     m_leftLayout->addWidget(episodeGroup);
 
+    auto* assessmentGroup = new QGroupBox(tr("Ocena kliniczna pacjenta"), visualPanel);
+    auto* assessmentLayout = new QVBoxLayout(assessmentGroup);
+    auto addAssessmentField = [assessmentGroup, assessmentLayout](const QString& label,
+                                                                  QLineEdit*& field,
+                                                                  const QString& placeholder) {
+        assessmentLayout->addWidget(new QLabel(label, assessmentGroup));
+        field = new QLineEdit(assessmentGroup);
+        field->setPlaceholderText(placeholder);
+        assessmentLayout->addWidget(field);
+    };
+    addAssessmentField(tr("Ból — NRS (0–10)"), m_assessmentPainNrsEdit,
+                       tr("Pozostaw puste, jeśli nie oceniono"));
+    addAssessmentField(tr("Zakres ruchu — ROM (stopnie)"), m_assessmentRomEdit,
+                       tr("Wartość w stopniach; 0 jest prawidłową wartością pomiaru"));
+    addAssessmentField(tr("Siła mięśniowa — MRC (0–5)"), m_assessmentStrengthEdit,
+                       tr("Stopień MRC; pozostaw puste, jeśli nie oceniono"));
+    addAssessmentField(tr("Obwód / obrzęk (cm)"), m_assessmentSwellingEdit,
+                       tr("Wartość w cm; pozostaw puste, jeśli nie zmierzono"));
+    addAssessmentField(tr("Test funkcjonalny / wynik"), m_assessmentFunctionalTestEdit,
+                       tr("Nazwa testu i wynik, np. TUG: 12,4 s"));
+    m_saveAssessmentButton = new QPushButton(tr("Zapisz ocenę początkową"), assessmentGroup);
+    m_assessmentStatusLabel = new QLabel(tr("Wybierz pacjenta i epizod, aby zapisać ocenę."), assessmentGroup);
+    m_assessmentStatusLabel->setWordWrap(true);
+    m_assessmentHistoryBrowser = new QTextBrowser(assessmentGroup);
+    m_assessmentHistoryBrowser->setMaximumHeight(130);
+    m_assessmentHistoryBrowser->setOpenExternalLinks(false);
+    assessmentLayout->addWidget(m_saveAssessmentButton);
+    assessmentLayout->addWidget(m_assessmentStatusLabel);
+    assessmentLayout->addWidget(m_assessmentHistoryBrowser);
+    m_leftLayout->addWidget(assessmentGroup);
+
+    connect(m_saveAssessmentButton, &QPushButton::clicked,
+            this, &OutlineTab::createRehabilitationAssessment);
+    m_saveAssessmentButton->setEnabled(false);
+    for (QLineEdit* field : {m_assessmentPainNrsEdit, m_assessmentRomEdit,
+                             m_assessmentStrengthEdit, m_assessmentSwellingEdit,
+                             m_assessmentFunctionalTestEdit}) {
+        field->setEnabled(false);
+    }
+
     connect(m_episodeSelector, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int index) {
                 m_currentEpisodeUuid = index >= 0
                     ? m_episodeSelector->itemData(index).toString() : QString();
+                refreshRehabilitationAssessments();
             });
     connect(m_createEpisodeButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationEpisode);
@@ -1043,6 +1084,7 @@ void OutlineTab::setCurrentPatientContext(const QString& patientUuid, const QStr
             m_patientContextLabel->setText(tr("Pacjent: nie wybrano"));
         m_currentEpisodeUuid.clear();
         refreshRehabilitationEpisodes();
+        refreshRehabilitationAssessments();
         return;
     }
     const QString safeName = displayName.trimmed().isEmpty()
@@ -1101,6 +1143,7 @@ void OutlineTab::refreshRehabilitationEpisodes()
     } else {
         m_episodeStatusLabel->setText(tr("Brak epizodów. Wprowadź rozpoznanie i utwórz epizod."));
     }
+    refreshRehabilitationAssessments();
 }
 
 void OutlineTab::createRehabilitationEpisode()
@@ -1140,6 +1183,122 @@ void OutlineTab::createRehabilitationEpisode()
         m_currentEpisodeUuid = createdId;
     }
     m_episodeStatusLabel->setText(tr("Epizod zapisany w repozytorium."));
+}
+
+void OutlineTab::refreshRehabilitationAssessments()
+{
+    const bool canSave = m_resourceRepository && !m_currentPatientUuid.isEmpty() &&
+                         !m_currentEpisodeUuid.isEmpty();
+    if (m_saveAssessmentButton) m_saveAssessmentButton->setEnabled(canSave);
+    for (QLineEdit* field : {m_assessmentPainNrsEdit, m_assessmentRomEdit,
+                             m_assessmentStrengthEdit, m_assessmentSwellingEdit,
+                             m_assessmentFunctionalTestEdit}) {
+        if (field) field->setEnabled(canSave);
+    }
+    if (!m_assessmentHistoryBrowser) return;
+    m_assessmentHistoryBrowser->clear();
+    if (!canSave) {
+        if (m_assessmentStatusLabel)
+            m_assessmentStatusLabel->setText(tr("Wybierz pacjenta i epizod, aby zapisać ocenę."));
+        return;
+    }
+
+    QString error;
+    const QJsonArray assessments = m_resourceRepository->list(
+        QStringLiteral("rehabilitation-assessments"), &error);
+    if (!error.isEmpty()) {
+        m_assessmentStatusLabel->setText(tr("Nie udało się odczytać historii ocen."));
+        m_saveAssessmentButton->setEnabled(false);
+        return;
+    }
+    QStringList entries;
+    for (const QJsonValue& value : assessments) {
+        if (!value.isObject()) continue;
+        const QJsonObject item = value.toObject();
+        if (item.value(QStringLiteral("patient_id")).toString() != m_currentPatientUuid ||
+            item.value(QStringLiteral("episode_id")).toString() != m_currentEpisodeUuid)
+            continue;
+        QStringList fields;
+        if (item.contains(QStringLiteral("pain_nrs")))
+            fields << tr("NRS: %1").arg(item.value(QStringLiteral("pain_nrs")).toInt());
+        if (item.contains(QStringLiteral("rom_degrees")))
+            fields << tr("ROM: %1°").arg(item.value(QStringLiteral("rom_degrees")).toDouble());
+        if (item.contains(QStringLiteral("strength_mrc")))
+            fields << tr("MRC: %1/5").arg(item.value(QStringLiteral("strength_mrc")).toDouble());
+        if (item.contains(QStringLiteral("swelling_cm")))
+            fields << tr("Obwód: %1 cm").arg(item.value(QStringLiteral("swelling_cm")).toDouble());
+        if (item.contains(QStringLiteral("functional_test")))
+            fields << item.value(QStringLiteral("functional_test")).toString();
+        entries << QStringLiteral("• %1 — %2")
+                       .arg(item.value(QStringLiteral("assessed_at")).toString(),
+                            fields.join(QStringLiteral("; ")));
+    }
+    m_assessmentHistoryBrowser->setPlainText(entries.isEmpty()
+        ? tr("Brak zapisanych ocen dla tego epizodu.") : entries.join(QStringLiteral("\n")));
+    m_assessmentStatusLabel->setText(tr("Historia ocen: %1").arg(entries.size()));
+}
+
+void OutlineTab::createRehabilitationAssessment()
+{
+    if (!m_resourceRepository || m_currentPatientUuid.isEmpty() ||
+        m_currentEpisodeUuid.isEmpty()) {
+        m_assessmentStatusLabel->setText(tr("Wybierz pacjenta i epizod rehabilitacji."));
+        return;
+    }
+
+    QJsonObject payload{
+        {QStringLiteral("patient_id"), m_currentPatientUuid},
+        {QStringLiteral("episode_id"), m_currentEpisodeUuid},
+        {QStringLiteral("assessment_type"), QStringLiteral("baseline")},
+        {QStringLiteral("assessed_at"),
+         QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
+    };
+    auto parseOptionalNumber = [this](QLineEdit* field, const QString& key,
+                                      double minimum, double maximum,
+                                      bool integerOnly, QString& error) -> bool {
+        const QString text = field->text().trimmed();
+        if (text.isEmpty()) return true; // Missing measurement is not zero.
+        bool ok = false;
+        const double number = text.toDouble(&ok);
+        if (!ok || !std::isfinite(number) || number < minimum || number > maximum ||
+            (integerOnly && std::floor(number) != number)) {
+            error = tr("Nieprawidłowa wartość pola: %1").arg(key);
+            return false;
+        }
+        payload.insert(key, number);
+        return true;
+    };
+
+    QString validationError;
+    if (!parseOptionalNumber(m_assessmentPainNrsEdit, QStringLiteral("NRS"), 0, 10, true, validationError) ||
+        !parseOptionalNumber(m_assessmentRomEdit, QStringLiteral("ROM"), 0, 360, false, validationError) ||
+        !parseOptionalNumber(m_assessmentStrengthEdit, QStringLiteral("MRC"), 0, 5, true, validationError) ||
+        !parseOptionalNumber(m_assessmentSwellingEdit, QStringLiteral("obrzęk"), 0, 100, false, validationError)) {
+        m_assessmentStatusLabel->setText(validationError);
+        return;
+    }
+    const QString functionalTest = m_assessmentFunctionalTestEdit->text().trimmed();
+    if (!functionalTest.isEmpty())
+        payload.insert(QStringLiteral("functional_test"), functionalTest.left(500));
+    if (payload.size() <= 4) {
+        m_assessmentStatusLabel->setText(tr("Wprowadź co najmniej jeden oceniony parametr."));
+        return;
+    }
+
+    QJsonObject created;
+    QString error;
+    if (!m_resourceRepository->create(QStringLiteral("rehabilitation-assessments"),
+                                      payload, created, &error)) {
+        m_assessmentStatusLabel->setText(tr("Nie udało się zapisać oceny: %1").arg(error));
+        return;
+    }
+    m_assessmentPainNrsEdit->clear();
+    m_assessmentRomEdit->clear();
+    m_assessmentStrengthEdit->clear();
+    m_assessmentSwellingEdit->clear();
+    m_assessmentFunctionalTestEdit->clear();
+    m_assessmentStatusLabel->setText(tr("Ocena początkowa została trwale zapisana."));
+    refreshRehabilitationAssessments();
 }
 
 void OutlineTab::setMeasurementEngine(
