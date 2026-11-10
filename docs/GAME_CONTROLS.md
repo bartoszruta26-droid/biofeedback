@@ -76,14 +76,17 @@
 - **Punktacja:** minięcie przeszkody bez kolizji zwiększa wynik. Kolizja odbiera życie.
 - **Wskaźniki:** wynik, dystans i pozostałe życia.
 
-### 8. Archer
+### 8. Archer Force Trainer
 
-**Cel:** ustaw kąt łuku i trafiaj w poruszający się cel.
+**Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego i synchronizację strzału z ruchem celu.
 
-- **Tensometr:** ustawia kąt celowania w całym dostępnym zakresie; większa wartość wejściowa unosi kąt łuku.
-- **Klawiatura:** `W` lub `↑` — podnieś celowanie; `S` lub `↓` — obniż celowanie; `SPACJA` — oddaj strzał.
-- **Wskaźniki:** wynik i aktualny kąt celowania.
-- **Wskazówka:** uwzględnij tor balistyczny strzały i ruch celu. Nie oceniaj kierunku wyłącznie na podstawie chwilowego położenia celu.
+- **Tensometr/HX711:** ustawia kąt łuku w zakresie gry. Wartość siły 0–100% jest mapowana na kąt od około +31° (niższe celowanie) do około −52° (wyższe celowanie). Zmiana siły natychmiast aktualizuje kąt.
+- **Klawiatura:** przytrzymaj `W` lub `↑`, aby płynnie podnosić kąt; przytrzymaj `S` lub `↓`, aby go obniżać. Po zwolnieniu klawisza regulacja zatrzymuje się. `SPACJA` oddaje pojedynczy strzał; kolejne strzały są ograniczone czasem odnowienia około 320 ms.
+- **Tor lotu:** kropkowana linia pokazuje przewidywany tor strzały z uwzględnieniem grawitacji i bieżącego kąta. Jest wskazówką, a poruszający się cel może zmienić położenie przed trafieniem.
+- **Strefy celu:** zewnętrzna część tarczy daje 10 punktów, środkowa 20, a środek 30. Trafienie zwiększa prędkość celu, maksymalnie do 150 jednostek na sekundę.
+- **Statystyki:** wynik, kąt celowania, łączna liczba oddanych strzałów, trafień, pudeł i strzał w locie.
+- **Ograniczenia:** jednocześnie może istnieć maksymalnie 8 aktywnych strzał. Strzała, która opuści planszę, jest liczona jako pudło.
+- **Praktyka:** najpierw ustaw kąt tensometrem, następnie koryguj go krótkimi przytrzymaniami klawiszy. Obserwuj kropkowany tor oraz kierunek ruchu celu i oddaj strzał z wyprzedzeniem.
 
 ### 9. Galaga
 
@@ -114,7 +117,7 @@
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
-| Archer | kąt celowania | `W`/`↑`, `S`/`↓`, `SPACJA` |
+| Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, przytrzymaj `SPACJĘ` |
 | Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
 
