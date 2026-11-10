@@ -78,9 +78,12 @@ void ArcherGame::repositionTarget()
 
 bool ArcherGame::handleInput(double value)
 {
+    if (!std::isfinite(value))
+        return false;
     m_force = qBound(0.0, value / 100.0, 1.0);
-    // Low force aims lower; high force raises the bow.
-    m_aimAngle = 0.55 - m_force * 1.45;
+    // Keyboard aiming temporarily takes priority over sensor samples.
+    if (!m_aimUp && !m_aimDown)
+        m_aimAngle = 0.55 - m_force * 1.45;
     return true;
 }
 
