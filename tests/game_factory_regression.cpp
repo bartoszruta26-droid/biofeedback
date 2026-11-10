@@ -95,6 +95,13 @@ int main(int argc, char **argv)
     waitForEvents(120);
     const double keyboardCenter = arkanoidKeysGame->paddlePositionX();
     REQUIRE(keyboardCenter < sensorCenter);
+    // An OS auto-repeat release must not be mistaken for the physical key-up.
+    QKeyEvent arkanoidLeftRepeatRelease(QEvent::KeyRelease, Qt::Key_Left,
+                                        Qt::NoModifier, QString(), true, 1);
+    QApplication::sendEvent(arkanoidKeysGame, &arkanoidLeftRepeatRelease);
+    waitForEvents(80);
+    const double afterRepeatRelease = arkanoidKeysGame->paddlePositionX();
+    REQUIRE(afterRepeatRelease < keyboardCenter);
     QApplication::sendEvent(arkanoidKeysGame, &arkanoidLeftUp);
     arkanoidKeysGame->handleSensorInput(90.0);
     waitForEvents(80);
