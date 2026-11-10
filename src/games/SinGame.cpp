@@ -38,7 +38,6 @@ SinGame::SinGame(QWidget *parent)
     , m_difficultyCheckSeconds(0.0)
     , m_accuracyWindowSeconds(0.0)
     , m_accuracyWindowHitSeconds(0.0)
-    , m_bestStreakSeconds(0.0)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
 {
@@ -71,7 +70,6 @@ void SinGame::initialize()
     m_timeInTarget = 0.0;
     m_accuracyWindowSeconds = 0.0;
     m_accuracyWindowHitSeconds = 0.0;
-    m_bestStreakSeconds = 0.0;
     refreshGeometryParameters();
     calculateTargetY(width() * 0.72);
 }
@@ -121,7 +119,12 @@ void SinGame::setWaveformMode(int mode)
 }
 
 int SinGame::waveformMode() const { return m_waveformMode; }
-void SinGame::setAutomaticDifficulty(bool enabled) { m_automaticDifficulty = enabled; }
+void SinGame::setAutomaticDifficulty(bool enabled)
+{
+    m_automaticDifficulty = enabled;
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
+}
 bool SinGame::automaticDifficulty() const { return m_automaticDifficulty; }
 
 void SinGame::keyPressEvent(QKeyEvent* event)
@@ -178,6 +181,7 @@ void SinGame::updateAutomaticDifficulty(double deltaTime)
 {
     if (!m_automaticDifficulty || m_inputAge > 0.35)
         return;
+    m_accuracyWindowSeconds += deltaTime;
     if (m_accuracyWindowSeconds < 12.0)
         return;
     const double ratio = m_accuracyWindowHitSeconds / m_accuracyWindowSeconds;
@@ -309,12 +313,10 @@ void SinGame::update(double deltaTime)
 
     m_lastDistance = std::abs(m_cursorY - m_targetY);
     m_isHit = m_lastDistance <= m_tolerance;
-    m_accuracyWindowSeconds += dt;
     if (m_isHit) {
         m_accuracyWindowHitSeconds += dt;
         m_timeInTarget += dt;
         m_comboSeconds += dt;
-        m_bestStreakSeconds = qMax(m_bestStreakSeconds, m_comboSeconds);
         m_combo = qMin(5, 1 + static_cast<int>(m_comboSeconds / 2.0));
         const double accuracy = qBound(0.0, 1.0 - m_lastDistance / m_tolerance, 1.0);
         const double pointsPerSecond = 2.0 + 4.0 * accuracy + 0.5 * m_combo;
