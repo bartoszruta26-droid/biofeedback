@@ -197,7 +197,10 @@ assert 'refreshRehabilitationAssessments();' in outline[outline.index('if (!canU
 assert 'refreshRehabilitationGoals();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
 assert 'arg(assessmentCount)' in outline
 assert 'Operacje sesji zostały zablokowane' in outline
-assert 'm_startRehabilitationSessionButton->setEnabled(false);' in outline[outline.index('Nie udało się odczytać sesji rehabilitacyjnych. Operacje sesji zostały zablokowane.'):outline.index('QJsonObject current;', outline.index('Nie udało się odczytać sesji rehabilitacyjnych. Operacje sesji zostały zablokowane.'))]
+session_refresh = outline[outline.index('void OutlineTab::refreshRehabilitationSession()'):outline.index('void OutlineTab::startRehabilitationSession()')]
+assert 'm_startRehabilitationSessionButton->setEnabled(false);' in session_refresh
+assert 'm_finishRehabilitationSessionButton->setEnabled(false);' in session_refresh
+assert 'Operacje sesji zostały zablokowane' in session_refresh
 
 assert 'const bool hasClinicalValue' in outline
 assert 'payload.contains(QStringLiteral("functional_test"))' in outline
