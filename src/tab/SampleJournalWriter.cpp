@@ -272,7 +272,7 @@ void SampleJournalWriter::run()
             break;
         }
 
-        const bool syncRequired = record.durable || ++pendingSinceSync >= 32;
+        const bool syncRequired = record.durable || ++pendingSinceSync >= 8;
         if (syncRequired) {
             if (!flushDurably(file, error)) {
                 std::lock_guard<std::mutex> lock(m_mutex);
