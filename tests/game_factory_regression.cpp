@@ -146,6 +146,45 @@ int main(int argc, char **argv)
     pongGame->update(std::numeric_limits<double>::quiet_NaN());
     pongGame->update(std::numeric_limits<double>::infinity());
     REQUIRE(pongGame->isRunning()); // Invalid deltas are ignored.
+
+    // Force input is smoothed, clamped and used to position the player's paddle.
+    pongGame->handleSensorInput(100.0);
+    REQUIRE(pongGame->hasFreshSensorInput());
+    pongGame->update(0.1);
+    REQUIRE(pongGame->currentForcePercent() > 50.0);
+    const double topPosition = pongGame->playerPaddleY();
+    pongGame->handleSensorInput(0.0);
+    pongGame->update(0.1);
+    REQUIRE(pongGame->currentForcePercent() < 100.0);
+    REQUIRE(pongGame->playerPaddleY() > topPosition);
+
+    // Keep the sensor alive while the initial serve delay expires and the rally starts.
+    for (int sample = 0; sample < 8; ++sample) {
+        pongGame->handleSensorInput(50.0);
+        waitForEvents(100);
+    }
+    const QPointF movingBall = pongGame->ballPosition();
+    REQUIRE(std::abs(movingBall.x() - pongGame->width() / 2.0) > 1.0);
+
+    // A stale sensor stream freezes the rally; it must not award a point from lost input.
+    waitForEvents(400);
+    REQUIRE(!pongGame->hasFreshSensorInput());
+    const QPointF frozenBall = pongGame->ballPosition();
+    pongGame->update(0.05);
+    REQUIRE(std::abs(pongGame->ballPosition().x() - frozenBall.x()) < 1e-6);
+    REQUIRE(std::abs(pongGame->ballPosition().y() - frozenBall.y()) < 1e-6);
+
+    // Resizing in both directions keeps paddles inside the court and preserves a finite ball state.
+    pongGame->handleSensorInput(50.0);
+    pongGame->resize(180, 120);
+    waitForEvents(40);
+    REQUIRE(pongGame->playerPaddleY() >= 0.0);
+    REQUIRE(pongGame->playerPaddleY() + 36.0 <= pongGame->height() + 1.0);
+    pongGame->resize(640, 480);
+    waitForEvents(40);
+    REQUIRE(pongGame->playerPaddleY() >= 0.0);
+    REQUIRE(std::isfinite(pongGame->ballPosition().x()));
+    REQUIRE(std::isfinite(pongGame->ballPosition().y()));
     pongGame->stop();
 
     std::unique_ptr<games::GameEngine> galaga(games::createGame(QStringLiteral("galaga")));
