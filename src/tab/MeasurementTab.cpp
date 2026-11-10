@@ -184,10 +184,18 @@ ForcePlotWidget::ForcePlotWidget(QWidget *parent)
     , m_minObservedForce(0.0)
     , m_unit(ForceUnit::Newtons)
 {
-    m_repaintTimer.setSingleShot(true);
+    m_repaintTimer.setSingleShot(false);
     m_repaintTimer.setTimerType(Qt::PreciseTimer);
-    m_repaintTimer.setInterval(16); // cap live chart repaint scheduling at ~60 Hz
-    connect(&m_repaintTimer, &QTimer::timeout, this, [this] { update(); });
+    m_repaintTimer.setInterval(8); // 120 Hz presentation cadence; acquisition remains 80 SPS
+    connect(&m_repaintTimer, &QTimer::timeout, this, [this] {
+        // Stop repainting after the stream goes idle; while active, each frame
+        // evaluates a shape-preserving interpolant on a 120 Hz time grid.
+        if (!m_lastSampleArrival.isValid() || m_lastSampleArrival.elapsed() > 250) {
+            m_repaintTimer.stop();
+            return;
+        }
+        update();
+    });
 
     setMinimumHeight(280);
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -226,6 +234,7 @@ void ForcePlotWidget::addSample(double force, double time)
 
     m_forces.push_back(force);
     m_times.push_back(time);
+    m_lastSampleArrival.restart();
 
     // Monotonic queues make extrema maintenance amortized O(1), rather than
     // scanning and shifting the entire visible trace on every sensor sample.
@@ -259,6 +268,7 @@ void ForcePlotWidget::addSample(double force, double time)
 void ForcePlotWidget::clearData()
 {
     m_repaintTimer.stop();
+    m_lastSampleArrival.invalidate();
     m_forces.clear();
     m_times.clear();
     m_maxCandidates.clear();
@@ -361,85 +371,88 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     const double maxTime = m_times.back();
     const double timeRange = (maxTime > minTime) ? (maxTime - minTime) : 1.0;
 
-    struct PixelBucket {
-        bool valid{false};
-        std::size_t minIndex{0};
-        std::size_t maxIndex{0};
-        double minForce{0.0};
-        double maxForce{0.0};
+    // Shape-preserving cubic Hermite interpolation is evaluated on a 120 Hz
+    // presentation grid. It never mutates the acquired sample buffer and is
+    // therefore visual-only: repetition detection and records use real 80 SPS
+    // samples exclusively.
+    const std::size_t sampleCount = m_forces.size();
+    const double minTime = m_times.front();
+    const double maxTime = m_times.back();
+    const double timeRange = maxTime > minTime ? maxTime - minTime : 1.0;
+    constexpr double displayStepSeconds = 1.0 / 120.0;
+
+    const auto secant = [this](std::size_t left, std::size_t right) {
+        const double dt = m_times[right] - m_times[left];
+        return dt > 0.0 ? (m_forces[right] - m_forces[left]) / dt : 0.0;
     };
-    std::vector<PixelBucket> buckets(static_cast<std::size_t>(plotWidth));
+    const auto interpolate = [&](std::size_t segment, double time) {
+        const double t0 = m_times[segment];
+        const double t1 = m_times[segment + 1];
+        const double y0 = m_forces[segment];
+        const double y1 = m_forces[segment + 1];
+        const double dt = t1 - t0;
+        if (dt <= 0.0) return y1;
 
-    // Keep the temporal order of each column's extrema. This envelope
-    // preserves brief peaks while limiting the trace to <= 2 points/pixel.
-    for (std::size_t i = 0; i < m_forces.size(); ++i) {
-        const double ratio = (m_times[i] - minTime) / timeRange;
-        const int x = qBound(0, static_cast<int>(ratio * plotWidth), plotWidth - 1);
-        PixelBucket& bucket = buckets[static_cast<std::size_t>(x)];
-        const double force = m_forces[i];
-        if (!bucket.valid) {
-            bucket.valid = true;
-            bucket.minIndex = bucket.maxIndex = i;
-            bucket.minForce = bucket.maxForce = force;
+        const double delta = (y1 - y0) / dt;
+        double tangent0 = segment > 0
+            ? secant(segment - 1, segment + 1) : delta;
+        double tangent1 = segment + 2 < sampleCount
+            ? secant(segment, segment + 2) : delta;
+
+        // Fritsch-Carlson limiter prevents overshoot around sharp load changes.
+        if (std::abs(delta) < 1e-12) {
+            tangent0 = 0.0;
+            tangent1 = 0.0;
         } else {
-            if (force < bucket.minForce) {
-                bucket.minForce = force;
-                bucket.minIndex = i;
-            }
-            if (force > bucket.maxForce) {
-                bucket.maxForce = force;
-                bucket.maxIndex = i;
+            if (tangent0 * delta <= 0.0) tangent0 = 0.0;
+            if (tangent1 * delta <= 0.0) tangent1 = 0.0;
+            const double alpha = tangent0 / delta;
+            const double beta = tangent1 / delta;
+            const double magnitude = alpha * alpha + beta * beta;
+            if (magnitude > 9.0) {
+                const double scale = 3.0 / std::sqrt(magnitude);
+                tangent0 = scale * alpha * delta;
+                tangent1 = scale * beta * delta;
             }
         }
-    }
 
-    // Keep sub-pixel coordinates and use a round-joined painter path. Integer
-    // QPoint conversion quantized every sample to whole pixels and made the
-    // live trace visibly angular even with antialiasing enabled.
-    QVector<QPointF> tracePoints;
-    tracePoints.reserve(plotWidth * 2);
-    for (int column = 0; column < plotWidth; ++column) {
-        const PixelBucket& bucket = buckets[static_cast<std::size_t>(column)];
-        if (!bucket.valid)
-            continue;
-
-        const auto toPoint = [&](double force) {
-            const double y = margin + plotHeight -
-                ((force + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
-            return QPointF(margin + column, y);
-        };
-
-        tracePoints.append(bucket.minIndex <= bucket.maxIndex
-            ? toPoint(bucket.minForce) : toPoint(bucket.maxForce));
-        if (bucket.minIndex != bucket.maxIndex) {
-            tracePoints.append(bucket.minIndex <= bucket.maxIndex
-                ? toPoint(bucket.maxForce) : toPoint(bucket.minForce));
-        }
-    }
+        const double u = qBound(0.0, (time - t0) / dt, 1.0);
+        const double u2 = u * u;
+        const double u3 = u2 * u;
+        const double value =
+            (2.0 * u3 - 3.0 * u2 + 1.0) * y0 +
+            (u3 - 2.0 * u2 + u) * dt * tangent0 +
+            (-2.0 * u3 + 3.0 * u2) * y1 +
+            (u3 - u2) * dt * tangent1;
+        return qBound(qMin(y0, y1), value, qMax(y0, y1));
+    };
 
     QPainterPath tracePath;
-    if (!tracePoints.isEmpty()) {
-        tracePath.moveTo(tracePoints.front());
-        for (int i = 0; i + 1 < tracePoints.size(); ++i) {
-            const QPointF& p1 = tracePoints[i];
-            const QPointF& p2 = tracePoints[i + 1];
-            if (qFuzzyCompare(p1.x() + 1.0, p2.x() + 1.0)) {
-                tracePath.lineTo(p2);
-                continue;
+    if (sampleCount >= 2 && maxTime > minTime) {
+        std::size_t segment = 0;
+        bool started = false;
+        const auto appendAt = [&](double time, double value, QPainterPath& path, bool& hasStarted) {
+            const double x = margin + ((time - minTime) / timeRange) * plotWidth;
+            const double y = margin + plotHeight -
+                ((value + m_maxForce) / (2.0 * m_maxForce)) * plotHeight;
+            const QPointF point(x, y);
+            if (!hasStarted) {
+                path.moveTo(point);
+                hasStarted = true;
+            } else {
+                path.lineTo(point);
             }
-            const QPointF& p0 = tracePoints[qMax(0, i - 1)];
-            const QPointF& p3 = tracePoints[qMin(i + 2, tracePoints.size() - 1)];
-            const qreal lowY = qMin(p1.y(), p2.y());
-            const qreal highY = qMax(p1.y(), p2.y());
-            QPointF control1 = p1 + (p2 - p0) / 6.0;
-            QPointF control2 = p2 - (p3 - p1) / 6.0;
-            control1.setY(qBound(lowY, control1.y(), highY));
-            control2.setY(qBound(lowY, control2.y(), highY));
-            tracePath.cubicTo(control1, control2, p2);
+        };
+
+        for (double time = minTime; time < maxTime; time += displayStepSeconds) {
+            while (segment + 1 < sampleCount - 1 && m_times[segment + 1] < time)
+                ++segment;
+            appendAt(time, interpolate(segment, time), tracePath, started);
         }
+        appendAt(maxTime, m_forces.back(), tracePath, started);
     }
 
-    if (tracePoints.size() >= 2) {
+    if (sampleCount >= 2 && !tracePath.isEmpty()) {
         painter.setPen(QPen(QColor(0, 100, 200), 2.2, Qt::SolidLine,
                             Qt::RoundCap, Qt::RoundJoin));
         painter.setBrush(Qt::NoBrush);
