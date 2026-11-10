@@ -109,6 +109,7 @@ void SinGame::setForceCalibration(double minimum, double maximum)
 
 double SinGame::forceCalibrationMinimum() const { return m_calibrationMinimum; }
 double SinGame::forceCalibrationMaximum() const { return m_calibrationMaximum; }
+double SinGame::normalizedForce() const { return m_currentForce; }
 
 void SinGame::setWaveformMode(int mode)
 {
