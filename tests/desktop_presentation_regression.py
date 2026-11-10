@@ -46,8 +46,8 @@ assert "selectedGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expandi
 # remains on the left while configuration is isolated in a compact sidebar.
 for source in (measurement, training):
     assert "QSplitter(Qt::Horizontal" in source
-    assert "workspaceSplitter->setStretchFactor(0, 1);" in source
-    assert "workspaceSplitter->setStretchFactor(1, 1);" in source
+    assert "workspaceSplitter->setStretchFactor(0, 89);" in source
+    assert "workspaceSplitter->setStretchFactor(1, 11);" in source
     assert "auto* visualScroll = new QScrollArea(workspaceSplitter);" in source
     assert "auto* optionsScroll = new QScrollArea(workspaceSplitter);" in source
     assert "QTimer::singleShot(0, workspaceSplitter" in source
