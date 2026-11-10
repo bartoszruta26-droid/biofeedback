@@ -148,6 +148,13 @@ assert 'QStringLiteral("pre_session_pain_nrs")' in outline
 assert 'QStringLiteral("post_session_pain_nrs")' in outline
 assert 'QStringLiteral("pain_at_24h_nrs")' in outline
 assert 'QStringLiteral("awaiting_24h")' in outline
+assert "createRehabilitationObservation()" in read("include/tab/OutlineTab.hpp")
+assert 'QStringLiteral("rehabilitation-observations")' in outline
+assert 'QStringLiteral("exercise_name")' in outline
+assert 'QStringLiteral("completed_sets")' in outline
+assert 'QStringLiteral("completed_repetitions")' in outline
+assert 'QStringLiteral("pain_at_24h")' in outline
+assert "refreshRehabilitationObservations()" in outline
 assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-assessments\")" in outline
 assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
