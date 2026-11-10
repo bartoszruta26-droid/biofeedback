@@ -227,7 +227,7 @@ void MainWindow::setupTabs()
     QVBoxLayout* dashboardLayout = new QVBoxLayout(dashboard);
     dashboardLayout->setContentsMargins(28, 26, 28, 26);
     QLabel* dashboardTitle = new QLabel(tr("Centrum Biofeedback"), dashboard);
-    dashboardTitle->setStyleSheet("font-size:16px;font-weight:700;color:#14243a;");
+    dashboardTitle->setStyleSheet("font-size:12px;font-weight:700;color:#14243a;");
     dashboardLayout->addWidget(dashboardTitle);
     QGridLayout* cards = new QGridLayout();
     cards->setHorizontalSpacing(14);
@@ -270,7 +270,7 @@ void MainWindow::setupTabs()
     dashboardLayout->addLayout(actions);
 
     QLabel* deviceHeading = new QLabel(tr("Połączenie z urządzeniem"), dashboard);
-    deviceHeading->setStyleSheet("font-size:11px;font-weight:700;color:#24364d;");
+    deviceHeading->setStyleSheet("font-size:10px;font-weight:700;color:#24364d;");
     dashboardLayout->addWidget(deviceHeading);
     QHBoxLayout* deviceControls = new QHBoxLayout();
     m_devicePortCombo = new QComboBox(dashboard);
@@ -443,7 +443,7 @@ void MainWindow::showSettingsDialog()
         auto* weightLayout = new QHBoxLayout();
         m_weightLabel = new QLabel(tr("Ostatni odczyt:"), settingsGroup);
         m_weightValue = new QLabel(tr("0,00 N"), settingsGroup);
-        m_weightValue->setStyleSheet("font-size: 16px; font-weight: 700; color: #087f82;");
+        m_weightValue->setStyleSheet("font-size: 12px; font-weight: 700; color: #087f82;");
         m_weightValue->setMinimumWidth(100);
         weightLayout->addWidget(m_weightLabel);
         weightLayout->addWidget(m_weightValue);
