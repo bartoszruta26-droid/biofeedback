@@ -99,7 +99,9 @@ writer_source = Path("src/tab/SampleJournalWriter.cpp").read_text(encoding="utf-
 for required in (
     "std::thread(&SampleJournalWriter::run, this)",
     "m_queue.size() >= m_capacity",
-    "m_queue.push_back(PendingRecord{line, ticket, durable})",
+    "m_queue.push_back(std::move(pending))",
+    "pending.jsonObject = record",
+    "pending.isJsonObject = true",
     "m_changed.wait(lock",
     "file.write(line)",
     "syncParentDirectory(m_path, error)",
