@@ -245,6 +245,14 @@ if "m_currentGame->handleSensorInput(gameInput);" not in training_source:
     raise SystemExit("Training must forward every acquired sample to the active game")
 if "m_lblCurrentForce->setText(QString(\"%1 N\").arg(force, 0, 'f', 2));" not in training_source:
     raise SystemExit("Training force display must consume the newest acquired sample")
+if "stats.completedReps = stats.repetitions.size();" not in training_source:
+    raise SystemExit("Training repetition total must derive from completed records")
+if "++m_currentRepIndex;" not in training_source or "finishCurrentSeries();" not in training_source:
+    raise SystemExit("Training must advance the repetition cursor and finish a series at its configured target")
+if "stats.completedSeries = stats.series.size();" not in training_source:
+    raise SystemExit("Completed series count must derive from stored series summaries")
+if "m_currentSeriesIndex = nextSeriesIndex;" not in training_source or "updateProgressWidgets();" not in training_source:
+    raise SystemExit("Training progress must refresh after each series transition")
 if "m_repaintTimer.setInterval(8);" not in source:
     raise SystemExit("Measurement force plot repaint must target approximately 120 Hz")
 if "constexpr double displayStepSeconds = 1.0 / 120.0;" not in source:
