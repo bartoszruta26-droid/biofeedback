@@ -481,6 +481,32 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
     }
 
     if (collection == QStringLiteral("rehabilitation-assessments")) {
+        const QString icfReference = payload.value(QStringLiteral("icf_assessment_ref")).toString().trimmed();
+        if (payload.contains(QStringLiteral("icf_assessment_ref"))) {
+            if (icfReference.isEmpty()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_ICF_REFERENCE"));
+                return false;
+            }
+            QJsonObject patient;
+            QString patientError;
+            if (!readRecord(QStringLiteral("patients"), patientId, patient, &patientError)) {
+                setError(error, patientError);
+                return false;
+            }
+            bool referenceFound = patient.value(QStringLiteral("icf_assessment"))
+                .toObject().value(QStringLiteral("assessed_at")).toString() == icfReference;
+            const QJsonArray icfHistory = patient.value(QStringLiteral("icf_assessment_history")).toArray();
+            for (const QJsonValue& entry : icfHistory) {
+                if (entry.toObject().value(QStringLiteral("assessed_at")).toString() == icfReference) {
+                    referenceFound = true;
+                    break;
+                }
+            }
+            if (!referenceFound) {
+                setError(error, QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
+                return false;
+            }
+        }
         const QStringList numericFields = {
             QStringLiteral("pain_nrs"), QStringLiteral("rom_degrees"),
             QStringLiteral("strength_mrc"), QStringLiteral("swelling_cm")
