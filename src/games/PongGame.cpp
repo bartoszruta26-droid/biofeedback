@@ -9,6 +9,7 @@
 #include <QRandomGenerator>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace games {
 
