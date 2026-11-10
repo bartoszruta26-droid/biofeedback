@@ -99,6 +99,34 @@ assert "m_forcePlot->setMinimumHeight(360);" in measurement
 assert "setMinimumHeight(280);" in training
 assert "QSizePolicy::Expanding, QSizePolicy::Preferred" in training
 assert "optionsLayout->addWidget(m_configBox);" in training
+# Outline workspace: exercise media, game area, progress and live graph are left;
+# outline selection, metadata, game selection and session controls are right.
+assert "QSplitter(Qt::Horizontal, this)" in outline
+assert "m_leftLayout = new QVBoxLayout(visualPanel);" in outline
+assert "m_rightLayout = new QVBoxLayout(settingsPanel);" in outline
+assert "m_rightLayout->addWidget(m_outlineGroup);" in outline
+assert "m_rightLayout->addWidget(m_outlineInfoGroup);" in outline
+assert "m_rightLayout->addWidget(m_gameSelectionGroup);" in outline
+assert "m_rightLayout->addWidget(m_controlGroup);" in outline
+assert "m_leftLayout->addWidget(m_exerciseGroup);" in outline
+assert "m_leftLayout->addWidget(m_gameAreaGroup, 1);" in outline
+assert "new gui::GraphWidget(graphGroup)" in outline
+assert "m_forceGraph->addDataPoint(value, timestamp)" in outline
+assert "m_measurementEngine->subscribe" in outline
+assert "sample.unit != \"N\"" in outline
+assert "m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());" in main
+assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
+# Both clinical outlines must be valid, non-empty, executable JSON plans.
+import json
+for outline_path in (
+    "data/outlines/rehabilitacja-lakotka-kolana.json",
+    "data/outlines/rehabilitacja-zespol-bolesnego-barku.json",
+):
+    with (ROOT / outline_path).open(encoding="utf-8") as stream:
+        protocol = json.load(stream)
+    assert protocol["id"] and protocol["clinicalProtocolHtml"]
+    assert len(protocol["exercises"]) >= 8
+    assert all(item["id"] and item["name"] and item["description"] for item in protocol["exercises"])
 assert "visualLayout->addWidget(m_progressBox, 2);" in training
 assert "visualLayout->addWidget(m_gameBox, 0);" in training
 assert "visualLayout->addWidget(m_statsBox, 3);" in training
