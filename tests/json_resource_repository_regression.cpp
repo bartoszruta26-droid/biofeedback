@@ -160,10 +160,25 @@ int main(int argc, char** argv) {
     QJsonObject goalPayload{
         {QStringLiteral("patient_id"), id},
         {QStringLiteral("episode_id"), episodeId},
-        {QStringLiteral("metric"), QStringLiteral("knee_flexion_rom")}
+        {QStringLiteral("title"), QStringLiteral("Poprawa zgięcia kolana")},
+        {QStringLiteral("metric_id"), QStringLiteral("knee_flexion_rom")},
+        {QStringLiteral("baseline_value"), 75.0},
+        {QStringLiteral("target_value"), 120.0},
+        {QStringLiteral("unit"), QStringLiteral("degrees")},
+        {QStringLiteral("target_date"), QStringLiteral("2026-12-01")}
     };
     QJsonObject goal;
     assert(restarted.create(QStringLiteral("rehabilitation-goals"), goalPayload, goal, &error));
+    assert(goal.value(QStringLiteral("baseline_value")).toDouble() == 75.0);
+    QJsonObject invalidGoal = goalPayload;
+    invalidGoal.insert(QStringLiteral("target_date"), QStringLiteral("2026-02-30"));
+    QJsonObject rejectedGoal;
+    assert(!restarted.create(QStringLiteral("rehabilitation-goals"), invalidGoal, rejectedGoal, &error));
+    assert(error == QStringLiteral("INVALID_REHABILITATION_GOAL_DATE"));
+    invalidGoal = goalPayload;
+    invalidGoal.remove(QStringLiteral("title"));
+    assert(!restarted.create(QStringLiteral("rehabilitation-goals"), invalidGoal, rejectedGoal, &error));
+    assert(error == QStringLiteral("INVALID_REHABILITATION_GOAL"));
 
     QJsonObject rehabSessionPayload{
         {QStringLiteral("patient_id"), id},
