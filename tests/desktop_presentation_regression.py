@@ -122,6 +122,12 @@ assert "m_currentPatientUuid = patientUuid.trimmed();" in outline
 assert "patient.value(QStringLiteral(\"id\")).toString()" in main
 assert "m_outlineTab->setCurrentPatientContext(" in main
 assert "rehabilitationPatientContext" in outline
+assert "setResourceRepository(m_sharedResources)" in read("src/core/Application.cpp")
+assert "createRehabilitationEpisode()" in read("include/tab/OutlineTab.hpp")
+assert "rehabilitation-episodes" in outline
+assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-episodes\")" in outline
+assert "{QStringLiteral(\"patient_id\"), m_currentPatientUuid}" in outline
+assert "m_currentEpisodeUuid = m_episodeSelector->currentData().toString();" in outline
 assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
 import json
