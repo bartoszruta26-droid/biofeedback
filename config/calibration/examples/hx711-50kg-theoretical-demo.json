@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "deviceId": "SIMULATED-HX711-50KG",
+  "firmwareVersion": "theoretical-demo",
+  "sensorModel": "HX711",
+  "unit": "g",
+  "zeroOffsetRaw": 0,
+  "scaleFactor": 0.011920928955078125,
+  "referenceValue": 50000,
+  "referenceRaw": 4194304,
+  "sampleCount": 100,
+  "createdAtUtc": "2026-11-10T00:00:00Z",
+  "status": "simulated_not_for_real_measurement",
+  "assumptions": {
+    "loadCellCapacityKg": 50,
+    "loadCellRatedOutputMvPerV": 2,
+    "excitationVoltageV": 5,
+    "hx711Channel": "A",
+    "hx711Gain": 128,
+    "hx711DifferentialFullScaleMv": 20,
+    "theoreticalFullLoadSignalMv": 10,
+    "theoreticalRawDeltaAtFullLoad": 4194304
+  },
+  "warning": "THEORETICAL DEMONSTRATION ONLY. This profile is not a physical calibration, must not be loaded for real measurements, clinical use, or force reporting. Replace zeroOffsetRaw and referenceRaw with measured readings from the actual sensor and a traceable reference mass."
+}
