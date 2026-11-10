@@ -84,6 +84,8 @@ Wartość techniczna `-99` oznacza „nie oceniono”; nie jest kwalifikatorem I
 
 W bazie zapisywane są wartości kwalifikatorów, a nie indeksy pozycji listy rozwijanej. Brak oceny nie jest automatycznie zamieniany na brak problemu.
 
+Każda nowa ocena otrzymuje własny identyfikator UUID (`id`), niezależny od daty wykonania. Dzięki temu dwie oceny wykonane w tej samej chwili lub z tym samym znacznikiem czasu pozostają jednoznacznie rozróżnialne. Epizod rehabilitacyjny zapisuje odwołanie do identyfikatora konkretnej wersji. Dla starszych danych bez UUID repozytorium zachowuje zgodność wsteczną przez znacznik czasu.
+
 ## Trwałość i prywatność
 
 Najnowsza ocena jest zapisywana jako pole `icf_assessment`, a historia kolejnych ocen jako `icf_assessment_history` w kanonicznym rekordzie pacjenta w kolekcji `patients`. Historia jest ograniczona do 100 ostatnich ocen. Zapis korzysta z wersjonowania i kontroli optymistycznej repozytorium. Zwykła edycja danych demograficznych zachowuje bieżącą ocenę i historię. Najnowsza ocena jest ponownie ładowana przy otwieraniu kartoteki.
