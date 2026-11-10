@@ -259,6 +259,13 @@ int main(int argc, char **argv)
     carRaceGame->handleSensorInput(std::numeric_limits<double>::infinity());
     REQUIRE(carRaceGame->currentLane() == 1);
     carRaceGame->handleSensorInput(50.0); // Stay in the first obstacle's deterministic lane.
+    QKeyEvent carRaceRight(QEvent::KeyPress, Qt::Key_Right, Qt::NoModifier);
+    QApplication::sendEvent(carRaceGame, &carRaceRight);
+    REQUIRE(carRaceGame->currentLane() == 2);
+    QKeyEvent carRaceLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+    QApplication::sendEvent(carRaceGame, &carRaceLeft);
+    REQUIRE(carRaceGame->currentLane() == 1);
+    carRaceGame->handleSensorInput(50.0);
     waitForEvents(4000); // First obstacle spawns at 1.25 s and reaches the player after ~2 s.
     REQUIRE(carRaceGame->livesRemaining() < 3);
     REQUIRE(carRaceGame->isRunning());
