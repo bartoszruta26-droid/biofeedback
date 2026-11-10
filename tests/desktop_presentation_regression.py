@@ -173,6 +173,10 @@ assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-episodes\")
 assert "{QStringLiteral(\"patient_id\"), m_currentPatientUuid}" in outline
 assert "m_currentEpisodeUuid = m_episodeSelector->currentData().toString();" in outline
 assert "rehabilitation-assessments" in outline
+assert "baselineAssessment" in outline and "latestAssessment" in outline
+assert "Porównanie: ocena początkowa → najnowsza" in outline
+assert "Zmiany liczbowe wymagają interpretacji klinicznej" in outline
+
 assert "createRehabilitationAssessment()" in read("include/tab/OutlineTab.hpp")
 assert 'QStringLiteral("pain_nrs")' in outline
 assert 'QStringLiteral("icf_assessment_ref")' in outline
