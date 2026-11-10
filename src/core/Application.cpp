@@ -745,7 +745,9 @@ void Application::setupConnections()
             patient.value(QStringLiteral("gender")).toString(),
             patient.value(QStringLiteral("medicalHistory")).toString());
         m_patientTab->setPatientIcfAssessment(
-            pesel, patient.value(QStringLiteral("icf_assessment")).toObject());
+            pesel,
+            patient.value(QStringLiteral("icf_assessment")).toObject(),
+            patient.value(QStringLiteral("icf_assessment_history")).toArray());
     }
 
     // One-time, non-destructive migration from the former per-patient files.
