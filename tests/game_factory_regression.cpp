@@ -79,6 +79,28 @@ int main(int argc, char **argv)
     REQUIRE(arkanoidGame->getScore() > 0); // Ball must hit at least one brick.
     arkanoidGame->stop();
 
+
+    // Arkanoid keyboard movement temporarily overrides the sensor and returns to it on release.
+    std::unique_ptr<games::GameEngine> arkanoidKeys(games::createGame(QStringLiteral("arkanoid")));
+    auto* arkanoidKeysGame = dynamic_cast<games::ArkanoidGame*>(arkanoidKeys.get());
+    REQUIRE(arkanoidKeysGame != nullptr);
+    arkanoidKeysGame->resize(640, 480);
+    arkanoidKeysGame->start();
+    arkanoidKeysGame->handleSensorInput(50.0);
+    waitForEvents(80);
+    const double sensorCenter = arkanoidKeysGame->paddlePositionX();
+    QKeyEvent arkanoidLeftDown(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+    QKeyEvent arkanoidLeftUp(QEvent::KeyRelease, Qt::Key_Left, Qt::NoModifier);
+    QApplication::sendEvent(arkanoidKeysGame, &arkanoidLeftDown);
+    waitForEvents(120);
+    const double keyboardCenter = arkanoidKeysGame->paddlePositionX();
+    REQUIRE(keyboardCenter < sensorCenter);
+    QApplication::sendEvent(arkanoidKeysGame, &arkanoidLeftUp);
+    arkanoidKeysGame->handleSensorInput(90.0);
+    waitForEvents(80);
+    REQUIRE(arkanoidKeysGame->paddlePositionX() > keyboardCenter);
+    arkanoidKeysGame->stop();
+
     std::unique_ptr<games::GameEngine> tan(games::createGame(QStringLiteral("tan")));
     auto* tanGame = dynamic_cast<games::TanGame*>(tan.get());
     REQUIRE(tanGame != nullptr);
