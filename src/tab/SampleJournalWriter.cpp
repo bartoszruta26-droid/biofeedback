@@ -87,6 +87,11 @@ bool SampleJournalWriter::appendJson(const QJsonObject& record)
     return enqueueJson(record, false);
 }
 
+bool SampleJournalWriter::appendJsonDurably(const QJsonObject& record)
+{
+    return enqueueJson(record, true);
+}
+
 bool SampleJournalWriter::enqueueJson(const QJsonObject& record, bool durable)
 {
     std::unique_lock<std::mutex> lock(m_mutex);
