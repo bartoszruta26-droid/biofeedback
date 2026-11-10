@@ -1308,21 +1308,24 @@ void TrainingTab::enqueueMeasurementSample(
 
 void TrainingTab::drainMeasurementSamples()
 {
-    // Training analysis is order-dependent. Detach the ordered FIFO once per
-    // Qt event so a backlog does not require repeated event-loop turns.
+    constexpr std::size_t MaximumBatch = 128;
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
+    bool scheduleAgain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         dropped = std::exchange(m_droppedMeasurementSamples, 0);
-        batch.reserve(m_measurementQueue.size());
-        while (!m_measurementQueue.empty()) {
+        const std::size_t count = std::min(MaximumBatch, m_measurementQueue.size());
+        batch.reserve(count);
+        for (std::size_t i = 0; i < count; ++i) {
             batch.push_back(std::move(m_measurementQueue.front()));
             m_measurementQueue.pop_front();
         }
-        // Clear this under the producer's mutex. A racing producer will
-        // schedule a new drain after the current batch has been detached.
-        m_measurementDrainScheduled = false;
+        if (m_measurementQueue.empty()) {
+            m_measurementDrainScheduled = false;
+        } else {
+            scheduleAgain = true;
+        }
     }
     if (dropped != 0) {
         m_repetitionDetector.reset();
@@ -1331,6 +1334,17 @@ void TrainingTab::drainMeasurementSamples()
     }
     for (const auto& sample : batch)
         onMeasurementSample(sample);
+    if (scheduleAgain) {
+        const bool queued = QMetaObject::invokeMethod(this, [this]() {
+            drainMeasurementSamples();
+        }, Qt::QueuedConnection);
+        if (!queued) {
+            std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
+            m_droppedMeasurementSamples += m_measurementQueue.size();
+            m_measurementQueue.clear();
+            m_measurementDrainScheduled = false;
+        }
+    }
 }
 
 void TrainingTab::scheduleLiveUiRefresh()
