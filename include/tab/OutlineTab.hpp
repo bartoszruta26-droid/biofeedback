@@ -245,6 +245,8 @@ private:
     void endSession();
     void refreshRehabilitationEpisodes();
     void createRehabilitationEpisode();
+    void refreshRehabilitationAssessments();
+    void createRehabilitationAssessment();
 
     // Główne widgety
     QVBoxLayout* m_mainLayout;
@@ -260,6 +262,14 @@ private:
     QComboBox* m_episodeSelector{nullptr};
     QPushButton* m_createEpisodeButton{nullptr};
     QLabel* m_episodeStatusLabel{nullptr};
+    QLineEdit* m_assessmentPainNrsEdit{nullptr};
+    QLineEdit* m_assessmentRomEdit{nullptr};
+    QLineEdit* m_assessmentStrengthEdit{nullptr};
+    QLineEdit* m_assessmentSwellingEdit{nullptr};
+    QLineEdit* m_assessmentFunctionalTestEdit{nullptr};
+    QPushButton* m_saveAssessmentButton{nullptr};
+    QLabel* m_assessmentStatusLabel{nullptr};
+    QTextBrowser* m_assessmentHistoryBrowser{nullptr};
     QTextBrowser* m_clinicalProtocolBrowser{nullptr};
     
     // Sekcja wyboru konspektu
