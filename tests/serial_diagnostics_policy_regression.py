@@ -14,7 +14,7 @@ checks = {
     "verbose serial output disabled by default": r"(?:bool\s+verbose\s*=\s*false\s*;|std::atomic<bool>\s+verbose\s*\{false\}\s*;)",
 }
 failed = [label for label, pattern in checks.items() if not re.search(pattern, source)]
-if "if (m_impl->verbose && !resp.empty()) std::cout" not in source:
+if not re.search(r"if\s*\(m_impl->verbose\s*&&\s*!(?:resp|response)\.empty\(\)\)\s*std::cout", source):
     failed.append("serial response output must remain behind explicit verbose opt-in")
 if failed:
     print("Serial diagnostics policy FAILED:")
