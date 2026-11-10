@@ -359,7 +359,7 @@ void GalagaGame::render(QPainter& painter)
     painter.drawText(width() - 110, 24, QStringLiteral("Życia: %1").arg(m_lives));
     painter.setFont(QFont(QStringLiteral("Arial"), 10));
     painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik: pozycja statku | Strzał: przytrzymaj SPACJĘ"));
+        QStringLiteral("Czujnik / mysz / A-D: ruch statku | Klik lub SPACJA: strzał"));
 }
 
 } // namespace games
