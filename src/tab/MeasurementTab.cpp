@@ -3167,7 +3167,56 @@ void MeasurementTab::onSensorDataReceived(const sensor::SensorData& data)
     // Per-frame logging at the sensor's sample rate floods the debug channel
     // and adds synchronous UI work to the acquisition hot path.
 
-    if (!m_isMeasuring) return;
+    if (!m_isMeasuring) {
+        // Keep a live diagnostic preview available before the user starts a
+        // recorded session. The shared acquisition engine continues to own
+        // sample validation; this path only updates the presentation layer.
+        double previewValue = static_cast<double>(data.value) * m_rawDisplayPolarity;
+        ForceUnit previewUnit = ForceUnit::Raw;
+        QString previewLabel = QStringLiteral("ADC");
+        if (!m_showRawValues) {
+            double calibratedForceN = 0.0;
+            if (rawToNewtons(data.value, calibratedForceN)) {
+                previewValue = calibratedForceN;
+                previewUnit = m_currentUnit == ForceUnit::Kilograms
+                    ? ForceUnit::Kilograms : ForceUnit::Newtons;
+                if (previewUnit == ForceUnit::Kilograms) {
+                    previewValue /= 9.80665;
+                    previewLabel = QStringLiteral("kgf");
+                } else {
+                    previewLabel = QStringLiteral("N");
+                }
+            } else {
+                previewLabel = QStringLiteral("ADC — brak kalibracji");
+            }
+        }
+
+        if (!m_hasPreviewTimestampOrigin) {
+            m_previewTimestampOriginMs = data.timestamp;
+            m_hasPreviewTimestampOrigin = true;
+        }
+        const std::uint32_t elapsedMs = data.timestamp - m_previewTimestampOriginMs;
+        if (m_forcePlot) {
+            m_forcePlot->setUnit(previewUnit);
+            m_forcePlot->addSample(previewValue,
+                                   static_cast<double>(elapsedMs) / 1000.0);
+        }
+        if (m_lblCurrentForce) {
+            m_lblCurrentForce->setText(
+                QStringLiteral("Podgląd czujnika: %1 %2")
+                    .arg(previewValue, 0, 'f', previewUnit == ForceUnit::Raw ? 0 : 2)
+                    .arg(previewLabel));
+        }
+        if (m_forceBar) {
+            m_forceBar->setValue(qBound(-100, static_cast<int>(previewValue), 100));
+            m_forceBar->setFormat(QStringLiteral("%v %1").arg(previewLabel));
+        }
+        if (m_lblStatus) {
+            m_lblStatus->setText(tr("Status: PODGLĄD NA ŻYWO — rejestracja nieaktywna"));
+            m_lblStatus->setStyleSheet("color: #087f82; font-weight: bold;");
+        }
+        return;
+    }
 
     // Both calibrated and RAW samples are committed by MeasurementEngine before
     // the GUI subscriber is notified; this callback only refreshes frame status.
