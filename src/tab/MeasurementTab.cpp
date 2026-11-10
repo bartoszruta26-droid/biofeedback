@@ -3146,7 +3146,7 @@ void MeasurementTab::enqueueMeasurementSample(
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-        constexpr std::size_t MaximumQueuedSamples = 128;
+        constexpr std::size_t MaximumQueuedSamples = 64;
         if (!m_measurementQueueAccepting ||
             sessionGeneration != m_measurementSessionGeneration.load(std::memory_order_acquire))
             return;
