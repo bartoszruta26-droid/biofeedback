@@ -4,6 +4,8 @@ from pathlib import Path
 
 source = Path("src/tab/MeasurementTab.cpp").read_text(encoding="utf-8")
 header = Path("include/tab/MeasurementTab.hpp").read_text(encoding="utf-8")
+training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
+training_header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
 
 for label, content in (("implementation", source), ("header", header)):
     if "connectToArduinoAsync" in content:
@@ -196,8 +198,7 @@ if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
 
 # Training's detector must consume each frame; visible widgets and game input
 # are updated from the latest-value snapshot by a precise 60 Hz timer.
-training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
-training_header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
+
 drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
 drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", drain_start)
 drain_body = training_source[drain_start:drain_end]
