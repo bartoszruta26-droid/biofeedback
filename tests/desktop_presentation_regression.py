@@ -184,6 +184,15 @@ assert 'QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)
 assert 'currentIcf.value(QStringLiteral("id"))' in outline
 assert 'currentIcf.value(QStringLiteral("assessed_at"))' not in outline
 assert 'historicalId == icfReference' in read("src/data/JsonResourceRepository.cpp")
+assert 'QUuid::createUuid().toString(QUuid::WithoutBraces)' in patient
+assert 'icfAssessmentId = currentIcf.value(QStringLiteral("id"))' in outline
+assert 'icfTimestamp' not in outline
+assert 'UUID' in read("docs/rehabilitation/OUTLINE_PATIENT_WORKFLOW.md")
+assert 'Nie oceniono' in patient
+assert 'refreshRehabilitationAssessments();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
+assert 'refreshRehabilitationGoals();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
+assert 'arg(assessmentCount)' in outline
+
 
 assert 'rehabilitationAssessmentType' in outline
 assert 'QStringLiteral("follow_up")' in outline and 'QStringLiteral("final")' in outline
