@@ -79,7 +79,7 @@ W bazie zapisywane są wartości kwalifikatorów, a nie indeksy pozycji listy ro
 
 ## Trwałość i prywatność
 
-Ocena jest zapisywana jako pole `icf_assessment` w kanonicznym rekordzie pacjenta w kolekcji `patients`. Zapis korzysta z wersjonowania i kontroli optymistycznej repozytorium. Zwykła edycja danych demograficznych zachowuje istniejącą ocenę. Ocena jest ponownie ładowana przy otwieraniu kartoteki.
+Najnowsza ocena jest zapisywana jako pole `icf_assessment`, a historia kolejnych ocen jako `icf_assessment_history` w kanonicznym rekordzie pacjenta w kolekcji `patients`. Historia jest ograniczona do 100 ostatnich ocen. Zapis korzysta z wersjonowania i kontroli optymistycznej repozytorium. Zwykła edycja danych demograficznych zachowuje bieżącą ocenę i historię. Najnowsza ocena jest ponownie ładowana przy otwieraniu kartoteki.
 
 ## Ograniczenia kliniczne
 
