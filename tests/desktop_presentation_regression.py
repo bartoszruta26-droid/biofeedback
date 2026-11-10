@@ -50,7 +50,9 @@ for source in (measurement, training):
     assert "workspaceSplitter->setStretchFactor(1, 1);" in source
     assert "auto* visualScroll = new QScrollArea(workspaceSplitter);" in source
     assert "auto* optionsScroll = new QScrollArea(workspaceSplitter);" in source
-    assert "workspaceSplitter->setSizes({89, 11});" in source
+    assert "QTimer::singleShot(0, workspaceSplitter" in source
+    assert "const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();" in source
+    assert "workspaceSplitter->setSizes({availableWidth * 89 / 100," in source
     assert "QSplitter::splitterMoved" in source
     assert "const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();" in source
     assert "const int maxVisualWidth = availableWidth * 89 / 100;" in source
