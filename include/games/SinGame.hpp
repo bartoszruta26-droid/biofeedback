@@ -77,6 +77,7 @@ private:
     QString m_feedbackText;
     double m_calibrationMinimum;
     double m_calibrationMaximum;
+    double m_lastRawForce;
     int m_waveformMode;
     bool m_automaticDifficulty;
     double m_sessionSeconds;
