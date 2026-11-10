@@ -119,3 +119,16 @@ Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie
 - [x] Dodano regresję śledzenia sinusoidy przez 3 sekundy oraz test zatrzymania punktowania po utracie sygnału.
 - [ ] Wymagana walidacja kompilacji Qt5, testu game_factory_regression i pełnego CI na commicie tej poprawki.
 - [ ] Test użyteczności na żywym HX711: ocena opóźnienia, zakresu siły i dobrania poziomu trudności z fizycznym ćwiczącym. Test CI nie zastępuje walidacji sprzętowej ani klinicznej.
+
+
+## Rozszerzenie Sinus Force Trainer — trening progresywny
+
+- [x] Kalibracja wejścia: dowolny poprawny przedział minimum–maksimum jest mapowany na zakres sterowania 0–100%; niepoprawny przedział nie zmienia aktywnej kalibracji.
+- [x] Trzy profile przebiegu celu: sinusoidalny (1), trójkątny (2) i łagodny plateau (3), przełączane klawiszami 1–3.
+- [x] Regulacja trudności w trakcie ćwiczenia klawiszami +/− lub strzałkami góra/dół; zmiana poziomu nie zeruje wyniku.
+- [x] Opcjonalna adaptacja trudności klawiszem A: analiza 12-sekundowego okna, podniesienie poziomu przy utrzymaniu celu przez co najmniej 82% czasu i obniżenie przy wyniku poniżej 42%.
+- [x] Rozszerzone informacje zwrotne: odsetek czasu w strefie celu, bieżąca seria, tryb przebiegu, zakres kalibracji i stan adaptacji.
+- [x] Przeliczenie geometrii i tolerancji po zmianie rozmiaru okna.
+- [x] Testy regresyjne kalibracji, odrzucania niepoprawnego zakresu, wyboru trybu, sterowania klawiaturą i zachowania wyniku po zmianie trudności.
+- [ ] Wymagana kompilacja Qt5 i pełny CI dla gałęzi feat/sinus-progressive-training.
+- [ ] Wymagany test z rzeczywistym Arduino Nano/HX711: zakres kalibracji, stabilność, opóźnienie, komfort oraz bezpieczne progi ćwiczenia. Testy automatyczne nie zastępują walidacji sprzętowej.
