@@ -1,12 +1,13 @@
 #include "games/SinGame.hpp"
+
 #include <QPainter>
 #include <QPaintEvent>
-#include <QDebug>
 #include <QPen>
 #include <QBrush>
 #include <QFont>
-#include <cmath>
 #include <QPainterPath>
+#include <QtMath>
+#include <cmath>
 
 namespace games {
 
@@ -18,93 +19,107 @@ SinGame::SinGame(QWidget *parent)
     , m_cursorY(0.0)
     , m_isHit(false)
     , m_difficultyLevel(1)
-    , m_scrollSpeed(100.0) // piksele na sekundę
-    , m_tolerance(40.0)    // piksele tolerancji
-    , m_frequency(0.02)
+    , m_scrollSpeed(115.0)
+    , m_tolerance(42.0)
+    , m_frequency(0.0)
+    , m_inputAge(1.0)
+    , m_scoreFraction(0.0)
+    , m_comboSeconds(0.0)
+    , m_combo(0)
+    , m_lastDistance(0.0)
+    , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
     , m_serialPort(nullptr)
     , m_ownSerial(false)
 {
 }
 
-SinGame::~SinGame() {
+SinGame::~SinGame()
+{
     disconnectSerial();
 }
 
-QString SinGame::gameName() const {
-    return "Sinus Force Trainer";
+QString SinGame::gameName() const
+{
+    return QStringLiteral("Sinus Force Trainer");
 }
 
-void SinGame::initialize() {
-    setDifficultyLevel(1); // Domyślny poziom
+void SinGame::initialize()
+{
+    setDifficultyLevel(1);
     m_currentForce = 0.0;
-    m_cursorY = height() / 2.0;
+    m_cursorY = height() * 0.5;
     m_phase = 0.0;
     m_isHit = false;
-    
-    // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
-
+    m_inputAge = 1.0;
+    m_scoreFraction = 0.0;
+    m_comboSeconds = 0.0;
+    m_combo = 0;
+    m_lastDistance = 0.0;
+    m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
+    m_frequency = width() > 0
+        ? (2.0 * M_PI * 1.5 / static_cast<double>(width())) : 0.0;
 }
 
-void SinGame::setDifficultyLevel(int level) {
+void SinGame::setDifficultyLevel(int level)
+{
     m_difficultyLevel = qBound(1, level, 5);
-    
-    // Skalowanie trudności
-    // Poziom 1: wolno, duża tolerancja
-    // Poziom 5: szybko, mała tolerancja
-    m_scrollSpeed = 80.0 + (m_difficultyLevel * 40.0); 
-    m_tolerance = qMax(10.0, 50.0 - (m_difficultyLevel * 8.0)); 
-    m_frequency = 0.015 + (m_difficultyLevel * 0.005);
-    
-    setScore(0); // Keep the base score and scoreChanged signal consistent
+
+    // Speed is expressed in pixels per second; the waveform is scaled to
+    // the current viewport so it always shows the same number of cycles.
+    m_scrollSpeed = 90.0 + m_difficultyLevel * 25.0;
+    const double toleranceRatio = 0.11 - (m_difficultyLevel - 1) * 0.012;
+    m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, height()) * toleranceRatio));
+    m_frequency = width() > 0
+        ? (2.0 * M_PI * 1.5 / static_cast<double>(width())) : 0.0;
+    setScore(0);
 }
 
-int SinGame::getDifficultyLevel() const {
+int SinGame::getDifficultyLevel() const
+{
     return m_difficultyLevel;
 }
 
-void SinGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial) {
-    // Rozłącz poprzednie jeśli istnieje i byliśmy właścicielem
+void SinGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
+{
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
     }
-    
-    m_serialPort = serial;
-    m_ownSerial = false; // Nie jesteśmy właścicielem, tylko użytkownikiem
-    
-    if (m_serialPort && m_serialPort->isConnected()) {
+
+    m_serialPort = std::move(serial);
+    m_ownSerial = false;
+
+    if (m_serialPort && m_serialPort->isConnected())
         emit serialConnected();
-    }
 }
 
-void SinGame::disconnectSerial() {
+void SinGame::disconnectSerial()
+{
     if (m_ownSerial && m_serialPort) {
         m_serialPort->stopAsyncReading();
         m_serialPort->disconnect();
-        m_serialPort = nullptr;
+        m_serialPort.reset();
         m_ownSerial = false;
         emit serialDisconnected();
     } else if (m_serialPort) {
-        // Tylko wyczyść wskaźnik, nie rozłączaj bo nie jesteśmy właścicielem
-        m_serialPort = nullptr;
+        m_serialPort.reset();
         emit serialDisconnected();
     }
 }
 
-bool SinGame::isSerialConnected() const {
+bool SinGame::isSerialConnected() const
+{
     return m_serialPort && m_serialPort->isConnected();
 }
 
-void SinGame::onSensorDataReceived(const sensor::SensorData& data) {
-    if (!data.isValid) {
-        return;
-    }
-    
-    // Użyj skalibrowanej wartości z sensora
-    normalizeForceValue(data.calibratedValue);
+void SinGame::onSensorDataReceived(const sensor::SensorData& data)
+{
+    if (data.isValid)
+        normalizeForceValue(data.calibratedValue);
 }
 
-void SinGame::onConnectionStatusChanged(bool connected, const std::string& message) {
+void SinGame::onConnectionStatusChanged(bool connected, const std::string& message)
+{
     if (connected) {
         qDebug() << "SinGame: Połączono z sensorem:" << QString::fromStdString(message);
         emit serialConnected();
@@ -115,171 +130,224 @@ void SinGame::onConnectionStatusChanged(bool connected, const std::string& messa
     }
 }
 
-void SinGame::normalizeForceValue(double rawValue) {
-    // Odrzuć uszkodzoną próbkę, zachowując ostatnią poprawną wartość.
+void SinGame::normalizeForceValue(double rawValue)
+{
     if (!std::isfinite(rawValue) || !std::isfinite(m_maxForce) || m_maxForce <= 0.0)
         return;
 
     const double normalizedForce = rawValue / m_maxForce;
     if (!std::isfinite(normalizedForce))
         return;
+
     m_currentForce = qBound(0.0, normalizedForce, 1.0);
+    m_inputAge = 0.0;
 }
 
-bool SinGame::handleInput(double value) {
-    // Ta metoda jest wywoływana przez GameEngine::handleSensorInput
-    // Wartość jest już przekazana przez callback seriala, ale obsługujemy też ręczne wejście
+bool SinGame::handleInput(double value)
+{
+    if (!std::isfinite(value))
+        return false;
+
+    // TrainingTab supplies force as a percentage of the exercise target.
+    // 0..100 therefore maps to the full vertical control range.
     normalizeForceValue(value);
-    
     return true;
 }
 
-void SinGame::calculateTargetY(double x) {
-    // Obliczamy Y sinusa dla danej pozycji X względem fazy
-    // Środek ekranu to 0, góra to -height/2, dół to +height/2
-    double amplitude = height() * 0.35; // Amplituda zajmuje 70% wysokości
-    double centerY = height() / 2.0;
-    
+void SinGame::calculateTargetY(double x)
+{
+    const double h = static_cast<double>(height());
+    const double amplitude = h * 0.32;
+    const double centerY = h * 0.5;
     m_targetY = centerY + std::sin(x * m_frequency + m_phase) * amplitude;
 }
 
-void SinGame::update(double deltaTime) {
+void SinGame::update(double deltaTime)
+{
     if (!isRunning() || width() <= 0 || height() <= 0 ||
         !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
-    deltaTime = qMin(deltaTime, 0.1);
 
-    // Aktualizacja fazy sinusa (ruch wykresu w lewo)
-    // Przelicz prędkość przesuwania w pikselach/s na zmianę fazy.
-    m_phase -= m_scrollSpeed * m_frequency * deltaTime;
-    
-    // Pozycja X "bramki" sprawdzającej trafienie (stała w prawo od środka)
-    // Gracz celuje w linię pionową na 75% szerokości ekranu
-    double checkX = width() * 0.75;
-    
-    // Oblicz gdzie powinien być sinus w punkcie sprawdzania
+    const double dt = qMin(deltaTime, 0.1);
+    const double w = static_cast<double>(width());
+    const double h = static_cast<double>(height());
+
+    // Keep 1.5 full wave cycles visible at every window size.
+    m_frequency = 2.0 * M_PI * 1.5 / w;
+    m_phase -= m_scrollSpeed * m_frequency * dt;
+    m_inputAge += dt;
+
+    const double checkX = w * 0.72;
     calculateTargetY(checkX);
-    
-    // Oblicz pozycję kursora gracza na podstawie siły
-    // Siła 0 -> dół ekranu, Siła 1 -> góra ekranu (naciąganie taśmy podnosi punkt)
-    double cursorY = height() - (m_currentForce * height());
-    
-    // Prosty filtr wygładzający dla kursora (żeby nie skakał)
-    m_cursorY = m_cursorY * 0.8 + cursorY * 0.2;
-    
-    // Detekcja kolizji
-    // Sprawdzamy czy kursor jest w pobliżu linii sinusa w punkcie checkX
-    double distance = std::abs(m_cursorY - m_targetY);
-    
-    // Histereza ogranicza wielokrotne naliczanie punktów przy szumie sygnału.
-    const double exitTolerance = m_tolerance * 1.5;
-    if (distance < (m_isHit ? exitTolerance : m_tolerance)) {
-        if (!m_isHit) {
-            m_isHit = true;
-            // Punktacja: im mniejszy dystans, tym więcej punktów
-            const double accuracy = qBound(0.0, (m_tolerance - distance) / m_tolerance, 1.0);
-            addScore(qBound(1, static_cast<int>(std::ceil(accuracy * 10.0)), 10));
-        }
-    } else {
+
+    // Time-constant smoothing: unlike a fixed 0.2 blend, this behaves the
+    // same at 60, 120 or irregular GUI frame rates.
+    const double rawCursorY = h * (1.0 - m_currentForce);
+    const double alpha = 1.0 - std::exp(-dt / 0.055);
+    m_cursorY += (rawCursorY - m_cursorY) * alpha;
+
+    if (m_inputAge > 0.35) {
         m_isHit = false;
+        m_comboSeconds = 0.0;
+        m_combo = 0;
+        m_feedbackText = QStringLiteral("Brak aktualnego sygnału — sprawdź czujnik");
+        return;
+    }
+
+    m_lastDistance = std::abs(m_cursorY - m_targetY);
+    m_isHit = m_lastDistance <= m_tolerance;
+
+    if (m_isHit) {
+        m_comboSeconds += dt;
+        m_combo = qMin(5, 1 + static_cast<int>(m_comboSeconds / 2.0));
+        const double accuracy = qBound(0.0, 1.0 - m_lastDistance / m_tolerance, 1.0);
+        const double pointsPerSecond = 2.0 + 4.0 * accuracy + 0.5 * m_combo;
+        m_scoreFraction += pointsPerSecond * dt;
+        const int earned = static_cast<int>(m_scoreFraction);
+        if (earned > 0) {
+            addScore(earned);
+            m_scoreFraction -= earned;
+        }
+        m_feedbackText = QStringLiteral("Dobrze — utrzymaj siłę  •  dokładność %1%")
+            .arg(static_cast<int>(std::round(accuracy * 100.0)));
+    } else {
+        m_comboSeconds = 0.0;
+        m_combo = 0;
+        m_feedbackText = m_cursorY > m_targetY
+            ? QStringLiteral("Zwiększ siłę")
+            : QStringLiteral("Zmniejsz siłę");
     }
 }
 
-void SinGame::render(QPainter &painter) {
-    painter.setRenderHint(QPainter::Antialiasing);
-    
-    int w = width();
-    int h = height();
-    double centerY = h / 2.0;
-    double amplitude = h * 0.35;
-    
-    // 1. Tło
-    painter.fillRect(rect(), QColor(20, 20, 30));
-    
-    // 2. Rysowanie Sinusoidy
-    QPen sinPen(getDifficultyColor(), 3);
-    painter.setPen(sinPen);
-    QPainterPath sinPath;
-    
+void SinGame::render(QPainter& painter)
+{
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    const int w = width();
+    const int h = height();
+    if (w <= 0 || h <= 0) {
+        painter.restore();
+        return;
+    }
+
+    const double widthD = static_cast<double>(w);
+    const double heightD = static_cast<double>(h);
+    const double centerY = heightD * 0.5;
+    const double amplitude = heightD * 0.32;
+    const double gateX = widthD * 0.72;
+    const double band = m_tolerance;
+
+    painter.fillRect(rect(), QColor(13, 20, 32));
+
+    // Subtle grid and force scale make the direction of control obvious.
+    painter.setPen(QPen(QColor(42, 55, 72), 1, Qt::DotLine));
+    for (int i = 1; i < 4; ++i) {
+        const int y = h * i / 4;
+        painter.drawLine(0, y, w, y);
+    }
+    painter.setPen(QPen(QColor(74, 91, 112), 1));
+    painter.drawLine(0, static_cast<int>(centerY), w, static_cast<int>(centerY));
+
+    QPainterPath targetPath;
+    QPainterPath targetBand;
     bool first = true;
     for (int x = 0; x <= w; ++x) {
-        // Odwracamy logikę fazowania, żeby rysować całą linię poprawnie
-        double val = std::sin(x * m_frequency + m_phase);
-        double y = centerY + val * amplitude;
-        
+        const double target = centerY +
+            std::sin(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
         if (first) {
-            sinPath.moveTo(x, y);
+            targetPath.moveTo(x, target);
+            targetBand.moveTo(x, target - band);
             first = false;
         } else {
-            sinPath.lineTo(x, y);
+            targetPath.lineTo(x, target);
+            targetBand.lineTo(x, target - band);
         }
     }
-    painter.drawPath(sinPath);
-    
-    // 3. Strefa celu (wyznacznik gdzie celować)
-    double checkX = w * 0.75;
-    painter.setPen(QPen(Qt::white, 1, Qt::DashLine));
-    painter.drawLine(checkX, 0, checkX, h);
-    
-    // Tekst informacyjny
+    for (int x = w; x >= 0; --x) {
+        const double target = centerY +
+            std::sin(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
+        targetBand.lineTo(x, target + band);
+    }
+    targetBand.closeSubpath();
+    painter.fillPath(targetBand, QColor(32, 190, 130, 35));
+
+    painter.setPen(QPen(getDifficultyColor(), 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.drawPath(targetPath);
+
+    // Target gate and tolerance zone at the point where the player tracks the wave.
+    painter.setPen(QPen(QColor(230, 238, 248, 150), 1.5, Qt::DashLine));
+    painter.drawLine(QPointF(gateX, 0), QPointF(gateX, heightD));
+    painter.setPen(QPen(QColor(100, 220, 170, 190), 1, Qt::DashLine));
+    painter.drawLine(QPointF(gateX - 22, m_targetY - band),
+                     QPointF(gateX + 22, m_targetY - band));
+    painter.drawLine(QPointF(gateX - 22, m_targetY + band),
+                     QPointF(gateX + 22, m_targetY + band));
+
+    // Live cursor: horizontal guide plus a high-contrast marker.
+    const QColor cursorColor = m_inputAge > 0.35 ? QColor(145, 155, 170)
+        : (m_isHit ? QColor(75, 235, 155) : QColor(75, 205, 245));
+    painter.setPen(QPen(QColor(cursorColor.red(), cursorColor.green(), cursorColor.blue(), 105), 1));
+    painter.drawLine(QPointF(0, m_cursorY), QPointF(widthD, m_cursorY));
+    painter.setBrush(cursorColor);
+    painter.setPen(QPen(Qt::white, 2));
+    painter.drawEllipse(QPointF(gateX, m_cursorY), 10, 10);
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor(255, 255, 255, 190), 1.5));
+    painter.drawEllipse(QPointF(gateX, m_targetY), 7, 7);
+
+    // Large feedback panel; text remains legible in fullscreen and compact windows.
+    const int margin = qMax(14, w / 80);
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 8));
-    painter.drawText(10, 20, "Celuj w linię przerywaną");
-    painter.drawText(10, 40, QString("Siła: %1%").arg(static_cast<int>(m_currentForce * 100)));
-    painter.drawText(10, 60, QString("Tolerancja: %1 px").arg(static_cast<int>(m_tolerance)));
-    painter.drawText(10, 80, QString("Poziom: %1").arg(m_difficultyLevel));
-    
-    // 4. Rysowanie Kursora Gracza
-    // Kursor znajduje się na linii checkX, ale na wysokości m_cursorY
-    double currentCursorY = m_cursorY;
-    
-    // Wizualizacja kursora (kółko)
-    painter.setBrush(QBrush(Qt::cyan));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(12, h / 34), QFont::Bold));
+    painter.drawText(QRect(margin, margin, w - 2 * margin, 34),
+                     Qt::AlignLeft | Qt::AlignVCenter,
+                     QStringLiteral("SINUS FORCE  •  POZIOM %1").arg(m_difficultyLevel));
+
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(11, h / 42), QFont::DemiBold));
+    const QColor feedbackColor = m_inputAge > 0.35 ? QColor(255, 190, 90)
+        : (m_isHit ? QColor(90, 245, 165) : QColor(255, 205, 105));
+    painter.setPen(feedbackColor);
+    painter.drawText(QRect(margin, margin + 38, w - 2 * margin, 30),
+                     Qt::AlignLeft | Qt::AlignVCenter, m_feedbackText);
+
+    painter.setPen(QColor(210, 220, 235));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(10, h / 52)));
+    painter.drawText(QRect(margin, h - 58, w - 2 * margin, 22),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QStringLiteral("Siła: %1%    Wynik: %2    Seria trafień: x%3")
+            .arg(static_cast<int>(std::round(m_currentForce * 100.0)))
+            .arg(getScore())
+            .arg(m_combo));
+
+    painter.drawText(QRect(margin, h - 34, w - 2 * margin, 20),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QStringLiteral("Dostosuj naciąg taśmy tak, aby kursor pozostawał w zielonym pasie."));
+
+    // Compact force meter with a clear 0..100% scale.
+    const int meterW = qMax(12, qMin(22, w / 45));
+    const int meterX = w - margin - meterW;
+    const int meterY = margin + 8;
+    const int meterH = qMax(80, h - 2 * margin - 92);
+    painter.setPen(QPen(QColor(180, 195, 215), 1));
+    painter.setBrush(QColor(28, 39, 54));
+    painter.drawRoundedRect(QRect(meterX, meterY, meterW, meterH), 5, 5);
+    const int fillH = static_cast<int>(m_currentForce * meterH);
     painter.setPen(Qt::NoPen);
-    painter.drawEllipse(QPointF(checkX, currentCursorY), 10, 10);
-    
-    // Wizualizacja strefy trafienia (jeśli blisko)
-    if (m_isHit) {
-        painter.setBrush(QBrush(Qt::green));
-        painter.drawEllipse(QPointF(checkX, m_targetY), 15, 15);
-        
-        painter.setPen(Qt::green);
-        painter.drawText(checkX + 20, currentCursorY, "TRAFFIENIE!");
-    } else {
-        // Pokaż gdzie jest cel (małe kółko na sinusoide w miejscu przecięcia)
-        painter.setBrush(QBrush(Qt::red));
-        painter.drawEllipse(QPointF(checkX, m_targetY), 5, 5);
-    }
-    
-    // 5. Pasek siły (UI pomocnicze)
-    int barW = 20;
-    int barH = h - 40;
-    int barX = w - 30;
-    int barY = 20;
-    
-    painter.setPen(Qt::white);
-    painter.drawRect(barX, barY, barW, barH);
-    
-    // Wypełnienie paska
-    int fillH = static_cast<int>(m_currentForce * barH);
-    painter.setBrush(QBrush(Qt::yellow));
-    painter.drawRect(barX, barY + barH - fillH, barW, fillH);
-    
-    // 6. Status połączenia serial
-    if (m_serialPort && !m_serialPort->isConnected()) {
-        painter.setPen(QPen(Qt::red, 2));
-        painter.setFont(QFont("Arial", 9, QFont::Bold));
-        painter.drawText(w/2 - 100, 30, "BRAK POŁĄCZENIA Z SENSOREM");
-    }
+    painter.setBrush(QColor(245, 190, 75));
+    painter.drawRoundedRect(QRect(meterX + 2, meterY + meterH - fillH,
+                                  meterW - 4, qMax(0, fillH - 2)), 3, 3);
+    painter.restore();
 }
 
-QColor SinGame::getDifficultyColor() const {
+QColor SinGame::getDifficultyColor() const
+{
     switch (m_difficultyLevel) {
-        case 1: return Qt::green;
-        case 2: return Qt::cyan;
-        case 3: return Qt::yellow;
-        case 4: return QColorConstants::Svg::orange;
-        default: return Qt::red;
+        case 1: return QColor(80, 220, 150);
+        case 2: return QColor(75, 205, 220);
+        case 3: return QColor(245, 205, 90);
+        case 4: return QColor(245, 155, 85);
+        default: return QColor(245, 105, 105);
     }
 }
 
