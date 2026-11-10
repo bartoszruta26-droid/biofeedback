@@ -25,6 +25,28 @@ Przeliczenie w GUI:
 Wewnętrzne buforowanie siły i analiza biomechaniczna pozostają w jednostkach SI. Wartość RAW jest zawsze zachowana niezależnie od wybranej jednostki prezentacji.
 
 
+## Plik profilu — właściwa lokalizacja
+
+Aplikacja desktopowa **nie czyta pliku z katalogu repozytorium** `config/calibration/`. Domyślnie odczytuje plik z katalogu konfiguracji użytkownika:
+
+- Linux: `~/.config/Biofeedback/calibration/hx711.json`
+- Windows: katalog zwracany przez Qt `QStandardPaths::AppConfigLocation`, następnie `calibration/hx711.json`.
+
+Na Linuksie utwórz katalog i skopiuj profil do właściwego miejsca:
+
+```bash
+mkdir -p ~/.config/Biofeedback/calibration
+cp config/calibration/examples/hx711-50kg-theoretical-demo.json ~/.config/Biofeedback/calibration/hx711.json
+```
+
+Jeśli aplikacja została zainstalowana w innym środowisku lub używa innego katalogu konfiguracji Qt, rozstrzygający jest pełny adres pliku wyświetlany w komunikacie błędu. Alternatywnie można wskazać inną ścieżkę przez `sensor.calibration_profile` w `~/.config/Biofeedback/config.json`.
+
+**Ważne:** plik `hx711-50kg-theoretical-demo.json` jest celowo syntaktycznie i strukturalnie poprawnym profilem demonstracyjnym. Po skopiowaniu do powyższej lokalizacji powinien zostać rozpoznany przez walidator profilu i pozwolić sprawdzić sam mechanizm wczytywania. Zawiera jednak symulowane wartości RAW i współczynnik — nie jest kalibracją Twojego egzemplarza HX711. Nie używaj go do rzeczywistego pomiaru siły ani sterowania treningiem. Do pracy z czujnikiem zastąp `zeroOffsetRaw`, `referenceRaw`, `referenceValue` i `scaleFactor` wynikami kalibracji wykonanej na rzeczywistym stanowisku. Współczynnik musi spełniać zależność:
+
+`scaleFactor = referenceValue / (referenceRaw - zeroOffsetRaw)`
+
+Wartości `referenceValue` i `scaleFactor` są wyrażone w gramach.
+
 ## Procedura
 
 1. Zamontuj czujnik tensometryczny w docelowej mechanice i sprawdź przewody HX711.
