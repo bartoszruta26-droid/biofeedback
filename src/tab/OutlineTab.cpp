@@ -194,6 +194,39 @@ void OutlineTab::setupUI()
     assessmentLayout->addWidget(m_assessmentHistoryBrowser);
     m_leftLayout->addWidget(assessmentGroup);
 
+    auto* goalsGroup = new QGroupBox(tr("Cele terapeutyczne"), visualPanel);
+    auto* goalsLayout = new QVBoxLayout(goalsGroup);
+    auto addGoalField = [goalsGroup, goalsLayout](const QString& label,
+                                                  QLineEdit*& field,
+                                                  const QString& placeholder) {
+        goalsLayout->addWidget(new QLabel(label, goalsGroup));
+        field = new QLineEdit(goalsGroup);
+        field->setPlaceholderText(placeholder);
+        goalsLayout->addWidget(field);
+    };
+    addGoalField(tr("Cel funkcjonalny"), m_goalTitleEdit, tr("Np. samodzielne wejście po schodach"));
+    addGoalField(tr("Wskaźnik / metoda pomiaru"), m_goalMetricEdit, tr("Np. TUG, ROM zgięcia kolana"));
+    addGoalField(tr("Wartość początkowa"), m_goalBaselineEdit, tr("Wartość liczbowa"));
+    addGoalField(tr("Wartość docelowa"), m_goalTargetEdit, tr("Wartość liczbowa"));
+    addGoalField(tr("Jednostka"), m_goalUnitEdit, tr("Np. s, stopnie, N, wynik skali"));
+    addGoalField(tr("Termin (RRRR-MM-DD, opcjonalnie)"), m_goalTargetDateEdit, tr("2026-12-01"));
+    m_createGoalButton = new QPushButton(tr("Zapisz cel terapeutyczny"), goalsGroup);
+    m_goalStatusLabel = new QLabel(tr("Wybierz pacjenta i epizod, aby zarządzać celami."), goalsGroup);
+    m_goalStatusLabel->setWordWrap(true);
+    m_goalHistoryBrowser = new QTextBrowser(goalsGroup);
+    m_goalHistoryBrowser->setMaximumHeight(150);
+    m_goalHistoryBrowser->setOpenExternalLinks(false);
+    goalsLayout->addWidget(m_createGoalButton);
+    goalsLayout->addWidget(m_goalStatusLabel);
+    goalsLayout->addWidget(m_goalHistoryBrowser);
+    m_leftLayout->addWidget(goalsGroup);
+    connect(m_createGoalButton, &QPushButton::clicked,
+            this, &OutlineTab::createRehabilitationGoal);
+    m_createGoalButton->setEnabled(false);
+    for (QLineEdit* field : {m_goalTitleEdit, m_goalMetricEdit, m_goalBaselineEdit,
+                             m_goalTargetEdit, m_goalUnitEdit, m_goalTargetDateEdit})
+        field->setEnabled(false);
+
     connect(m_saveAssessmentButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationAssessment);
     m_saveAssessmentButton->setEnabled(false);
@@ -208,6 +241,7 @@ void OutlineTab::setupUI()
                 m_currentEpisodeUuid = index >= 0
                     ? m_episodeSelector->itemData(index).toString() : QString();
                 refreshRehabilitationAssessments();
+                refreshRehabilitationGoals();
             });
     connect(m_createEpisodeButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationEpisode);
@@ -1085,6 +1119,7 @@ void OutlineTab::setCurrentPatientContext(const QString& patientUuid, const QStr
         m_currentEpisodeUuid.clear();
         refreshRehabilitationEpisodes();
         refreshRehabilitationAssessments();
+        refreshRehabilitationGoals();
         return;
     }
     const QString safeName = displayName.trimmed().isEmpty()
@@ -1144,6 +1179,7 @@ void OutlineTab::refreshRehabilitationEpisodes()
         m_episodeStatusLabel->setText(tr("Brak epizodów. Wprowadź rozpoznanie i utwórz epizod."));
     }
     refreshRehabilitationAssessments();
+    refreshRehabilitationGoals();
 }
 
 void OutlineTab::createRehabilitationEpisode()
@@ -1300,6 +1336,102 @@ void OutlineTab::createRehabilitationAssessment()
     m_assessmentFunctionalTestEdit->clear();
     m_assessmentStatusLabel->setText(tr("Ocena początkowa została trwale zapisana."));
     refreshRehabilitationAssessments();
+}
+
+void OutlineTab::refreshRehabilitationGoals()
+{
+    const bool canUse = m_resourceRepository && !m_currentPatientUuid.isEmpty() &&
+                        !m_currentEpisodeUuid.isEmpty();
+    if (m_createGoalButton) m_createGoalButton->setEnabled(canUse);
+    for (QLineEdit* field : {m_goalTitleEdit, m_goalMetricEdit, m_goalBaselineEdit,
+                             m_goalTargetEdit, m_goalUnitEdit, m_goalTargetDateEdit})
+        if (field) field->setEnabled(canUse);
+    if (!m_goalHistoryBrowser) return;
+    m_goalHistoryBrowser->clear();
+    if (!canUse) {
+        m_goalStatusLabel->setText(tr("Wybierz pacjenta i epizod, aby zarządzać celami."));
+        return;
+    }
+    QString error;
+    const QJsonArray goals = m_resourceRepository->list(QStringLiteral("rehabilitation-goals"), &error);
+    if (!error.isEmpty()) {
+        m_goalStatusLabel->setText(tr("Nie udało się odczytać celów terapeutycznych."));
+        m_createGoalButton->setEnabled(false);
+        return;
+    }
+    QStringList entries;
+    for (const QJsonValue& value : goals) {
+        if (!value.isObject()) continue;
+        const QJsonObject goal = value.toObject();
+        if (goal.value(QStringLiteral("patient_id")).toString() != m_currentPatientUuid ||
+            goal.value(QStringLiteral("episode_id")).toString() != m_currentEpisodeUuid)
+            continue;
+        entries << QStringLiteral("%1 — %2: %3 %4 (cel: %5 %4; termin: %6; status: %7)")
+            .arg(goal.value(QStringLiteral("title")).toString(),
+                 goal.value(QStringLiteral("metric_id")).toString(),
+                 QString::number(goal.value(QStringLiteral("baseline_value")).toDouble()),
+                 goal.value(QStringLiteral("unit")).toString(),
+                 QString::number(goal.value(QStringLiteral("target_value")).toDouble()),
+                 goal.value(QStringLiteral("target_date")).toString().isEmpty()
+                    ? tr("nie określono") : goal.value(QStringLiteral("target_date")).toString(),
+                 goal.value(QStringLiteral("status")).toString());
+    }
+    m_goalHistoryBrowser->setPlainText(entries.isEmpty()
+        ? tr("Brak zapisanych celów dla tego epizodu.") : entries.join(QStringLiteral("\n")));
+    m_goalStatusLabel->setText(tr("Zapisane cele: %1").arg(entries.size()));
+}
+
+void OutlineTab::createRehabilitationGoal()
+{
+    if (!m_resourceRepository || m_currentPatientUuid.isEmpty() || m_currentEpisodeUuid.isEmpty()) {
+        m_goalStatusLabel->setText(tr("Wybierz pacjenta i epizod rehabilitacji."));
+        return;
+    }
+    const QString title = m_goalTitleEdit->text().trimmed();
+    const QString metric = m_goalMetricEdit->text().trimmed();
+    const QString unit = m_goalUnitEdit->text().trimmed();
+    bool baselineOk = false, targetOk = false;
+    const double baseline = m_goalBaselineEdit->text().trimmed().toDouble(&baselineOk);
+    const double target = m_goalTargetEdit->text().trimmed().toDouble(&targetOk);
+    if (title.isEmpty() || title.size() > 200 || metric.isEmpty() || metric.size() > 120 ||
+        unit.isEmpty() || unit.size() > 32 || !baselineOk || !targetOk ||
+        !std::isfinite(baseline) || !std::isfinite(target)) {
+        m_goalStatusLabel->setText(tr("Uzupełnij cel, wskaźnik, wartości liczbowe i jednostkę."));
+        return;
+    }
+    const QString targetDate = m_goalTargetDateEdit->text().trimmed();
+    if (!targetDate.isEmpty()) {
+        const QDate parsed = QDate::fromString(targetDate, Qt::ISODate);
+        if (!parsed.isValid() || parsed.toString(Qt::ISODate) != targetDate) {
+            m_goalStatusLabel->setText(tr("Termin musi mieć format RRRR-MM-DD."));
+            return;
+        }
+    }
+    QJsonObject payload{
+        {QStringLiteral("patient_id"), m_currentPatientUuid},
+        {QStringLiteral("episode_id"), m_currentEpisodeUuid},
+        {QStringLiteral("title"), title},
+        {QStringLiteral("metric_id"), metric},
+        {QStringLiteral("baseline_value"), baseline},
+        {QStringLiteral("target_value"), target},
+        {QStringLiteral("unit"), unit},
+        {QStringLiteral("status"), QStringLiteral("active")},
+        {QStringLiteral("target_date"), targetDate}
+    };
+    QJsonObject created;
+    QString error;
+    if (!m_resourceRepository->create(QStringLiteral("rehabilitation-goals"), payload, created, &error)) {
+        m_goalStatusLabel->setText(tr("Nie udało się zapisać celu: %1").arg(error));
+        return;
+    }
+    m_goalTitleEdit->clear();
+    m_goalMetricEdit->clear();
+    m_goalBaselineEdit->clear();
+    m_goalTargetEdit->clear();
+    m_goalUnitEdit->clear();
+    m_goalTargetDateEdit->clear();
+    m_goalStatusLabel->setText(tr("Cel terapeutyczny zapisany w repozytorium."));
+    refreshRehabilitationGoals();
 }
 
 void OutlineTab::setMeasurementEngine(
