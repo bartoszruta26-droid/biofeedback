@@ -12,6 +12,11 @@
 #include <QFrame>
 #include <cmath>
 #include <QFileDialog>
+#include <QPdfWriter>
+#include <QPageSize>
+#include <QPageLayout>
+#include <QTextDocument>
+#include <QMarginsF>
 #include <QTextStream>
 #include <QDateTime>
 #include <QDate>
@@ -192,12 +197,15 @@ void OutlineTab::setupUI()
     addAssessmentField(tr("Test funkcjonalny / wynik"), m_assessmentFunctionalTestEdit,
                        tr("Nazwa testu i wynik, np. TUG: 12,4 s"));
     m_saveAssessmentButton = new QPushButton(tr("Zapisz ocenę"), assessmentGroup);
+    m_exportAssessmentReportButton = new QPushButton(tr("Eksportuj raport epizodu do PDF"), assessmentGroup);
+    m_exportAssessmentReportButton->setObjectName(QStringLiteral("exportRehabilitationReportPdf"));
     m_assessmentStatusLabel = new QLabel(tr("Wybierz pacjenta i epizod, aby zapisać ocenę."), assessmentGroup);
     m_assessmentStatusLabel->setWordWrap(true);
     m_assessmentHistoryBrowser = new QTextBrowser(assessmentGroup);
     m_assessmentHistoryBrowser->setMaximumHeight(130);
     m_assessmentHistoryBrowser->setOpenExternalLinks(false);
     assessmentLayout->addWidget(m_saveAssessmentButton);
+    assessmentLayout->addWidget(m_exportAssessmentReportButton);
     assessmentLayout->addWidget(m_assessmentStatusLabel);
     assessmentLayout->addWidget(m_assessmentHistoryBrowser);
     m_leftLayout->addWidget(assessmentGroup);
@@ -324,7 +332,10 @@ void OutlineTab::setupUI()
 
     connect(m_saveAssessmentButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationAssessment);
+    connect(m_exportAssessmentReportButton, &QPushButton::clicked,
+            this, &OutlineTab::exportRehabilitationReportPdf);
     m_saveAssessmentButton->setEnabled(false);
+    m_exportAssessmentReportButton->setEnabled(false);
     if (m_assessmentTypeCombo) m_assessmentTypeCombo->setEnabled(false);
     for (QLineEdit* field : {m_assessmentPainNrsEdit, m_assessmentRomEdit,
                              m_assessmentStrengthEdit, m_assessmentSwellingEdit,
@@ -1336,6 +1347,7 @@ void OutlineTab::refreshRehabilitationAssessments()
     const bool canSave = m_resourceRepository && !m_currentPatientUuid.isEmpty() &&
                          !m_currentEpisodeUuid.isEmpty();
     if (m_saveAssessmentButton) m_saveAssessmentButton->setEnabled(canSave);
+    if (m_exportAssessmentReportButton) m_exportAssessmentReportButton->setEnabled(canSave);
     if (m_assessmentTypeCombo) m_assessmentTypeCombo->setEnabled(canSave);
     for (QLineEdit* field : {m_assessmentPainNrsEdit, m_assessmentRomEdit,
                              m_assessmentStrengthEdit, m_assessmentSwellingEdit,
@@ -1356,6 +1368,7 @@ void OutlineTab::refreshRehabilitationAssessments()
     if (!error.isEmpty()) {
         m_assessmentStatusLabel->setText(tr("Nie udało się odczytać historii ocen."));
         m_saveAssessmentButton->setEnabled(false);
+        if (m_exportAssessmentReportButton) m_exportAssessmentReportButton->setEnabled(false);
         return;
     }
     QStringList entries;
@@ -1452,8 +1465,8 @@ void OutlineTab::createRehabilitationAssessment()
          QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
     };
 
-    // Link the rehabilitation assessment to the exact ICF assessment version.
-    // Only the timestamp reference is stored; the ICF response set stays in the patient chart.
+    // Link the rehabilitation assessment to the exact immutable ICF assessment version.
+    // Only its UUID is stored; the ICF response set stays in the patient chart.
     QJsonObject patientRecord;
     QString patientReadError;
     bool linkedIcfAssessment = false;
@@ -1526,6 +1539,190 @@ void OutlineTab::createRehabilitationAssessment()
         ? tr("Ocena została zapisana i powiązana z aktualną wersją oceny ICF.")
         : tr("Ocena została zapisana. Brak aktualnej oceny ICF do powiązania."));
     refreshRehabilitationAssessments();
+}
+
+
+void OutlineTab::exportRehabilitationReportPdf()
+{
+    if (!m_resourceRepository || m_currentPatientUuid.isEmpty() || m_currentEpisodeUuid.isEmpty()) {
+        m_assessmentStatusLabel->setText(tr("Wybierz pacjenta i epizod przed eksportem raportu."));
+        return;
+    }
+
+    const QString fileName = QFileDialog::getSaveFileName(
+        this, tr("Zapisz raport rehabilitacyjny"), QString(),
+        tr("Dokument PDF (*.pdf)"));
+    if (fileName.isEmpty()) return;
+    const QString outputPath = fileName.endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive)
+        ? fileName : fileName + QStringLiteral(".pdf");
+
+    QJsonObject patient;
+    QJsonObject episode;
+    QString error;
+    if (!m_resourceRepository->get(QStringLiteral("patients"), m_currentPatientUuid, patient, &error)) {
+        m_assessmentStatusLabel->setText(tr("Nie można odczytać kartoteki pacjenta: %1").arg(error));
+        return;
+    }
+    if (!m_resourceRepository->get(QStringLiteral("rehabilitation-episodes"), m_currentEpisodeUuid,
+                                   episode, &error)) {
+        m_assessmentStatusLabel->setText(tr("Nie można odczytać epizodu rehabilitacji: %1").arg(error));
+        return;
+    }
+
+    auto recordsForEpisode = [this, &error](const QString& collection) {
+        QJsonArray filtered;
+        const QJsonArray records = m_resourceRepository->list(collection, &error);
+        if (!error.isEmpty()) return filtered;
+        for (const QJsonValue& value : records) {
+            if (!value.isObject()) continue;
+            const QJsonObject record = value.toObject();
+            if (record.value(QStringLiteral("patient_id")).toString() == m_currentPatientUuid &&
+                record.value(QStringLiteral("episode_id")).toString() == m_currentEpisodeUuid)
+                filtered.append(record);
+        }
+        return filtered;
+    };
+
+    const QJsonArray assessments = recordsForEpisode(QStringLiteral("rehabilitation-assessments"));
+    if (!error.isEmpty()) {
+        m_assessmentStatusLabel->setText(tr("Nie można odczytać ocen: %1").arg(error));
+        return;
+    }
+    const QJsonArray goals = recordsForEpisode(QStringLiteral("rehabilitation-goals"));
+    if (!error.isEmpty()) {
+        m_assessmentStatusLabel->setText(tr("Nie można odczytać celów: %1").arg(error));
+        return;
+    }
+    const QJsonArray sessions = recordsForEpisode(QStringLiteral("rehabilitation-sessions"));
+    if (!error.isEmpty()) {
+        m_assessmentStatusLabel->setText(tr("Nie można odczytać sesji: %1").arg(error));
+        return;
+    }
+    const QJsonArray observations = recordsForEpisode(QStringLiteral("rehabilitation-observations"));
+    if (!error.isEmpty()) {
+        m_assessmentStatusLabel->setText(tr("Nie można odczytać obserwacji: %1").arg(error));
+        return;
+    }
+
+    const auto safe = [](const QString& value) { return value.toHtmlEscaped(); };
+    const QString patientLabel = m_patientContextLabel
+        ? m_patientContextLabel->text() : tr("Pacjent");
+    const QString diagnosis = episode.value(QStringLiteral("diagnosis_code")).toString();
+    const QString pathway = episode.value(QStringLiteral("care_pathway")).toString();
+    const QJsonObject icf = patient.value(QStringLiteral("icf_assessment")).toObject();
+    const QJsonObject icfResponses = icf.value(QStringLiteral("responses")).toObject();
+
+    QString html;
+    html += QStringLiteral("<html><head><meta charset='utf-8'><style>"
+        "body{font-family:'DejaVu Sans',sans-serif;font-size:9pt;color:#202124;}"
+        "h1{font-size:18pt;}h2{font-size:12pt;margin-top:18px;border-bottom:1px solid #777;}"
+        "table{width:100%;border-collapse:collapse;margin-top:6px;}"
+        "th,td{border:1px solid #bbb;padding:5px;text-align:left;vertical-align:top;}"
+        "th{background:#eee;} .muted{color:#555;font-size:8pt;}"
+        "</style></head><body>");
+    html += QStringLiteral("<h1>Raport z epizodu rehabilitacyjnego</h1>");
+    html += QStringLiteral("<p><b>%1</b><br>Wygenerowano: %2<br>Rozpoznanie / problem: %3<br>Ścieżka postępowania: %4</p>")
+        .arg(safe(patientLabel),
+             safe(QDateTime::currentDateTimeUtc().toString(Qt::ISODate)),
+             safe(diagnosis.isEmpty() ? tr("nie podano") : diagnosis),
+             safe(pathway.isEmpty() ? tr("nie określono") : pathway));
+    html += QStringLiteral("<p class='muted'>Identyfikator epizodu: %1. Raport jest zestawieniem zapisanych danych, nie automatycznym rozpoznaniem ani zaleceniem terapeutycznym.</p>")
+        .arg(safe(m_currentEpisodeUuid));
+
+    html += QStringLiteral("<h2>Oceny kliniczne</h2><table><tr><th>Data</th><th>Rodzaj</th><th>Wyniki</th><th>Powiązanie ICF</th></tr>");
+    for (const QJsonValue& value : assessments) {
+        const QJsonObject item = value.toObject();
+        QStringList results;
+        if (item.contains(QStringLiteral("pain_nrs")))
+            results << tr("NRS: %1/10").arg(item.value(QStringLiteral("pain_nrs")).toInt());
+        if (item.contains(QStringLiteral("rom_degrees")))
+            results << tr("ROM: %1°").arg(item.value(QStringLiteral("rom_degrees")).toDouble());
+        if (item.contains(QStringLiteral("strength_mrc")))
+            results << tr("MRC: %1/5").arg(item.value(QStringLiteral("strength_mrc")).toInt());
+        if (item.contains(QStringLiteral("swelling_cm")))
+            results << tr("Obwód: %1 cm").arg(item.value(QStringLiteral("swelling_cm")).toDouble());
+        if (item.contains(QStringLiteral("functional_test")))
+            results << item.value(QStringLiteral("functional_test")).toString();
+        QString type = item.value(QStringLiteral("assessment_type")).toString();
+        if (type == QStringLiteral("baseline")) type = tr("Początkowa");
+        else if (type == QStringLiteral("follow_up")) type = tr("Kontrolna");
+        else if (type == QStringLiteral("final")) type = tr("Końcowa");
+        html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
+            .arg(safe(item.value(QStringLiteral("assessed_at")).toString()),
+                 safe(type), safe(results.join(QStringLiteral("; "))),
+                 item.contains(QStringLiteral("icf_assessment_ref")) ? tr("Tak") : tr("Brak"));
+    }
+    html += QStringLiteral("</table>");
+
+    html += QStringLiteral("<h2>Cele terapeutyczne</h2><table><tr><th>Cel</th><th>Wskaźnik</th><th>Wartość początkowa</th><th>Cel</th><th>Termin / status</th></tr>");
+    for (const QJsonValue& value : goals) {
+        const QJsonObject item = value.toObject();
+        html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3 %4</td><td>%5 %4</td><td>%6 / %7</td></tr>")
+            .arg(safe(item.value(QStringLiteral("title")).toString()),
+                 safe(item.value(QStringLiteral("metric_id")).toString()),
+                 safe(QString::number(item.value(QStringLiteral("baseline_value")).toDouble())),
+                 safe(item.value(QStringLiteral("unit")).toString()),
+                 safe(QString::number(item.value(QStringLiteral("target_value")).toDouble())),
+                 safe(item.value(QStringLiteral("target_date")).toString()),
+                 safe(item.value(QStringLiteral("status")).toString()));
+    }
+    html += QStringLiteral("</table>");
+
+    html += QStringLiteral("<h2>Sesje rehabilitacyjne</h2><table><tr><th>Rozpoczęcie</th><th>Zakończenie</th><th>Status</th><th>Ból NRS przed / po / 24 h</th></tr>");
+    for (const QJsonValue& value : sessions) {
+        const QJsonObject item = value.toObject();
+        const QString pain = QStringLiteral("%1 / %2 / %3")
+            .arg(item.value(QStringLiteral("pre_session_pain_nrs")).toVariant().toString(),
+                 item.value(QStringLiteral("post_session_pain_nrs")).toVariant().toString(),
+                 item.value(QStringLiteral("pain_at_24h_nrs")).toVariant().toString());
+        html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td></tr>")
+            .arg(safe(item.value(QStringLiteral("started_at")).toString()),
+                 safe(item.value(QStringLiteral("ended_at")).toString()),
+                 safe(item.value(QStringLiteral("session_status")).toString()), safe(pain));
+    }
+    html += QStringLiteral("</table>");
+
+    html += QStringLiteral("<h2>Obserwacje ćwiczeń</h2><table><tr><th>Data</th><th>Ćwiczenie</th><th>Dawka</th><th>Ból przed / po / 24 h</th><th>RPE / jakość</th></tr>");
+    for (const QJsonValue& value : observations) {
+        const QJsonObject item = value.toObject();
+        const QString dose = tr("%1 serii × %2 powtórzeń; %3 s")
+            .arg(item.value(QStringLiteral("completed_sets")).toInt())
+            .arg(item.value(QStringLiteral("completed_repetitions")).toInt())
+            .arg(item.value(QStringLiteral("duration_seconds")).toInt());
+        const QString pain = QStringLiteral("%1 / %2 / %3")
+            .arg(item.value(QStringLiteral("pain_before")).toVariant().toString(),
+                 item.value(QStringLiteral("pain_after")).toVariant().toString(),
+                 item.value(QStringLiteral("pain_at_24h")).toVariant().toString());
+        const QString effort = QStringLiteral("%1 / %2")
+            .arg(item.value(QStringLiteral("rpe")).toVariant().toString(),
+                 item.value(QStringLiteral("movement_quality")).toString());
+        html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td></tr>")
+            .arg(safe(item.value(QStringLiteral("observed_at")).toString()),
+                 safe(item.value(QStringLiteral("exercise_name")).toString()),
+                 safe(dose), safe(pain), safe(effort));
+    }
+    html += QStringLiteral("</table>");
+
+    html += QStringLiteral("<h2>Ocena ICF</h2>");
+    if (icf.isEmpty()) {
+        html += QStringLiteral("<p>Brak aktualnej oceny ICF w kartotece pacjenta.</p>");
+    } else {
+        html += QStringLiteral("<p>Data oceny: %1<br>Liczba zapisanych domen: %2<br>Opis: %3</p>")
+            .arg(safe(icf.value(QStringLiteral("assessed_at")).toString()),
+                 QString::number(icfResponses.size()),
+                 safe(icf.value(QStringLiteral("narrative")).toString()));
+    }
+    html += QStringLiteral("<p class='muted'>Dokument wygenerowano z danych dostępnych w repozytorium w chwili eksportu. Brak pomiaru pozostaje brakiem danych i nie jest interpretowany jako zero.</p></body></html>");
+
+    QPdfWriter writer(outputPath);
+    writer.setPageSize(QPageSize(QPageSize::A4));
+    writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+    writer.setTitle(tr("Raport rehabilitacyjny"));
+    writer.setCreator(QStringLiteral("Biofeedback"));
+    QTextDocument document;
+    document.setHtml(html);
+    document.print(&writer);
+    m_assessmentStatusLabel->setText(tr("Raport PDF zapisano: %1").arg(outputPath));
 }
 
 void OutlineTab::refreshRehabilitationGoals()
