@@ -192,6 +192,13 @@ int main(int argc, char** argv) {
     assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), wrongVersionPayload,
                              rejectedWrongVersion, &error));
     assert(error == QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
+    // UUID-backed records must not silently fall back to a colliding timestamp.
+    QJsonObject timestampOnlyReferencePayload = assessmentPayload;
+    timestampOnlyReferencePayload.insert(QStringLiteral("icf_assessment_ref"), currentIcfTimestamp);
+    QJsonObject rejectedTimestampOnlyReference;
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), timestampOnlyReferencePayload,
+                             rejectedTimestampOnlyReference, &error));
+    assert(error == QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
 
     QJsonObject invalidAssessmentType = assessmentPayload;
     invalidAssessmentType.insert(QStringLiteral("assessment_type"), QStringLiteral("unknown"));
