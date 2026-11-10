@@ -13,6 +13,8 @@
 #include <cmath>
 #include <QFileDialog>
 #include <QPdfWriter>
+#include <QFile>
+#include <QFileInfo>
 #include <QPageSize>
 #include <QPageLayout>
 #include <QTextDocument>
@@ -1714,14 +1716,27 @@ void OutlineTab::exportRehabilitationReportPdf()
     }
     html += QStringLiteral("<p class='muted'>Dokument wygenerowano z danych dostępnych w repozytorium w chwili eksportu. Brak pomiaru pozostaje brakiem danych i nie jest interpretowany jako zero.</p></body></html>");
 
-    QPdfWriter writer(outputPath);
-    writer.setPageSize(QPageSize(QPageSize::A4));
-    writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
-    writer.setTitle(tr("Raport rehabilitacyjny"));
-    writer.setCreator(QStringLiteral("Biofeedback"));
-    QTextDocument document;
-    document.setHtml(html);
-    document.print(&writer);
+    QFile pdfFile(outputPath);
+    if (!pdfFile.open(QIODevice::WriteOnly)) {
+        m_assessmentStatusLabel->setText(
+            tr("Nie można utworzyć pliku PDF: %1").arg(pdfFile.errorString()));
+        return;
+    }
+    {
+        QPdfWriter writer(&pdfFile);
+        writer.setPageSize(QPageSize(QPageSize::A4));
+        writer.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+        writer.setTitle(tr("Raport rehabilitacyjny"));
+        writer.setCreator(QStringLiteral("Biofeedback"));
+        QTextDocument document;
+        document.setHtml(html);
+        document.print(&writer);
+    }
+    pdfFile.close();
+    if (!QFileInfo(outputPath).exists() || QFileInfo(outputPath).size() <= 0) {
+        m_assessmentStatusLabel->setText(tr("Eksport PDF nie powiódł się — plik jest pusty."));
+        return;
+    }
     m_assessmentStatusLabel->setText(tr("Raport PDF zapisano: %1").arg(outputPath));
 }
 
