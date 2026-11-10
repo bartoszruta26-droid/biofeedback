@@ -770,6 +770,7 @@ void PatientTab::onSelectionChanged()
     bool hasSelection = currentRow >= 0;
     m_editButton->setEnabled(hasSelection);
     m_deleteButton->setEnabled(hasSelection);
+    m_icfButton->setEnabled(hasSelection);
     
     // Emituj sygnał patientSelected gdy wybrano pacjenta
     if (hasSelection) {
