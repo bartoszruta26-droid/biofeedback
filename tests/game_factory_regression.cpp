@@ -341,11 +341,11 @@ int main(int argc, char **argv)
     scorchedMouseGame->resize(640, 480);
     scorchedMouseGame->start();
     const double scorchedAimBeforeMouse = scorchedMouseGame->aimDegrees();
-    QMouseEvent scorchedAimMove(QEvent::MouseMove, QPointF(500.0, 170.0),
+    QMouseEvent scorchedAimMove(QEvent::MouseMove, QPointF(220.0, 80.0),
                                 Qt::NoButton, Qt::NoButton, Qt::NoModifier);
     QApplication::sendEvent(scorchedMouseGame, &scorchedAimMove);
     REQUIRE(scorchedMouseGame->aimDegrees() > scorchedAimBeforeMouse);
-    QMouseEvent scorchedMouseFire(QEvent::MouseButtonPress, QPointF(500.0, 170.0),
+    QMouseEvent scorchedMouseFire(QEvent::MouseButtonPress, QPointF(220.0, 80.0),
                                   Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
     QApplication::sendEvent(scorchedMouseGame, &scorchedMouseFire);
     REQUIRE(scorchedMouseGame->activeProjectileCount() == 1);
