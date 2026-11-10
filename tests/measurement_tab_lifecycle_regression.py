@@ -158,13 +158,40 @@ if "MaximumQueuedInputs" in game_source or "scheduleAgain" in game_source:
 
 # Failed Qt event scheduling must release the scheduled flag and account for
 # the discarded UI backlog, both on initial enqueue and on batch rescheduling.
-for label, content in (("MeasurementTab", source), ("TrainingTab", training_source)):
-    if content.count("const bool queued = QMetaObject::invokeMethod") < 2:
-        raise SystemExit(f"{label}: initial and follow-up drain scheduling must check invokeMethod")
-    if content.count("m_measurementQueue.clear();") < 2:
-        raise SystemExit(f"{label}: failed scheduling must clear stranded UI backlog")
-    if content.count("m_measurementDrainScheduled = false;") < 2:
-        raise SystemExit(f"{label}: failed scheduling must release the drain flag")
+# MeasurementTab still has two checked invokeMethod scheduling sites.
+if source.count("const bool queued = QMetaObject::invokeMethod") < 2:
+    raise SystemExit("MeasurementTab: initial and follow-up drain scheduling must check invokeMethod")
+if source.count("m_measurementQueue.clear();") < 2:
+    raise SystemExit("MeasurementTab: failed scheduling must clear stranded UI backlog")
+if source.count("m_measurementDrainScheduled = false;") < 2:
+    raise SystemExit("MeasurementTab: failed scheduling must release the drain flag")
+
+# TrainingTab now detaches and drains its entire ordered FIFO in one GUI
+# callback, avoiding another Qt event turn for each 128-sample chunk.
+training_drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
+training_drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", training_drain_start)
+training_drain = training_source[training_drain_start:training_drain_end]
+if "while (!m_measurementQueue.empty())" not in training_drain:
+    raise SystemExit("TrainingTab must drain the acquired FIFO in order")
+if "scheduleAgain" in training_drain or "MaximumBatch" in training_drain:
+    raise SystemExit("TrainingTab must not requeue the same sensor backlog in 128-sample batches")
+
+# The training detector receives every real sample; only the visible UI and
+# game control are refreshed from the latest value at a bounded 60 Hz cadence.
+for required in (
+    "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
+    "m_liveUiTimer->setInterval(16)",
+    "m_liveUiTimer->setTimerType(Qt::PreciseTimer)",
+    "void TrainingTab::scheduleLiveUiRefresh()",
+    "void TrainingTab::refreshLiveUi()",
+    "m_progressWidget->setCurrentForce(force)",
+    "m_lblCurrentForce->setText(QString(\"%1 N\").arg(force, 0, 'f', 2));",
+    "m_currentGame->handleSensorInput(gameInput)",
+):
+    if required not in training_source:
+        raise SystemExit(f"Missing low-latency training invariant: {required}")
+if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
+    raise SystemExit("TrainingTab live UI timer state is missing")
 
 
 # ForcePlotWidget must keep the visible-window trace in O(1)-amortized append
@@ -274,7 +301,7 @@ if "tracePath.lineTo(point);" not in source:
 if "m_forcePlot->addSample(forceValue, currentTime)" not in source:
     raise SystemExit("Measurement plot must receive every acquired sample")
 if "m_progressWidget->setCurrentForce(force);" not in training_source:
-    raise SystemExit("Training live force trace must receive every acquired sample")
+    raise SystemExit("Training live force trace must receive the latest acquired sample")
 training_header = Path("include/tab/TrainingTab.hpp").read_text(encoding="utf-8")
 if "std::deque<double> m_forceHistory" not in training_header or "MaximumTraceSamples = 600" not in training_source:
     raise SystemExit("Training live trace must retain a bounded six-second sample window")
