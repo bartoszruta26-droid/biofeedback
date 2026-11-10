@@ -121,7 +121,7 @@ assert "m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurement
 assert "setCurrentPatientContext(const QString& patientUuid" in read("include/tab/OutlineTab.hpp")
 assert "m_currentPatientUuid = patientUuid.trimmed();" in outline
 assert "patient.value(QStringLiteral(\"id\")).toString()" in application
-assert "m_outlineTab->setCurrentPatientContext(" in main
+assert "m_outlineTab->setCurrentPatientContext(" in application
 assert "rehabilitationPatientContext" in outline
 assert "setResourceRepository(m_sharedResources)" in read("src/core/Application.cpp")
 assert "createRehabilitationEpisode()" in read("include/tab/OutlineTab.hpp")
