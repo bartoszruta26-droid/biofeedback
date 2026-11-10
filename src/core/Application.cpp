@@ -594,7 +594,7 @@ void Application::setupConnections()
                          const QString& lastName, const QDate& birthDate,
                          const QString& gender, const QString& notes) {
                 if (!m_sharedResources || pesel.isEmpty()) return;
-                const QJsonObject payload{
+                QJsonObject payload{
                     {QStringLiteral("pesel"), pesel},
                     {QStringLiteral("firstName"), firstName},
                     {QStringLiteral("lastName"), lastName},
