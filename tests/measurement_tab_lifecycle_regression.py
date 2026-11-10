@@ -168,15 +168,14 @@ if source.count("m_measurementQueue.clear();") < 2:
 if source.count("m_measurementDrainScheduled = false;") < 2:
     raise SystemExit("MeasurementTab: failed scheduling must release the drain flag")
 
-# TrainingTab now detaches and drains its entire ordered FIFO in one GUI
-# callback, avoiding another Qt event turn for each 128-sample chunk.
+# TrainingTab retains bounded FIFO batches so Qt can service other events.
 training_drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
 training_drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", training_drain_start)
 training_drain = training_source[training_drain_start:training_drain_end]
-if "while (!m_measurementQueue.empty())" not in training_drain:
-    raise SystemExit("TrainingTab must drain the acquired FIFO in order")
-if "scheduleAgain" in training_drain or "MaximumBatch" in training_drain:
-    raise SystemExit("TrainingTab must not requeue the same sensor backlog in 128-sample batches")
+if "constexpr std::size_t MaximumBatch = 128;" not in training_drain:
+    raise SystemExit("TrainingTab must keep GUI analysis batches bounded")
+if "scheduleAgain" not in training_drain or "QMetaObject::invokeMethod" not in training_drain:
+    raise SystemExit("TrainingTab must reschedule remaining FIFO work without dropping it")
 
 # The training detector receives every real sample; only the visible UI and
 # game control are refreshed from the latest value at a bounded 60 Hz cadence.
@@ -196,16 +195,14 @@ if "QTimer* m_liveUiTimer{nullptr};" not in training_header:
     raise SystemExit("TrainingTab live UI timer state is missing")
 
 
-# Training's detector must consume each frame; visible widgets and game input
+# Training's detector consumes each frame; visible widgets and game input
 # are updated from the latest-value snapshot by a precise 60 Hz timer.
 
 drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
 drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", drain_start)
 drain_body = training_source[drain_start:drain_end]
-if "while (!m_measurementQueue.empty())" not in drain_body:
-    raise SystemExit("Training analysis FIFO must be drained in order")
-if "MaximumBatch" in drain_body or "scheduleAgain" in drain_body:
-    raise SystemExit("Training analysis must not requeue stale 128-sample batches")
+if "MaximumBatch = 128" not in drain_body or "scheduleAgain" not in drain_body:
+    raise SystemExit("Training analysis must preserve bounded FIFO batches")
 for required in (
     "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
     "m_liveUiTimer->setInterval(16)",
