@@ -46,13 +46,12 @@ assert "selectedGame->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expandi
 # remains on the left while configuration is isolated in a compact sidebar.
 for source in (measurement, training):
     assert "QSplitter(Qt::Horizontal" in source
-    assert "workspaceSplitter->setStretchFactor(0, 1);" in source
-    assert "workspaceSplitter->setStretchFactor(1, 1);" in source
+    assert "class ProportionalWorkspaceSplitter final : public QSplitter" in source
+    assert "void resizeEvent(QResizeEvent* event) override" in source
+    assert "const int visualWidth = availableWidth * 89 / 100;" in source
+    assert "setSizes({visualWidth, availableWidth - visualWidth});" in source
     assert "auto* visualScroll = new QScrollArea(workspaceSplitter);" in source
     assert "auto* optionsScroll = new QScrollArea(workspaceSplitter);" in source
-    assert "QTimer::singleShot(0, workspaceSplitter" in source
-    assert "const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();" in source
-    assert "workspaceSplitter->setSizes({availableWidth * 89 / 100," in source
     assert "QSplitter::splitterMoved" in source
     assert "const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();" in source
     assert "const int maxVisualWidth = availableWidth * 89 / 100;" in source
