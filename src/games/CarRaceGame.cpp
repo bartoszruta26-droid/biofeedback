@@ -195,9 +195,15 @@ void CarRaceGame::render(QPainter& painter)
     const double roadWidth = width() * 0.72;
     const double roadLeft = (width() - roadWidth) / 2.0;
     const double laneWidth = roadWidth / 3.0;
-    painter.fillRect(QRectF(roadLeft, 0.0, roadWidth, height()), QColor(42, 45, 52));
+    const double roadRight = roadLeft + roadWidth;
+    painter.fillRect(QRectF(roadLeft, 0.0, roadWidth, height()), QColor(38, 42, 49));
+    painter.fillRect(QRectF(roadLeft, 0.0, 5.0, height()), QColor(245, 205, 80));
+    painter.fillRect(QRectF(roadRight - 5.0, 0.0, 5.0, height()), QColor(245, 205, 80));
+    painter.fillRect(QRectF(roadLeft + laneWidth * m_lane + 3.0, 0.0,
+                            qMax(0.0, laneWidth - 6.0), height()),
+                     QColor(255, 255, 255, 15));
 
-    painter.setPen(QPen(QColor(235, 235, 220), 3, Qt::DashLine));
+    painter.setPen(QPen(QColor(225, 228, 218), 2, Qt::DashLine));
     for (int divider = 1; divider <= 2; ++divider) {
         const double x = roadLeft + laneWidth * divider;
         const double offset = std::fmod(m_distance * 0.8, 48.0);
@@ -205,26 +211,108 @@ void CarRaceGame::render(QPainter& painter)
             painter.drawLine(QPointF(x, y), QPointF(x, y + 24.0));
     }
 
+    // Traffic vehicles have wheels, bodywork and a windscreen.
+    for (const Obstacle& obstacle : m_obstacles) {
+        if (obstacle.rect.isEmpty())
+            continue;
+        const QRectF car = obstacle.rect;
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(20, 22, 27));
+        painter.drawRoundedRect(QRectF(car.left() - 3.0, car.top() + 9.0,
+                                       5.0, qMax(1.0, car.height() - 18.0)), 2.0, 2.0);
+        painter.drawRoundedRect(QRectF(car.right() - 2.0, car.top() + 9.0,
+                                       5.0, qMax(1.0, car.height() - 18.0)), 2.0, 2.0);
+        painter.setBrush(QColor(205, 68, 62));
+        painter.drawRoundedRect(car, 7.0, 7.0);
+        painter.setBrush(QColor(245, 185, 165));
+        painter.drawRoundedRect(QRectF(car.left() + car.width() * 0.18,
+                                       car.top() + car.height() * 0.16,
+                                       car.width() * 0.64, car.height() * 0.25), 3.0, 3.0);
+        painter.setBrush(QColor(255, 225, 115));
+        painter.drawRect(QRectF(car.left() + 4.0, car.bottom() - 5.0,
+                                qMax(1.0, car.width() - 8.0), 3.0));
+    }
+
+    // Player vehicle with a visible hit/recovery state.
+    const QRectF car = m_player;
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(70, 165, 245));
-    painter.drawRoundedRect(m_player, 8.0, 8.0);
-    painter.setBrush(QColor(170, 220, 250));
-    painter.drawRoundedRect(QRectF(m_player.left() + 7.0, m_player.top() + 9.0,
-                                   m_player.width() - 14.0, 20.0), 4.0, 4.0);
+    painter.setBrush(QColor(15, 18, 22));
+    painter.drawRoundedRect(QRectF(car.left() - 4.0, car.top() + 10.0,
+                                   6.0, qMax(1.0, car.height() - 20.0)), 2.0, 2.0);
+    painter.drawRoundedRect(QRectF(car.right() - 2.0, car.top() + 10.0,
+                                   6.0, qMax(1.0, car.height() - 20.0)), 2.0, 2.0);
+    painter.setBrush(m_collisionCooldown > 0.0 ? QColor(255, 190, 65) : QColor(48, 142, 230));
+    painter.drawRoundedRect(car, 8.0, 8.0);
+    painter.setBrush(QColor(155, 218, 250));
+    painter.drawRoundedRect(QRectF(car.left() + car.width() * 0.17,
+                                   car.top() + car.height() * 0.17,
+                                   car.width() * 0.66, car.height() * 0.23), 4.0, 4.0);
+    painter.setBrush(QColor(255, 242, 170));
+    painter.drawRoundedRect(QRectF(car.left() + 4.0, car.top() + 3.0,
+                                   qMax(1.0, car.width() - 8.0), 4.0), 2.0, 2.0);
+    painter.setBrush(QColor(245, 75, 65));
+    painter.drawRoundedRect(QRectF(car.left() + 4.0, car.bottom() - 7.0,
+                                   qMax(1.0, car.width() - 8.0), 4.0), 2.0, 2.0);
 
-    painter.setBrush(QColor(225, 75, 65));
-    for (const Obstacle& obstacle : m_obstacles)
-        if (!obstacle.rect.isEmpty())
-            painter.drawRoundedRect(obstacle.rect, 7.0, 7.0);
-
+    // HUD: score, distance, lives, force gauge and selected lane.
     painter.setPen(Qt::white);
-    painter.setFont(QFont(QStringLiteral("Arial"), 14, QFont::Bold));
-    painter.drawText(14, 24, QStringLiteral("Wynik: %1").arg(getScore()));
-    painter.drawText(14, 46, QStringLiteral("Dystans: %1 m").arg(qRound(m_distance / 10.0)));
-    painter.drawText(width() - 110, 24, QStringLiteral("Życia: %1").arg(m_lives));
-    painter.setFont(QFont(QStringLiteral("Arial"), 10));
-    painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik: wybór pasa | Strzałki/A-D: zmiana pasa"));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(10, height() / 34), QFont::Bold));
+    painter.drawText(12, 24, QStringLiteral("Wynik: %1").arg(getScore()));
+    painter.drawText(12, 46, QStringLiteral("Dystans: %1 m").arg(qRound(m_distance / 10.0)));
+    painter.drawText(width() - 112, 24, QStringLiteral("Życia: %1").arg(m_lives));
+
+    const double gaugeWidth = qMin(150.0, qMax(72.0, width() * 0.28));
+    const double gaugeX = qMax(10.0, width() - gaugeWidth - 12.0);
+    const double gaugeY = 38.0;
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0, 0, 0, 110));
+    painter.drawRoundedRect(QRectF(gaugeX, gaugeY, gaugeWidth, 12.0), 5.0, 5.0);
+    painter.setBrush(QColor(90, 205, 130));
+    painter.drawRoundedRect(QRectF(gaugeX, gaugeY, gaugeWidth * m_force, 12.0), 5.0, 5.0);
+    painter.setPen(Qt::white);
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(8, height() / 52)));
+    painter.drawText(QRectF(gaugeX, gaugeY + 14.0, gaugeWidth, 16.0),
+                     Qt::AlignRight, QStringLiteral("Siła %1%").arg(qRound(m_force * 100.0)));
+
+    const QString laneLabel = m_lane == 0 ? QStringLiteral("LEWY")
+                              : (m_lane == 1 ? QStringLiteral("ŚRODKOWY")
+                                             : QStringLiteral("PRAWY"));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(9, height() / 42), QFont::Bold));
+    painter.drawText(QRectF(roadLeft, height() - 35.0, roadWidth, 18.0),
+                     Qt::AlignCenter, QStringLiteral("PAS: %1").arg(laneLabel));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(8, height() / 55)));
+    painter.drawText(QRectF(4.0, height() - 17.0, width() - 8.0, 14.0),
+                     Qt::AlignCenter,
+                     QStringLiteral("Tensometr: lewo / środek / prawo   •   Klawiatura: ← → lub A / D"));
 }
 
+void CarRaceGame::paintEvent(QPaintEvent* event)
+{
+    Q_UNUSED(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    render(painter);
+
+    if (!isRunning()) {
+        const QRectF panel(width() * 0.12, height() * 0.32,
+                           width() * 0.76, height() * 0.36);
+        painter.fillRect(panel, QColor(0, 0, 0, 190));
+        painter.setPen(Qt::white);
+        painter.setFont(QFont(QStringLiteral("Arial"), qMax(14, height() / 22), QFont::Bold));
+        const bool gameOver = m_lives <= 0;
+        painter.drawText(QRectF(panel.left() + 8.0, panel.top() + 8.0,
+                                panel.width() - 16.0, panel.height() * 0.35),
+                         Qt::AlignCenter,
+                         gameOver ? QStringLiteral("KONIEC WYŚCIGU")
+                                  : QStringLiteral("CAR RACE"));
+        painter.setFont(QFont(QStringLiteral("Arial"), qMax(9, height() / 38)));
+        const QString message = gameOver
+            ? QStringLiteral("Wynik: %1\nDystans: %2 m\nUruchom ponownie, aby zagrać jeszcze raz.")
+                  .arg(getScore()).arg(qRound(m_distance / 10.0))
+            : QStringLiteral("Steruj naciskiem: lewy, środkowy lub prawy pas.\nPrzeszkody omijaj, zmieniając pas.\nWynik rośnie za każdą ominiętą przeszkodę.");
+        painter.drawText(QRectF(panel.left() + 10.0, panel.top() + panel.height() * 0.38,
+                                panel.width() - 20.0, panel.height() * 0.56),
+                         Qt::AlignCenter, message);
+    }
+}
 } // namespace games
