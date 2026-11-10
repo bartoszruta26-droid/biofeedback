@@ -38,6 +38,8 @@ struct MeasurementInput {
 
 struct MeasurementSample {
     std::uint64_t sequence{0};
+    // Host monotonic timestamp captured at engine ingress; never persisted as wall-clock time.
+    std::uint64_t ingestMonotonicNs{0};
     std::int64_t timestampUnixMs{0};
     std::uint32_t deviceTimestampMs{0};
     std::int32_t rawValue{0};
