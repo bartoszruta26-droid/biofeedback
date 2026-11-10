@@ -133,6 +133,49 @@ int main(int argc, char **argv)
     waitForEvents(80);
     REQUIRE(flappyGame->isRunning());
     flappyGame->stop();
+
+    // Sensor input is edge-triggered, rejects invalid samples and applies one
+    // impulse per press/release cycle rather than continuously overriding gravity.
+    std::unique_ptr<games::GameEngine> flappySensor(games::createGame(QStringLiteral("flappy")));
+    auto* flappySensorGame = dynamic_cast<games::FlappyBirdGame*>(flappySensor.get());
+    REQUIRE(flappySensorGame != nullptr);
+    flappySensorGame->resize(640, 480);
+    flappySensorGame->start();
+    flappySensorGame->handleSensorInput(80.0);
+    flappySensorGame->update(1.0 / 60.0);
+    REQUIRE(flappySensorGame->birdVerticalVelocity() < 0.0);
+    const double firstFlapVelocity = flappySensorGame->birdVerticalVelocity();
+    flappySensorGame->handleSensorInput(95.0); // Held force must not retrigger.
+    flappySensorGame->update(1.0 / 60.0);
+    REQUIRE(flappySensorGame->birdVerticalVelocity() > firstFlapVelocity);
+    flappySensorGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    flappySensorGame->handleSensorInput(std::numeric_limits<double>::infinity());
+    REQUIRE(flappySensorGame->isRunning());
+    flappySensorGame->handleSensorInput(0.0); // Release rearms the next flap.
+    flappySensorGame->handleSensorInput(80.0);
+    flappySensorGame->update(1.0 / 60.0);
+    REQUIRE(flappySensorGame->birdVerticalVelocity() < 0.0);
+    flappySensorGame->stop();
+
+    // Keyboard and mouse provide usable alternatives when no sensor is attached.
+    std::unique_ptr<games::GameEngine> flappyManual(games::createGame(QStringLiteral("flappy")));
+    auto* flappyManualGame = dynamic_cast<games::FlappyBirdGame*>(flappyManual.get());
+    REQUIRE(flappyManualGame != nullptr);
+    flappyManualGame->resize(640, 480);
+    flappyManualGame->start();
+    QKeyEvent flappySpace(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(flappyManualGame, &flappySpace);
+    flappyManualGame->update(1.0 / 60.0);
+    REQUIRE(flappyManualGame->birdVerticalVelocity() < 0.0);
+    flappyManualGame->update(0.25); // A held key is not a continuous lift.
+    REQUIRE(flappyManualGame->birdVerticalVelocity() > -350.0);
+    QMouseEvent flappyClick(QEvent::MouseButtonPress, QPointF(100.0, 100.0),
+                            Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(flappyManualGame, &flappyClick);
+    flappyManualGame->update(1.0 / 60.0);
+    REQUIRE(flappyManualGame->birdVerticalVelocity() < 0.0);
+    flappyManualGame->stop();
+
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
 
