@@ -142,10 +142,53 @@ int main(int argc, char **argv)
     pongGame->resize(640, 480);
     pongGame->start();
     pongGame->update(std::numeric_limits<double>::max());
-    REQUIRE(pongGame->isRunning()); // Huge finite deltas are bounded before substep conversion.
+    REQUIRE(pongGame->isRunning());
     pongGame->update(std::numeric_limits<double>::quiet_NaN());
     pongGame->update(std::numeric_limits<double>::infinity());
-    REQUIRE(pongGame->isRunning()); // Invalid deltas are ignored.
+    REQUIRE(pongGame->isRunning());
+
+    // Sensor force is clamped and smoothed before moving the player's paddle.
+    pongGame->handleSensorInput(100.0);
+    REQUIRE(pongGame->hasFreshSensorInput());
+    pongGame->update(0.1);
+    REQUIRE(pongGame->currentForcePercent() > 50.0);
+    const double topPosition = pongGame->playerPaddleY();
+    pongGame->handleSensorInput(0.0);
+    pongGame->update(0.1);
+    REQUIRE(pongGame->currentForcePercent() < 100.0);
+    REQUIRE(pongGame->playerPaddleY() > topPosition);
+
+    // Keep the input stream alive while the serve delay expires.
+    for (int sample = 0; sample < 8; ++sample) {
+        pongGame->handleSensorInput(50.0);
+        waitForEvents(100);
+    }
+    const QPointF movingBall = pongGame->ballPosition();
+    REQUIRE(std::abs(movingBall.x() - pongGame->width() / 2.0) > 1.0);
+
+    // Missing samples freeze the rally; they cannot cause a phantom point.
+    waitForEvents(400);
+    REQUIRE(!pongGame->hasFreshSensorInput());
+    const QPointF frozenBall = pongGame->ballPosition();
+    const int playerScoreBeforeStale = pongGame->playerMatchScore();
+    const int aiScoreBeforeStale = pongGame->aiMatchScore();
+    pongGame->update(0.05);
+    REQUIRE(std::abs(pongGame->ballPosition().x() - frozenBall.x()) < 1e-6);
+    REQUIRE(std::abs(pongGame->ballPosition().y() - frozenBall.y()) < 1e-6);
+    REQUIRE(pongGame->playerMatchScore() == playerScoreBeforeStale);
+    REQUIRE(pongGame->aiMatchScore() == aiScoreBeforeStale);
+
+    // A compact resize and a return to the normal size preserve valid geometry.
+    pongGame->handleSensorInput(50.0);
+    pongGame->resize(180, 120);
+    waitForEvents(40);
+    REQUIRE(pongGame->playerPaddleY() >= 0.0);
+    REQUIRE(pongGame->playerPaddleY() + 36.0 <= pongGame->height() + 1.0);
+    pongGame->resize(640, 480);
+    waitForEvents(40);
+    REQUIRE(pongGame->playerPaddleY() >= 0.0);
+    REQUIRE(std::isfinite(pongGame->ballPosition().x()));
+    REQUIRE(std::isfinite(pongGame->ballPosition().y()));
     pongGame->stop();
 
     std::unique_ptr<games::GameEngine> galaga(games::createGame(QStringLiteral("galaga")));
