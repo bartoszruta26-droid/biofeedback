@@ -984,45 +984,53 @@ void MeasurementTab::setupUI()
 
     // Sekcja kontrolna w prawej, wąskiej kolumnie.
     m_controlLayout = new QVBoxLayout();
-    m_controlLayout->setSpacing(4);
+    m_controlLayout->setSpacing(3);
+    m_controlLayout->setContentsMargins(2, 2, 2, 2);
     
-    m_btnStartStop = new QPushButton("START POMIARU", this);
-    m_btnStartStop->setMinimumHeight(45);
+    m_btnStartStop = new QPushButton("START", this);
+    m_btnStartStop->setMinimumHeight(34);
+    m_btnStartStop->setToolTip(tr("Rozpocznij lub zatrzymaj rejestrację pomiaru"));
     m_btnStartStop->setFont(QFont("Arial", 7, QFont::Bold));
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     connect(m_btnStartStop, &QPushButton::clicked, this, &MeasurementTab::onToggleMeasurement);
     
-    m_btnReadManual = new QPushButton("WCZYTAJ POJEDYNCZO", this);
-    m_btnReadManual->setMinimumHeight(35);
+    m_btnReadManual = new QPushButton("ODCZYT", this);
+    m_btnReadManual->setMinimumHeight(30);
+    m_btnReadManual->setToolTip(tr("Wczytaj jedną próbkę z czujnika"));
     m_btnReadManual->setFont(QFont("Arial", 7));
     connect(m_btnReadManual, &QPushButton::clicked, this, &MeasurementTab::onReadSingleSample);
     
     m_btnSave = new QPushButton("ZAPISZ CSV", this);
-    m_btnSave->setMinimumHeight(35);
+    m_btnSave->setMinimumHeight(30);
+    m_btnSave->setToolTip(tr("Zapisz dane pomiarowe do pliku CSV"));
     m_btnSave->setFont(QFont("Arial", 7));
     connect(m_btnSave, &QPushButton::clicked, this, &MeasurementTab::onSaveData);
     
     m_btnLoad = new QPushButton("WCZYTAJ CSV", this);
-    m_btnLoad->setMinimumHeight(35);
+    m_btnLoad->setMinimumHeight(30);
+    m_btnLoad->setToolTip(tr("Wczytaj dane pomiarowe z pliku CSV"));
     m_btnLoad->setFont(QFont("Arial", 7));
     connect(m_btnLoad, &QPushButton::clicked, this, &MeasurementTab::onLoadData);
     
-    m_btnSaveJSON = new QPushButton("ZAPISZ POMIAR JSON", this);
-    m_btnSaveJSON->setMinimumHeight(35);
+    m_btnSaveJSON = new QPushButton("ZAPISZ JSON", this);
+    m_btnSaveJSON->setMinimumHeight(30);
+    m_btnSaveJSON->setToolTip(tr("Zapisz kompletną sesję pomiarową w formacie JSON"));
     m_btnSaveJSON->setFont(QFont("Arial", 7));
     connect(m_btnSaveJSON, &QPushButton::clicked, this, &MeasurementTab::onSaveMeasurementJSON);
     
-    m_btnLoadJSON = new QPushButton("OTWÓRZ POMIAR JSON", this);
-    m_btnLoadJSON->setMinimumHeight(35);
+    m_btnLoadJSON = new QPushButton("WCZYTAJ JSON", this);
+    m_btnLoadJSON->setMinimumHeight(30);
+    m_btnLoadJSON->setToolTip(tr("Wczytaj kompletną sesję pomiarową z formatu JSON"));
     m_btnLoadJSON->setFont(QFont("Arial", 7));
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
     // Przełącznik RAW jest dostępny przed pierwszą próbką; tryb jest blokowany, aby nie mieszać jednostek w jednej sesji.
-    m_btnToggleRaw = new QPushButton("TRYB: WARTOŚCI RAW", this);
+    m_btnToggleRaw = new QPushButton("RAW / SI", this);
     m_btnToggleRaw->setCheckable(true);
     m_btnToggleRaw->setChecked(true); // Domyślnie rejestruj i pokazuj surowe próbki
     m_btnToggleRaw->setEnabled(true);  // Tryb diagnostyczny RAW dostępny poza pomiarem
-    m_btnToggleRaw->setMinimumHeight(35);
+    m_btnToggleRaw->setMinimumHeight(30);
+    m_btnToggleRaw->setToolTip(tr("Przełącz wyświetlanie surowych wartości ADC i jednostek skalibrowanych"));
     m_btnToggleRaw->setFont(QFont("Arial", 7));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
         if (checked) {
@@ -1037,7 +1045,8 @@ void MeasurementTab::setupUI()
     m_btnToggleRaw->setStyleSheet("background-color: #FF9800; color: white;");
     
     m_btnReset = new QPushButton("RESET SESJI", this);
-    m_btnReset->setMinimumHeight(35);
+    m_btnReset->setMinimumHeight(30);
+    m_btnReset->setToolTip(tr("Wyczyść bieżącą sesję pomiarową"));
     m_btnReset->setFont(QFont("Arial", 7));
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
@@ -1047,7 +1056,8 @@ void MeasurementTab::setupUI()
     m_unitSelector->addItem("Newtony (N)", static_cast<int>(ForceUnit::Newtons));
     m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
     m_unitSelector->setCurrentIndex(0);  // Domyślnie RAW; bez kalibracji
-    m_unitSelector->setMinimumHeight(35);
+    m_unitSelector->setMinimumHeight(30);
+    m_unitSelector->setToolTip(tr("Wybierz jednostkę prezentacji siły"));
     m_unitSelector->setFont(QFont("Arial", 7));
     connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
             this, [this](int index) {
@@ -1055,9 +1065,10 @@ void MeasurementTab::setupUI()
         setCurrentUnit(static_cast<ForceUnit>(unitValue));
     });
     
-    m_chkShowTrends = new QCheckBox("POKAŻ TRENDY DŁUGOTERMINOWE", this);
+    m_chkShowTrends = new QCheckBox("TRENDY", this);
     m_chkShowTrends->setFont(QFont("Arial", 7, QFont::Bold));
-    m_chkShowTrends->setMinimumHeight(35);
+    m_chkShowTrends->setMinimumHeight(30);
+    m_chkShowTrends->setToolTip(tr("Pokaż lub ukryj wykresy trendów długoterminowych"));
     connect(m_chkShowTrends, &QCheckBox::toggled, this, &MeasurementTab::onShowTrends);
     
     m_controlLayout->addWidget(m_btnStartStop);
@@ -1396,7 +1407,7 @@ void MeasurementTab::startMeasurement()
         m_btnToggleRaw->setStyleSheet("background-color: #808080; color: #C0C0C0;");  // Szary kolor
     }
     
-    m_btnStartStop->setText("STOP POMIARU");
+    m_btnStartStop->setText("STOP");
     m_btnStartStop->setStyleSheet("background-color: #f44336; color: white;");
     m_lblStatus->setText("Status: REJESTRACJA...");
     m_lblStatus->setStyleSheet("color: red; font-weight: bold;");
@@ -1462,7 +1473,7 @@ void MeasurementTab::stopMeasurement()
         }
     }
     
-    m_btnStartStop->setText("START POMIARU");
+    m_btnStartStop->setText("START");
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     m_lblStatus->setText("Status: ZATRZYMANO");
     m_lblStatus->setStyleSheet("color: orange; font-weight: bold;");
@@ -2629,7 +2640,7 @@ void MeasurementTab::showCurrentMeasurementData()
         m_btnToggleRaw->setChecked(m_showRawValues);
         m_btnToggleRaw->setEnabled(false);
         m_btnToggleRaw->setText(m_showRawValues
-            ? tr("TRYB: WARTOŚCI RAW")
+            ? tr("RAW / SI")
             : tr("TRYB: WARTOŚCI SKALIBROWANE"));
         m_btnToggleRaw->setStyleSheet(m_showRawValues
             ? "background-color: #FF9800; color: white;"
