@@ -404,7 +404,7 @@ bool MarioGame::handleInput(double value)
 
     if (wasPressed && !m_sensorPressed && m_player.isCharging && m_player.isOnGround) {
         const double chargeRatio = qBound(0.0, m_player.chargeLevel, 1.0);
-        const double jumpForce = JUMP_FORCE * (0.3 + 0.7 * chargeRatio);
+        const double jumpForce = JUMP_FORCE * (0.43 + 0.57 * chargeRatio);
         m_player.velocityY = -jumpForce;
         m_player.isJumping = true;
         m_player.isOnGround = false;
