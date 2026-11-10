@@ -295,7 +295,8 @@ void PatientTab::openIcfAssessmentHistoryDialog()
             const int qualifier = response.contains(QStringLiteral("qualifier"))
                 ? response.value(QStringLiteral("qualifier")).toInt(-99)
                 : response.value(QStringLiteral("performance")).toInt(-99);
-            if (qualifier != -99) ++assessed;
+            const int capacity = response.value(QStringLiteral("capacity")).toInt(-99);
+            if (qualifier != -99 || capacity != -99) ++assessed;
         }
         table->setItem(row, 0, new QTableWidgetItem(
             date.isValid() ? date.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm")) : tr("Brak daty")));
