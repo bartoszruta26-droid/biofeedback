@@ -1646,7 +1646,14 @@ void OutlineTab::refreshRehabilitationSession()
     const QJsonArray sessions = m_resourceRepository->list(
         QStringLiteral("rehabilitation-sessions"), &error);
     if (!error.isEmpty()) {
-        m_rehabilitationSessionStatusLabel->setText(tr("Nie udało się odczytać sesji rehabilitacyjnych."));
+        m_startRehabilitationSessionButton->setEnabled(false);
+        m_finishRehabilitationSessionButton->setEnabled(false);
+        m_saveRehabilitation24hButton->setEnabled(false);
+        m_sessionPainBeforeEdit->setEnabled(false);
+        m_sessionPainAfterEdit->setEnabled(false);
+        m_sessionPain24hEdit->setEnabled(false);
+        m_rehabilitationSessionStatusLabel->setText(
+            tr("Nie udało się odczytać sesji rehabilitacyjnych. Operacje sesji zostały zablokowane."));
         return;
     }
     QJsonObject current;
