@@ -255,7 +255,8 @@ int main(int argc, char** argv) {
                             decision.value(QStringLiteral("id")).toString(), 1, &error));
     assert(restarted.remove(QStringLiteral("rehabilitation-observations"),
                             observation.value(QStringLiteral("id")).toString(), 1, &error));
-    assert(restarted.remove(QStringLiteral("rehabilitation-sessions"), rehabSessionId, 1, &error));
+    assert(restarted.remove(QStringLiteral("rehabilitation-sessions"), rehabSessionId,
+                            completedRehabSession.value(QStringLiteral("version")).toInt(), &error));
     assert(restarted.remove(QStringLiteral("rehabilitation-goals"),
                             goal.value(QStringLiteral("id")).toString(), 1, &error));
     assert(restarted.remove(QStringLiteral("rehabilitation-assessments"),
