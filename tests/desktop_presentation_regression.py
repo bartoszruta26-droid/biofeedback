@@ -13,6 +13,13 @@ patient = read("src/tab/PatientTab.cpp")
 outline = read("src/tab/OutlineTab.cpp")
 debug = read("src/tab/DebugTab.cpp")
 graph = read("src/gui/GraphWidget.cpp")
+games = [read(path) for path in (
+    "src/games/PongGame.cpp",
+    "src/games/FlappyBirdGame.cpp",
+    "src/games/SinGame.cpp",
+    "src/games/MarioGame.cpp",
+    "src/games/GameEngine.cpp",
+)]
 measurement_header = read("include/tab/MeasurementTab.hpp")
 
 assert "if (!sample.isValid() || sample.unit != \"N\"" in main
@@ -76,6 +83,13 @@ assert 'QFont("Sans Serif", 12' not in outline
 assert 'QFont("Sans Serif", 14' not in outline
 assert 'QFont("Courier New", 9' not in debug
 assert "titleFont.setPointSize(12);" not in graph
+# Full-screen game HUD typography is compacted as well; only the title/score
+# hierarchy remains moderately larger than ordinary controls.
+for source in games:
+    assert 'QFont("Arial", 36' not in source
+    assert 'QFont("Arial", 24' not in source
+    assert 'QFont("Arial", 16' not in source
+
 assert "m_visualLayout->addWidget(m_liveBox, 3);" in measurement
 assert "m_visualLayout->addWidget(m_statsBox);" in measurement
 assert "m_visualLayout->addWidget(m_biomechBox);" in measurement
