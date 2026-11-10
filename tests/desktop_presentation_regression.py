@@ -115,6 +115,13 @@ assert "m_forceGraph->addDataPoint(value, timestamp)" in outline
 assert "m_measurementEngine->subscribe" in outline
 assert "sample.unit != \"N\"" in outline
 assert "m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());" in main
+# The rehabilitation workspace receives the repository UUID, not the PESEL
+# or the legacy per-patient filesystem path.
+assert "setCurrentPatientContext(const QString& patientUuid" in read("include/tab/OutlineTab.hpp")
+assert "m_currentPatientUuid = patientUuid.trimmed();" in outline
+assert "patient.value(QStringLiteral(\"id\")).toString()" in main
+assert "m_outlineTab->setCurrentPatientContext(" in main
+assert "rehabilitationPatientContext" in outline
 assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
 import json
