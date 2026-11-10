@@ -133,7 +133,7 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     // Sekcja 1: Ćwiczenie
     QRect exerciseRect(margin, margin, sectionWidth - margin, height() - 2 * margin);
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 10, QFont::Bold));
+    painter.setFont(QFont("Arial", 7, QFont::Bold));
     painter.drawText(exerciseRect, Qt::AlignTop | Qt::AlignHCenter,
                     progressLabel(QStringLiteral("Ćwiczenie"), m_currentExercise, m_totalExercises));
 
@@ -218,7 +218,7 @@ void TrainingProgressWidget::paintEvent(QPaintEvent *event)
     
     // Tekst na pasku
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 9, QFont::Bold));
+    painter.setFont(QFont("Arial", 7, QFont::Bold));
     painter.drawText(margin, barY, barWidth, barHeight, Qt::AlignCenter,
                     QString("%1 N").arg(m_currentForce, 0, 'f', 1));
 }
@@ -327,7 +327,7 @@ void TrainingTab::setupUI()
     visualScroll->setFrameShape(QFrame::NoFrame);
     auto* visualPanel = new QWidget(visualScroll);
     auto* visualLayout = new QVBoxLayout(visualPanel);
-    visualLayout->setSpacing(8);
+    visualLayout->setSpacing(5);
     visualLayout->setContentsMargins(4, 4, 4, 4);
 
     auto* optionsScroll = new QScrollArea(workspaceSplitter);
@@ -336,8 +336,8 @@ void TrainingTab::setupUI()
     optionsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto* optionsPanel = new QWidget(optionsScroll);
     auto* optionsLayout = new QVBoxLayout(optionsPanel);
-    optionsLayout->setSpacing(8);
-    optionsLayout->setContentsMargins(8, 8, 8, 8);
+    optionsLayout->setSpacing(4);
+    optionsLayout->setContentsMargins(3, 3, 3, 3);
     auto* optionsHeading = new QLabel(tr("KONFIGURACJA TRENINGU"), optionsPanel);
     optionsHeading->setStyleSheet("font-weight:700;color:#40516a;");
     optionsLayout->addWidget(optionsHeading);
@@ -346,15 +346,15 @@ void TrainingTab::setupUI()
     optionsScroll->setWidget(optionsPanel);
     workspaceSplitter->addWidget(visualScroll);
     workspaceSplitter->addWidget(optionsScroll);
-    workspaceSplitter->setStretchFactor(0, 3);
-    workspaceSplitter->setStretchFactor(1, 1);
-    workspaceSplitter->setSizes({900, 300});
-    // Keep manual sidebar resizing available while enforcing a 25% maximum.
-    // QSplitter preserves the relative sizes as the window changes resolution.
+    workspaceSplitter->setStretchFactor(0, 89);
+    workspaceSplitter->setStretchFactor(1, 11);
+    workspaceSplitter->setSizes({89, 11});
+    // The right-hand options sidebar is capped at 11% of the workspace.
+    // It remains user-resizable toward a narrower width on large displays.
     connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
             [workspaceSplitter](int position, int) {
         const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
-        const int maxVisualWidth = availableWidth * 3 / 4;
+        const int maxVisualWidth = availableWidth * 89 / 100;
         if (position < maxVisualWidth) {
             workspaceSplitter->setSizes({maxVisualWidth, availableWidth - maxVisualWidth});
         }
@@ -363,14 +363,15 @@ void TrainingTab::setupUI()
 
     // Panel konfiguracji w prawej kolumnie.
     m_configBox = new QGroupBox("Konfiguracja ćwiczenia", optionsPanel);
-    m_configBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_configBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* configLayout = new QVBoxLayout(m_configBox);
-    configLayout->setSpacing(10);
+    configLayout->setSpacing(4);
     
     m_exerciseSelector = new QComboBox(this);
-    m_exerciseSelector->setMinimumWidth(200);
+    m_exerciseSelector->setMinimumWidth(0);
+    m_exerciseSelector->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     m_exerciseSelector->setMinimumHeight(35);
-    m_exerciseSelector->setFont(QFont("Arial", 10));
+    m_exerciseSelector->setFont(QFont("Arial", 7));
     configLayout->addWidget(new QLabel("Ćwiczenie:", this));
     configLayout->addWidget(m_exerciseSelector);
     
@@ -380,7 +381,7 @@ void TrainingTab::setupUI()
     m_targetForceSpin->setValue(50.0);
     m_targetForceSpin->setDecimals(1);
     m_targetForceSpin->setMinimumHeight(35);
-    m_targetForceSpin->setFont(QFont("Arial", 10));
+    m_targetForceSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_targetForceSpin);
     
     configLayout->addWidget(new QLabel("Serie:", this));
@@ -388,7 +389,7 @@ void TrainingTab::setupUI()
     m_seriesSpin->setRange(1, 20);
     m_seriesSpin->setValue(3);
     m_seriesSpin->setMinimumHeight(35);
-    m_seriesSpin->setFont(QFont("Arial", 10));
+    m_seriesSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_seriesSpin);
     
     configLayout->addWidget(new QLabel("Powtórzenia:", this));
@@ -396,7 +397,7 @@ void TrainingTab::setupUI()
     m_repsSpin->setRange(1, 50);
     m_repsSpin->setValue(8);
     m_repsSpin->setMinimumHeight(35);
-    m_repsSpin->setFont(QFont("Arial", 10));
+    m_repsSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_repsSpin);
     
     configLayout->addWidget(new QLabel("Odpoczynek [s]:", this));
@@ -404,7 +405,7 @@ void TrainingTab::setupUI()
     m_restTimeSpin->setRange(0, 300);
     m_restTimeSpin->setValue(60);
     m_restTimeSpin->setMinimumHeight(35);
-    m_restTimeSpin->setFont(QFont("Arial", 10));
+    m_restTimeSpin->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_restTimeSpin);
     
     configLayout->addWidget(new QLabel("Gra:", this));
@@ -420,19 +421,19 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Scorched Earth", "scorched_earth");
     m_gameTypeCombo->addItem("Car Race", "car_race");
     m_gameTypeCombo->setMinimumHeight(35);
-    m_gameTypeCombo->setFont(QFont("Arial", 10));
+    m_gameTypeCombo->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_gameTypeCombo);
     
     m_btnAddExercise = new QPushButton("Dodaj", this);
     m_btnAddExercise->setMaximumWidth(80);
     m_btnAddExercise->setMinimumHeight(35);
-    m_btnAddExercise->setFont(QFont("Arial", 10, QFont::Bold));
+    m_btnAddExercise->setFont(QFont("Arial", 7, QFont::Bold));
     configLayout->addWidget(m_btnAddExercise);
     
     m_btnRemoveExercise = new QPushButton("Usuń", this);
     m_btnRemoveExercise->setMaximumWidth(80);
     m_btnRemoveExercise->setMinimumHeight(35);
-    m_btnRemoveExercise->setFont(QFont("Arial", 10));
+    m_btnRemoveExercise->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_btnRemoveExercise);
     
     optionsLayout->addWidget(m_configBox);
@@ -443,28 +444,28 @@ void TrainingTab::setupUI()
     
     m_btnStartStop = new QPushButton("Start", this);
     m_btnStartStop->setMinimumHeight(45);
-    m_btnStartStop->setFont(QFont("Arial", 12, QFont::Bold));
+    m_btnStartStop->setFont(QFont("Arial", 8, QFont::Bold));
     m_controlLayout->addWidget(m_btnStartStop);
     
     m_btnPauseResume = new QPushButton("Pauza", this);
     m_btnPauseResume->setMinimumHeight(40);
-    m_btnPauseResume->setFont(QFont("Arial", 12));
+    m_btnPauseResume->setFont(QFont("Arial", 8));
     m_btnPauseResume->setEnabled(false);
     m_controlLayout->addWidget(m_btnPauseResume);
     
     m_btnSave = new QPushButton("Zapisz wyniki", this);
     m_btnSave->setMinimumHeight(35);
-    m_btnSave->setFont(QFont("Arial", 10));
+    m_btnSave->setFont(QFont("Arial", 7));
     m_controlLayout->addWidget(m_btnSave);
     
     m_btnLoad = new QPushButton("Wczytaj plan", this);
     m_btnLoad->setMinimumHeight(35);
-    m_btnLoad->setFont(QFont("Arial", 10));
+    m_btnLoad->setFont(QFont("Arial", 7));
     m_controlLayout->addWidget(m_btnLoad);
     
     m_btnExport = new QPushButton("Eksportuj plan", this);
     m_btnExport->setMinimumHeight(35);
-    m_btnExport->setFont(QFont("Arial", 10));
+    m_btnExport->setFont(QFont("Arial", 7));
     m_controlLayout->addWidget(m_btnExport);
     
     visualLayout->addLayout(m_controlLayout);
@@ -488,7 +489,7 @@ void TrainingTab::setupUI()
     infoLayout->addWidget(m_lblCurrentRep);
     
     m_lblTimer = new QLabel("Czas: 00:00", this);
-    m_lblTimer->setFont(QFont("Arial", 14, QFont::Bold));
+    m_lblTimer->setFont(QFont("Arial", 9, QFont::Bold));
     infoLayout->addWidget(m_lblTimer);
     
     progressLayout->addLayout(infoLayout);
@@ -497,7 +498,7 @@ void TrainingTab::setupUI()
     forceLayout->addWidget(new QLabel("Aktualna siła:", this));
     
     m_lblCurrentForce = new QLabel("0.0 N", this);
-    m_lblCurrentForce->setFont(QFont("Arial", 12, QFont::Bold));
+    m_lblCurrentForce->setFont(QFont("Arial", 8, QFont::Bold));
     forceLayout->addWidget(m_lblCurrentForce);
     
     forceLayout->addWidget(new QLabel("Cel:", this));
@@ -511,7 +512,7 @@ void TrainingTab::setupUI()
     forceLayout->addWidget(m_forceBar);
     
     m_lblRestTimer = new QLabel("", this);
-    m_lblRestTimer->setFont(QFont("Arial", 12, QFont::Bold));
+    m_lblRestTimer->setFont(QFont("Arial", 8, QFont::Bold));
     m_lblRestTimer->setStyleSheet("color: yellow;");
     forceLayout->addWidget(m_lblRestTimer);
     
