@@ -191,7 +191,6 @@ void SinGame::updateAutomaticDifficulty(double deltaTime)
         setDifficultyLevel(m_difficultyLevel - 1);
     m_accuracyWindowSeconds = 0.0;
     m_accuracyWindowHitSeconds = 0.0;
-    m_difficultyCheckSeconds = 0.0;
 }
 
 void SinGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
