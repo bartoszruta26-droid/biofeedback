@@ -88,6 +88,30 @@ int main() {
     assert(detector.process(0x00000130u, 4.0, true, rep));
     assert(rep.durationMs == 320);
 
+    // At 80 SPS, a complete short tubing repetition spans at least 10
+    // acquired samples. Verify repeated contractions are segmented exactly once.
+    RepetitionDetector fastDetector({50.0, 0.20, 0.10, 2.0, 120, 30000, 100});
+    std::vector<RepetitionRecord> fastRepetitions;
+    std::uint32_t fastTimestamp = 0;
+    const double contraction[] = {0.0, 12.0, 20.0, 30.0, 40.0, 50.0,
+                                  50.0, 40.0, 30.0, 20.0, 10.0, 4.0};
+    for (int repetitionIndex = 0; repetitionIndex < 3; ++repetitionIndex) {
+        for (double force : contraction) {
+            if (fastDetector.process(fastTimestamp, force, true, rep))
+                fastRepetitions.push_back(rep);
+            fastTimestamp += 12; // 12.5 ms nominal period, integer device clock
+        }
+        // A confirmed low baseline rearms the detector between repetitions.
+        assert(!fastDetector.process(fastTimestamp, 0.0, true, rep));
+        fastTimestamp += 12;
+    }
+    assert(fastRepetitions.size() == 3);
+    for (const auto& fastRep : fastRepetitions) {
+        assert(fastRep.durationMs >= 120);
+        assert(fastRep.peakForceN == 50.0);
+    }
+    assert(summarizeSeries(fastRepetitions, 50.0).repetitionCount == 3);
+
     std::vector<RepetitionRecord> series{
         {0, 400, 400, 200, 40.0, 20.0, 5, {}},
         {500, 900, 400, 180, 50.0, 22.0, 5, {}},
