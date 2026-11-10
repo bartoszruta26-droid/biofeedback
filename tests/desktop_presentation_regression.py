@@ -39,6 +39,10 @@ assert 'icf_assessment_history' in application
 assert 'patient.value(QStringLiteral("icf_assessment_history")).toArray()' in application
 assert 'm_patientTab->setPatientIcfAssessment(pesel, assessment, assessmentHistory)' in application
 assert 'capacity != -99' in patient
+assert 'structureExtent' in patient and 'structureNature' in patient and 'structureLocation' in patient
+assert 'QStringLiteral("extent")' in patient and 'QStringLiteral("nature")' in patient and 'QStringLiteral("location")' in patient
+assert 'extent != -99' in patient
+
 
 
 outline = read("src/tab/OutlineTab.cpp")
