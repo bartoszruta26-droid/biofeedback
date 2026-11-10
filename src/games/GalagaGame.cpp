@@ -330,7 +330,7 @@ void GalagaGame::render(QPainter& painter)
 
     painter.setBrush(QColor(90, 115, 160, 130));
     for (int i = 0; i < 28; ++i) {
-        const double x = (i * 97.0 + 31.0) % qMax(1, width());
+        const double x = std::fmod(i * 97.0 + 31.0, qMax(1, width()));
         const double y = std::fmod(i * 53.0 + m_backgroundOffset * (1 + i % 3), qMax(1, height()));
         painter.drawEllipse(QPointF(x, y), i % 5 == 0 ? 1.5 : 0.8, i % 5 == 0 ? 1.5 : 0.8);
     }
