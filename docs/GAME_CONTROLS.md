@@ -45,7 +45,7 @@
 **Cel:** odbijaj piłkę paletką, rozbijaj kolejne układy klocków i buduj serie trafień.
 
 - **Tensometr/HX711:** steruje poziomym położeniem paletki w zakresie 0–100%, od lewej do prawej. Po zwolnieniu klawiszy sterowanie automatycznie wraca do czujnika.
-- **Klawiatura:** `A` lub `←` — ruch w lewo; `D` lub `→` — ruch w prawo. Przytrzymanie klawisza zapewnia płynny ruch. Jednoczesne przytrzymanie obu kierunków zatrzymuje ruch klawiaturowy. Klawiatura ma pierwszeństwo tylko podczas trzymania kierunku.
+- **Klawiatura:** `A` lub `←` — ruch w lewo; `D` lub `→` — ruch w prawo. Przytrzymanie klawisza zapewnia płynny ruch; systemowe zdarzenia automatycznego powtarzania klawisza nie przerywają ruchu. Jednoczesne przytrzymanie obu kierunków zatrzymuje ruch klawiaturowy. Klawiatura ma pierwszeństwo tylko podczas fizycznego przytrzymania kierunku.
 - **Odbicia:** miejsce kontaktu z paletką określa kąt. Trafienie przy krawędzi nadaje piłce większą składową poziomą, a trafienie środkiem daje bardziej pionowy lot. Prędkość nieznacznie rośnie po odbiciu, z ograniczeniem maksymalnym.
 - **Klocki:** kolejne poziomy zawierają coraz więcej rzędów. Od poziomu 3 górny rząd wymaga dwóch trafień; czerwone klocki z jasnym paskiem są wytrzymalsze.
 - **Serie trafień:** kolejne trafienia w krótkim odstępie zwiększają mnożnik punktów. Mnożnik rośnie co cztery trafienia, maksymalnie do x5. Przerwa 2,4 sekundy zeruje serię.
