@@ -83,7 +83,6 @@ private:
     double m_timeInTarget;
     double m_accuracyWindowSeconds;
     double m_accuracyWindowHitSeconds;
-    double m_bestStreakSeconds;
 
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     bool m_ownSerial;
