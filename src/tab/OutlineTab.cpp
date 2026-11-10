@@ -4,7 +4,13 @@
 #include "games/FlappyBirdGame.hpp"
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
+#include "gui/GraphWidget.hpp"
 #include <QMessageBox>
+#include <QScrollArea>
+#include <QSplitter>
+#include <QMetaObject>
+#include <QFrame>
+#include <cmath>
 #include <QFileDialog>
 #include <QTextStream>
 #include <QDateTime>
@@ -85,6 +91,10 @@ OutlineTab::~OutlineTab()
         m_serialPort->removeDataCallback(m_dataCallbackToken);
         m_dataCallbackToken = 0;
     }
+    if (m_measurementEngine && m_measurementCallbackToken) {
+        m_measurementEngine->unsubscribe(m_measurementCallbackToken);
+        m_measurementCallbackToken = 0;
+    }
     if (m_isSessionActive) {
         stopSession();
     }
@@ -93,13 +103,60 @@ OutlineTab::~OutlineTab()
 void OutlineTab::setupUI()
 {
     m_mainLayout = new QVBoxLayout(this);
-    m_mainLayout->setSpacing(15);
-    m_mainLayout->setContentsMargins(15, 15, 15, 15);
-    
+    m_mainLayout->setSpacing(6);
+    m_mainLayout->setContentsMargins(8, 8, 8, 8);
+
+    auto* workspace = new QSplitter(Qt::Horizontal, this);
+    workspace->setChildrenCollapsible(false);
+    workspace->setHandleWidth(6);
+
+    auto* visualScroll = new QScrollArea(workspace);
+    visualScroll->setWidgetResizable(true);
+    visualScroll->setFrameShape(QFrame::NoFrame);
+    auto* visualPanel = new QWidget(visualScroll);
+    m_leftLayout = new QVBoxLayout(visualPanel);
+    m_leftLayout->setContentsMargins(4, 4, 4, 4);
+    m_leftLayout->setSpacing(8);
+    visualScroll->setWidget(visualPanel);
+
+    auto* settingsScroll = new QScrollArea(workspace);
+    settingsScroll->setWidgetResizable(true);
+    settingsScroll->setFrameShape(QFrame::NoFrame);
+    settingsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    auto* settingsPanel = new QWidget(settingsScroll);
+    m_rightLayout = new QVBoxLayout(settingsPanel);
+    m_rightLayout->setContentsMargins(4, 4, 4, 4);
+    m_rightLayout->setSpacing(8);
+    settingsScroll->setWidget(settingsPanel);
+
+    workspace->addWidget(visualScroll);
+    workspace->addWidget(settingsScroll);
+    workspace->setStretchFactor(0, 72);
+    workspace->setStretchFactor(1, 28);
+    workspace->setSizes({720, 280});
+    m_mainLayout->addWidget(workspace, 1);
+
     setupOutlineSelector();
     setupExerciseView();
     setupControlPanel();
     setupGameArea();
+
+    auto* graphGroup = new QGroupBox(tr("Biofeedback — siła w czasie rzeczywistym"), visualPanel);
+    auto* graphLayout = new QVBoxLayout(graphGroup);
+    m_forceGraph = new gui::GraphWidget(graphGroup);
+    m_forceGraph->setTitle(tr("Siła z czujnika"));
+    m_forceGraph->setYLabel(tr("Siła"));
+    m_forceGraph->setUnit(tr("N"));
+    m_forceGraph->setTimeRange(30);
+    m_forceGraph->setMinimumHeight(220);
+    graphLayout->addWidget(m_forceGraph);
+    m_leftLayout->insertWidget(1, graphGroup);
+
+    m_clinicalProtocolBrowser = new QTextBrowser(visualPanel);
+    m_clinicalProtocolBrowser->setOpenExternalLinks(true);
+    m_clinicalProtocolBrowser->setMinimumHeight(150);
+    m_clinicalProtocolBrowser->setPlaceholderText(tr("Wybierz konspekt, aby zobaczyć protokół kliniczny."));
+    m_leftLayout->addWidget(m_clinicalProtocolBrowser);
 }
 
 void OutlineTab::setupOutlineSelector()
@@ -127,7 +184,7 @@ void OutlineTab::setupOutlineSelector()
     m_outlineSelectorLayout->addWidget(m_loadOutlineButton);
     
     m_outlineGroup->setLayout(m_outlineSelectorLayout);
-    m_mainLayout->addWidget(m_outlineGroup);
+    m_rightLayout->addWidget(m_outlineGroup);
     
     // Panel informacji o konspekcie
     m_outlineInfoGroup = new QGroupBox(tr("Informacje o Konspekcie"), this);
@@ -156,7 +213,7 @@ void OutlineTab::setupOutlineSelector()
     infoLayout->addLayout(metaLayout);
     
     m_outlineInfoGroup->setLayout(infoLayout);
-    m_mainLayout->addWidget(m_outlineInfoGroup);
+    m_rightLayout->addWidget(m_outlineInfoGroup);
 }
 
 void OutlineTab::setupExerciseView()
@@ -224,10 +281,11 @@ void OutlineTab::setupExerciseView()
     m_gameSelectionLayout->addWidget(m_configureGameButton);
     
     m_gameSelectionGroup->setLayout(m_gameSelectionLayout);
-    m_exerciseLayout->addWidget(m_gameSelectionGroup);
-    
+    // Gra jest ustawieniem protokołu i dlatego pozostaje w prawym panelu.
+    m_rightLayout->addWidget(m_gameSelectionGroup);
+
     m_exerciseGroup->setLayout(m_exerciseLayout);
-    m_mainLayout->addWidget(m_exerciseGroup);
+    m_leftLayout->addWidget(m_exerciseGroup);
 }
 
 void OutlineTab::setupControlPanel()
@@ -264,7 +322,7 @@ void OutlineTab::setupControlPanel()
     m_controlLayout->addStretch();
     
     m_controlGroup->setLayout(m_controlLayout);
-    m_mainLayout->addWidget(m_controlGroup);
+    m_rightLayout->addWidget(m_controlGroup);
     
     // Pasek postępu
     m_progressGroup = new QGroupBox(tr("Postęp"), this);
@@ -284,7 +342,7 @@ void OutlineTab::setupControlPanel()
     m_progressLayout->addWidget(m_currentExerciseLabel);
     
     m_progressGroup->setLayout(m_progressLayout);
-    m_mainLayout->addWidget(m_progressGroup);
+    m_leftLayout->addWidget(m_progressGroup);
 }
 
 void OutlineTab::setupGameArea()
@@ -306,7 +364,7 @@ void OutlineTab::setupGameArea()
     
     m_gameAreaLayout->addWidget(m_gameStack);
     m_gameAreaGroup->setLayout(m_gameAreaLayout);
-    m_mainLayout->addWidget(m_gameAreaGroup);
+    m_leftLayout->addWidget(m_gameAreaGroup, 1);
 }
 
 void OutlineTab::createConnections()
@@ -402,6 +460,7 @@ bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline)
     outline.author = root["author"].toString();
     outline.category = root["category"].toString();
     outline.estimatedDurationMinutes = root["estimatedDurationMinutes"].toInt(0);
+    outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();
     
     // Parsowanie ćwiczeń
     QJsonArray exercisesArray = root["exercises"].toArray();
@@ -518,6 +577,8 @@ void OutlineTab::onOutlineSelected(int index)
         // Wyczyść wyświetlanie
         m_outlineNameLabel->setText(tr("Nazwa: -"));
         m_outlineDescriptionLabel->setText(tr("Opis: -"));
+        if (m_clinicalProtocolBrowser)
+            m_clinicalProtocolBrowser->setHtml(tr("<p>Wybierz konspekt, aby wyświetlić protokół.</p>"));
         m_outlineAuthorLabel->setText(tr("Autor: -"));
         m_outlineDurationLabel->setText(tr("Czas: -"));
         m_outlineExerciseCountLabel->setText(tr("Ćwiczenia: 0"));
@@ -532,6 +593,12 @@ void OutlineTab::onOutlineSelected(int index)
     // Wyświetl informacje o konspekcie
     m_outlineNameLabel->setText(tr("Nazwa: %1").arg(m_currentOutline.name));
     m_outlineDescriptionLabel->setText(m_currentOutline.description);
+    if (m_clinicalProtocolBrowser) {
+        if (!m_currentOutline.clinicalProtocolHtml.isEmpty())
+            m_clinicalProtocolBrowser->setHtml(m_currentOutline.clinicalProtocolHtml);
+        else
+            m_clinicalProtocolBrowser->setHtml(tr("<p>Ten konspekt nie zawiera rozszerzonego protokołu klinicznego.</p>"));
+    }
     m_outlineAuthorLabel->setText(tr("Autor: %1").arg(
         m_currentOutline.author.isEmpty() ? tr("Nieznany") : m_currentOutline.author));
     m_outlineDurationLabel->setText(tr("Czas: %1 min").arg(
@@ -920,14 +987,37 @@ QVector<OutlineData> OutlineTab::getOutlines() const
 
 void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
 {
-    // MainWindow is the sole serial-to-game input owner. OutlineTab does not
-    // subscribe directly; this prevents another per-frame delivery path.
+    // MainWindow owns serial acquisition. OutlineTab consumes only the shared
+    // calibrated MeasurementEngine stream and never subscribes to raw serial data.
     if (m_serialPort && m_dataCallbackToken) {
         m_serialPort->removeDataCallback(m_dataCallbackToken);
         m_dataCallbackToken = 0;
     }
     m_serialPort = std::move(serial);
 }
+
+void OutlineTab::setMeasurementEngine(
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine)
+{
+    if (m_measurementEngine && m_measurementCallbackToken) {
+        m_measurementEngine->unsubscribe(m_measurementCallbackToken);
+        m_measurementCallbackToken = 0;
+    }
+    m_measurementEngine = std::move(engine);
+    if (!m_measurementEngine) return;
+
+    m_measurementCallbackToken = m_measurementEngine->subscribe(
+        [this](const biofeedback::measurement::MeasurementSample& sample) {
+            if (!sample.isValid() || sample.unit != "N" || !std::isfinite(sample.value))
+                return;
+            const auto timestamp = QDateTime::fromMSecsSinceEpoch(sample.timestampUnixMs);
+            QMetaObject::invokeMethod(this, [this, value = std::abs(sample.value), timestamp]() {
+                if (m_forceGraph)
+                    m_forceGraph->addDataPoint(value, timestamp);
+            }, Qt::QueuedConnection);
+        });
+}
+
 bool OutlineTab::isSerialConnected() const
 {
     return m_serialPort && m_serialPort->isConnected();
