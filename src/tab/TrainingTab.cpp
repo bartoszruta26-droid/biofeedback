@@ -1369,7 +1369,6 @@ void TrainingTab::onMeasurementSample(
     // Every real acquisition sample reaches the training display and game.
     // QWidget::update() coalesces paints; throttling by host-clock time here
     // used to discard later samples when a queued batch was drained at once.
-    const qint64 nowMs = m_sessionClock.isValid() ? m_sessionClock.elapsed() : 0;
     m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
 
     const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
