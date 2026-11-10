@@ -221,6 +221,8 @@ void FlappyBirdGame::keyPressEvent(QKeyEvent* event) {
         (event->key() == Qt::Key_Space || event->key() == Qt::Key_Up ||
          event->key() == Qt::Key_W || event->key() == Qt::Key_Return ||
          event->key() == Qt::Key_Enter)) {
+        if (!isRunning())
+            start();
         if (isRunning())
             m_flapRequested = true;
         event->accept();
@@ -231,6 +233,8 @@ void FlappyBirdGame::keyPressEvent(QKeyEvent* event) {
 
 void FlappyBirdGame::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
+        if (!isRunning())
+            start();
         if (isRunning())
             m_flapRequested = true;
         setFocus(Qt::MouseFocusReason);
@@ -532,6 +536,18 @@ void FlappyBirdGame::render(QPainter &painter) {
     painter.setBrush(QBrush(QColor(139, 90, 43)));
     painter.drawRect(0, h - 10, w, 10);
     
+    if (!isRunning() && !isPaused()) {
+        painter.fillRect(QRectF(w * 0.15, h * 0.38, w * 0.70, h * 0.22),
+                         QColor(0, 0, 0, 155));
+        painter.setPen(Qt::white);
+        painter.setFont(QFont("Arial", qMax(12, h / 24), QFont::Bold));
+        painter.drawText(QRectF(w * 0.17, h * 0.40, w * 0.66, h * 0.09),
+                         Qt::AlignCenter, "KONIEC GRY");
+        painter.setFont(QFont("Arial", qMax(9, h / 38)));
+        painter.drawText(QRectF(w * 0.17, h * 0.49, w * 0.66, h * 0.08),
+                         Qt::AlignCenter, "Spacja / kliknięcie — zagraj ponownie");
+    }
+
     // 9. Status połączenia serial
     if (m_serialPort && !m_serialPort->isConnected()) {
         painter.setPen(QPen(Qt::red, 2));
