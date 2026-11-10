@@ -737,6 +737,8 @@ void TrainingTab::stopTraining(bool completed)
     }
 
     m_repetitionDetector.reset();
+    if (m_liveUiTimer) m_liveUiTimer->stop();
+    m_pendingUiSamples = 0;
     
     // Aktualizacja UI
     m_btnStartStop->setText("Start");
