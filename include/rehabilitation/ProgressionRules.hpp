@@ -1,6 +1,6 @@
 #pragma once
 
-#include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace biofeedback::rehabilitation {
@@ -52,13 +52,16 @@ public:
                     latest.adverseEvent ? "ADVERSE_EVENT_REQUIRES_REVIEW" :
                     "POST_OPERATIVE_RESTRICTION_CONFLICT", true};
 
-        if (latest.painBefore < 0 || latest.painAfter < 0 ||
-            latest.painAt24Hours < 0 || latest.completedDoseRatio < 0.0 ||
+        if (latest.painBefore < -1 || latest.painAfter < -1 ||
+            latest.painAt24Hours < -1 || latest.painBefore > 10 ||
+            latest.painAfter > 10 || latest.painAt24Hours > 10 ||
+            !std::isfinite(latest.completedDoseRatio))
+            return {ProgressionDecision::NotEvaluable, "INVALID_SESSION_EVIDENCE", true};
+
+        if (latest.painBefore == -1 || latest.painAfter == -1 ||
+            latest.painAt24Hours == -1 || latest.completedDoseRatio < 0.0 ||
             latest.completedDoseRatio > 1.0)
             return {ProgressionDecision::NotEvaluable, "INCOMPLETE_SESSION_EVIDENCE", true};
-
-        if (latest.painBefore > 10 || latest.painAfter > 10 || latest.painAt24Hours > 10)
-            return {ProgressionDecision::NotEvaluable, "PAIN_SCORE_OUT_OF_RANGE", true};
 
         if (!latest.movementQualityAcceptable)
             return {ProgressionDecision::Hold, "MOVEMENT_QUALITY_NOT_ACCEPTABLE", true};
@@ -93,6 +96,7 @@ public:
 private:
     static bool validPolicy(const ProgressionPolicy& policy) noexcept {
         return policy.maximumPermittedPain >= 0 && policy.maximumPermittedPain <= 10 &&
+               std::isfinite(policy.minimumCompletedDoseRatio) &&
                policy.minimumCompletedDoseRatio >= 0.0 &&
                policy.minimumCompletedDoseRatio <= 1.0 &&
                policy.minimumQualifyingSessions >= 1;
