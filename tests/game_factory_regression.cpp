@@ -156,6 +156,11 @@ int main(int argc, char **argv)
         tanGame->update(tanDt);
     }
     REQUIRE(tanGame->getScore() > 0);
+    const int scoreBeforeLiveDifficultyChange = tanGame->getScore();
+    tanGame->setDifficultyLevel(2);
+    REQUIRE(tanGame->getScore() == scoreBeforeLiveDifficultyChange);
+    tanGame->setDifficultyLevel(1);
+    REQUIRE(tanGame->getScore() == scoreBeforeLiveDifficultyChange);
 
     // Once sensor samples become stale, the game must stop awarding points.
     for (int frame = 0; frame < 60; ++frame)
