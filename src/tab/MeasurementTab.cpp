@@ -1376,6 +1376,8 @@ void MeasurementTab::startMeasurement()
     }
     ensureCurrentSeriesInitialized();
     m_inContraction = false;
+    m_hasDeviceTimestampOrigin = false;
+    m_deviceTimestampOriginMs = 0;
     m_repetitionDetector.reset();
     m_currentRepForces.clear();
     m_currentRepTimes.clear();
@@ -1498,6 +1500,8 @@ void MeasurementTab::resetSession()
     m_sessionStartTime = 0;
     m_sessionElapsedTimer.invalidate();
     m_sessionElapsedOffsetSeconds = 0.0;
+    m_hasDeviceTimestampOrigin = false;
+    m_deviceTimestampOriginMs = 0;
     
     m_rawForceBuffer.clear();
     m_timeBuffer.clear();
@@ -1608,10 +1612,16 @@ void MeasurementTab::readSingleSample(double forceValue, std::uint32_t deviceTim
     if (m_sessionStartTime <= 0.0 || !m_sessionElapsedTimer.isValid())
         ensureSessionClockStarted();
 
-    // Elapsed time must be monotonic even when the system wall clock is
-    // corrected while a measurement is running.
+    // Plot and archive against the sensor's acquisition clock, not GUI
+    // callback arrival time. A queued GUI batch may contain many old samples;
+    // using the host clock here would compress them into a visible step.
+    if (!m_hasDeviceTimestampOrigin) {
+        m_deviceTimestampOriginMs = deviceTimestampMs;
+        m_hasDeviceTimestampOrigin = true;
+    }
+    const std::uint32_t deviceElapsedMs = deviceTimestampMs - m_deviceTimestampOriginMs;
     const double currentTime = m_sessionElapsedOffsetSeconds +
-                               m_sessionElapsedTimer.elapsed() / 1000.0;
+                               static_cast<double>(deviceElapsedMs) / 1000.0;
 
     m_rawForceBuffer.append(forceValue);
     m_timeBuffer.append(currentTime);
