@@ -243,7 +243,7 @@ void SinGame::onConnectionStatusChanged(bool connected, const std::string& messa
 
 void SinGame::normalizeForceValue(double rawValue)
 {
-    if (!std::isfinite(rawValue) || !std::isfinite(m_maxForce) || m_maxForce <= 0.0)
+    if (!std::isfinite(rawValue))
         return;
 
     const double span = m_calibrationMaximum - m_calibrationMinimum;
