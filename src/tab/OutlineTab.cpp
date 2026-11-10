@@ -106,21 +106,21 @@ void OutlineTab::setupOutlineSelector()
 {
     // Sekcja wyboru konspektu
     m_outlineGroup = new QGroupBox(tr("Wybór Konspektu"), this);
-    m_outlineGroup->setFont(QFont("Arial", 11, QFont::Bold));
+    m_outlineGroup->setFont(QFont("Arial", 8, QFont::Bold));
     m_outlineSelectorLayout = new QHBoxLayout();
     
     m_outlineLabel = new QLabel(tr("Konspekt:"), this);
-    m_outlineLabel->setFont(QFont("Arial", 10, QFont::Bold));
+    m_outlineLabel->setFont(QFont("Arial", 7, QFont::Bold));
     m_outlineCombo = new QComboBox(this);
     m_outlineCombo->setMinimumWidth(300);
     m_outlineCombo->setMinimumHeight(35);
-    m_outlineCombo->setFont(QFont("Arial", 10));
+    m_outlineCombo->setFont(QFont("Arial", 7));
     m_outlineCombo->addItem(tr("-- Wybierz konspekt --"), QString());
     
     m_loadOutlineButton = new QPushButton(tr("Wczytaj..."), this);
     m_loadOutlineButton->setToolTip(tr("Wczytaj plik JSON konspektu"));
     m_loadOutlineButton->setMinimumHeight(35);
-    m_loadOutlineButton->setFont(QFont("Arial", 10));
+    m_loadOutlineButton->setFont(QFont("Arial", 7));
     
     m_outlineSelectorLayout->addWidget(m_outlineLabel);
     m_outlineSelectorLayout->addWidget(m_outlineCombo, 1);
@@ -134,7 +134,7 @@ void OutlineTab::setupOutlineSelector()
     QVBoxLayout* infoLayout = new QVBoxLayout();
     
     m_outlineNameLabel = new QLabel(tr("Nazwa: -"), this);
-    m_outlineNameLabel->setFont(QFont("Sans Serif", 12, QFont::Bold));
+    m_outlineNameLabel->setFont(QFont("Sans Serif", 8, QFont::Bold));
     m_outlineNameLabel->setWordWrap(true);
     
     m_outlineDescriptionLabel = new QLabel(tr("Opis: -"), this);
@@ -170,7 +170,7 @@ void OutlineTab::setupExerciseView()
     m_exerciseInfoLayout->setContentsMargins(0, 0, 0, 0);
     
     m_exerciseNameLabel = new QLabel(tr("Nazwa ćwiczenia"), this);
-    m_exerciseNameLabel->setFont(QFont("Sans Serif", 14, QFont::Bold));
+    m_exerciseNameLabel->setFont(QFont("Sans Serif", 8, QFont::Bold));
     m_exerciseNameLabel->setWordWrap(true);
     
     m_exerciseDescriptionLabel = new QLabel(tr("Opis ćwiczenia pojawi się tutaj."), this);
