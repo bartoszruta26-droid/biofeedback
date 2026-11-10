@@ -152,7 +152,11 @@ bool SampleJournalWriter::enqueue(const QByteArray& line, bool durable)
 
     const std::uint64_t ticket = ++m_nextTicket;
     try {
-        m_queue.push_back(PendingRecord{line, ticket, durable});
+        PendingRecord pending;
+        pending.line = line;
+        pending.ticket = ticket;
+        pending.durable = durable;
+        m_queue.push_back(std::move(pending));
     } catch (...) {
         m_failed = true;
         m_accepting = false;
@@ -312,7 +316,7 @@ void SampleJournalWriter::run()
         }
 
         QByteArray line = record.isJsonObject
-            ? QJsonDocument(record.jsonObject).toJson(QJsonDocument::Compact) + '\\n'
+            ? QJsonDocument(record.jsonObject).toJson(QJsonDocument::Compact) + '\n'
             : std::move(record.line);
         if (file.write(line) != line.size()) {
             error = file.errorString();
