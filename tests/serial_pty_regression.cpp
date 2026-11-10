@@ -372,6 +372,13 @@ int main() {
     });
     const std::string tareResponse = serial.sendCommand("TARE", true);
     tareDevice.join();
+    serial.stopAsyncReading();
+    if (!readLine(master, command, 1000) || command != "STOP\\n") {
+        std::cerr << "Continuous stream did not stop after the command transaction\\n";
+        serial.disconnect();
+        ::close(master);
+        return 1;
+    }
     if (tareResponse.find("Tare set!") == std::string::npos) {
         std::cerr << "TARE response was lost while pausing the continuous stream\\n";
         serial.stopAsyncReading();
