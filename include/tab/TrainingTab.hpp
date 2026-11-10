@@ -374,6 +374,8 @@ private:
     bool m_measurementDrainScheduled{false};
     std::size_t m_droppedMeasurementSamples{0};
     QTimer* m_liveUiTimer{nullptr};
+    QVector<double> m_uiDispatchLatencyWindowMs;
+    qint64 m_lastDispatchLatencyReportMs{0};
     quint64 m_pendingUiSamples{0};
     
     // Pomocnicze
