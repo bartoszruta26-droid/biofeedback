@@ -212,9 +212,11 @@ int main(int argc, char **argv)
     QKeyEvent archerAimUp(QEvent::KeyPress, Qt::Key_Up, Qt::NoModifier);
     QKeyEvent archerAimUpRelease(QEvent::KeyRelease, Qt::Key_Up, Qt::NoModifier);
     QApplication::sendEvent(archerControlsGame, &archerAimUp);
+    archerControlsGame->handleSensorInput(0.0); // Held keyboard control overrides sensor samples.
     archerControlsGame->update(0.1);
     const double archerKeyboardAngle = archerControlsGame->aimAngle();
     REQUIRE(archerKeyboardAngle < archerSensorAngle);
+    REQUIRE(!archerControlsGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN()));
     QApplication::sendEvent(archerControlsGame, &archerAimUpRelease);
     archerControlsGame->update(0.1);
     REQUIRE(std::abs(archerControlsGame->aimAngle() - archerKeyboardAngle) < 1e-6);
