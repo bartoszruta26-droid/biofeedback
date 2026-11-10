@@ -156,10 +156,28 @@ int main(int argc, char **argv)
     REQUIRE(galagaGame->livesRemaining() == 3);
     REQUIRE(galagaGame->currentWave() == 1);
     REQUIRE(galagaGame->activeEnemyCount() == 24);
+
+    // Keyboard steering temporarily overrides the sensor position and
+    // returns to sensor control after key release.
+    galagaGame->handleSensorInput(90.0);
+    galagaGame->update(0.02);
+    const double sensorPosition = galagaGame->playerPositionX();
+    QKeyEvent galagaLeftDown(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+    QKeyEvent galagaLeftUp(QEvent::KeyRelease, Qt::Key_Left, Qt::NoModifier);
+    QApplication::sendEvent(galagaGame, &galagaLeftDown);
+    galagaGame->update(0.08);
+    REQUIRE(galagaGame->playerPositionX() < sensorPosition);
+    QApplication::sendEvent(galagaGame, &galagaLeftUp);
+    galagaGame->update(0.02);
+    REQUIRE(galagaGame->playerPositionX() > sensorPosition - 5.0);
+
+    // Holding fire creates player projectiles on the automatic cadence.
     galagaGame->handleSensorInput(50.0);
     QKeyEvent galagaFireDown(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QKeyEvent galagaFireUp(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(galagaGame, &galagaFireDown);
+    galagaGame->update(0.02);
+    REQUIRE(galagaGame->activeProjectileCount() > 0);
     waitForEvents(900); // Space is held so the repeat-fire mechanic can shoot.
     QApplication::sendEvent(galagaGame, &galagaFireUp);
     REQUIRE(galagaGame->isRunning());
