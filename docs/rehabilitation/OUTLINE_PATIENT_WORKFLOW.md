@@ -297,3 +297,12 @@ W `OutlineTab` dodano formularz trwałego zapisu celów do kolekcji `rehabilitat
 ## Aktualizacja interfejsu — przebieg sesji i kontrola po 24 godzinach
 
 W `OutlineTab` dodano trwały cykl sesji rehabilitacyjnej w kolekcji `rehabilitation-sessions`. Rozpoczęcie sesji wymaga wpisania bólu przed sesją w skali NRS 0–10. Zakończenie zapisuje ból po sesji, czas zakończenia i stan `awaiting_24h`. Po kontroli pacjenta zapisuje się `pain_at_24h_nrs`, czas kontroli i stan `completed`. Otwarta sesja jest odtwarzana po ponownym wybraniu epizodu, ponieważ jej stan jest pobierany z repozytorium. Repozytorium waliduje zakresy wszystkich trzech wartości NRS i dopuszczalne stany sesji. Ten mechanizm zapisuje ból na poziomie całej sesji; rejestrowanie bólu dla poszczególnych ćwiczeń i serii pozostaje osobnym, kolejnym etapem.
+
+
+## Aktualizacja interfejsu — obserwacje poszczególnych ćwiczeń
+
+W aktywnej sesji można zapisywać odrębne obserwacje wykonania ćwiczeń w kolekcji `rehabilitation-observations`. Rekord jest powiązany z UUID pacjenta, epizodu i sesji. Zawiera nazwę ćwiczenia, liczbę wykonanych serii i powtórzeń, ból przed i po ćwiczeniu, ocenę jakości ruchu oraz opcjonalnie czas wykonania, RPE i ból po 24 godzinach. Brak wartości opcjonalnej pozostaje brakiem danych, a nie zerem.
+
+Formularz pozwala zapisywać obserwacje wyłącznie podczas aktywnej sesji. Historia jest filtrowana według bieżącego pacjenta i epizodu. Repozytorium niezależnie waliduje zakresy: serie 0–100, powtórzenia 0–10000, NRS i RPE 0–10, czas 1–86400 sekund. Jakość ruchu ma wartości `not_assessed`, `acceptable` lub `unacceptable`. Nieprawidłowe dane są odrzucane również przy zapisie poza GUI.
+
+Obecny formularz zapisuje wykonane parametry, ale nie stanowi jeszcze pełnego systemu recept ćwiczeń: nie definiuje planowanej dawki, strony ciała, obciążenia ani wersjonowanej instrukcji. Nie wylicza automatycznie progresji i nie modyfikuje zaleceń klinicznych. Kontrola bólu po 24 godzinach na poziomie pojedynczego ćwiczenia jest zapisywana, jeśli została już zebrana; odrębny mechanizm przypomnienia i późniejszego uzupełnienia obserwacji będzie kolejnym etapem.
