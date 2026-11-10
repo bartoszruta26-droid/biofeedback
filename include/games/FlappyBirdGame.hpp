@@ -12,6 +12,7 @@ class QKeyEvent;
 class QMouseEvent;
 
 class QResizeEvent;
+class QPaintEvent;
 
 namespace games {
 
@@ -127,6 +128,7 @@ private slots:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
 
