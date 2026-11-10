@@ -32,6 +32,7 @@ public:
     void setForceCalibration(double minimum, double maximum);
     double forceCalibrationMinimum() const;
     double forceCalibrationMaximum() const;
+    double normalizedForce() const;
 
     // 0 = sinusoidal, 1 = triangular, 2 = smooth plateau.
     void setWaveformMode(int mode);
