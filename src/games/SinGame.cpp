@@ -6,6 +6,7 @@
 #include <QBrush>
 #include <QFont>
 #include <QPainterPath>
+#include <QDebug>
 #include <QtMath>
 #include <cmath>
 
@@ -57,7 +58,7 @@ void SinGame::initialize()
     m_lastDistance = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     m_frequency = width() > 0
-        ? (2.0 * M_PI * 1.5 / static_cast<double>(width())) : 0.0;
+        ? (2.0 * 3.14159265358979323846 * 1.5 / static_cast<double>(width())) : 0.0;
 }
 
 void SinGame::setDifficultyLevel(int level)
@@ -70,7 +71,7 @@ void SinGame::setDifficultyLevel(int level)
     const double toleranceRatio = 0.11 - (m_difficultyLevel - 1) * 0.012;
     m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, height()) * toleranceRatio));
     m_frequency = width() > 0
-        ? (2.0 * M_PI * 1.5 / static_cast<double>(width())) : 0.0;
+        ? (2.0 * 3.14159265358979323846 * 1.5 / static_cast<double>(width())) : 0.0;
     setScore(0);
 }
 
@@ -173,7 +174,7 @@ void SinGame::update(double deltaTime)
     const double h = static_cast<double>(height());
 
     // Keep 1.5 full wave cycles visible at every window size.
-    m_frequency = 2.0 * M_PI * 1.5 / w;
+    m_frequency = 2.0 * 3.14159265358979323846 * 1.5 / w;
     m_phase -= m_scrollSpeed * m_frequency * dt;
     m_inputAge += dt;
 
