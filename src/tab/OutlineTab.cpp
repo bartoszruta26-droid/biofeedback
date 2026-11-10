@@ -14,6 +14,7 @@
 #include <QFileDialog>
 #include <QTextStream>
 #include <QDateTime>
+#include <QDate>
 #include <QPainter>
 #include <QDesktopServices>
 #include <QUrl>
