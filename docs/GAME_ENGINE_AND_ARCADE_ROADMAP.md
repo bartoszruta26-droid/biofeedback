@@ -120,3 +120,15 @@ Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie
 - [x] Dodano regresję śledzenia tangensa przez 6 sekund oraz test zatrzymania punktowania po utracie sygnału.
 - [ ] Wymagana walidacja kompilacji Qt5, game_factory_regression i pełnego CI na aktualnym commicie.
 - [ ] Wymagany test na fizycznym HX711, w tym ocena przejść asymptot, opóźnienia i ergonomii sterowania. Test symulowany nie zastępuje walidacji sprzętowej ani klinicznej.
+
+
+## Rozszerzenie Tangens Force Trainer — trening konfigurowalny
+
+- [x] Kalibracja zakresu siły minimum–maksimum z walidacją przedziału; klawisze `[` i `]` zapisują aktualny odczyt jako granice.
+- [x] Regulacja ostrości przebiegu tangensa przez ograniczony parametr 0,25–1,50; ta sama funkcja jest używana w obliczaniu celu i rysowaniu wykresu.
+- [x] Zmiana trudności w trakcie gry klawiszami `+`/`-` lub strzałkami góra/dół, bez zerowania zdobytego wyniku.
+- [x] Opcjonalna automatyczna trudność (`A`): analiza skuteczności w 12-sekundowym oknie, zwiększenie poziomu przy trafieniu przez co najmniej 82% czasu i zmniejszenie poniżej 42%.
+- [x] HUD pokazuje procent czasu w strefie celu, aktualną siłę, wynik, serię, poziom i ustawienie przebiegu.
+- [x] Testy regresyjne kalibracji, odrzucania zakresu niepoprawnego, klawiszy kalibracji, ograniczania ostrości, automatycznej trudności i zachowania wyniku.
+- [ ] Wymagana kompilacja Qt5 i pełny CI dla aktualnego HEAD PR #247.
+- [ ] Wymagany test fizycznego Arduino Nano/HX711; sprawdzić stabilność kalibracji, opóźnienie, zachowanie przy asymptotach i komfort ćwiczenia.
