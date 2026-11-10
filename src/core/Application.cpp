@@ -672,6 +672,21 @@ void Application::setupConnections()
                 payload.insert(QStringLiteral("icf_assessment"), assessment);
                 QJsonArray assessmentHistory = existing.value(
                     QStringLiteral("icf_assessment_history")).toArray();
+                const QJsonObject previousAssessment = existing.value(
+                    QStringLiteral("icf_assessment")).toObject();
+                if (!previousAssessment.isEmpty()) {
+                    const QString previousTimestamp = previousAssessment.value(
+                        QStringLiteral("assessed_at")).toString();
+                    bool previousAlreadyArchived = false;
+                    for (const QJsonValue& item : assessmentHistory) {
+                        if (item.toObject().value(QStringLiteral("assessed_at")).toString()
+                                == previousTimestamp && !previousTimestamp.isEmpty()) {
+                            previousAlreadyArchived = true;
+                            break;
+                        }
+                    }
+                    if (!previousAlreadyArchived) assessmentHistory.append(previousAssessment);
+                }
                 assessmentHistory.append(assessment);
                 // Keep a bounded longitudinal history in the patient chart.
                 while (assessmentHistory.size() > 100) assessmentHistory.removeAt(0);
