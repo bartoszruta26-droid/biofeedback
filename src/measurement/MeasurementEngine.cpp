@@ -82,6 +82,9 @@ void MeasurementEngine::setCommitHook(CommitHook hook) {
 
 bool MeasurementEngine::ingest(const MeasurementInput& input, MeasurementSample& output) {
     MeasurementSample sample;
+    sample.ingestMonotonicNs = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
     sample.timestampUnixMs = nowUnixMilliseconds();
     sample.deviceTimestampMs = input.deviceTimestampMs;
     sample.rawValue = input.rawValue;
