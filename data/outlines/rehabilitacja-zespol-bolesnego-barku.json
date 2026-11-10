@@ -1,0 +1,83 @@
+{
+  "id": "rehab-painful-shoulder-adult-v1",
+  "name": "Rehabilitacja zespołu bolesnego barku",
+  "description": "Program dla dorosłych z bólem związanym z obciążaniem stożka rotatorów po diagnostyce różnicowej. Nie jest protokołem pooperacyjnym.",
+  "author": "Biofeedback — protokół kliniczny",
+  "category": "Rehabilitacja ortopedyczna",
+  "estimatedDurationMinutes": 50,
+  "clinicalProtocolHtml": "<h2>Cel programu</h2><p>Zmniejszenie bólu, poprawa tolerancji ruchu i obciążenia stożka rotatorów, siły mięśni łopatki i powrót do zadań nad głową.</p><h3>Rozpoznanie</h3><p>„Zespół bolesnego barku” jest określeniem objawowym. Różnicuj tendinopatię stożka rotatorów, częściowe/pełne zerwanie, zamrożony bark, patologię AC, niestabilność, ból szyjny i przyczyny rzutowane.</p><h3>Bezpieczeństwo</h3><p>Pilnej oceny wymagają: ból z klatki piersiowej/dusznością, gorączka i zaczerwienienie stawu, uraz z nagłą utratą siły lub niemożnością uniesienia ramienia, deformacja, narastające objawy neurologiczne i niewyjaśniony ból ogólnoustrojowy. Po naprawie stożka rotatorów obowiązuje odrębny protokół operatora.</p><h3>Dawkowanie</h3><p>Izometrie 5 × 10–20 sekund lub ćwiczenia dynamiczne 2–3 serie po 10–15 powtórzeń, początkowo RPE 3–5/10. Progresuj małymi krokami, jeżeli technika jest dobra i objawy wracają do poziomu wyjściowego do następnego dnia.</p><h3>Ocena</h3><p>NPRS, SPADI/QuickDASH, ROM, siła izometryczna rotacji zewnętrznej/wewnętrznej i unoszenia, kontrola łopatki oraz testy funkcjonalne dostosowane do pracy i sportu.</p>",
+  "exercises": [
+    {
+      "id": "shoulder-01",
+      "name": "Wspomagane unoszenie ramienia",
+      "description": "W leżeniu lub przy ścianie wspomóż ruch zdrową ręką. Poruszaj się w komfortowym zakresie, bez wymuszania końcowej pozycji.",
+      "durationSeconds": 120,
+      "targetRepetitions": 10,
+      "difficulty": "easy",
+      "gameId": ""
+    },
+    {
+      "id": "shoulder-02",
+      "name": "Izometria rotacji zewnętrznej",
+      "description": "Łokieć przy tułowiu, zgięty około 90°. Naciskaj grzbietem dłoni na ścianę lub opór bez widocznego ruchu. Utrzymaj 10–20 sekund, oddychaj swobodnie.",
+      "durationSeconds": 150,
+      "targetRepetitions": 5,
+      "difficulty": "easy",
+      "gameId": ""
+    },
+    {
+      "id": "shoulder-03",
+      "name": "Izometria rotacji wewnętrznej",
+      "description": "Łokieć przy tułowiu. Naciskaj dłonią do wewnątrz na nieruchomy opór bez ruchu ramienia. Zachowaj tolerowany poziom wysiłku.",
+      "durationSeconds": 150,
+      "targetRepetitions": 5,
+      "difficulty": "easy",
+      "gameId": ""
+    },
+    {
+      "id": "shoulder-04",
+      "name": "Wiosłowanie z lekką taśmą",
+      "description": "Ściągnij łopatki płynnie, prowadząc łokcie w tył. Nie unoś barków i nie wypychaj głowy do przodu. Kontroluj powrót.",
+      "durationSeconds": 180,
+      "targetRepetitions": 12,
+      "difficulty": "medium",
+      "gameId": ""
+    },
+    {
+      "id": "shoulder-05",
+      "name": "Rotacja zewnętrzna z taśmą",
+      "description": "Łokieć przy tułowiu, przedramię porusza się na zewnątrz. Utrzymuj nadgarstek neutralnie, bez rotacji tułowia i bez bólu narastającego z powtórzenia na powtórzenie.",
+      "durationSeconds": 180,
+      "targetRepetitions": 10,
+      "difficulty": "medium",
+      "gameId": ""
+    },
+    {
+      "id": "shoulder-06",
+      "name": "Wall slide",
+      "description": "Przedramiona oparte o ścianę. Przesuń je w górę w tolerowanym zakresie, zachowując kontrolę żeber i łopatki. Nie wymuszaj zakresu.",
+      "durationSeconds": 150,
+      "targetRepetitions": 10,
+      "difficulty": "medium",
+      "gameId": ""
+    },
+    {
+      "id": "shoulder-07",
+      "name": "Push-up plus przy ścianie",
+      "description": "W podporze przy ścianie wykonaj niewielkie ugięcie łokci, a następnie odepchnij ścianę, pozwalając łopatkom na kontrolowaną protrakcję. Nie zapadaj się w barkach.",
+      "durationSeconds": 150,
+      "targetRepetitions": 10,
+      "difficulty": "medium",
+      "gameId": ""
+    },
+    {
+      "id": "shoulder-08",
+      "name": "Unoszenie w płaszczyźnie łopatki",
+      "description": "Unieś ramię lekko przed linią boczną ciała, kciuk skierowany ku górze. Rozpocznij bez obciążenia lub z lekkim ciężarem; zwiększaj zakres i opór oddzielnie.",
+      "durationSeconds": 180,
+      "targetRepetitions": 8,
+      "difficulty": "hard",
+      "gameId": ""
+    }
+  ]
+}
