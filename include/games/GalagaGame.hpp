@@ -9,6 +9,7 @@
 #include <memory>
 
 class QKeyEvent;
+class QMouseEvent;
 class QResizeEvent;
 
 namespace games {
@@ -27,6 +28,8 @@ public:
     int currentWave() const { return m_wave; }
     int activeEnemyCount() const;
     double hitProtectionRemaining() const { return m_hitCooldown; }
+    double playerCenterX() const { return m_player.center().x(); }
+    double normalizedForce() const { return m_force; }
 
 protected:
     void initialize() override;
@@ -35,6 +38,8 @@ protected:
     bool handleInput(double value) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
