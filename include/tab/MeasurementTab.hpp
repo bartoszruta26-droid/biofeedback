@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <vector>
+#include <cstdint>
 #include <QElapsedTimer>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
