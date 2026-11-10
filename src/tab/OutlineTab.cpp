@@ -1395,8 +1395,7 @@ void OutlineTab::refreshRehabilitationAssessments()
         if (item.contains(QStringLiteral("functional_test")))
             fields << item.value(QStringLiteral("functional_test")).toString();
         if (item.contains(QStringLiteral("icf_assessment_ref")))
-            fields << tr("Powiązana ocena ICF: %1")
-                          .arg(item.value(QStringLiteral("icf_assessment_ref")).toString());
+            fields << tr("Powiązano z konkretną wersją oceny ICF");
         entries << QStringLiteral("• %1 — %2")
                        .arg(item.value(QStringLiteral("assessed_at")).toString(),
                             fields.join(QStringLiteral("; ")));
@@ -1500,8 +1499,14 @@ void OutlineTab::createRehabilitationAssessment()
     const QString functionalTest = m_assessmentFunctionalTestEdit->text().trimmed();
     if (!functionalTest.isEmpty())
         payload.insert(QStringLiteral("functional_test"), functionalTest.left(500));
-    if (payload.size() <= 4) {
-        m_assessmentStatusLabel->setText(tr("Wprowadź co najmniej jeden oceniony parametr."));
+    const bool hasClinicalValue =
+        payload.contains(QStringLiteral("pain_nrs")) ||
+        payload.contains(QStringLiteral("rom_degrees")) ||
+        payload.contains(QStringLiteral("strength_mrc")) ||
+        payload.contains(QStringLiteral("swelling_cm")) ||
+        payload.contains(QStringLiteral("functional_test"));
+    if (!hasClinicalValue) {
+        m_assessmentStatusLabel->setText(tr("Wprowadź co najmniej jeden oceniony parametr kliniczny."));
         return;
     }
 
