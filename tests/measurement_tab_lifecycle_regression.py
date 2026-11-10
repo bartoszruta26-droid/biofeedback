@@ -273,14 +273,16 @@ if commit_start > history_start:
 if engine_source.index("m_commitHook(sample)") > history_start:
     raise SystemExit("MeasurementEngine must invoke the commit hook before publication")
 
-# The bounded presentation queue must never block the serial reader. It
-# preserves FIFO order for the lossless analysis consumer while the UI display
-# is coalesced separately; saturation must be visible as an incomplete analysis.
+# The bounded presentation/analysis queue must never block the serial reader.
+# The durable journal remains lossless; when the short GUI buffer saturates,
+# stale queued frames are discarded and the detector is reset.
 for required in (
     "bool m_measurementQueueAccepting{true}",
-    "MaximumQueuedSamples = 4096",
+    "MaximumQueuedSamples = 64",
     "if (m_measurementQueue.size() >= MaximumQueuedSamples)",
-    "++m_droppedMeasurementSamples",
+    "m_droppedMeasurementSamples += static_cast<std::size_t>(discarded)",
+    "m_measurementQueue.clear()",
+    "m_totalDroppedMeasurementSamples += discarded",
     "m_measurementQueueAccepting = false",
 ):
     if required not in source and required not in header:
