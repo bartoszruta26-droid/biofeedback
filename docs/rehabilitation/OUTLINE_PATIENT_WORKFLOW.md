@@ -270,4 +270,20 @@ Każdy rekord rehabilitacyjny wymaga istniejącego `patient_id` będącego UUID 
 
 Test regresyjny repozytorium obejmuje tworzenie i usuwanie sześciu rodzajów rekordów, odrzucanie nieistniejącego pacjenta oraz ochronę relacji przed osieroceniem.
 
-**Ograniczenie integracyjne:** obecny `PatientTab` emituje PESEL i ścieżkę lokalną, a nie UUID z `JsonResourceRepository`. Dlatego nie należy jeszcze łączyć go bezpośrednio z nowymi rekordami rehabilitacyjnymi ani traktować PESEL jako `patient_id`. Następnym wymaganym etapem jest ujednolicenie źródła tożsamości pacjenta i migracja/odczyt istniejących kartotek do wspólnego repozytorium, zanim zostanie udostępniony formularz kliniczny w `OutlineTab`.
+**Status integracji tożsamości:** `Application` rozwiązuje PESEL emitowany przez `PatientTab` do rekordu pacjenta w `JsonResourceRepository`, a do `OutlineTab` przekazuje wyłącznie kanoniczny UUID oraz nazwę wyświetlaną. PESEL służy wyłącznie do odnalezienia rekordu i nie jest zapisywany w rekordach rehabilitacyjnych. Jeżeli lookup się nie powiedzie, kontekst pacjenta w Outline jest czyszczony.
+
+
+## Aktualizacja interfejsu — ocena kliniczna
+
+W `OutlineTab` dodano formularz oceny początkowej powiązany z aktualnie wybranym pacjentem i epizodem. Formularz zapisuje rekord do `rehabilitation-assessments` i pokazuje historię ocen danego epizodu.
+
+Pola i zakresy:
+- `pain_nrs`: liczba całkowita 0–10;
+- `rom_degrees`: liczba 0–360 stopni;
+- `strength_mrc`: liczba całkowita 0–5;
+- `swelling_cm`: liczba 0–100 cm;
+- `functional_test`: opis testu i wyniku, maksymalnie 500 znaków.
+
+Puste pole oznacza brak pomiaru i jest pomijane w rekordzie. Wartość 0 jest zachowywana jako rzeczywisty wynik, a nie zamieniana na brak danych. Wymagany jest co najmniej jeden oceniony parametr. Zakresy są walidowane zarówno w formularzu, jak i w `JsonResourceRepository`, również dla zapisów spoza GUI.
+
+Ocena zawiera `patient_id`, `episode_id`, typ `baseline` i czas UTC. Historia jest filtrowana po UUID pacjenta i epizodu. Formularz nie stawia rozpoznania i nie podejmuje decyzji terapeutycznych.
