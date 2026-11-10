@@ -1368,23 +1368,19 @@ void TrainingTab::onMeasurementSample(
     // QWidget::update() coalesces paints to the display refresh cadence.
     m_progressWidget->setCurrentForce(force);
 
-    // Preserve every sample for biomechanics/repetition detection while
-    // throttling text/progress controls and game input to approximately 60 Hz.
-    static constexpr qint64 LiveUiIntervalMs = 16;
+    // Every real acquisition sample reaches the training display and game.
+    // QWidget::update() coalesces paints; throttling by host-clock time here
+    // used to discard later samples when a queued batch was drained at once.
     const qint64 nowMs = m_sessionClock.isValid() ? m_sessionClock.elapsed() : 0;
-    if (nowMs - m_lastLiveUiRefreshMs >= LiveUiIntervalMs) {
-        m_lastLiveUiRefreshMs = nowMs;
-        m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
-
-        const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
-        const int barValue = targetForce > 0.0
-            ? static_cast<int>((force / targetForce) * 100.0) : 0;
-        m_forceBar->setValue(qBound(0, barValue, 100));
-    }
+    m_lastLiveUiRefreshMs = nowMs;
+    m_lblCurrentForce->setText(QString("%1 N").arg(force, 0, 'f', 2));
 
     const double targetForce = m_exercisePlan[m_currentExerciseIndex].targetForce;
-    if (m_currentGame && m_currentGame->isRunning() &&
-        nowMs - m_lastGameInputRefreshMs >= LiveUiIntervalMs) {
+    const int barValue = targetForce > 0.0
+        ? static_cast<int>((force / targetForce) * 100.0) : 0;
+    m_forceBar->setValue(qBound(0, barValue, 100));
+
+    if (m_currentGame && m_currentGame->isRunning()) {
         m_lastGameInputRefreshMs = nowMs;
         const double gameInput = targetForce > 0.0
             ? qBound(0.0, force / targetForce * 100.0, 100.0) : 0.0;
