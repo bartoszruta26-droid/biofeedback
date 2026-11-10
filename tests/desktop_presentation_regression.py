@@ -7,6 +7,7 @@ def read(path):
     return (ROOT / path).read_text(encoding="utf-8")
 
 main = read("src/gui/MainWindow.cpp")
+application = read("src/core/Application.cpp")
 measurement = read("src/tab/MeasurementTab.cpp")
 training = read("src/tab/TrainingTab.cpp")
 patient = read("src/tab/PatientTab.cpp")
@@ -119,7 +120,7 @@ assert "m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurement
 # or the legacy per-patient filesystem path.
 assert "setCurrentPatientContext(const QString& patientUuid" in read("include/tab/OutlineTab.hpp")
 assert "m_currentPatientUuid = patientUuid.trimmed();" in outline
-assert "patient.value(QStringLiteral(\"id\")).toString()" in main
+assert "patient.value(QStringLiteral(\"id\")).toString()" in application
 assert "m_outlineTab->setCurrentPatientContext(" in main
 assert "rehabilitationPatientContext" in outline
 assert "setResourceRepository(m_sharedResources)" in read("src/core/Application.cpp")
