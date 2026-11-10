@@ -19,8 +19,16 @@
 #include <QFile>
 #include <QDir>
 #include <QProgressBar>
+#include <QSplitter>
+#include <QTextBrowser>
+#include <QLineEdit>
+#include <QSignalBlocker>
+#include "data/JsonResourceRepository.hpp"
 #include <memory>
 #include "sensor/SerialCommunication.hpp"
+#include "measurement/MeasurementEngine.hpp"
+
+namespace gui { class GraphWidget; }
 
 namespace games {
     class GameEngine;
@@ -56,7 +64,8 @@ struct OutlineData {
     QString category;               // Kategoria (np. rehabilitacja, trening)
     QVector<ExerciseData> exercises; // Lista ćwiczeń w konspekcie
     int estimatedDurationMinutes;   // Szacowany czas trwania całego konspektu
-    
+    QString clinicalProtocolHtml;   // Rozwinięty protokół kliniczny do podglądu w stanowisku
+
     OutlineData() : estimatedDurationMinutes(0) {}
 };
 
@@ -234,9 +243,74 @@ private:
     void finishCurrentExercise();
     void moveToNextExercise();
     void endSession();
+    void refreshRehabilitationEpisodes();
+    void createRehabilitationEpisode();
+    void refreshRehabilitationAssessments();
+    void createRehabilitationAssessment();
+    void exportRehabilitationReportPdf();
+    void refreshRehabilitationGoals();
+    void createRehabilitationGoal();
+    void refreshRehabilitationSession();
+    void startRehabilitationSession();
+    void finishRehabilitationSession();
+    void recordRehabilitation24HourFollowUp();
+    void createRehabilitationObservation();
+    void refreshRehabilitationObservations();
 
     // Główne widgety
     QVBoxLayout* m_mainLayout;
+    QVBoxLayout* m_leftLayout{nullptr};
+    QVBoxLayout* m_rightLayout{nullptr};
+    gui::GraphWidget* m_forceGraph{nullptr};
+    QLabel* m_patientContextLabel{nullptr};
+    QString m_currentPatientUuid;
+    QString m_currentEpisodeUuid;
+    std::shared_ptr<biofeedback::data::JsonResourceRepository> m_resourceRepository;
+    QLineEdit* m_episodeDiagnosisEdit{nullptr};
+    QComboBox* m_episodePathwayCombo{nullptr};
+    QComboBox* m_episodeSelector{nullptr};
+    QPushButton* m_createEpisodeButton{nullptr};
+    QLabel* m_episodeStatusLabel{nullptr};
+    QComboBox* m_assessmentTypeCombo{nullptr};
+    QLineEdit* m_assessmentPainNrsEdit{nullptr};
+    QLineEdit* m_assessmentRomEdit{nullptr};
+    QLineEdit* m_assessmentStrengthEdit{nullptr};
+    QLineEdit* m_assessmentSwellingEdit{nullptr};
+    QLineEdit* m_assessmentFunctionalTestEdit{nullptr};
+    QPushButton* m_saveAssessmentButton{nullptr};
+    QPushButton* m_exportAssessmentReportButton{nullptr};
+    QLabel* m_assessmentStatusLabel{nullptr};
+    QTextBrowser* m_assessmentHistoryBrowser{nullptr};
+    QLineEdit* m_goalTitleEdit{nullptr};
+    QLineEdit* m_goalMetricEdit{nullptr};
+    QLineEdit* m_goalBaselineEdit{nullptr};
+    QLineEdit* m_goalTargetEdit{nullptr};
+    QLineEdit* m_goalUnitEdit{nullptr};
+    QLineEdit* m_goalTargetDateEdit{nullptr};
+    QPushButton* m_createGoalButton{nullptr};
+    QLabel* m_goalStatusLabel{nullptr};
+    QTextBrowser* m_goalHistoryBrowser{nullptr};
+    QString m_currentRehabilitationSessionUuid;
+    QLineEdit* m_sessionPainBeforeEdit{nullptr};
+    QLineEdit* m_sessionPainAfterEdit{nullptr};
+    QLineEdit* m_sessionPain24hEdit{nullptr};
+    QPushButton* m_startRehabilitationSessionButton{nullptr};
+    QPushButton* m_finishRehabilitationSessionButton{nullptr};
+    QPushButton* m_saveRehabilitation24hButton{nullptr};
+    QLabel* m_rehabilitationSessionStatusLabel{nullptr};
+    QLineEdit* m_observationExerciseEdit{nullptr};
+    QLineEdit* m_observationSetsEdit{nullptr};
+    QLineEdit* m_observationRepetitionsEdit{nullptr};
+    QLineEdit* m_observationDurationEdit{nullptr};
+    QLineEdit* m_observationRpeEdit{nullptr};
+    QLineEdit* m_observationPainBeforeEdit{nullptr};
+    QLineEdit* m_observationPainAfterEdit{nullptr};
+    QLineEdit* m_observationPain24hEdit{nullptr};
+    QComboBox* m_observationMovementQualityCombo{nullptr};
+    QPushButton* m_saveObservationButton{nullptr};
+    QLabel* m_observationStatusLabel{nullptr};
+    QTextBrowser* m_observationHistoryBrowser{nullptr};
+    QTextBrowser* m_clinicalProtocolBrowser{nullptr};
     
     // Sekcja wyboru konspektu
     QGroupBox* m_outlineGroup;
@@ -324,6 +398,8 @@ private:
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
+    biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken{0};
     
 public:
     /**
@@ -331,6 +407,11 @@ public:
      * @param serial Współdzielony wskaźnik do obiektu SerialCommunication
      */
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    void setMeasurementEngine(std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine);
+    // UUID from the canonical shared patient repository; never a PESEL.
+    void setCurrentPatientContext(const QString& patientUuid, const QString& displayName);
+    void setResourceRepository(std::shared_ptr<biofeedback::data::JsonResourceRepository> repository);
+    QString currentPatientUuid() const { return m_currentPatientUuid; }
     
     /**
      * @brief Sprawdza czy połączenie z Arduino jest aktywne

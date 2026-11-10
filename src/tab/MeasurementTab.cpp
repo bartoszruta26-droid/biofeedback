@@ -3493,8 +3493,9 @@ bool MeasurementTab::loadCalibrationProfile(QString* error)
 bool MeasurementTab::rawToNewtons(std::int32_t rawValue, double& forceNewtons) const
 {
     if (!m_hasCalibrationProfile) return false;
-    const auto grams = sensor::CalibrationMath::convertRaw(
-        rawValue, m_calibrationZeroOffsetRaw, m_calibrationScaleFactor);
+    const auto grams = sensor::CalibrationMath::convertRawWithPolarity(
+        rawValue, m_calibrationZeroOffsetRaw, m_calibrationScaleFactor,
+        m_rawDisplayPolarity);
     if (!grams || !std::isfinite(*grams)) return false;
     forceNewtons = (*grams / 1000.0) * 9.80665;
     return std::isfinite(forceNewtons);

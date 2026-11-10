@@ -438,6 +438,31 @@ void Application::setupConnections()
         return false;
     };
 
+    if (m_outlineTab) m_outlineTab->setResourceRepository(m_sharedResources);
+
+    // Route the selected patient chart to Outline using its canonical repository UUID.
+    // PESEL is used only for lookup and is never stored in rehabilitation records.
+    connect(m_patientTab, &tab::PatientTab::currentPatientChanged,
+            this, [this, findPatientByPesel](const QString& pesel, const QString&) {
+                if (!m_outlineTab) return;
+                if (pesel.isEmpty()) {
+                    m_outlineTab->setCurrentPatientContext(QString(), QString());
+                    return;
+                }
+                QJsonObject patient;
+                QString lookupError;
+                if (!findPatientByPesel(pesel, patient, &lookupError)) {
+                    m_outlineTab->setCurrentPatientContext(QString(), QString());
+                    if (!lookupError.isEmpty() && m_logger)
+                        m_logger->warning("Outline patient context lookup failed.");
+                    return;
+                }
+                m_outlineTab->setCurrentPatientContext(
+                    patient.value(QStringLiteral("id")).toString(),
+                    patient.value(QStringLiteral("firstName")).toString() + QStringLiteral(" ") +
+                    patient.value(QStringLiteral("lastName")).toString());
+            });
+
     if (m_mainWindow && m_mainWindow->trainingTab()) {
         tab::TrainingTab* trainingTab = m_mainWindow->trainingTab();
         connect(trainingTab, &tab::TrainingTab::trainingStopped,
@@ -569,7 +594,7 @@ void Application::setupConnections()
                          const QString& lastName, const QDate& birthDate,
                          const QString& gender, const QString& notes) {
                 if (!m_sharedResources || pesel.isEmpty()) return;
-                const QJsonObject payload{
+                QJsonObject payload{
                     {QStringLiteral("pesel"), pesel},
                     {QStringLiteral("firstName"), firstName},
                     {QStringLiteral("lastName"), lastName},
@@ -591,6 +616,13 @@ void Application::setupConnections()
                     if (cachedVersion != existing.value(QStringLiteral("version")).toInt()) {
                         error = QStringLiteral("VERSION_CONFLICT");
                     } else {
+                        // Ordinary demographic edits must preserve the separately maintained ICF assessment.
+                        if (existing.contains(QStringLiteral("icf_assessment")))
+                            payload.insert(QStringLiteral("icf_assessment"),
+                                            existing.value(QStringLiteral("icf_assessment")));
+                        if (existing.contains(QStringLiteral("icf_assessment_history")))
+                            payload.insert(QStringLiteral("icf_assessment_history"),
+                                            existing.value(QStringLiteral("icf_assessment_history")));
                         QJsonObject updated;
                         saved = m_sharedResources->update(
                             QStringLiteral("patients"),
@@ -611,6 +643,68 @@ void Application::setupConnections()
                     if (m_mainWindow && m_mainWindow->debugTerminal())
                         m_mainWindow->addDebugMessage("Nie udało się zapisać kartoteki pacjenta w serwerze danych.", "ERROR");
                 }
+            });
+
+    connect(m_patientTab, &tab::PatientTab::patientIcfAssessmentChanged,
+            this, [this, findPatientByPesel, patientVersions](const QString& pesel,
+                                                               const QJsonObject& assessment) {
+                if (!m_sharedResources || pesel.isEmpty()) return;
+                QJsonObject existing;
+                QString error;
+                if (!findPatientByPesel(pesel, existing, &error) || !error.isEmpty()) {
+                    if (m_logger) m_logger->error("ICF assessment patient lookup failed: " + error.toStdString());
+                    if (m_mainWindow)
+                        m_mainWindow->addDebugMessage("Nie udało się odnaleźć kartoteki pacjenta dla oceny ICF.", "ERROR");
+                    return;
+                }
+                const int version = existing.value(QStringLiteral("version")).toInt();
+                const int cachedVersion = patientVersions->value(pesel, version);
+                if (cachedVersion != version) {
+                    m_patientTab->setPatientIcfAssessment(
+                        pesel, existing.value(QStringLiteral("icf_assessment")).toObject(),
+                        existing.value(QStringLiteral("icf_assessment_history")).toArray());
+                    if (m_logger) m_logger->warning("ICF assessment update rejected due to stale patient version.");
+                    if (m_mainWindow)
+                        m_mainWindow->addDebugMessage("Ocena ICF nie została zapisana: kartoteka została zmieniona w innym miejscu. Odśwież dane pacjenta.", "WARNING");
+                    return;
+                }
+                QJsonObject payload = existing;
+                payload.insert(QStringLiteral("icf_assessment"), assessment);
+                QJsonArray assessmentHistory = existing.value(
+                    QStringLiteral("icf_assessment_history")).toArray();
+                const QJsonObject previousAssessment = existing.value(
+                    QStringLiteral("icf_assessment")).toObject();
+                if (!previousAssessment.isEmpty()) {
+                    const QString previousTimestamp = previousAssessment.value(
+                        QStringLiteral("assessed_at")).toString();
+                    bool previousAlreadyArchived = false;
+                    for (const QJsonValue& item : assessmentHistory) {
+                        if (item.toObject().value(QStringLiteral("assessed_at")).toString()
+                                == previousTimestamp && !previousTimestamp.isEmpty()) {
+                            previousAlreadyArchived = true;
+                            break;
+                        }
+                    }
+                    if (!previousAlreadyArchived) assessmentHistory.append(previousAssessment);
+                }
+                assessmentHistory.append(assessment);
+                // Keep a bounded longitudinal history in the patient chart.
+                while (assessmentHistory.size() > 100) assessmentHistory.removeAt(0);
+                payload.insert(QStringLiteral("icf_assessment_history"), assessmentHistory);
+                QJsonObject updated;
+                if (!m_sharedResources->update(QStringLiteral("patients"),
+                        existing.value(QStringLiteral("id")).toString(), version, payload, updated, &error)) {
+                    m_patientTab->setPatientIcfAssessment(
+                        pesel, existing.value(QStringLiteral("icf_assessment")).toObject(),
+                        existing.value(QStringLiteral("icf_assessment_history")).toArray());
+                    if (m_logger) m_logger->error("ICF assessment persistence failed: " + error.toStdString());
+                    if (m_mainWindow)
+                        m_mainWindow->addDebugMessage("Nie udało się trwale zapisać oceny ICF: " + error, "ERROR");
+                    return;
+                }
+                patientVersions->insert(pesel, updated.value(QStringLiteral("version")).toInt());
+                m_patientTab->setPatientIcfAssessment(pesel, assessment, assessmentHistory);
+                if (m_logger) m_logger->info("Patient ICF functional assessment saved [personal fields redacted]");
             });
 
     connect(m_patientTab, &tab::PatientTab::patientRecordDeleted,
@@ -672,6 +766,10 @@ void Application::setupConnections()
             QDate::fromString(patient.value(QStringLiteral("birthDate")).toString(), Qt::ISODate),
             patient.value(QStringLiteral("gender")).toString(),
             patient.value(QStringLiteral("medicalHistory")).toString());
+        m_patientTab->setPatientIcfAssessment(
+            pesel,
+            patient.value(QStringLiteral("icf_assessment")).toObject(),
+            patient.value(QStringLiteral("icf_assessment_history")).toArray());
     }
 
     // One-time, non-destructive migration from the former per-patient files.

@@ -11,6 +11,8 @@
 #include <QUuid>
 
 #include <limits>
+#include <cmath>
+#include <QDate>
 #include <utility>
 
 namespace biofeedback::data {
@@ -22,7 +24,13 @@ const QStringList Collections = {
     QStringLiteral("training-sessions"),
     QStringLiteral("training-results"),
     QStringLiteral("game-sessions"),
-    QStringLiteral("game-results")
+    QStringLiteral("game-results"),
+    QStringLiteral("rehabilitation-episodes"),
+    QStringLiteral("rehabilitation-assessments"),
+    QStringLiteral("rehabilitation-goals"),
+    QStringLiteral("rehabilitation-sessions"),
+    QStringLiteral("rehabilitation-observations"),
+    QStringLiteral("rehabilitation-decisions")
 };
 }
 
@@ -187,6 +195,41 @@ bool JsonResourceRepository::remove(const QString& collection, const QString& id
         setError(error, QStringLiteral("VERSION_CONFLICT"));
         return false;
     }
+    if (collection == QStringLiteral("rehabilitation-episodes") ||
+        collection == QStringLiteral("rehabilitation-sessions")) {
+        const QStringList dependents = collection == QStringLiteral("rehabilitation-episodes")
+            ? QStringList{QStringLiteral("rehabilitation-assessments"),
+                          QStringLiteral("rehabilitation-goals"),
+                          QStringLiteral("rehabilitation-sessions"),
+                          QStringLiteral("rehabilitation-observations"),
+                          QStringLiteral("rehabilitation-decisions")}
+            : QStringList{QStringLiteral("rehabilitation-observations"),
+                          QStringLiteral("rehabilitation-decisions")};
+        const QString referenceField = collection == QStringLiteral("rehabilitation-episodes")
+            ? QStringLiteral("episode_id") : QStringLiteral("session_id");
+        for (const QString& dependentCollection : dependents) {
+            const QDir directory(collectionPath(dependentCollection));
+            if (!directory.exists()) continue;
+            const QFileInfoList files = directory.entryInfoList(
+                QStringList{QStringLiteral("*.json")}, QDir::Files | QDir::Readable, QDir::Name);
+            for (const QFileInfo& fileInfo : files) {
+                const QString dependentId = fileInfo.completeBaseName();
+                if (!validId(dependentId)) continue;
+                QJsonObject dependent;
+                QString readError;
+                if (!readRecord(dependentCollection, dependentId, dependent, &readError)) {
+                    setError(error, readError);
+                    return false;
+                }
+                if (dependent.value(referenceField).toString().compare(id, Qt::CaseInsensitive) == 0) {
+                    setError(error, collection == QStringLiteral("rehabilitation-episodes")
+                        ? QStringLiteral("REHABILITATION_EPISODE_HAS_REFERENCES")
+                        : QStringLiteral("REHABILITATION_SESSION_HAS_REFERENCES"));
+                    return false;
+                }
+            }
+        }
+    }
     if (collection == QStringLiteral("training-sessions")) {
         const QDir directory(collectionPath(QStringLiteral("training-results")));
         if (directory.exists()) {
@@ -214,7 +257,10 @@ bool JsonResourceRepository::remove(const QString& collection, const QString& id
         for (const QString& dependentCollection : {
                  QStringLiteral("measurements"), QStringLiteral("training-sessions"),
                  QStringLiteral("training-results"), QStringLiteral("game-sessions"),
-                 QStringLiteral("game-results")}) {
+                 QStringLiteral("game-results"), QStringLiteral("rehabilitation-episodes"),
+                 QStringLiteral("rehabilitation-assessments"), QStringLiteral("rehabilitation-goals"),
+                 QStringLiteral("rehabilitation-sessions"), QStringLiteral("rehabilitation-observations"),
+                 QStringLiteral("rehabilitation-decisions")}) {
             const QDir directory(collectionPath(dependentCollection));
             if (!directory.exists()) continue;
             const QFileInfoList files = directory.entryInfoList(
@@ -292,6 +338,259 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
             setError(error, patientError == QStringLiteral("RESOURCE_NOT_FOUND")
                 ? QStringLiteral("PATIENT_NOT_FOUND") : patientError);
             return false;
+        }
+    }
+
+    const QStringList rehabilitationCollections = {
+        QStringLiteral("rehabilitation-episodes"),
+        QStringLiteral("rehabilitation-assessments"),
+        QStringLiteral("rehabilitation-goals"),
+        QStringLiteral("rehabilitation-sessions"),
+        QStringLiteral("rehabilitation-observations"),
+        QStringLiteral("rehabilitation-decisions")
+    };
+    if (rehabilitationCollections.contains(collection)) {
+        if (patientId.isEmpty()) {
+            setError(error, QStringLiteral("REHABILITATION_PATIENT_REQUIRED"));
+            return false;
+        }
+        const bool isEpisode = collection == QStringLiteral("rehabilitation-episodes");
+        const QString episodeId = payload.value(QStringLiteral("episode_id")).toString().trimmed();
+        if (!isEpisode) {
+            if (!validId(episodeId)) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_EPISODE_REFERENCE"));
+                return false;
+            }
+            QJsonObject episode;
+            QString episodeError;
+            if (!readRecord(QStringLiteral("rehabilitation-episodes"), episodeId, episode, &episodeError)) {
+                setError(error, episodeError == QStringLiteral("RESOURCE_NOT_FOUND")
+                    ? QStringLiteral("REHABILITATION_EPISODE_NOT_FOUND") : episodeError);
+                return false;
+            }
+            if (episode.value(QStringLiteral("patient_id")).toString().compare(
+                    patientId, Qt::CaseInsensitive) != 0) {
+                setError(error, QStringLiteral("REHABILITATION_EPISODE_PATIENT_MISMATCH"));
+                return false;
+            }
+        }
+        const bool needsSession = collection == QStringLiteral("rehabilitation-observations") ||
+                                  collection == QStringLiteral("rehabilitation-decisions");
+        if (needsSession) {
+            const QString sessionId = payload.value(QStringLiteral("session_id")).toString().trimmed();
+            if (!validId(sessionId)) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_SESSION_REFERENCE"));
+                return false;
+            }
+            QJsonObject session;
+            QString sessionError;
+            if (!readRecord(QStringLiteral("rehabilitation-sessions"), sessionId, session, &sessionError)) {
+                setError(error, sessionError == QStringLiteral("RESOURCE_NOT_FOUND")
+                    ? QStringLiteral("REHABILITATION_SESSION_NOT_FOUND") : sessionError);
+                return false;
+            }
+            if (session.value(QStringLiteral("patient_id")).toString().compare(
+                    patientId, Qt::CaseInsensitive) != 0 ||
+                session.value(QStringLiteral("episode_id")).toString().compare(
+                    episodeId, Qt::CaseInsensitive) != 0) {
+                setError(error, QStringLiteral("REHABILITATION_SESSION_CONTEXT_MISMATCH"));
+                return false;
+            }
+        }
+    }
+
+    if (collection == QStringLiteral("rehabilitation-sessions")) {
+        const QStringList painFields = {
+            QStringLiteral("pre_session_pain_nrs"),
+            QStringLiteral("post_session_pain_nrs"),
+            QStringLiteral("pain_at_24h_nrs")
+        };
+        for (const QString& field : painFields) {
+            if (!payload.contains(field)) continue;
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble()) ||
+                value.toDouble() < 0.0 || value.toDouble() > 10.0 ||
+                std::floor(value.toDouble()) != value.toDouble()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_SESSION_PAIN_NRS"));
+                return false;
+            }
+        }
+        const QString status = payload.value(QStringLiteral("session_status")).toString();
+        if (!status.isEmpty() &&
+            status != QStringLiteral("active") &&
+            status != QStringLiteral("awaiting_24h") &&
+            status != QStringLiteral("completed") &&
+            status != QStringLiteral("paused")) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_SESSION_STATUS"));
+            return false;
+        }
+    }
+
+
+    if (collection == QStringLiteral("rehabilitation-observations")) {
+        const QString exercise = payload.value(QStringLiteral("exercise_name")).toString().trimmed();
+        if (exercise.isEmpty() || exercise.size() > 200) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_OBSERVATION_EXERCISE"));
+            return false;
+        }
+        const QStringList requiredIntegerFields = {
+            QStringLiteral("completed_sets"), QStringLiteral("completed_repetitions"),
+            QStringLiteral("pain_before"), QStringLiteral("pain_after")
+        };
+        for (const QString& field : requiredIntegerFields) {
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble()) ||
+                std::floor(value.toDouble()) != value.toDouble()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_OBSERVATION_VALUE"));
+                return false;
+            }
+            const double number = value.toDouble();
+            const double maximum = field == QStringLiteral("completed_sets") ? 100.0
+                : field == QStringLiteral("completed_repetitions") ? 10000.0 : 10.0;
+            if (number < 0.0 || number > maximum) {
+                setError(error, QStringLiteral("REHABILITATION_OBSERVATION_VALUE_OUT_OF_RANGE"));
+                return false;
+            }
+        }
+        const QStringList optionalIntegerFields = {
+            QStringLiteral("duration_seconds"), QStringLiteral("rpe"),
+            QStringLiteral("pain_at_24h")
+        };
+        for (const QString& field : optionalIntegerFields) {
+            if (!payload.contains(field)) continue;
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble()) ||
+                std::floor(value.toDouble()) != value.toDouble()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_OBSERVATION_VALUE"));
+                return false;
+            }
+            const double number = value.toDouble();
+            const double minimum = field == QStringLiteral("duration_seconds") ? 1.0 : 0.0;
+            const double maximum = field == QStringLiteral("duration_seconds") ? 86400.0 : 10.0;
+            if (number < minimum || number > maximum) {
+                setError(error, QStringLiteral("REHABILITATION_OBSERVATION_VALUE_OUT_OF_RANGE"));
+                return false;
+            }
+        }
+        const QString quality = payload.value(QStringLiteral("movement_quality")).toString();
+        if (!quality.isEmpty() && quality != QStringLiteral("not_assessed") &&
+            quality != QStringLiteral("acceptable") && quality != QStringLiteral("unacceptable")) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_MOVEMENT_QUALITY"));
+            return false;
+        }
+    }
+
+    if (collection == QStringLiteral("rehabilitation-assessments")) {
+        const QString assessmentType = payload.value(QStringLiteral("assessment_type")).toString();
+        if (assessmentType != QStringLiteral("baseline") &&
+            assessmentType != QStringLiteral("follow_up") &&
+            assessmentType != QStringLiteral("final")) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_ASSESSMENT_TYPE"));
+            return false;
+        }
+        const QString icfReference = payload.value(QStringLiteral("icf_assessment_ref")).toString().trimmed();
+        if (payload.contains(QStringLiteral("icf_assessment_ref"))) {
+            if (icfReference.isEmpty()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_ICF_REFERENCE"));
+                return false;
+            }
+            QJsonObject patient;
+            QString patientError;
+            if (!readRecord(QStringLiteral("patients"), patientId, patient, &patientError)) {
+                setError(error, patientError);
+                return false;
+            }
+            const QJsonObject currentIcf = patient.value(QStringLiteral("icf_assessment")).toObject();
+            // New records use immutable assessment UUIDs. Timestamp matching remains
+            // supported only for legacy records created before UUID references existed.
+            bool referenceFound = currentIcf.value(QStringLiteral("id")).toString() == icfReference ||
+                (currentIcf.value(QStringLiteral("id")).toString().isEmpty() &&
+                 currentIcf.value(QStringLiteral("assessed_at")).toString() == icfReference);
+            const QJsonArray icfHistory = patient.value(QStringLiteral("icf_assessment_history")).toArray();
+            for (const QJsonValue& entry : icfHistory) {
+                const QJsonObject historical = entry.toObject();
+                const QString historicalId = historical.value(QStringLiteral("id")).toString();
+                if (historicalId == icfReference ||
+                    (historicalId.isEmpty() &&
+                     historical.value(QStringLiteral("assessed_at")).toString() == icfReference)) {
+                    referenceFound = true;
+                    break;
+                }
+            }
+            if (!referenceFound) {
+                setError(error, QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
+                return false;
+            }
+        }
+        const QStringList numericFields = {
+            QStringLiteral("pain_nrs"), QStringLiteral("rom_degrees"),
+            QStringLiteral("strength_mrc"), QStringLiteral("swelling_cm")
+        };
+        bool hasClinicalValue = false;
+        for (const QString& field : numericFields) {
+            if (!payload.contains(field)) continue;
+            hasClinicalValue = true;
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble())) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_ASSESSMENT_VALUE"));
+                return false;
+            }
+            const double number = value.toDouble();
+            double minimum = 0.0;
+            double maximum = 0.0;
+            bool integerOnly = false;
+            if (field == QStringLiteral("pain_nrs")) {
+                maximum = 10.0;
+                integerOnly = true;
+            } else if (field == QStringLiteral("rom_degrees")) {
+                maximum = 360.0;
+            } else if (field == QStringLiteral("strength_mrc")) {
+                maximum = 5.0;
+                integerOnly = true;
+            } else {
+                maximum = 100.0;
+            }
+            if (number < minimum || number > maximum ||
+                (integerOnly && std::floor(number) != number)) {
+                setError(error, QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_OUT_OF_RANGE"));
+                return false;
+            }
+        }
+        const QJsonValue functionalTest = payload.value(QStringLiteral("functional_test"));
+        if (!functionalTest.isUndefined()) {
+            if (!functionalTest.isString() || functionalTest.toString().trimmed().isEmpty() ||
+                functionalTest.toString().size() > 500) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_FUNCTIONAL_TEST"));
+                return false;
+            }
+            hasClinicalValue = true;
+        }
+        if (!hasClinicalValue) {
+            setError(error, QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_REQUIRED"));
+            return false;
+        }
+    }
+
+    if (collection == QStringLiteral("rehabilitation-goals")) {
+        const QString title = payload.value(QStringLiteral("title")).toString().trimmed();
+        const QString metric = payload.value(QStringLiteral("metric_id")).toString().trimmed();
+        const QString unit = payload.value(QStringLiteral("unit")).toString().trimmed();
+        const QJsonValue baselineValue = payload.value(QStringLiteral("baseline_value"));
+        const QJsonValue targetValue = payload.value(QStringLiteral("target_value"));
+        if (title.isEmpty() || title.size() > 200 || metric.isEmpty() || metric.size() > 120 ||
+            unit.isEmpty() || unit.size() > 32 ||
+            !baselineValue.isDouble() || !targetValue.isDouble() ||
+            !std::isfinite(baselineValue.toDouble()) || !std::isfinite(targetValue.toDouble())) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_GOAL"));
+            return false;
+        }
+        const QString targetDate = payload.value(QStringLiteral("target_date")).toString().trimmed();
+        if (!targetDate.isEmpty()) {
+            const QDate parsedDate = QDate::fromString(targetDate, Qt::ISODate);
+            if (!parsedDate.isValid() || parsedDate.toString(Qt::ISODate) != targetDate) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_GOAL_DATE"));
+                return false;
+            }
         }
     }
 

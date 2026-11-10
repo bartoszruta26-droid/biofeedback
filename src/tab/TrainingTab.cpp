@@ -314,7 +314,9 @@ TrainingTab::TrainingTab(QWidget *parent)
 {
     m_liveUiTimer->setSingleShot(true);
     m_liveUiTimer->setTimerType(Qt::PreciseTimer);
-    m_liveUiTimer->setInterval(16);
+    // Refresh the game-control presentation at 120 Hz; incoming sensor samples
+    // remain authoritative and are coalesced to the newest value.
+    m_liveUiTimer->setInterval(8);
     connect(m_liveUiTimer, &QTimer::timeout, this, &TrainingTab::refreshLiveUi);
     setupUI();
 }

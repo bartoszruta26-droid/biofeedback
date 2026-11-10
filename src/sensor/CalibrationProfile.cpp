@@ -97,6 +97,19 @@ std::optional<double> CalibrationMath::convertRaw(int32_t raw,
     return result;
 }
 
+std::optional<double> CalibrationMath::convertRawWithPolarity(
+    int32_t raw, double zeroOffsetRaw, double scaleFactor, int rawPolarity) noexcept
+{
+    if (rawPolarity != -1 && rawPolarity != 1) return std::nullopt;
+    if (!std::isfinite(zeroOffsetRaw) || !std::isfinite(scaleFactor) ||
+        std::abs(scaleFactor) < 1e-15)
+        return std::nullopt;
+    const double delta = static_cast<double>(raw) - zeroOffsetRaw;
+    const double result = delta * std::abs(scaleFactor) * static_cast<double>(rawPolarity);
+    if (!std::isfinite(result)) return std::nullopt;
+    return result;
+}
+
 bool CalibrationProfile::isValidFor(const std::string& expectedDeviceId) const noexcept
 {
     if (schemaVersion != CurrentSchemaVersion || deviceId.empty() ||

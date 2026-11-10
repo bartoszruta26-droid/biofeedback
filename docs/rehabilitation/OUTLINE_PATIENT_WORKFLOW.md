@@ -1,0 +1,323 @@
+# Outline — indywidualny proces rehabilitacji pacjenta
+
+## Cel i zakres
+
+Outline ma prowadzić kompletny, audytowalny proces rehabilitacji: od kwalifikacji i pomiaru bazowego, przez planowanie celów i realizację sesji, po ocenę wyniku. Konspekt pozostaje szablonem klinicznym; pacjent otrzymuje odrębny, wersjonowany plan indywidualny. Dane sesji nie mogą modyfikować źródłowego konspektu.
+
+Zakres pierwszej implementacji:
+1. Indywidualna karta pacjenta i powiązanie jej z planem rehabilitacji.
+2. Cele terapeutyczne z wartością początkową, docelową, terminem i metodą pomiaru.
+3. Rejestracja bólu przed i po każdym ćwiczeniu oraz podsumowanie reakcji po sesji.
+4. Rejestrowanie dawki: serie, powtórzenia, czas, obciążenie, RPE, jakość wykonania i pomiar biofeedbacku.
+5. Reguły oceny gotowości do progresji oraz jawna akceptacja terapeuty.
+6. Raport końcowy porównujący wartości bazowe i aktualne.
+
+Poza zakresem pierwszego etapu: samodzielne rozpoznawanie chorób, automatyczna zmiana ograniczeń pooperacyjnych, automatyczne ordynowanie ćwiczeń i interpretowanie pomiarów jako diagnozy.
+
+## Model danych
+
+### PatientReference
+
+Dane osobowe pozostają w istniejącym module pacjentów. Sesja rehabilitacyjna przechowuje wyłącznie wewnętrzny identyfikator pacjenta (UUID), bez PESEL, nazwiska, adresu i innych danych bezpośrednich. Widok może pobrać nazwę z modułu pacjentów po autoryzowanym powiązaniu. Eksport PDF jest świadomą operacją użytkownika. Obecna wersja raportu zawiera nazwę wyświetlaną pacjenta z kontekstu interfejsu oraz UUID epizodu; nie zawiera PESEL. Wybór wariantu zanonimizowanego pozostaje osobnym zadaniem i nie jest jeszcze dostępny w interfejsie.
+
+Pola powiązania:
+- patient_id: UUID wymagany;
+- icf_assessment_ref: UUID konkretnej, niezmiennej wersji oceny ICF; bez kopiowania odpowiedzi ICF do epizodu.
+- created_at, updated_at: UTC ISO-8601;
+- record_version: dodatnia liczba całkowita;
+- consent_status i consent_recorded_at: stan zgody oraz data, jeśli ma zastosowanie;
+- clinician_id: identyfikator operatora/terapeuty, jeśli system obsługuje konta.
+
+### RehabilitationEpisode
+
+Jeden epizod odpowiada jednemu problemowi funkcjonalnemu i może obejmować wiele sesji.
+
+Pola:
+- id, patient_id, outline_id, outline_version;
+- region, side, working_diagnosis, diagnosis_status;
+- onset_date, episode_start_date, planned_review_date, episode_end_date;
+- care_path: conservative, post_meniscectomy, post_repair, other;
+- precautions: jawna lista ograniczeń, źródło ograniczenia i data weryfikacji;
+- red_flag_screen: wynik, data, osoba wykonująca i komentarz;
+- baseline_assessment_id, current_status;
+- status: draft, active, paused, completed, archived.
+
+Ograniczenia pooperacyjne są polami epizodu, a nie parametrem możliwym do nadpisania przez algorytm progresji. Zmiana wymaga działania uprawnionego terapeuty i zapisania uzasadnienia.
+
+### PatientAssessment
+
+Ocena jest niezmiennym zapisem wykonanym w określonym czasie. Korekta tworzy nową wersję/ocenę, nie nadpisuje historii.
+
+Pola wspólne:
+- id, episode_id, assessed_at, assessor_id;
+- pain_rest_nrs, pain_activity_nrs (0–10; dopuszczalne null);
+- patient_reported_outcome: instrument, version, raw_score, normalized_score;
+- range_of_motion: joint, movement, value, unit, method;
+- strength: movement, value, unit, device, protocol, calibration_id;
+- swelling_or_edema: method, value, unit;
+- functional_tests: test_id, protocol, result, unit, side;
+- notes, measurement_quality, missing_data_reason.
+
+Każdy pomiar siły musi zawierać jednostkę, stronę, pozycję, metodę, identyfikator urządzenia i status kalibracji. Wartości bez poprawnej kalibracji nie mogą być przedstawiane jako wiarygodna siła w N/kg. Wynik RAW można zachować jako osobny kanał techniczny.
+
+### TherapeuticGoal
+
+Cel ma być mierzalny, terminowy i powiązany z funkcją pacjenta.
+
+Pola:
+- id, episode_id, title, functional_context;
+- metric_id, baseline_value, target_value, current_value, unit;
+- target_date, priority, status;
+- measurement_method, reassessment_interval_days;
+- patient_agreed: boolean, agreed_at;
+- achieved_at, clinician_comment.
+
+Cele mogą dotyczyć bólu, zakresu ruchu, siły, tolerancji obciążenia, testu funkcjonalnego albo konkretnej aktywności życia codziennego/pracy/sportu. Nie należy porównywać wartości pochodzących z różnych metod lub jednostek bez jawnej normalizacji.
+
+### ExercisePrescription
+
+Indywidualna recepta ćwiczenia jest kopią parametrów z szablonu z możliwością klinicznej indywidualizacji.
+
+Pola:
+- id, episode_id, source_exercise_id, exercise_name;
+- order_index, phase, permitted_rom, permitted_load;
+- sets_target, reps_target, hold_seconds, rest_seconds;
+- resistance_value, resistance_unit, tempo, rpe_target;
+- pain_policy_id, progression_rule_id;
+- assigned_at, assigned_by, active, stop_reason.
+
+### ExerciseObservation
+
+Jeden rekord dotyczy jednego wykonania/serii ćwiczenia.
+
+Pola:
+- id, session_id, prescription_id, exercise_id, sequence_index;
+- pain_before_nrs, pain_after_nrs, pain_peak_nrs;
+- completed_sets, completed_repetitions, duration_seconds;
+- resistance_value, resistance_unit, rpe, perceived_difficulty;
+- movement_quality: acceptable, compensatory, unsafe, not_assessed;
+- biofeedback: metric, value, unit, sample_count, quality, calibration_id;
+- symptom_response_24h: pending, returned_to_baseline, worse, improved, unknown;
+- skipped, skip_reason, therapist_note, recorded_at.
+
+Skale bólu są jawnie opisane: NRS 0 oznacza brak bólu, 10 — najgorszy wyobrażalny ból. Brak odpowiedzi jest null, a nie zero. Ból przed i po ćwiczeniu to osobne pomiary i nie wolno ich scalać w jedną średnią.
+
+### RehabilitationSession
+
+Pola:
+- id, episode_id, patient_id, started_at, ended_at;
+- therapist_id, session_status, session_notes;
+- pre_session_pain_nrs, post_session_pain_nrs;
+- adverse_event, adverse_event_description;
+- exercise_observation_ids;
+- progression_review_status, report_snapshot_id.
+
+## Kryteria progresji
+
+Reguły są wersjonowanymi, konfigurowalnymi propozycjami klinicznymi. Każda reguła określa warunki, okno obserwacji, minimalną liczbę poprawnych sesji, kryteria wykluczające, proponowaną zmianę i wymagany poziom zatwierdzenia.
+
+Przykładowy zestaw warunków do oceny gotowości:
+- pacjent wykonał zaplanowaną dawkę w wymaganej jakości ruchu;
+- brak niepożądanej kompensacji i zdarzenia niepożądanego;
+- reakcja bólowo-objawowa mieści się w indywidualnym limicie określonym przez terapeutę;
+- objawy wracają do ustalonego poziomu w uzgodnionym oknie (np. do 24 godzin), jeśli takie kryterium jest właściwe dla danego przypadku;
+- nie występuje wzrost wysięku/obrzęku ani pogorszenie funkcji;
+- pomiar biofeedbacku jest poprawny, skalibrowany i ma wystarczającą jakość, jeżeli jest używany jako kryterium.
+
+Wynik silnika reguł:
+- NOT_EVALUABLE — brakuje danych, kalibracji lub obserwacji kontrolnej;
+- HOLD — utrzymaj dawkę i ponownie oceń;
+- REVIEW — wymagana ocena terapeuty;
+- SUGGEST_PROGRESS — warunki spełnione; przedstaw propozycję;
+- REGRESSION_REVIEW — wystąpiło pogorszenie; zaproponuj przegląd obciążenia.
+
+Silnik nie zmienia samodzielnie ćwiczeń, zakresu ruchu, obciążania, etapu pooperacyjnego ani ograniczeń operatora. Propozycja progresji wymaga akceptacji terapeuty. Każda decyzja zapisuje: wersję reguły, dane wejściowe, wynik, autora zatwierdzenia, datę i uzasadnienie.
+
+Nie stosuj jednego uniwersalnego progu bólu dla wszystkich rozpoznań. Progi i tolerancja obciążenia są definiowane dla danego epizodu oraz etapu leczenia. Alarmy bezpieczeństwa mają pierwszeństwo przed oceną progresji.
+
+## Przepływ sesji
+
+1. Terapeuta wybiera pacjenta i aktywny epizod.
+2. Aplikacja pokazuje ostrzeżenia, ograniczenia, cele i datę ostatniej oceny.
+3. Przed sesją zapisuje się ból spoczynkowy i/lub ból przy aktywności.
+4. Dla każdego ćwiczenia rejestruje się ból przed wykonaniem.
+5. Podczas ćwiczenia zapisywane są dawka, jakość ruchu, RPE i poprawne pomiary biofeedbacku.
+6. Po ćwiczeniu zapisywany jest ból i komentarz pacjenta.
+7. Po sesji zapisywany jest ból końcowy, tolerancja sesji i zdarzenia niepożądane.
+8. Po wymaganym czasie uzupełnia się odpowiedź 24-godzinną.
+9. Silnik reguł ocenia kompletne dane i przedstawia rekomendację.
+10. Terapeuta akceptuje, odrzuca lub modyfikuje rekomendację z uzasadnieniem.
+
+Sesję można przerwać i wznowić. Stan niekompletny nie może zostać oznaczony jako ukończony. Brak danych nie jest interpretowany jako wynik prawidłowy.
+
+## Raport końcowy
+
+Raport powinien zawierać:
+- identyfikację epizodu i okres rehabilitacji;
+- rozpoznanie robocze, stronę, ścieżkę leczenia i ograniczenia;
+- cele uzgodnione z pacjentem oraz status każdego celu;
+- tabelę pomiarów bazowych, pośrednich i końcowych;
+- różnicę bezwzględną, procentową tylko gdy matematycznie i klinicznie ma sens, jednostkę i metodę;
+- wyniki kwestionariuszy z nazwą i wersją narzędzia;
+- wykres trendu bólu przed/po ćwiczeniach;
+- wykres siły/zakresu ruchu wyłącznie dla porównywalnych pomiarów;
+- frekwencję, wykonane dawki, tolerancję i przerwane ćwiczenia;
+- historię propozycji progresji oraz decyzji terapeuty;
+- zdarzenia niepożądane, ograniczenia i brakujące dane;
+- wnioski, dalszy plan i podpis/identyfikator osoby zatwierdzającej.
+
+Porównanie musi zestawiać tę samą stronę, pozycję, metodę, urządzenie/protokół i jednostkę. Raport ma oznaczać zmianę jako opisową, jeżeli nie ma podstaw do interpretacji klinicznej. Nie wolno automatycznie orzekać o skuteczności leczenia ani powrocie do sportu wyłącznie na podstawie jednego pomiaru.
+
+## Interfejs Outline
+
+### Panel lewy — praca z pacjentem
+- multimedia i instrukcja aktualnego ćwiczenia;
+- wykres biofeedbacku w czasie rzeczywistym;
+- dziennik bólu przed/po ćwiczeniu;
+- postęp sesji i jakość wykonania;
+- podgląd protokołu klinicznego;
+- podsumowanie reakcji po sesji.
+
+### Panel prawy — sterowanie i dane
+- wybór pacjenta i epizodu;
+- karta kliniczna i ograniczenia;
+- cele terapeutyczne;
+- indywidualna dawka ćwiczeń;
+- ustawienia sesji i reguł progresji;
+- akceptacja/odrzucenie rekomendacji;
+- generowanie raportu.
+
+### Widoki pomocnicze
+- Karta pacjenta: dane identyfikacyjne tylko z modułu PatientTab, historia epizodów i zgody.
+- Ocena: pomiary bazowe/aktualne i kwestionariusze.
+- Cele: lista celów z trendami i terminami.
+- Historia: sesje, obserwacje, decyzje i raporty.
+- Raport: podgląd, eksport PDF/CSV i wybór anonimizacji.
+
+## Prywatność, bezpieczeństwo i audyt
+
+- Dane medyczne i identyfikacyjne są danymi szczególnej kategorii. Dostęp wymaga kontroli uprawnień i celu przetwarzania.
+- Nie umieszczaj PESEL, nazwiska, daty urodzenia ani notatek klinicznych w logach technicznych, nazwach plików, identyfikatorach zdarzeń ani telemetrii.
+- Zastosuj szyfrowanie danych w spoczynku i w kopiach zapasowych, kontrolę dostępu, blokadę sesji, kopie zapasowe i test odtwarzania.
+- Każdy odczyt/zmiana/eksport danych medycznych powinien mieć ślad audytowy adekwatny do architektury i wymagań prawnych.
+- Zastosuj wersjonowanie rekordów i ochronę przed nadpisaniem równoległych zmian.
+- Raporty eksportowane domyślnie powinny być minimalizowane; użytkownik wybiera, czy potrzebne są dane identyfikujące.
+- Nie używaj rzeczywistych danych pacjentów w testach automatycznych. Stosuj syntetyczne dane.
+- Ustal retencję, procedurę usuwania/anonimizacji i kontrolę eksportu przed wdrożeniem produkcyjnym.
+
+## Plan wdrożenia
+
+### Etap 1 — model domenowy i trwałość
+- dodać wersjonowane rekordy epizodów, ocen, celów, recept, sesji, obserwacji i decyzji progresji;
+- wykorzystać istniejący JsonResourceRepository tylko po rozszerzeniu walidacji schematów i polityki prywatności;
+- dodać testy walidacji, konfliktów wersji, szyfrowania, uprawnień i izolacji pacjentów.
+
+### Etap 2 — karta i ocena bazowa
+- powiązać Outline z istniejącym PatientTab przez UUID;
+- utworzyć epizod i ocenę bazową;
+- dodać edytor celów i ograniczeń.
+
+### Etap 3 — rejestracja sesji
+- formularze bólu przed/po;
+- rejestracja dawki i jakości;
+- wiązanie pomiarów z sesją i ćwiczeniem;
+- obsługa przerwania/wznowienia i odpowiedzi 24-godzinnej.
+
+### Etap 4 — reguły progresji
+- deterministyczny silnik reguł niezależny od GUI;
+- wynik wraz z uzasadnieniem i brakującymi danymi;
+- zatwierdzanie przez terapeutę i dziennik decyzji.
+
+### Eksport raportu PDF — implementacja
+
+W `OutlineTab` dostępny jest jawny przycisk eksportu raportu bieżącego epizodu. Raport pobiera dane z repozytorium i obejmuje oceny początkowe/kontrolne/końcowe, cele terapeutyczne, sesje, obserwacje ćwiczeń oraz dokładne wersje ocen ICF wskazane przez odwołania z ocen klinicznych, wraz z zapisanymi kwalifikatorami domen. Eksport jest przerywany, jeżeli nie można odczytać któregokolwiek wymaganego zbioru danych; aplikacja nie tworzy raportu częściowego jako kompletnego. Brak pomiaru pozostaje pusty, a nie jest zamieniany na zero. Raport zawiera nazwę wyświetlaną pacjenta i identyfikator epizodu, ale nie PESEL. Wersja zanonimizowana, podpis elektroniczny, niezmienny snapshot i ślad audytowy eksportu wymagają dalszej implementacji.
+
+### Etap 5 — raport i walidacja
+- raport porównawczy z wykresami;
+- eksport z anonimizacją;
+- testy regresyjne i testy scenariuszy klinicznych na danych syntetycznych;
+- przegląd prywatności, bezpieczeństwa i użyteczności przed wdrożeniem.
+
+## Kryteria akceptacji
+
+- Sesja jest zawsze powiązana z pacjentem, epizodem i konkretną wersją konspektu.
+- Ból przed i po ćwiczeniu zapisuje się osobno; null nie jest zamieniany na zero.
+- Każdy pomiar ma jednostkę, metodę, stronę i status jakości/kalibracji.
+- Cele zawierają wartość bazową, docelową, termin i metodę oceny.
+- Silnik progresji zwraca wynik deterministyczny i uzasadnienie; nie modyfikuje planu bez zatwierdzenia.
+- Ograniczenia pooperacyjne blokują niezgodne propozycje.
+- Raport pokazuje porównywalne pomiary, ich różnicę, metodę i brakujące dane.
+- Testy potwierdzają izolację danych pacjentów, ochronę przed konfliktami wersji i brak danych osobowych w logach.
+- Testy nie używają rzeczywistych danych pacjentów.
+
+## Status implementacji w repozytorium
+
+Pierwszy element wykonawczy został dodany:
+- `include/rehabilitation/ProgressionRules.hpp` — niezależny od GUI, deterministyczny silnik oceny kryteriów;
+- `tests/rehabilitation_progression_rules_regression.cpp` — testy braku danych, zakresów NRS, nieprawidłowych wartości liczbowych, jakości ruchu, dawki, zdarzeń niepożądanych, czerwonych flag, konfliktu ograniczeń pooperacyjnych i zatwierdzania przez terapeutę;
+- test zarejestrowany w CMake jako `rehabilitation_progression_rules_regression`.
+
+Silnik zwraca wyłącznie rekomendację. Nie zapisuje danych, nie zmienia recepty ćwiczenia i nie wykonuje progresji. Zatwierdzenie wymaga uwierzytelnionego terapeuty oraz jawnej akceptacji; warstwa aplikacyjna musi dopisać do tego trwały ślad audytowy. Interfejs, trwały model epizodu, rejestracja bólu i raport porównawczy pozostają kolejnymi etapami.
+
+
+## Aktualizacja implementacji — trwały magazyn danych rehabilitacyjnych
+
+Wspólny `JsonResourceRepository` udostępnia teraz następujące kolekcje:
+
+- `rehabilitation-episodes` — epizody rehabilitacyjne;
+- `rehabilitation-assessments` — oceny początkowe, kontrolne i końcowe;
+- `rehabilitation-goals` — cele terapeutyczne;
+- `rehabilitation-sessions` — sesje rehabilitacyjne;
+- `rehabilitation-observations` — obserwacje ćwiczeń, w tym ból i dawka;
+- `rehabilitation-decisions` — oceny reguł progresji i decyzje wymagające zatwierdzenia.
+
+Każdy rekord rehabilitacyjny wymaga istniejącego `patient_id` będącego UUID rekordu w kolekcji `patients`. Rekordy zależne wymagają `episode_id`; obserwacje i decyzje wymagają również `session_id`. Repozytorium weryfikuje zgodność pacjenta i epizodu pomiędzy powiązanymi rekordami. Usunięcie pacjenta, epizodu lub sesji jest blokowane, gdy istnieją rekordy zależne. Dane nadal przechodzą przez dotychczasowy mechanizm szyfrowania, ograniczenia dostępu do plików i wersjonowania optymistycznego.
+
+Test regresyjny repozytorium obejmuje tworzenie i usuwanie sześciu rodzajów rekordów, odrzucanie nieistniejącego pacjenta oraz ochronę relacji przed osieroceniem.
+
+**Status integracji tożsamości:** `Application` rozwiązuje PESEL emitowany przez `PatientTab` do rekordu pacjenta w `JsonResourceRepository`, a do `OutlineTab` przekazuje wyłącznie kanoniczny UUID oraz nazwę wyświetlaną. PESEL służy wyłącznie do odnalezienia rekordu i nie jest zapisywany w rekordach rehabilitacyjnych. Jeżeli lookup się nie powiedzie, kontekst pacjenta w Outline jest czyszczony.
+
+
+## Aktualizacja interfejsu — ocena kliniczna
+
+W `OutlineTab` dodano formularz oceny początkowej powiązany z aktualnie wybranym pacjentem i epizodem. Formularz zapisuje rekord do `rehabilitation-assessments` i pokazuje historię ocen danego epizodu.
+
+Pola i zakresy:
+- `pain_nrs`: liczba całkowita 0–10;
+- `rom_degrees`: liczba 0–360 stopni;
+- `strength_mrc`: liczba całkowita 0–5;
+- `swelling_cm`: liczba 0–100 cm;
+- `functional_test`: opis testu i wyniku, maksymalnie 500 znaków.
+
+Puste pole oznacza brak pomiaru i jest pomijane w rekordzie. Wartość 0 jest zachowywana jako rzeczywisty wynik, a nie zamieniana na brak danych. Wymagany jest co najmniej jeden oceniony parametr. Zakresy są walidowane zarówno w formularzu, jak i w `JsonResourceRepository`, również dla zapisów spoza GUI.
+
+Ocena zawiera `patient_id`, `episode_id`, typ `baseline` i czas UTC. Historia jest filtrowana po UUID pacjenta i epizodu. Formularz nie stawia rozpoznania i nie podejmuje decyzji terapeutycznych.
+
+
+## Aktualizacja interfejsu — cele terapeutyczne
+
+W `OutlineTab` dodano formularz trwałego zapisu celów do kolekcji `rehabilitation-goals`. Każdy cel jest przypisany do UUID pacjenta i epizodu oraz zawiera nazwę celu funkcjonalnego, wskaźnik/metodę pomiaru, wartość początkową, wartość docelową, jednostkę, status i opcjonalny termin. Termin jest walidowany jako rzeczywista data ISO 8601 `RRRR-MM-DD`. Wartości liczbowe muszą być skończone; repozytorium ponownie waliduje wymagane pola i datę, niezależnie od interfejsu. Lista celów jest filtrowana według bieżącego pacjenta i epizodu. Obecny etap umożliwia zapis i przegląd celów; nie oblicza automatycznie ich realizacji ani nie zmienia zaleceń ćwiczeń.
+
+
+## Aktualizacja interfejsu — przebieg sesji i kontrola po 24 godzinach
+
+W `OutlineTab` dodano trwały cykl sesji rehabilitacyjnej w kolekcji `rehabilitation-sessions`. Rozpoczęcie sesji wymaga wpisania bólu przed sesją w skali NRS 0–10. Zakończenie zapisuje ból po sesji, czas zakończenia i stan `awaiting_24h`. Po kontroli pacjenta zapisuje się `pain_at_24h_nrs`, czas kontroli i stan `completed`. Otwarta sesja jest odtwarzana po ponownym wybraniu epizodu, ponieważ jej stan jest pobierany z repozytorium. Repozytorium waliduje zakresy wszystkich trzech wartości NRS i dopuszczalne stany sesji. Ten mechanizm zapisuje ból na poziomie całej sesji; rejestrowanie bólu dla poszczególnych ćwiczeń i serii pozostaje osobnym, kolejnym etapem.
+
+
+## Aktualizacja interfejsu — obserwacje poszczególnych ćwiczeń
+
+W aktywnej sesji można zapisywać odrębne obserwacje wykonania ćwiczeń w kolekcji `rehabilitation-observations`. Rekord jest powiązany z UUID pacjenta, epizodu i sesji. Zawiera nazwę ćwiczenia, liczbę wykonanych serii i powtórzeń, ból przed i po ćwiczeniu, ocenę jakości ruchu oraz opcjonalnie czas wykonania, RPE i ból po 24 godzinach. Brak wartości opcjonalnej pozostaje brakiem danych, a nie zerem.
+
+Formularz pozwala zapisywać obserwacje wyłącznie podczas aktywnej sesji. Historia jest filtrowana według bieżącego pacjenta i epizodu. Repozytorium niezależnie waliduje zakresy: serie 0–100, powtórzenia 0–10000, NRS i RPE 0–10, czas 1–86400 sekund. Jakość ruchu ma wartości `not_assessed`, `acceptable` lub `unacceptable`. Nieprawidłowe dane są odrzucane również przy zapisie poza GUI.
+
+Obecny formularz zapisuje wykonane parametry, ale nie stanowi jeszcze pełnego systemu recept ćwiczeń: nie definiuje planowanej dawki, strony ciała, obciążenia ani wersjonowanej instrukcji. Nie wylicza automatycznie progresji i nie modyfikuje zaleceń klinicznych. Kontrola bólu po 24 godzinach na poziomie pojedynczego ćwiczenia jest zapisywana, jeśli została już zebrana; odrębny mechanizm przypomnienia i późniejszego uzupełnienia obserwacji będzie kolejnym etapem.
+
+Ocena rehabilitacyjna ma jawny typ: `baseline` (początkowa), `follow_up` (kontrolna) albo `final` (końcowa). Repozytorium odrzuca nieznane wartości, a historia w interfejsie pokazuje typ każdej oceny. Typ opisuje etap dokumentowania i sam w sobie nie stanowi kryterium progresji.
+
+## Powiązanie oceny ICF z oceną rehabilitacyjną
+
+Ocena rehabilitacyjna może zawierać opcjonalne pole `icf_assessment_ref`. Jest to dokładna wartość `assessed_at` oceny ICF zapisanej w kartotece tego samego pacjenta. Repozytorium sprawdza, czy wskazana ocena występuje jako bieżące `icf_assessment` albo w `icf_assessment_history`. Dzięki temu odwołanie pozostaje poprawne także po wykonaniu kolejnej oceny ICF i przeniesieniu poprzedniej wersji do historii.
+
+Do rekordu rehabilitacyjnego nie są kopiowane odpowiedzi ICF, dane identyfikacyjne ani PESEL. Rekord nadal zawiera wyłącznie UUID pacjenta, UUID epizodu oraz odwołanie do konkretnej wersji oceny ICF. Brak oceny ICF nie blokuje zapisu oceny rehabilitacyjnej; w takim przypadku pole referencyjne jest pomijane. Nieprawidłowe lub nieistniejące odwołanie jest odrzucane przez repozytorium.
+
+Wartość `assessed_at` pełni obecnie rolę identyfikatora wersji oceny ICF. W razie przyszłej migracji modelu należy zastąpić ją dedykowanym, niezmiennym `assessment_id`, zachowując obsługę dotychczasowych odwołań. Powiązanie ma charakter dokumentacyjny i nie oznacza automatycznej interpretacji kwalifikatorów ICF ani generowania decyzji terapeutycznej.

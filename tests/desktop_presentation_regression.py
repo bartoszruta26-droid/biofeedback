@@ -7,9 +7,47 @@ def read(path):
     return (ROOT / path).read_text(encoding="utf-8")
 
 main = read("src/gui/MainWindow.cpp")
+application = read("src/core/Application.cpp")
 measurement = read("src/tab/MeasurementTab.cpp")
 training = read("src/tab/TrainingTab.cpp")
 patient = read("src/tab/PatientTab.cpp")
+assert 'Ocena funkcjonalna ICF' in patient
+assert 'openIcfAssessmentDialog()' in patient
+assert 'icf-functional-screening-v1' in patient
+assert '"b280"' in patient and '"b710"' in patient and '"b730"' in patient
+assert '"d410"' in patient and '"d450"' in patient and '"d850"' in patient
+assert '"e310"' in patient and '"e580"' in patient
+assert '"s730"' in patient and '"s750"' in patient and '"s760"' in patient and '"s770"' in patient
+assert '"Nie oceniono"' in patient
+assert '"-8 — bariera, stopień nieokreślony"' in patient
+assert '"+8 — ułatwiacz, stopień nieokreślony"' in patient
+assert 'const QList<int> values = {-99, 0, -1, -2, -3, -4, 1, 2, 3, 4, -8, 8, 9}' in patient
+
+assert 'currentData().toInt()' in patient
+assert 'patientIcfAssessmentChanged' in patient
+assert 'patientIcfAssessmentChanged' in application
+assert 'icf_assessment' in application
+assert 'icf_assessment_history' in application
+assert 'assessmentHistory.size() > 100' in application
+assert 'previousAlreadyArchived' in application
+assert 'assessmentHistory.append(previousAssessment)' in application
+
+assert 'icf_assessment_history' in application
+
+assert 'setPatientIcfAssessment(' in application
+assert 'Historia ICF' in patient
+assert 'openIcfAssessmentHistoryDialog()' in patient
+assert 'm_icfAssessmentHistories' in patient
+assert 'icf_assessment_history' in application
+assert 'patient.value(QStringLiteral("icf_assessment_history")).toArray()' in application
+assert 'm_patientTab->setPatientIcfAssessment(pesel, assessment, assessmentHistory)' in application
+assert 'capacity != -99' in patient
+assert 'structureExtent' in patient and 'structureNature' in patient and 'structureLocation' in patient
+assert 'QStringLiteral("extent")' in patient and 'QStringLiteral("nature")' in patient and 'QStringLiteral("location")' in patient
+assert 'extent != -99' in patient
+
+
+
 outline = read("src/tab/OutlineTab.cpp")
 debug = read("src/tab/DebugTab.cpp")
 graph = read("src/gui/GraphWidget.cpp")
@@ -99,6 +137,140 @@ assert "m_forcePlot->setMinimumHeight(360);" in measurement
 assert "setMinimumHeight(280);" in training
 assert "QSizePolicy::Expanding, QSizePolicy::Preferred" in training
 assert "optionsLayout->addWidget(m_configBox);" in training
+# Outline workspace: exercise media, game area, progress and live graph are left;
+# outline selection, metadata, game selection and session controls are right.
+assert "QSplitter(Qt::Horizontal, this)" in outline
+assert "m_leftLayout = new QVBoxLayout(visualPanel);" in outline
+assert "m_rightLayout = new QVBoxLayout(settingsPanel);" in outline
+assert "m_rightLayout->addWidget(m_outlineGroup);" in outline
+assert "m_rightLayout->addWidget(m_outlineInfoGroup);" in outline
+assert "m_rightLayout->addWidget(m_gameSelectionGroup);" in outline
+assert "m_rightLayout->addWidget(m_controlGroup);" in outline
+assert "m_leftLayout->addWidget(m_exerciseGroup);" in outline
+assert "m_leftLayout->addWidget(m_gameAreaGroup, 1);" in outline
+assert "new gui::GraphWidget(graphGroup)" in outline
+assert "m_forceGraph->addDataPoint(value, timestamp)" in outline
+assert "m_measurementEngine->subscribe" in outline
+assert "sample.unit != \"N\"" in outline
+assert "m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());" in main
+# User-facing desktop tab names: rehabilitation outlines and games.
+assert 'm_tabWidget->addTab(m_outlineTab, tr("📚 Konspekty"));' in main
+assert 'm_tabWidget->addTab(m_trainingTab, tr("🎮 Gry"));' in main
+assert 'new QPushButton(tr("Gry"), dashboard)' in main
+assert 'tr("🎮 Trening (Gry)")' not in main
+assert 'tr("🎮 Trening (Outline)")' not in main
+# The rehabilitation workspace receives the repository UUID, not the PESEL
+# or the legacy per-patient filesystem path.
+assert "setCurrentPatientContext(const QString& patientUuid" in read("include/tab/OutlineTab.hpp")
+assert "m_currentPatientUuid = patientUuid.trimmed();" in outline
+assert "patient.value(QStringLiteral(\"id\")).toString()" in application
+assert "m_outlineTab->setCurrentPatientContext(" in application
+assert "rehabilitationPatientContext" in outline
+assert "setResourceRepository(m_sharedResources)" in read("src/core/Application.cpp")
+assert "createRehabilitationEpisode()" in read("include/tab/OutlineTab.hpp")
+assert "rehabilitation-episodes" in outline
+assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-episodes\")" in outline
+assert "{QStringLiteral(\"patient_id\"), m_currentPatientUuid}" in outline
+assert "m_currentEpisodeUuid = m_episodeSelector->currentData().toString();" in outline
+assert "rehabilitation-assessments" in outline
+assert "baselineAssessment" in outline and "latestAssessment" in outline
+assert "Porównanie: ocena początkowa → najnowsza" in outline
+assert "Zmiany liczbowe wymagają interpretacji klinicznej" in outline
+
+assert "createRehabilitationAssessment()" in read("include/tab/OutlineTab.hpp")
+assert 'QStringLiteral("pain_nrs")' in outline
+assert 'QStringLiteral("icf_assessment_ref")' in outline
+assert 'QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)' in patient
+assert 'currentIcf.value(QStringLiteral("id"))' in outline
+assert 'icfAssessmentReference = currentIcf.value(QStringLiteral("assessed_at"))' in outline
+assert 'legacy assessments without UUID retain timestamp compatibility' in outline
+
+assert 'currentIcf.value(QStringLiteral("id"))' in outline
+assert 'currentIcf.value(QStringLiteral("assessed_at")).toString() == reference' in outline
+assert 'historicalId == icfReference' in read("src/data/JsonResourceRepository.cpp")
+assert 'QUuid::createUuid().toString(QUuid::WithoutBraces)' in patient
+assert 'icfAssessmentReference = currentIcf.value(QStringLiteral("id"))' in outline
+assert 'icfTimestamp' not in outline
+assert 'UUID' in read("docs/rehabilitation/OUTLINE_PATIENT_WORKFLOW.md")
+assert 'Nie oceniono' in patient
+assert 'refreshRehabilitationAssessments();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
+assert 'refreshRehabilitationGoals();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
+assert 'arg(assessmentCount)' in outline
+assert 'Operacje sesji zostały zablokowane' in outline
+session_refresh = outline[outline.index('void OutlineTab::refreshRehabilitationSession()'):outline.index('void OutlineTab::startRehabilitationSession()')]
+assert 'm_startRehabilitationSessionButton->setEnabled(false);' in session_refresh
+assert 'm_finishRehabilitationSessionButton->setEnabled(false);' in session_refresh
+assert 'Operacje sesji zostały zablokowane' in session_refresh
+
+assert 'const bool hasClinicalValue' in outline
+assert 'payload.contains(QStringLiteral("functional_test"))' in outline
+assert 'Powiązano z konkretną wersją oceny ICF' in outline
+assert 'exportRehabilitationReportPdf()' in read("include/tab/OutlineTab.hpp")
+assert 'Eksportuj raport epizodu do PDF' in outline
+assert 'QPdfWriter writer(&pdfFile)' in outline
+assert 'rehabilitation-assessments' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'rehabilitation-observations' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'responses.constBegin()' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'resolveIcfReference' in outline
+assert 'icfHistory = patient.value(QStringLiteral("icf_assessment_history"))' in outline
+assert 'Oceny ICF powiązane z ocenami klinicznymi epizodu' in outline
+assert 'linkedIcfDate' in outline
+assert 'Nie można odczytać obserwacji' in outline
+assert 'QFileInfo(outputPath).size() <= 0' in outline
+assert 'raw.toInt() == -99' in outline
+assert 'return tr("Nie oceniono")' in outline
+
+
+assert 'PDF' in read("docs/rehabilitation/OUTLINE_PATIENT_WORKFLOW.md")
+
+
+
+
+assert 'rehabilitationAssessmentType' in outline
+assert 'QStringLiteral("follow_up")' in outline and 'QStringLiteral("final")' in outline
+assert 'INVALID_REHABILITATION_ASSESSMENT_TYPE' in read("src/data/JsonResourceRepository.cpp")
+assert 'Link the rehabilitation assessment to the exact ICF assessment version.' in outline
+assert 'REHABILITATION_ICF_ASSESSMENT_NOT_FOUND' in read("src/data/JsonResourceRepository.cpp")
+assert 'icf_assessment_history' in read("src/data/JsonResourceRepository.cpp")
+assert 'QStringLiteral("rom_degrees")' in outline
+assert 'QStringLiteral("strength_mrc")' in outline
+assert 'QStringLiteral("swelling_cm")' in outline
+assert "Missing measurement is not zero" in outline
+assert "rehabilitation-goals" in outline
+assert "createRehabilitationGoal()" in read("include/tab/OutlineTab.hpp")
+assert 'QStringLiteral("baseline_value")' in outline
+assert 'QStringLiteral("target_value")' in outline
+assert "refreshRehabilitationGoals()" in outline
+assert "startRehabilitationSession()" in read("include/tab/OutlineTab.hpp")
+assert "finishRehabilitationSession()" in outline
+assert "recordRehabilitation24HourFollowUp()" in outline
+assert 'QStringLiteral("pre_session_pain_nrs")' in outline
+assert 'QStringLiteral("post_session_pain_nrs")' in outline
+assert 'QStringLiteral("pain_at_24h_nrs")' in outline
+assert 'QStringLiteral("awaiting_24h")' in outline
+assert "createRehabilitationObservation()" in read("include/tab/OutlineTab.hpp")
+assert 'QStringLiteral("rehabilitation-observations")' in outline
+assert 'QStringLiteral("exercise_name")' in outline
+assert 'QStringLiteral("completed_sets")' in outline
+assert 'QStringLiteral("completed_repetitions")' in outline
+assert 'QStringLiteral("pain_at_24h")' in outline
+assert "refreshRehabilitationObservations()" in outline
+assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-assessments\")" in outline
+assert "if (!m_resourceRepository->get(QStringLiteral(\"patients\"), m_currentPatientUuid," in outline
+assert "Ocena nie została zapisana" in outline
+
+assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
+# Both clinical outlines must be valid, non-empty, executable JSON plans.
+import json
+for outline_path in (
+    "data/outlines/rehabilitacja-lakotka-kolana.json",
+    "data/outlines/rehabilitacja-zespol-bolesnego-barku.json",
+):
+    with (ROOT / outline_path).open(encoding="utf-8") as stream:
+        protocol = json.load(stream)
+    assert protocol["id"] and protocol["clinicalProtocolHtml"]
+    assert len(protocol["exercises"]) >= 8
+    assert all(item["id"] and item["name"] and item["description"] for item in protocol["exercises"])
 assert "visualLayout->addWidget(m_progressBox, 2);" in training
 assert "visualLayout->addWidget(m_gameBox, 0);" in training
 assert "visualLayout->addWidget(m_statsBox, 3);" in training

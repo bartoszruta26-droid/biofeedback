@@ -40,4 +40,15 @@ if "gameReferenceForceN = 150.0" not in main:
     raise SystemExit("All games must normalize calibrated force against the 150 N (approximately 15 kgf) full-scale input")
 if "m_sensorThreshold(30.0)" not in Path("src/games/MarioGame.cpp").read_text(encoding="utf-8"):
     raise SystemExit("Mario input threshold must match 0-100 normalized game input")
-print("Centralized game sensor ownership regression passed")
+game_engine = Path("src/games/GameEngine.cpp").read_text(encoding="utf-8")
+training = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
+arkanoid = Path("src/games/ArkanoidGame.cpp").read_text(encoding="utf-8")
+if "m_gameTimer->setInterval(8)" not in game_engine:
+    raise SystemExit("Game loop must run at the 120 Hz presentation cadence")
+if "m_liveUiTimer->setInterval(8)" not in training:
+    raise SystemExit("TrainingTab must refresh the latest game-control sample at 120 Hz")
+if "std::exp(-deltaTime / 0.025)" not in arkanoid:
+    raise SystemExit("Arkanoid paddle must interpolate between sensor samples")
+if "setAttribute(Qt::WA_OpaquePaintEvent, true)" not in game_engine:
+    raise SystemExit("Game widget must avoid redundant background painting")
+print("Centralized game sensor ownership and smoothness regression passed")

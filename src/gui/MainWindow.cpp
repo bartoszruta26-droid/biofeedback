@@ -170,6 +170,7 @@ void MainWindow::setupTabs()
     if (m_serialPort) {
         m_measurementTab->setSerialConnection(m_serialPort);
         m_outlineTab->setSerialConnection(m_serialPort);
+        m_outlineTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());
         m_trainingTab->setSerialConnection(m_serialPort);
         m_trainingTab->setMeasurementEngine(m_measurementTab->trainingMeasurementEngine());
         m_trainingTab->setSensorCalibrationReady(m_measurementTab->hasCalibrationProfile());
@@ -268,7 +269,7 @@ void MainWindow::setupTabs()
     QHBoxLayout* actions = new QHBoxLayout();
     QPushButton* patientsButton = new QPushButton(tr("Pacjenci"), dashboard);
     QPushButton* measurementsButton = new QPushButton(tr("Otwórz pomiary"), dashboard);
-    QPushButton* trainingButton = new QPushButton(tr("Trening"), dashboard);
+    QPushButton* trainingButton = new QPushButton(tr("Gry"), dashboard);
     actions->addWidget(patientsButton); actions->addWidget(measurementsButton); actions->addWidget(trainingButton); actions->addStretch();
     dashboardLayout->addLayout(actions);
 
@@ -314,8 +315,8 @@ void MainWindow::setupTabs()
     m_tabWidget->addTab(dashboard, tr("⌂ Pulpit"));
     m_tabWidget->addTab(m_patientTab, tr("📋 Pacjenci"));
     m_tabWidget->addTab(m_measurementTab, tr("📊 Pomiary"));
-    m_tabWidget->addTab(m_outlineTab, tr("🎮 Trening (Outline)"));
-    m_tabWidget->addTab(m_trainingTab, tr("🏋️ Trening (Gry)"));
+    m_tabWidget->addTab(m_outlineTab, tr("📚 Konspekty"));
+    m_tabWidget->addTab(m_trainingTab, tr("🎮 Gry"));
     m_tabWidget->addTab(m_debugTab, tr("🔍 Debug Terminal"));
     connect(patientsButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_patientTab); });
     connect(measurementsButton, &QPushButton::clicked, this, [this]() { m_tabWidget->setCurrentWidget(m_measurementTab); });
