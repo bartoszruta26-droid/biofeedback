@@ -39,7 +39,6 @@ for required in (
     "bool MeasurementTab::openSampleJournal()",
     "SampleJournalWriter m_sampleJournalWriter",
     "m_sampleJournalWriter.appendJson(record)",
-    "QJsonDocument(record.jsonObject).toJson(QJsonDocument::Compact)",
     "m_totalDroppedMeasurementSamples",
     "sample.ingestMonotonicNs",
     "m_uiDispatchLatencyWindowMs",
@@ -255,6 +254,7 @@ if "removeFirst()" in add_sample_body or "for (double sample : m_forces)" in add
 
 # Journal queue admission precedes publication to the lossy GUI queue; fsync is batched.
 engine_source = Path("src/measurement/MeasurementEngine.cpp").read_text(encoding="utf-8")
+journal_writer_source = Path("src/tab/SampleJournalWriter.cpp").read_text(encoding="utf-8")
 for required in (
     "m_measurementEngine->setCommitHook",
     "m_measurementEngine->setCommitHook({})",
@@ -288,6 +288,8 @@ hook_call = engine_source.index("committed = commitHook(sample)", hook_start)
 history_start = engine_source.index("m_history.push_back(sample)", hook_call)
 if not (lock_end < hook_start < hook_call < history_start):
     raise SystemExit("Commit hook must run outside the state mutex and before history publication")
+if "QJsonDocument(record.jsonObject).toJson(QJsonDocument::Compact)" not in journal_writer_source:
+    raise SystemExit("Journal JSON serialization must run on the writer thread")
 
 # The bounded presentation/analysis queue must never block the serial reader.
 # The durable journal remains lossless; when the short GUI buffer saturates,
