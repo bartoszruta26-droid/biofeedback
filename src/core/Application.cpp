@@ -616,6 +616,10 @@ void Application::setupConnections()
                     if (cachedVersion != existing.value(QStringLiteral("version")).toInt()) {
                         error = QStringLiteral("VERSION_CONFLICT");
                     } else {
+                        // Ordinary demographic edits must preserve the separately maintained ICF assessment.
+                        if (existing.contains(QStringLiteral("icf_assessment")))
+                            payload.insert(QStringLiteral("icf_assessment"),
+                                            existing.value(QStringLiteral("icf_assessment")));
                         QJsonObject updated;
                         saved = m_sharedResources->update(
                             QStringLiteral("patients"),
