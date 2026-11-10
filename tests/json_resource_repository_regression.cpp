@@ -172,6 +172,13 @@ int main(int argc, char** argv) {
     assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), invalidIcfReferencePayload,
                              rejectedIcfReference, &error));
     assert(error == QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
+    QJsonObject invalidAssessmentType = assessmentPayload;
+    invalidAssessmentType.insert(QStringLiteral("assessment_type"), QStringLiteral("unknown"));
+    QJsonObject rejectedAssessmentType;
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), invalidAssessmentType,
+                             rejectedAssessmentType, &error));
+    assert(error == QStringLiteral("INVALID_REHABILITATION_ASSESSMENT_TYPE"));
+
     QJsonObject invalidAssessment = assessmentPayload;
     invalidAssessment.insert(QStringLiteral("pain_nrs"), 11);
     QJsonObject rejectedAssessment;
