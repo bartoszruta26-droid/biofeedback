@@ -36,7 +36,6 @@ SinGame::SinGame(QWidget *parent)
     , m_automaticDifficulty(false)
     , m_sessionSeconds(0.0)
     , m_timeInTarget(0.0)
-    , m_difficultyCheckSeconds(0.0)
     , m_accuracyWindowSeconds(0.0)
     , m_accuracyWindowHitSeconds(0.0)
     , m_serialPort(nullptr)
@@ -162,7 +161,7 @@ void SinGame::resizeEvent(QResizeEvent* event)
     QWidget::resizeEvent(event);
     refreshGeometryParameters();
     calculateTargetY(width() * 0.72);
-    update();
+    QWidget::update();
 }
 
 void SinGame::refreshGeometryParameters()
