@@ -367,6 +367,7 @@ void PatientTab::openIcfAssessmentDialog()
     const QJsonObject previous = m_icfAssessments.value(pesel);
     const QJsonObject previousResponses = previous.value(QStringLiteral("responses")).toObject();
     QHash<QString, QComboBox*> qualifiers, capacities, performances;
+    QHash<QString, QComboBox*> structureExtent, structureNature, structureLocation;
 
     auto addDomain = [&](int domain, const QString& title) {
         auto* group = new QGroupBox(title, content);
@@ -378,7 +379,47 @@ void PatientTab::openIcfAssessmentDialog()
             const QString code = QString::fromLatin1(question.code);
             const QString label = QStringLiteral("%1 — %2").arg(code, QString::fromUtf8(question.label));
             const QJsonObject old = previousResponses.value(code).toObject();
-            if (domain == 1) {
+            if (domain == 3) {
+                auto* row = new QWidget(group);
+                auto* rowLayout = new QHBoxLayout(row);
+                rowLayout->setContentsMargins(0, 0, 0, 0);
+                auto makeQualifier = [&](const QStringList& labels, const QList<int>& values,
+                                         const QString& key, int fallback) {
+                    auto* combo = new QComboBox(row);
+                    for (int i = 0; i < labels.size(); ++i)
+                        combo->addItem(labels.at(i), values.at(i));
+                    combo->setCurrentIndex(combo->findData(old.value(key).toInt(fallback)));
+                    return combo;
+                };
+                const QStringList extentLabels = {tr("Nie oceniono"), tr("0 — brak"), tr("1 — niewielkie"),
+                    tr("2 — umiarkowane"), tr("3 — znaczne"), tr("4 — całkowite"),
+                    tr("8 — nieokreślone"), tr("9 — nie dotyczy")};
+                const QList<int> extentValues = {-99, 0, 1, 2, 3, 4, 8, 9};
+                const QStringList natureLabels = {tr("Nie oceniono"), tr("0 — brak zmiany"),
+                    tr("1 — brak części"), tr("2 — część dodatkowa"), tr("3 — nieprawidłowy wymiar"),
+                    tr("4 — przerwanie ciągłości"), tr("5 — przemieszczenie"), tr("6 — odchylenie położenia"),
+                    tr("7 — zmiana jakościowa"), tr("8 — nieokreślona"), tr("9 — nie dotyczy")};
+                const QList<int> natureValues = {-99, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+                const QStringList locationLabels = {tr("Nie oceniono"), tr("0 — więcej niż jeden obszar"),
+                    tr("1 — prawa strona"), tr("2 — lewa strona"), tr("3 — obustronnie"),
+                    tr("4 — z przodu"), tr("5 — z tyłu"), tr("6 — bliżej tułowia"),
+                    tr("7 — dalej od tułowia"), tr("8 — nieokreślona"), tr("9 — nie dotyczy")};
+                const QList<int> locationValues = {-99, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+                auto* extent = makeQualifier(extentLabels, extentValues, QStringLiteral("extent"),
+                    old.value(QStringLiteral("qualifier")).toInt(-99));
+                auto* nature = makeQualifier(natureLabels, natureValues, QStringLiteral("nature"), -99);
+                auto* location = makeQualifier(locationLabels, locationValues, QStringLiteral("location"), -99);
+                rowLayout->addWidget(new QLabel(tr("Zakres:"), row));
+                rowLayout->addWidget(extent, 1);
+                rowLayout->addWidget(new QLabel(tr("Charakter:"), row));
+                rowLayout->addWidget(nature, 1);
+                rowLayout->addWidget(new QLabel(tr("Lokalizacja:"), row));
+                rowLayout->addWidget(location, 1);
+                form->addRow(label, row);
+                structureExtent.insert(code, extent);
+                structureNature.insert(code, nature);
+                structureLocation.insert(code, location);
+            } else if (domain == 1) {
                 auto* row = new QWidget(group);
                 auto* rowLayout = new QHBoxLayout(row);
                 rowLayout->setContentsMargins(0, 0, 0, 0);
@@ -463,6 +504,12 @@ void PatientTab::openIcfAssessmentDialog()
         responses.insert(it.key(), QJsonObject{
             {QStringLiteral("performance"), it.value()->currentData().toInt()},
             {QStringLiteral("capacity"), capacities.value(it.key())->currentData().toInt()}
+        });
+    for (auto it = structureExtent.constBegin(); it != structureExtent.constEnd(); ++it)
+        responses.insert(it.key(), QJsonObject{
+            {QStringLiteral("extent"), it.value()->currentData().toInt()},
+            {QStringLiteral("nature"), structureNature.value(it.key())->currentData().toInt()},
+            {QStringLiteral("location"), structureLocation.value(it.key())->currentData().toInt()}
         });
 
     const QJsonObject assessment{
