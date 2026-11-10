@@ -27,6 +27,10 @@ assert 'currentData().toInt()' in patient
 assert 'patientIcfAssessmentChanged' in patient
 assert 'patientIcfAssessmentChanged' in application
 assert 'icf_assessment' in application
+assert 'icf_assessment_history' in application
+assert 'assessmentHistory.size() > 100' in application
+assert 'icf_assessment_history' in application
+
 assert 'setPatientIcfAssessment(' in application
 
 outline = read("src/tab/OutlineTab.cpp")
