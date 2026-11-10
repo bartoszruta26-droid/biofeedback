@@ -78,7 +78,6 @@ private:
 
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
 
-    static constexpr double MAX_FORCE = 100.0;
 };
 
 } // namespace games
