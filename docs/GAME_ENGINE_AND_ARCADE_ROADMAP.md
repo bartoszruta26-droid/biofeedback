@@ -105,3 +105,18 @@ Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie
 - [x] Drugi przebieg kompilacji wykazał niejednorodne typy argumentów Qt `qBound/qMax` (float/double) w nowym ograniczeniu kąta Pong oraz istniejącym przeliczaniu luki Flappy Bird. Ujednolicono obliczenia do `double` przed konwersją wyniku do stanu gry. Commity: `57b28c12f35891bba176299064b820b2a24f21c5`, `f5b64697f2d87c863ddcff420683fb465998f214`. Wymagana ponowna kompilacja aktualnego HEAD.
 - [x] Test `game_factory_regression` wykrył przypadek zmiany rozmiaru ukrytego widgetu: Qt może przekazać nieprawidłowy `oldSize`, przez co pozycja ptaka była jedynie przycinana do nowego widoku (w małym oknie tuż przy ziemi). Flappy Bird przechowuje teraz ostatni znany rozmiar logiczny, ustawia go podczas inicjalizacji, a przy braku poprawnego rozmiaru odtwarza proporcje pozycji początkowej. Usunięto też skalowanie bazowych parametrów luk, aby trudność nie zależała od historii zmian okna. Commity: `c4d4031e6649f3e667139fd4f41d2508e81a91e3`, `9b0cd8cd0ac1368f7773b27c06e64fc7d974dc93`. Wymagane ponowne uruchomienie kompilacji i testów.
 - [x] Kolejny przebieg potwierdził, że test nadal nie przechodzi, ponieważ ukryty widget może w ogóle nie otrzymać `resizeEvent()` przed następną klatką. Przeniesiono dopasowanie geometrii do wspólnej metody `adaptToSize()`, wywoływanej zarówno z `resizeEvent()`, jak i defensywnie z `update()` przy wykryciu zmiany rzeczywistych wymiarów. Dzięki temu zmiana rozmiaru jest obsługiwana również dla niewidocznych widgetów. Commity: `fd30a1479c076130080ec07c086f36216da5f2e4`, `4df128b2ea3478bfb3c1a315950a1a2b63bc9eae`. Oczekuje na ponowną kompilację i testy.
+
+
+## Audyt i poprawa Tan Force Trainer — 2026-11-10
+
+- [x] Zastąpiono twarde obcinanie tangensa do ±1 ograniczoną funkcją arctan(tan(x)), aby zmniejszyć długie płaskie odcinki i zachować skończone współrzędne.
+- [x] Rozdzielono gałęzie wykresu przy skokach w pobliżu asymptot; gra nie rysuje sztucznego połączenia przez pionową asymptotę.
+- [x] Wprowadzono strefę przejścia przy asymptocie. W tym obszarze punktacja jest wstrzymana, ponieważ cel zmienia położenie skokowo.
+- [x] Dostosowano częstotliwość przestrzenną do szerokości okna; widoczne jest 1,5 okresu tangensa.
+- [x] Zastąpiono wygładzanie zależne od liczby klatek filtrem wykładniczym o stałej czasowej 55 ms.
+- [x] Wprowadzono punktację za utrzymywanie celu, premię za dokładność i serię trafień.
+- [x] Dodano wykrywanie nieaktualnych próbek po 350 ms i blokadę naliczania punktów po utracie sygnału.
+- [x] Dodano czytelny pas tolerancji, kursor, miernik siły i instrukcje korekty siły.
+- [x] Dodano regresję śledzenia tangensa przez 6 sekund oraz test zatrzymania punktowania po utracie sygnału.
+- [ ] Wymagana walidacja kompilacji Qt5, game_factory_regression i pełnego CI na aktualnym commicie.
+- [ ] Wymagany test na fizycznym HX711, w tym ocena przejść asymptot, opóźnienia i ergonomii sterowania. Test symulowany nie zastępuje walidacji sprzętowej ani klinicznej.
