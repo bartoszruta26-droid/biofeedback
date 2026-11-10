@@ -113,6 +113,35 @@ int main(int argc, char **argv)
     sinusGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     sinusGame->handleSensorInput(std::numeric_limits<double>::infinity());
     REQUIRE(sinusGame->isRunning());
+
+    // Follow the moving sinusoid with the force signal. The game must reward
+    // sustained tracking, not only a one-frame crossing of the target.
+    sinusGame->setDifficultyLevel(1);
+    sinusGame->start();
+    constexpr double sinusDt = 1.0 / 120.0;
+    constexpr double sinusPi = 3.14159265358979323846;
+    constexpr double sinusWidth = 640.0;
+    constexpr double sinusHeight = 480.0;
+    constexpr double sinusWaveNumber = 2.0 * sinusPi * 1.5 / sinusWidth;
+    constexpr double sinusGateX = sinusWidth * 0.72;
+    constexpr double sinusAmplitude = sinusHeight * 0.32;
+    constexpr double sinusSpeed = 115.0;
+    double sinusPhase = 0.0;
+    for (int frame = 0; frame < 360; ++frame) {
+        sinusPhase -= sinusSpeed * sinusWaveNumber * sinusDt;
+        const double targetY = sinusHeight * 0.5 +
+            std::sin(sinusGateX * sinusWaveNumber + sinusPhase) * sinusAmplitude;
+        const double forcePercent = (sinusHeight - targetY) / sinusHeight * 100.0;
+        sinusGame->handleSensorInput(forcePercent);
+        sinusGame->update(sinusDt);
+    }
+    REQUIRE(sinusGame->getScore() > 0);
+
+    // A lost sensor stream must stop awarding points and display a safe state.
+    const int scoreBeforeSignalLoss = sinusGame->getScore();
+    for (int frame = 0; frame < 60; ++frame)
+        sinusGame->update(sinusDt);
+    REQUIRE(sinusGame->getScore() == scoreBeforeSignalLoss);
     sinusGame->stop();
 
     std::unique_ptr<games::GameEngine> flappy(games::createGame(QStringLiteral("flappy")));
