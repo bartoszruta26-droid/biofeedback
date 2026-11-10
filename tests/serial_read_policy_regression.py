@@ -44,7 +44,10 @@ checks.update({
     "batch read API is declared": "std::vector<SensorData> readDataBatch(int timeout = 1000);" in header,
     "batch read consumes every parser frame": "while (const auto frame = binaryParser.takeFrame())" in read_data,
     "batch read does not discard extra parser frames": "while (binaryParser.takeFrame()) {}" not in read_data,
-    "async reader dispatches every batch sample": "for (const auto& sample : samples)" in source[source.index("void SerialCommunication::startAsyncReading"):],
+    "async reader enables firmware continuous mode": 'const std::string command = "CONT\\n";' in source[source.index("void SerialCommunication::startAsyncReading"):],
+    "async reader retains parser state across UART reads": "m_impl->streamParser.feed(buffer" in source,
+    "async reader dispatches each parsed frame": "while (const auto frame = m_impl->streamParser.takeFrame())" in source,
+    "async reader does not poll DATA once per batch": "readDataBatch(100)" not in source[source.index("void SerialCommunication::startAsyncReading"):],
     "async reader no longer reads a single sample": "SensorData data = readData(100);" not in source[source.index("void SerialCommunication::startAsyncReading"):],
 })
 
