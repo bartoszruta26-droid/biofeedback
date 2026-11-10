@@ -84,7 +84,7 @@ void MarioGame::paintEvent(QPaintEvent* event)
         painter.drawText(QRectF(panel.left() + 8, panel.top() + panel.height() * 0.42,
                                 panel.width() - 16, panel.height() * 0.48),
                          Qt::AlignCenter,
-                         QStringLiteral("Przytrzymaj tensometr, aby naładować skok.\\nPuść, aby wykonać skok.\\nWynik: %1").arg(getScore()));
+                         QStringLiteral("Przytrzymaj tensometr, aby naładować skok.\nPuść, aby wykonać skok.\nWynik: %1").arg(getScore()));
     }
 }
 
