@@ -270,6 +270,10 @@ void ArkanoidGame::adaptToSize()
         const double sy = static_cast<double>(newSize.height()) / m_lastSize.height();
         m_ballPosition = QPointF(m_ballPosition.x() * sx, m_ballPosition.y() * sy);
         m_ballVelocity = QPointF(m_ballVelocity.x() * sx, m_ballVelocity.y() * sy);
+        const double resizedSpeed = std::hypot(m_ballVelocity.x(), m_ballVelocity.y());
+        if (resizedSpeed > 1e-6) {
+            m_ballVelocity *= m_ballSpeed / resizedSpeed;
+        }
         m_paddle = QRectF(m_paddle.x() * sx, m_paddle.y() * sy,
                           paddleWidth, paddleHeight);
         for (Brick& brick : m_bricks) {
@@ -282,7 +286,8 @@ void ArkanoidGame::adaptToSize()
             paddleWidth, paddleHeight);
     }
 
-    m_paddleWidth = paddleWidth;
+    // Keep the difficulty-derived preferred width separate from the
+    // viewport-clamped width, so enlarging the window restores paddle size.
     m_paddleHeight = paddleHeight;
     m_ballRadius = ballRadius;
 
