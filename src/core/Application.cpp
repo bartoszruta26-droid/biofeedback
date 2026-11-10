@@ -620,6 +620,9 @@ void Application::setupConnections()
                         if (existing.contains(QStringLiteral("icf_assessment")))
                             payload.insert(QStringLiteral("icf_assessment"),
                                             existing.value(QStringLiteral("icf_assessment")));
+                        if (existing.contains(QStringLiteral("icf_assessment_history")))
+                            payload.insert(QStringLiteral("icf_assessment_history"),
+                                            existing.value(QStringLiteral("icf_assessment_history")));
                         QJsonObject updated;
                         saved = m_sharedResources->update(
                             QStringLiteral("patients"),
@@ -664,6 +667,12 @@ void Application::setupConnections()
                 }
                 QJsonObject payload = existing;
                 payload.insert(QStringLiteral("icf_assessment"), assessment);
+                QJsonArray assessmentHistory = existing.value(
+                    QStringLiteral("icf_assessment_history")).toArray();
+                assessmentHistory.append(assessment);
+                // Keep a bounded longitudinal history in the patient chart.
+                while (assessmentHistory.size() > 100) assessmentHistory.removeAt(0);
+                payload.insert(QStringLiteral("icf_assessment_history"), assessmentHistory);
                 QJsonObject updated;
                 if (!m_sharedResources->update(QStringLiteral("patients"),
                         existing.value(QStringLiteral("id")).toString(), version, payload, updated, &error)) {
