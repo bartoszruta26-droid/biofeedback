@@ -140,6 +140,13 @@ assert "createRehabilitationGoal()" in read("include/tab/OutlineTab.hpp")
 assert 'QStringLiteral("baseline_value")' in outline
 assert 'QStringLiteral("target_value")' in outline
 assert "refreshRehabilitationGoals()" in outline
+assert "startRehabilitationSession()" in read("include/tab/OutlineTab.hpp")
+assert "finishRehabilitationSession()" in outline
+assert "recordRehabilitation24HourFollowUp()" in outline
+assert 'QStringLiteral("pre_session_pain_nrs")' in outline
+assert 'QStringLiteral("post_session_pain_nrs")' in outline
+assert 'QStringLiteral("pain_at_24h_nrs")' in outline
+assert 'QStringLiteral("awaiting_24h")' in outline
 assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-assessments\")" in outline
 assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
