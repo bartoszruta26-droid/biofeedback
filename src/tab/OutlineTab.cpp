@@ -1455,9 +1455,9 @@ void OutlineTab::createRehabilitationAssessment()
         return;
     }
     const QJsonObject currentIcf = patientRecord.value(QStringLiteral("icf_assessment")).toObject();
-    const QString icfTimestamp = currentIcf.value(QStringLiteral("assessed_at")).toString().trimmed();
-    if (!icfTimestamp.isEmpty()) {
-        payload.insert(QStringLiteral("icf_assessment_ref"), icfTimestamp);
+    const QString icfAssessmentId = currentIcf.value(QStringLiteral("id")).toString().trimmed();
+    if (!icfAssessmentId.isEmpty()) {
+        payload.insert(QStringLiteral("icf_assessment_ref"), icfAssessmentId);
         linkedIcfAssessment = true;
     }
 
