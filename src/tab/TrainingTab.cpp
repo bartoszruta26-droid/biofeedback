@@ -1301,24 +1301,23 @@ void TrainingTab::enqueueMeasurementSample(
 
 void TrainingTab::drainMeasurementSamples()
 {
-    constexpr std::size_t MaximumBatch = 128;
+    // Training analysis is order-dependent: process every acquired sample in
+    // sequence, but do not yield one Qt event per 128 samples. The acquisition
+    // producer only schedules the first drain; this consumer takes the FIFO
+    // and finishes the backlog in one bounded-by-queue operation.
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
-    bool scheduleAgain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
         dropped = std::exchange(m_droppedMeasurementSamples, 0);
-        const std::size_t count = std::min(MaximumBatch, m_measurementQueue.size());
-        batch.reserve(count);
-        for (std::size_t i = 0; i < count; ++i) {
+        batch.reserve(m_measurementQueue.size());
+        while (!m_measurementQueue.empty()) {
             batch.push_back(std::move(m_measurementQueue.front()));
             m_measurementQueue.pop_front();
         }
-        if (m_measurementQueue.empty()) {
-            m_measurementDrainScheduled = false;
-        } else {
-            scheduleAgain = true;
-        }
+        // Clear this under the producer's mutex. A racing producer will
+        // schedule a new drain after the current batch has been detached.
+        m_measurementDrainScheduled = false;
     }
     if (dropped != 0) {
         m_repetitionDetector.reset();
@@ -1327,17 +1326,6 @@ void TrainingTab::drainMeasurementSamples()
     }
     for (const auto& sample : batch)
         onMeasurementSample(sample);
-    if (scheduleAgain) {
-        const bool queued = QMetaObject::invokeMethod(this, [this]() {
-            drainMeasurementSamples();
-        }, Qt::QueuedConnection);
-        if (!queued) {
-            std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-            m_droppedMeasurementSamples += m_measurementQueue.size();
-            m_measurementQueue.clear();
-            m_measurementDrainScheduled = false;
-        }
-    }
 }
 
 void TrainingTab::onMeasurementSample(
