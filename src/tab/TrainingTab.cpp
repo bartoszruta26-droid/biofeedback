@@ -317,7 +317,7 @@ void TrainingTab::setupUI()
     m_mainLayout->setSpacing(4);
     m_mainLayout->setContentsMargins(6, 6, 6, 6);
 
-    // Keep the training display, progress and analytics on the left (75%).
+    // Keep the training display, progress and analytics on the left (89%).
     // The exercise plan and its parameters live in a scrollable right column.
     auto* workspaceSplitter = new QSplitter(Qt::Horizontal, this);
     workspaceSplitter->setChildrenCollapsible(false);
