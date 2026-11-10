@@ -426,6 +426,60 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
         }
     }
 
+
+    if (collection == QStringLiteral("rehabilitation-observations")) {
+        const QString exercise = payload.value(QStringLiteral("exercise_name")).toString().trimmed();
+        if (exercise.isEmpty() || exercise.size() > 200) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_OBSERVATION_EXERCISE"));
+            return false;
+        }
+        const QStringList requiredIntegerFields = {
+            QStringLiteral("completed_sets"), QStringLiteral("completed_repetitions"),
+            QStringLiteral("pain_before"), QStringLiteral("pain_after")
+        };
+        for (const QString& field : requiredIntegerFields) {
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble()) ||
+                std::floor(value.toDouble()) != value.toDouble()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_OBSERVATION_VALUE"));
+                return false;
+            }
+            const double number = value.toDouble();
+            const double maximum = field == QStringLiteral("completed_sets") ? 100.0
+                : field == QStringLiteral("completed_repetitions") ? 10000.0 : 10.0;
+            if (number < 0.0 || number > maximum) {
+                setError(error, QStringLiteral("REHABILITATION_OBSERVATION_VALUE_OUT_OF_RANGE"));
+                return false;
+            }
+        }
+        const QStringList optionalIntegerFields = {
+            QStringLiteral("duration_seconds"), QStringLiteral("rpe"),
+            QStringLiteral("pain_at_24h")
+        };
+        for (const QString& field : optionalIntegerFields) {
+            if (!payload.contains(field)) continue;
+            const QJsonValue value = payload.value(field);
+            if (!value.isDouble() || !std::isfinite(value.toDouble()) ||
+                std::floor(value.toDouble()) != value.toDouble()) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_OBSERVATION_VALUE"));
+                return false;
+            }
+            const double number = value.toDouble();
+            const double minimum = field == QStringLiteral("duration_seconds") ? 1.0 : 0.0;
+            const double maximum = field == QStringLiteral("duration_seconds") ? 86400.0 : 10.0;
+            if (number < minimum || number > maximum) {
+                setError(error, QStringLiteral("REHABILITATION_OBSERVATION_VALUE_OUT_OF_RANGE"));
+                return false;
+            }
+        }
+        const QString quality = payload.value(QStringLiteral("movement_quality")).toString();
+        if (!quality.isEmpty() && quality != QStringLiteral("not_assessed") &&
+            quality != QStringLiteral("acceptable") && quality != QStringLiteral("unacceptable")) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_MOVEMENT_QUALITY"));
+            return false;
+        }
+    }
+
     if (collection == QStringLiteral("rehabilitation-assessments")) {
         const QStringList numericFields = {
             QStringLiteral("pain_nrs"), QStringLiteral("rom_degrees"),
