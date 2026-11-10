@@ -554,6 +554,22 @@ void ArkanoidGame::keyPressEvent(QKeyEvent *event)
         event->accept();
         return;
     }
+    // Keyboard fallback remains usable when the sensor is disconnected or
+    // its samples become stale. It moves the paddle directly and is bounded
+    // by the same playfield limits as sensor control.
+    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_A ||
+        event->key() == Qt::Key_Right || event->key() == Qt::Key_D) {
+        const double direction =
+            (event->key() == Qt::Key_Left || event->key() == Qt::Key_A) ? -1.0 : 1.0;
+        const double step = qMax(18.0, width() * 0.055);
+        const double maxX = qMax(12.0, static_cast<double>(width()) - 12.0 - m_paddle.width());
+        m_paddle.moveLeft(qBound(12.0, m_paddle.left() + direction * step, maxX));
+        if (!m_ballLaunched)
+            m_ballPosition = QPointF(m_paddle.center().x(), m_paddle.top() - m_ballRadius - 1.0);
+        QWidget::update();
+        event->accept();
+        return;
+    }
     QWidget::keyPressEvent(event);
 }
 
