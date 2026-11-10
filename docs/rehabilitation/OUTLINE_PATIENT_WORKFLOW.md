@@ -306,3 +306,11 @@ W aktywnej sesji można zapisywać odrębne obserwacje wykonania ćwiczeń w kol
 Formularz pozwala zapisywać obserwacje wyłącznie podczas aktywnej sesji. Historia jest filtrowana według bieżącego pacjenta i epizodu. Repozytorium niezależnie waliduje zakresy: serie 0–100, powtórzenia 0–10000, NRS i RPE 0–10, czas 1–86400 sekund. Jakość ruchu ma wartości `not_assessed`, `acceptable` lub `unacceptable`. Nieprawidłowe dane są odrzucane również przy zapisie poza GUI.
 
 Obecny formularz zapisuje wykonane parametry, ale nie stanowi jeszcze pełnego systemu recept ćwiczeń: nie definiuje planowanej dawki, strony ciała, obciążenia ani wersjonowanej instrukcji. Nie wylicza automatycznie progresji i nie modyfikuje zaleceń klinicznych. Kontrola bólu po 24 godzinach na poziomie pojedynczego ćwiczenia jest zapisywana, jeśli została już zebrana; odrębny mechanizm przypomnienia i późniejszego uzupełnienia obserwacji będzie kolejnym etapem.
+
+## Powiązanie oceny ICF z oceną rehabilitacyjną
+
+Ocena rehabilitacyjna może zawierać opcjonalne pole `icf_assessment_ref`. Jest to dokładna wartość `assessed_at` oceny ICF zapisanej w kartotece tego samego pacjenta. Repozytorium sprawdza, czy wskazana ocena występuje jako bieżące `icf_assessment` albo w `icf_assessment_history`. Dzięki temu odwołanie pozostaje poprawne także po wykonaniu kolejnej oceny ICF i przeniesieniu poprzedniej wersji do historii.
+
+Do rekordu rehabilitacyjnego nie są kopiowane odpowiedzi ICF, dane identyfikacyjne ani PESEL. Rekord nadal zawiera wyłącznie UUID pacjenta, UUID epizodu oraz odwołanie do konkretnej wersji oceny ICF. Brak oceny ICF nie blokuje zapisu oceny rehabilitacyjnej; w takim przypadku pole referencyjne jest pomijane. Nieprawidłowe lub nieistniejące odwołanie jest odrzucane przez repozytorium.
+
+Wartość `assessed_at` pełni obecnie rolę identyfikatora wersji oceny ICF. W razie przyszłej migracji modelu należy zastąpić ją dedykowanym, niezmiennym `assessment_id`, zachowując obsługę dotychczasowych odwołań. Powiązanie ma charakter dokumentacyjny i nie oznacza automatycznej interpretacji kwalifikatorów ICF ani generowania decyzji terapeutycznej.
