@@ -40,15 +40,20 @@
 - **Klawiatura:** w wersji bazowej brak odrębnego sterowania paletką klawiszami.
 - **Punktacja:** punkt gracza jest naliczany po tym, gdy piłka minie stronę przeciwnika; odbicia od paletek i ścian nie są punktami.
 
-### 4. Arkanoid
+### 4. Arkanoid Force Trainer
 
-**Cel:** odbijaj piłkę paletką i rozbijaj wszystkie klocki.
+**Cel:** odbijaj piłkę paletką, rozbijaj kolejne układy klocków i buduj serie trafień.
 
-- **Tensometr:** steruje poziomym położeniem paletki. Zmieniaj nacisk, aby przesuwać paletkę pod piłkę.
-- **Wskaźniki:** wynik, poziom, liczba żyć i trudność.
-- **Punktacja:** trafienie w klocek daje punkty; klocki wymagające kilku trafień mogą pozostać aktywne po pierwszym uderzeniu.
-- **Klawiatura:** w wersji bazowej brak odrębnych skrótów sterowania paletką.
-
+- **Tensometr/HX711:** steruje poziomym położeniem paletki w zakresie 0–100%, od lewej do prawej. Po zwolnieniu klawiszy sterowanie automatycznie wraca do czujnika.
+- **Klawiatura:** `A` lub `←` — ruch w lewo; `D` lub `→` — ruch w prawo. Przytrzymanie klawisza zapewnia płynny ruch. Jednoczesne przytrzymanie obu kierunków zatrzymuje ruch klawiaturowy. Klawiatura ma pierwszeństwo tylko podczas trzymania kierunku.
+- **Odbicia:** miejsce kontaktu z paletką określa kąt. Trafienie przy krawędzi nadaje piłce większą składową poziomą, a trafienie środkiem daje bardziej pionowy lot. Prędkość nieznacznie rośnie po odbiciu, z ograniczeniem maksymalnym.
+- **Klocki:** kolejne poziomy zawierają coraz więcej rzędów. Od poziomu 3 górny rząd wymaga dwóch trafień; czerwone klocki z jasnym paskiem są wytrzymalsze.
+- **Serie trafień:** kolejne trafienia w krótkim odstępie zwiększają mnożnik punktów. Mnożnik rośnie co cztery trafienia, maksymalnie do x5. Przerwa 2,4 sekundy zeruje serię.
+- **Punktacja:** zniszczenie klocka daje 10 punktów pomnożone przez mnożnik; uszkodzenie wytrzymałego klocka daje 5 punktów pomnożone przez mnożnik. Ukończenie planszy daje dodatkowe 100 punktów.
+- **Życia i poziomy:** utrata piłki odbiera jedno życie i zeruje serię. Po zniszczeniu wszystkich klocków rozpoczyna się kolejny poziom, a prędkość piłki rośnie.
+- **Obraz:** świetlista smuga ułatwia ocenę toru piłki; siatka planszy i oznaczenia wytrzymałych klocków poprawiają orientację.
+- **Wskaźniki:** wynik, poziom, liczba żyć, trudność i mnożnik serii.
+- **Praktyka:** obserwuj przewidywany punkt lądowania piłki. Środkowa część paletki daje bardziej pionowe odbicie; trafienia przy krawędzi kierują piłkę w boczne sektory planszy.
 ### 5. Flappy Bird
 
 **Cel:** przeprowadź ptaka przez szczeliny między przeszkodami, unikając zderzeń.
