@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 #include <QFile>
+#include <QJsonObject>
 #include <QString>
 
 #include <condition_variable>
@@ -34,6 +35,8 @@ public:
               QString* error = nullptr);
     // Non-blocking bounded enqueue. false means the journal is no longer accepting.
     bool append(const QByteArray& line);
+    // Enqueues an implicitly-shared JSON object; compact serialization runs on the writer thread.
+    bool appendJson(const QJsonObject& record);
     // Blocks the acquisition producer until this record has been fsynced.
     bool appendDurably(const QByteArray& line);
     // Stops admission, drains accepted records, flushes/fsyncs and joins the worker.
@@ -46,8 +49,11 @@ private:
         QByteArray line;
         std::uint64_t ticket{0};
         bool durable{false};
+        QJsonObject jsonObject;
+        bool isJsonObject{false};
     };
     bool enqueue(const QByteArray& line, bool durable);
+    bool enqueueJson(const QJsonObject& record, bool durable);
     void run();
     static bool writeDurably(QFile& file, const QByteArray& bytes,
                              QString& error);
