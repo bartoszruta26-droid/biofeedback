@@ -3,6 +3,7 @@
 #include <QFileInfo>
 #include <QTextStream>
 #include <QDateTime>
+#include <QUuid>
 #include <QDir>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -514,6 +515,7 @@ void PatientTab::openIcfAssessmentDialog()
         });
 
     const QJsonObject assessment{
+        {QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)},
         {QStringLiteral("schema"), QStringLiteral("icf-functional-screening-v1")},
         {QStringLiteral("assessed_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
         {QStringLiteral("reference_period_days"), 30},
