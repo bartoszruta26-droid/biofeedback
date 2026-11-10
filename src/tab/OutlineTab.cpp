@@ -1713,6 +1713,19 @@ void OutlineTab::exportRehabilitationReportPdf()
             .arg(safe(icf.value(QStringLiteral("assessed_at")).toString()),
                  QString::number(icfResponses.size()),
                  safe(icf.value(QStringLiteral("narrative")).toString()));
+        html += QStringLiteral("<table><tr><th>Domena ICF</th><th>Kwalifikator</th><th>Wykonanie</th><th>Zdolność</th><th>Zakres</th><th>Charakter</th><th>Lokalizacja</th></tr>");
+        for (auto it = icfResponses.constBegin(); it != icfResponses.constEnd(); ++it) {
+            const QJsonObject response = it.value().toObject();
+            const auto value = [&response](const QString& key) {
+                return response.contains(key) ? response.value(key).toVariant().toString() : QString();
+            };
+            html += QStringLiteral("<tr><td>%1</td><td>%2</td><td>%3</td><td>%4</td><td>%5</td><td>%6</td><td>%7</td></tr>")
+                .arg(safe(it.key()), safe(value(QStringLiteral("qualifier"))),
+                     safe(value(QStringLiteral("performance"))), safe(value(QStringLiteral("capacity"))),
+                     safe(value(QStringLiteral("extent"))), safe(value(QStringLiteral("nature"))),
+                     safe(value(QStringLiteral("location"))));
+        }
+        html += QStringLiteral("</table>");
     }
     html += QStringLiteral("<p class='muted'>Dokument wygenerowano z danych dostępnych w repozytorium w chwili eksportu. Brak pomiaru pozostaje brakiem danych i nie jest interpretowany jako zero.</p></body></html>");
 
