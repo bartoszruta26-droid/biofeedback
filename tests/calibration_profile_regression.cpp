@@ -48,6 +48,25 @@ int main()
         100000, 100000.0, *reverseScale);
     assert(reverseHalfLoad && std::abs(*reverseHalfLoad - 4.905) < 1e-9);
     assert(reverseZeroLoad && std::abs(*reverseZeroLoad) < 1e-12);
+
+    // Tensile-positive presentation is controlled by raw_polarity, not by
+    // the sign of a profile that may have been calibrated in compression.
+    const auto tensileFromPositiveScale =
+        sensor::CalibrationMath::convertRawWithPolarity(76542, 100000.0,
+            std::abs(*scale), -1);
+    const auto tensileFromNegativeScale =
+        sensor::CalibrationMath::convertRawWithPolarity(76542, 100000.0,
+            *reverseScale, -1);
+    const auto nativeDirection =
+        sensor::CalibrationMath::convertRawWithPolarity(123357, 100000.0,
+            *scale, 1);
+    assert(tensileFromPositiveScale &&
+           std::abs(*tensileFromPositiveScale - 9.81) < 1e-9);
+    assert(tensileFromNegativeScale &&
+           std::abs(*tensileFromNegativeScale - 9.81) < 1e-9);
+    assert(nativeDirection && std::abs(*nativeDirection - 9.81) < 1e-9);
+    assert(!sensor::CalibrationMath::convertRawWithPolarity(
+        123357, 100000.0, *scale, 0).has_value());
     sensor::CalibrationProfile reverseProfile = profile;
     reverseProfile.referenceRaw = 76542;
     reverseProfile.scaleFactor = *reverseScale;
