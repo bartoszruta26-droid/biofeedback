@@ -128,6 +128,14 @@ assert "rehabilitation-episodes" in outline
 assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-episodes\")" in outline
 assert "{QStringLiteral(\"patient_id\"), m_currentPatientUuid}" in outline
 assert "m_currentEpisodeUuid = m_episodeSelector->currentData().toString();" in outline
+assert "rehabilitation-assessments" in outline
+assert "createRehabilitationAssessment()" in read("include/tab/OutlineTab.hpp")
+assert 'QStringLiteral("pain_nrs")' in outline
+assert 'QStringLiteral("rom_degrees")' in outline
+assert 'QStringLiteral("strength_mrc")' in outline
+assert 'QStringLiteral("swelling_cm")' in outline
+assert "Missing measurement is not zero" in outline
+assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-assessments\")" in outline
 assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
 import json
