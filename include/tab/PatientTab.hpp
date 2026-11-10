@@ -19,6 +19,7 @@
 #include <QGroupBox>
 #include <QScrollArea>
 #include <QJsonObject>
+#include <QHash>
 
 namespace tab {
 
@@ -63,6 +64,7 @@ public:
      * @brief Czyści wszystkie dane pacjentów
      */
     void clearAllPatients();
+    void setPatientIcfAssessment(const QString& pesel, const QJsonObject& assessment);
 
     /**
      * @brief Eksportuje dane pacjentów do pliku CSV
@@ -219,6 +221,7 @@ private:
     // Aktualnie załadowany pacjent
     QString m_currentPatientPesel;
     QString m_currentPatientDataPath;
+    QHash<QString, QJsonObject> m_icfAssessments;
 };
 
 } // namespace tab
