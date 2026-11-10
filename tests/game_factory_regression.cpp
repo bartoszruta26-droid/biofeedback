@@ -239,6 +239,24 @@ int main(int argc, char **argv)
     REQUIRE(carRaceGame != nullptr);
     carRaceGame->resize(640, 480);
     carRaceGame->start();
+    REQUIRE(carRaceGame->currentLane() == 1);
+    carRaceGame->handleSensorInput(31.0);
+    REQUIRE(carRaceGame->currentLane() == 1); // Noise around the boundary must not change lanes.
+    carRaceGame->handleSensorInput(29.0);
+    REQUIRE(carRaceGame->currentLane() == 0);
+    carRaceGame->handleSensorInput(35.0);
+    REQUIRE(carRaceGame->currentLane() == 0); // Hysteresis retains the selected lane.
+    carRaceGame->handleSensorInput(40.0);
+    REQUIRE(carRaceGame->currentLane() == 1);
+    carRaceGame->handleSensorInput(70.0);
+    REQUIRE(carRaceGame->currentLane() == 2);
+    carRaceGame->handleSensorInput(65.0);
+    REQUIRE(carRaceGame->currentLane() == 2);
+    carRaceGame->handleSensorInput(61.0);
+    REQUIRE(carRaceGame->currentLane() == 1);
+    carRaceGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    carRaceGame->handleSensorInput(std::numeric_limits<double>::infinity());
+    REQUIRE(carRaceGame->currentLane() == 1);
     carRaceGame->handleSensorInput(50.0); // Stay in the first obstacle's deterministic lane.
     waitForEvents(4000); // First obstacle spawns at 1.25 s and reaches the player after ~2 s.
     REQUIRE(carRaceGame->livesRemaining() < 3);
@@ -251,6 +269,23 @@ int main(int argc, char **argv)
     waitForEvents(120);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->stop();
+
+    // One impact starts a short recovery window; a second nearby hit cannot
+    // consume another life during that window.
+    std::unique_ptr<games::GameEngine> carRaceRecovery(games::createGame(QStringLiteral("car_race")));
+    auto* carRaceRecoveryGame = dynamic_cast<games::CarRaceGame*>(carRaceRecovery.get());
+    REQUIRE(carRaceRecoveryGame != nullptr);
+    carRaceRecoveryGame->resize(640, 480);
+    carRaceRecoveryGame->start();
+    carRaceRecoveryGame->handleSensorInput(50.0);
+    for (int attempt = 0; attempt < 350 && carRaceRecoveryGame->livesRemaining() == 3; ++attempt)
+        waitForEvents(10);
+    REQUIRE(carRaceRecoveryGame->livesRemaining() == 2);
+    REQUIRE(carRaceRecoveryGame->collisionCooldownRemaining() > 0.0);
+    waitForEvents(150);
+    REQUIRE(carRaceRecoveryGame->livesRemaining() == 2);
+    carRaceRecoveryGame->stop();
+
     carRaceGame->reset();
     REQUIRE(carRaceGame->livesRemaining() == 3);
     REQUIRE(carRaceGame->obstacleCount() == 0);
