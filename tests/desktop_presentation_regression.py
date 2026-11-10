@@ -192,6 +192,9 @@ assert 'Nie oceniono' in patient
 assert 'refreshRehabilitationAssessments();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
 assert 'refreshRehabilitationGoals();' in outline[outline.index('if (!canUseRepository)'):outline.index('const QJsonArray episodes')]
 assert 'arg(assessmentCount)' in outline
+assert 'Operacje sesji zostały zablokowane' in outline
+assert 'm_startRehabilitationSessionButton->setEnabled(false);' in outline[outline.index('Nie udało się odczytać sesji rehabilitacyjnych. Operacje sesji zostały zablokowane.'):outline.index('QJsonObject current;', outline.index('Nie udało się odczytać sesji rehabilitacyjnych. Operacje sesji zostały zablokowane.'))]
+
 assert 'const bool hasClinicalValue' in outline
 assert 'payload.contains(QStringLiteral("functional_test"))' in outline
 assert 'Powiązano z konkretną wersją oceny ICF' in outline
