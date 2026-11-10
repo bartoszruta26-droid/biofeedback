@@ -19,8 +19,13 @@
 #include <QFile>
 #include <QDir>
 #include <QProgressBar>
+#include <QSplitter>
+#include <QTextBrowser>
 #include <memory>
 #include "sensor/SerialCommunication.hpp"
+#include "measurement/MeasurementEngine.hpp"
+
+namespace gui { class GraphWidget; }
 
 namespace games {
     class GameEngine;
@@ -56,7 +61,8 @@ struct OutlineData {
     QString category;               // Kategoria (np. rehabilitacja, trening)
     QVector<ExerciseData> exercises; // Lista ćwiczeń w konspekcie
     int estimatedDurationMinutes;   // Szacowany czas trwania całego konspektu
-    
+    QString clinicalProtocolHtml;   // Rozwinięty protokół kliniczny do podglądu w stanowisku
+
     OutlineData() : estimatedDurationMinutes(0) {}
 };
 
@@ -237,6 +243,10 @@ private:
 
     // Główne widgety
     QVBoxLayout* m_mainLayout;
+    QVBoxLayout* m_leftLayout{nullptr};
+    QVBoxLayout* m_rightLayout{nullptr};
+    gui::GraphWidget* m_forceGraph{nullptr};
+    QTextBrowser* m_clinicalProtocolBrowser{nullptr};
     
     // Sekcja wyboru konspektu
     QGroupBox* m_outlineGroup;
@@ -324,6 +334,8 @@ private:
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
     sensor::SerialCommunication::CallbackToken m_dataCallbackToken = 0;
+    std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
+    biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken{0};
     
 public:
     /**
@@ -331,6 +343,7 @@ public:
      * @param serial Współdzielony wskaźnik do obiektu SerialCommunication
      */
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
+    void setMeasurementEngine(std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine);
     
     /**
      * @brief Sprawdza czy połączenie z Arduino jest aktywne
