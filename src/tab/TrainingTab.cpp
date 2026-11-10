@@ -14,6 +14,7 @@
 #include <QStackedWidget>
 #include <QScrollArea>
 #include <QSplitter>
+#include <QResizeEvent>
 #include <QTimer>
 #include <QDir>
 #include <QGuiApplication>
@@ -36,6 +37,27 @@
 #include "games/ArkanoidGame.hpp"
 #include "games/GalagaGame.hpp"
 #include "games/GameFactory.hpp"
+
+namespace {
+
+class ProportionalWorkspaceSplitter final : public QSplitter {
+public:
+    explicit ProportionalWorkspaceSplitter(QWidget* parent = nullptr)
+        : QSplitter(Qt::Horizontal, parent) {}
+
+protected:
+    void resizeEvent(QResizeEvent* event) override
+    {
+        QSplitter::resizeEvent(event);
+        const int availableWidth = width() - handleWidth();
+        if (availableWidth > 0 && count() == 2) {
+            const int visualWidth = availableWidth * 89 / 100;
+            setSizes({visualWidth, availableWidth - visualWidth});
+        }
+    }
+};
+
+} // namespace
 
 namespace tab {
 
@@ -320,7 +342,7 @@ void TrainingTab::setupUI()
 
     // Keep the training display, progress and analytics on the left (89%).
     // The exercise plan and its parameters live in a scrollable right column.
-    auto* workspaceSplitter = new QSplitter(Qt::Horizontal, this);
+    auto* workspaceSplitter = new ProportionalWorkspaceSplitter(this);
     workspaceSplitter->setChildrenCollapsible(false);
     workspaceSplitter->setHandleWidth(5);
 
@@ -348,17 +370,7 @@ void TrainingTab::setupUI()
     optionsScroll->setWidget(optionsPanel);
     workspaceSplitter->addWidget(visualScroll);
     workspaceSplitter->addWidget(optionsScroll);
-    // Qt scales each stretch factor by the widget's initial size. Equal
-    // factors therefore preserve the 89:11 ratio established by setSizes().
-    workspaceSplitter->setStretchFactor(0, 1);
-    workspaceSplitter->setStretchFactor(1, 1);
-    // Initialize the actual pixel sizes after the splitter receives its layout width.
-    // QSplitter::setSizes({89, 11}) here would mean 89 and 11 pixels, not percentages.
-    QTimer::singleShot(0, workspaceSplitter, [workspaceSplitter] {
-        const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
-        workspaceSplitter->setSizes({availableWidth * 89 / 100,
-                                      availableWidth * 11 / 100});
-    });
+    // ProportionalWorkspaceSplitter reapplies the 89:11 layout on every resize.
     // The right-hand options sidebar is capped at 11% of the workspace.
     // It remains user-resizable toward a narrower width on large displays.
     connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
