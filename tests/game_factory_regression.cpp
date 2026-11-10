@@ -139,10 +139,12 @@ int main(int argc, char **argv)
     REQUIRE(sinusGame->getScore() > 0);
 
     // A lost sensor stream must stop awarding points and display a safe state.
-    const int scoreBeforeSignalLoss = sinusGame->getScore();
+    for (int frame = 0; frame < 60; ++frame)
+        sinusGame->update(sinusDt); // Includes the 350 ms stale-sample grace period.
+    const int scoreAfterSignalTimeout = sinusGame->getScore();
     for (int frame = 0; frame < 60; ++frame)
         sinusGame->update(sinusDt);
-    REQUIRE(sinusGame->getScore() == scoreBeforeSignalLoss);
+    REQUIRE(sinusGame->getScore() == scoreAfterSignalTimeout);
     sinusGame->stop();
 
     std::unique_ptr<games::GameEngine> flappy(games::createGame(QStringLiteral("flappy")));
