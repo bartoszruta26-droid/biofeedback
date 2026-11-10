@@ -12,6 +12,7 @@
 
 #include <limits>
 #include <cmath>
+#include <QDate>
 #include <utility>
 
 namespace biofeedback::data {
@@ -445,6 +446,29 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
         if (!hasClinicalValue) {
             setError(error, QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_REQUIRED"));
             return false;
+        }
+    }
+
+    if (collection == QStringLiteral("rehabilitation-goals")) {
+        const QString title = payload.value(QStringLiteral("title")).toString().trimmed();
+        const QString metric = payload.value(QStringLiteral("metric_id")).toString().trimmed();
+        const QString unit = payload.value(QStringLiteral("unit")).toString().trimmed();
+        const QJsonValue baselineValue = payload.value(QStringLiteral("baseline_value"));
+        const QJsonValue targetValue = payload.value(QStringLiteral("target_value"));
+        if (title.isEmpty() || title.size() > 200 || metric.isEmpty() || metric.size() > 120 ||
+            unit.isEmpty() || unit.size() > 32 ||
+            !baselineValue.isDouble() || !targetValue.isDouble() ||
+            !std::isfinite(baselineValue.toDouble()) || !std::isfinite(targetValue.toDouble())) {
+            setError(error, QStringLiteral("INVALID_REHABILITATION_GOAL"));
+            return false;
+        }
+        const QString targetDate = payload.value(QStringLiteral("target_date")).toString().trimmed();
+        if (!targetDate.isEmpty()) {
+            const QDate parsedDate = QDate::fromString(targetDate, Qt::ISODate);
+            if (!parsedDate.isValid() || parsedDate.toString(Qt::ISODate) != targetDate) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_GOAL_DATE"));
+                return false;
+            }
         }
     }
 
