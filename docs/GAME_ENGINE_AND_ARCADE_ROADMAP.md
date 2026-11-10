@@ -105,3 +105,20 @@ Wszystkie prace prowadzić na gałęziach opartych o `integration/all-work`. Nie
 - [x] Drugi przebieg kompilacji wykazał niejednorodne typy argumentów Qt `qBound/qMax` (float/double) w nowym ograniczeniu kąta Pong oraz istniejącym przeliczaniu luki Flappy Bird. Ujednolicono obliczenia do `double` przed konwersją wyniku do stanu gry. Commity: `57b28c12f35891bba176299064b820b2a24f21c5`, `f5b64697f2d87c863ddcff420683fb465998f214`. Wymagana ponowna kompilacja aktualnego HEAD.
 - [x] Test `game_factory_regression` wykrył przypadek zmiany rozmiaru ukrytego widgetu: Qt może przekazać nieprawidłowy `oldSize`, przez co pozycja ptaka była jedynie przycinana do nowego widoku (w małym oknie tuż przy ziemi). Flappy Bird przechowuje teraz ostatni znany rozmiar logiczny, ustawia go podczas inicjalizacji, a przy braku poprawnego rozmiaru odtwarza proporcje pozycji początkowej. Usunięto też skalowanie bazowych parametrów luk, aby trudność nie zależała od historii zmian okna. Commity: `c4d4031e6649f3e667139fd4f41d2508e81a91e3`, `9b0cd8cd0ac1368f7773b27c06e64fc7d974dc93`. Wymagane ponowne uruchomienie kompilacji i testów.
 - [x] Kolejny przebieg potwierdził, że test nadal nie przechodzi, ponieważ ukryty widget może w ogóle nie otrzymać `resizeEvent()` przed następną klatką. Przeniesiono dopasowanie geometrii do wspólnej metody `adaptToSize()`, wywoływanej zarówno z `resizeEvent()`, jak i defensywnie z `update()` przy wykryciu zmiany rzeczywistych wymiarów. Dzięki temu zmiana rozmiaru jest obsługiwana również dla niewidocznych widgetów. Commity: `fd30a1479c076130080ec07c086f36216da5f2e4`, `4df128b2ea3478bfb3c1a315950a1a2b63bc9eae`. Oczekuje na ponowną kompilację i testy.
+
+
+## Mario Run — audyt użyteczności i poprawki mechaniki
+
+- [x] Dodano histerezę wejścia tensometru: próg naciśnięcia 30% i zwolnienia 20%, aby ograniczyć drgania sygnału HX711.
+- [x] Ładowanie skoku pozostaje zależne od czasu symulacji, a zwolnienie czujnika wyzwala pojedynczy skok o sile zależnej od czasu ładowania.
+- [x] Platformy są powierzchniami jednostronnymi: postać może na nich wylądować podczas opadania; kontakt z bokiem platformy nie kończy gry.
+- [x] Lądowanie na podłożu wymaga rzeczywistego przejścia przez jego górną krawędź. Postać spadająca w dół otworu nie teleportuje się na powierzchnię po minięciu krawędzi dziury.
+- [x] Zmniejszono hitbox postaci i kolców, aby ograniczyć niesprawiedliwe kolizje z dekoracyjnymi krawędziami sprite'a.
+- [x] Zachowano nadmiar czasu generatora przeszkód, zamiast zerować licznik po każdym wygenerowaniu.
+- [x] Ograniczono maksymalną wysokość rur i szerokość dziur do wymiarów widoku oraz zakresu osiągalnego skokiem; ograniczono też tempo narastania trudności.
+- [x] Animacja biegu zachowuje resztę czasu klatki, bez dryfowania przy zmiennej częstotliwości aktualizacji.
+- [x] Dodano własny ekran startowy/końcowy rysujący scenę gry i instrukcję sterowania tensometrem także wtedy, gdy symulacja jest zatrzymana.
+- [x] Inicjalizacja postaci uwzględnia mały lub jeszcze nieustalony rozmiar widoku.
+- [x] Dodano diagnostyczne odczyty stanu postaci i regresje: ładowanie skoku, histereza, pojedynczy skok, powrót na podłoże, odrzucanie błędnych próbek i generowanie przeszkód bez urządzenia szeregowego.
+- [ ] Wymagana pełna kompilacja Qt5 i testy CI dla aktualnego SHA gałęzi.
+- [ ] Wymagany test praktyczny z Arduino Nano/HX711; CI nie potwierdza kalibracji progu nacisku ani odczuć użytkownika.
