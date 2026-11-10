@@ -168,6 +168,15 @@ if source.count("m_measurementQueue.clear();") < 2:
 if source.count("m_measurementDrainScheduled = false;") < 2:
     raise SystemExit("MeasurementTab: failed scheduling must release the drain flag")
 
+# GUI queues are deliberately short: at 80 SPS, 64 frames cap stale
+# presentation backlog at 800 ms. The durable journal remains lossless.
+if "MaximumQueuedSamples = 64" not in source:
+    raise SystemExit("MeasurementTab GUI backlog must be capped at 64 samples")
+if "MaximumQueuedSamples = 64" not in training_source:
+    raise SystemExit("TrainingTab GUI backlog must be capped at 64 samples")
+if "m_measurementQueue.clear();" not in source[source.index("void MeasurementTab::enqueueMeasurementSample("):]:
+    raise SystemExit("MeasurementTab overload must discard stale frames to preserve freshness")
+
 # TrainingTab retains bounded FIFO batches so Qt can service other events.
 training_drain_start = training_source.index("void TrainingTab::drainMeasurementSamples(")
 training_drain_end = training_source.index("void TrainingTab::scheduleLiveUiRefresh(", training_drain_start)
