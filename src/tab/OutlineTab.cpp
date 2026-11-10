@@ -136,6 +136,12 @@ void OutlineTab::setupUI()
     workspace->setSizes({720, 280});
     m_mainLayout->addWidget(workspace, 1);
 
+    m_patientContextLabel = new QLabel(tr("Pacjent: nie wybrano"), visualPanel);
+    m_patientContextLabel->setObjectName(QStringLiteral("rehabilitationPatientContext"));
+    m_patientContextLabel->setWordWrap(true);
+    m_patientContextLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_leftLayout->addWidget(m_patientContextLabel);
+
     setupOutlineSelector();
     setupExerciseView();
     setupControlPanel();
@@ -994,6 +1000,20 @@ void OutlineTab::setSerialConnection(std::shared_ptr<sensor::SerialCommunication
         m_dataCallbackToken = 0;
     }
     m_serialPort = std::move(serial);
+}
+
+void OutlineTab::setCurrentPatientContext(const QString& patientUuid, const QString& displayName)
+{
+    m_currentPatientUuid = patientUuid.trimmed();
+    if (m_currentPatientUuid.isEmpty()) {
+        if (m_patientContextLabel)
+            m_patientContextLabel->setText(tr("Pacjent: nie wybrano"));
+        return;
+    }
+    const QString safeName = displayName.trimmed().isEmpty()
+        ? tr("Pacjent bez nazwy") : displayName.trimmed();
+    if (m_patientContextLabel)
+        m_patientContextLabel->setText(tr("Pacjent: %1").arg(safeName));
 }
 
 void OutlineTab::setMeasurementEngine(
