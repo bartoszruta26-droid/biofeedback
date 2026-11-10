@@ -709,8 +709,9 @@ bool MeasurementTab::commitMeasurementSample(
     record["source"] = QString::fromStdString(sample.source);
     record["quality"] = quality;
 
-    const QByteArray line = QJsonDocument(record).toJson(QJsonDocument::Compact) + '\n';
-    if (!m_sampleJournalWriter.append(line)) {
+    // Keep JSON serialization off the serial-ingest thread; the bounded writer
+    // queue owns the implicitly-shared object and serializes it in its worker.
+    if (!m_sampleJournalWriter.appendJson(record)) {
         m_sampleJournalFailed = true;
         m_journalAdmission.store(false, std::memory_order_release);
         QMetaObject::invokeMethod(this, [this] {
