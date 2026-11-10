@@ -195,6 +195,8 @@ for required in (
     "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
     "m_liveUiTimer->setInterval(16)",
     "m_liveUiTimer->setTimerType(Qt::PreciseTimer)",
+    "sample.ingestMonotonicNs",
+    "Opóźnienie ingest→GUI treningu [ms]: p50=%1, p95=%2, p99=%3",
     "void TrainingTab::scheduleLiveUiRefresh()",
     "void TrainingTab::refreshLiveUi()",
     "m_progressWidget->setCurrentForce(force)",
