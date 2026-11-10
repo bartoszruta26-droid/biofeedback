@@ -11,9 +11,9 @@ struct RepDetectorConfig {
     double activationRatio{0.20};
     double releaseRatio{0.10};
     double minimumActivationN{2.0};
-    std::uint32_t minimumDurationMs{250};
+    std::uint32_t minimumDurationMs{120};
     std::uint32_t maximumDurationMs{30000};
-    std::uint32_t maximumSampleGapMs{500};
+    std::uint32_t maximumSampleGapMs{100};
 };
 
 struct ForceSample {
