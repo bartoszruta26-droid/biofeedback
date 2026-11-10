@@ -19,6 +19,7 @@
 #include <QGroupBox>
 #include <QScrollArea>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QHash>
 
 namespace tab {
@@ -64,7 +65,7 @@ public:
      * @brief Czyści wszystkie dane pacjentów
      */
     void clearAllPatients();
-    void setPatientIcfAssessment(const QString& pesel, const QJsonObject& assessment);
+    void setPatientIcfAssessment(const QString& pesel, const QJsonObject& assessment, const QJsonArray& history = QJsonArray());
 
     /**
      * @brief Eksportuje dane pacjentów do pliku CSV
@@ -169,6 +170,7 @@ private slots:
     void onSelectionChanged();
     void onTableRowDoubleClicked(int row, int column);
     void openIcfAssessmentDialog();
+    void openIcfAssessmentHistoryDialog();
 
 private:
     void setupUI();
@@ -203,6 +205,7 @@ private:
     QPushButton* m_deleteButton;
     QPushButton* m_clearButton;
     QPushButton* m_icfButton;
+    QPushButton* m_icfHistoryButton;
     
     // Tabela pacjentów
     QGroupBox* m_tableGroup;
@@ -222,6 +225,7 @@ private:
     QString m_currentPatientPesel;
     QString m_currentPatientDataPath;
     QHash<QString, QJsonObject> m_icfAssessments;
+    QHash<QString, QJsonArray> m_icfAssessmentHistories;
 };
 
 } // namespace tab
