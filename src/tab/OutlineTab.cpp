@@ -1686,6 +1686,149 @@ void OutlineTab::recordRehabilitation24HourFollowUp()
     refreshRehabilitationSession();
 }
 
+
+void OutlineTab::refreshRehabilitationObservations()
+{
+    const bool hasContext = m_resourceRepository && !m_currentPatientUuid.isEmpty() &&
+                            !m_currentEpisodeUuid.isEmpty();
+    QJsonObject session;
+    QString error;
+    const bool hasActiveSession = hasContext && !m_currentRehabilitationSessionUuid.isEmpty() &&
+        m_resourceRepository->get(QStringLiteral("rehabilitation-sessions"),
+                                  m_currentRehabilitationSessionUuid, session, &error) &&
+        session.value(QStringLiteral("session_status")).toString() == QStringLiteral("active");
+    if (m_saveObservationButton) m_saveObservationButton->setEnabled(hasActiveSession);
+    for (QLineEdit* field : {m_observationExerciseEdit, m_observationSetsEdit,
+                             m_observationRepetitionsEdit, m_observationDurationEdit,
+                             m_observationRpeEdit, m_observationPainBeforeEdit,
+                             m_observationPainAfterEdit, m_observationPain24hEdit})
+        if (field) field->setEnabled(hasActiveSession);
+    if (m_observationMovementQualityCombo)
+        m_observationMovementQualityCombo->setEnabled(hasActiveSession);
+    if (!m_observationHistoryBrowser) return;
+    m_observationHistoryBrowser->clear();
+    if (!hasContext) {
+        m_observationStatusLabel->setText(tr("Wybierz pacjenta i epizod."));
+        return;
+    }
+    const QJsonArray records = m_resourceRepository->list(
+        QStringLiteral("rehabilitation-observations"), &error);
+    if (!error.isEmpty()) {
+        m_observationStatusLabel->setText(tr("Nie udało się odczytać obserwacji."));
+        if (m_saveObservationButton) m_saveObservationButton->setEnabled(false);
+        return;
+    }
+    QStringList entries;
+    for (const QJsonValue& value : records) {
+        if (!value.isObject()) continue;
+        const QJsonObject record = value.toObject();
+        if (record.value(QStringLiteral("patient_id")).toString() != m_currentPatientUuid ||
+            record.value(QStringLiteral("episode_id")).toString() != m_currentEpisodeUuid)
+            continue;
+        entries << QStringLiteral("%1 | serie: %2 | powtórzenia: %3 | ból: %4 → %5 → %6 | RPE: %7 | jakość: %8")
+            .arg(record.value(QStringLiteral("exercise_name")).toString(),
+                 record.value(QStringLiteral("completed_sets")).toVariant().toString(),
+                 record.value(QStringLiteral("completed_repetitions")).toVariant().toString(),
+                 record.value(QStringLiteral("pain_before")).toVariant().toString(),
+                 record.value(QStringLiteral("pain_after")).toVariant().toString(),
+                 record.value(QStringLiteral("pain_at_24h")).isUndefined()
+                    ? tr("brak") : record.value(QStringLiteral("pain_at_24h")).toVariant().toString(),
+                 record.value(QStringLiteral("rpe")).isUndefined()
+                    ? tr("brak") : record.value(QStringLiteral("rpe")).toVariant().toString(),
+                 record.value(QStringLiteral("movement_quality")).toString());
+    }
+    m_observationHistoryBrowser->setPlainText(entries.isEmpty()
+        ? tr("Brak zapisanych obserwacji dla tego epizodu.") : entries.join(QStringLiteral("\n")));
+    m_observationStatusLabel->setText(hasActiveSession
+        ? tr("Aktywna sesja: można zapisać obserwację ćwiczenia. Zapisane obserwacje: %1").arg(entries.size())
+        : tr("Wymagana aktywna sesja. Zapisane obserwacje: %1").arg(entries.size()));
+}
+
+void OutlineTab::createRehabilitationObservation()
+{
+    if (!m_resourceRepository || m_currentPatientUuid.isEmpty() ||
+        m_currentEpisodeUuid.isEmpty() || m_currentRehabilitationSessionUuid.isEmpty()) {
+        m_observationStatusLabel->setText(tr("Wybierz pacjenta, epizod i rozpocznij sesję."));
+        return;
+    }
+    QJsonObject session;
+    QString error;
+    if (!m_resourceRepository->get(QStringLiteral("rehabilitation-sessions"),
+            m_currentRehabilitationSessionUuid, session, &error) ||
+        session.value(QStringLiteral("session_status")).toString() != QStringLiteral("active")) {
+        m_observationStatusLabel->setText(tr("Obserwacje można zapisywać wyłącznie podczas aktywnej sesji."));
+        refreshRehabilitationObservations();
+        return;
+    }
+    const QString exercise = m_observationExerciseEdit->text().trimmed();
+    bool setsOk = false, repsOk = false, beforeOk = false, afterOk = false;
+    const int sets = m_observationSetsEdit->text().trimmed().toInt(&setsOk);
+    const int reps = m_observationRepetitionsEdit->text().trimmed().toInt(&repsOk);
+    const int painBefore = m_observationPainBeforeEdit->text().trimmed().toInt(&beforeOk);
+    const int painAfter = m_observationPainAfterEdit->text().trimmed().toInt(&afterOk);
+    if (exercise.isEmpty() || exercise.size() > 200 || !setsOk || sets < 0 || sets > 100 ||
+        !repsOk || reps < 0 || reps > 10000 || !beforeOk || painBefore < 0 || painBefore > 10 ||
+        !afterOk || painAfter < 0 || painAfter > 10) {
+        m_observationStatusLabel->setText(tr("Wymagane: ćwiczenie, serie 0–100, powtórzenia 0–10000 oraz ból przed i po 0–10."));
+        return;
+    }
+    QJsonObject payload{
+        {QStringLiteral("patient_id"), m_currentPatientUuid},
+        {QStringLiteral("episode_id"), m_currentEpisodeUuid},
+        {QStringLiteral("session_id"), m_currentRehabilitationSessionUuid},
+        {QStringLiteral("exercise_name"), exercise},
+        {QStringLiteral("completed_sets"), sets},
+        {QStringLiteral("completed_repetitions"), reps},
+        {QStringLiteral("pain_before"), painBefore},
+        {QStringLiteral("pain_after"), painAfter},
+        {QStringLiteral("movement_quality"), m_observationMovementQualityCombo->currentData().toString()},
+        {QStringLiteral("observed_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
+    };
+    const QString durationText = m_observationDurationEdit->text().trimmed();
+    if (!durationText.isEmpty()) {
+        bool ok = false; const int duration = durationText.toInt(&ok);
+        if (!ok || duration < 1 || duration > 86400) {
+            m_observationStatusLabel->setText(tr("Czas ćwiczenia musi wynosić 1–86400 sekund."));
+            return;
+        }
+        payload.insert(QStringLiteral("duration_seconds"), duration);
+    }
+    const QString rpeText = m_observationRpeEdit->text().trimmed();
+    if (!rpeText.isEmpty()) {
+        bool ok = false; const int rpe = rpeText.toInt(&ok);
+        if (!ok || rpe < 0 || rpe > 10) {
+            m_observationStatusLabel->setText(tr("RPE musi być liczbą całkowitą 0–10."));
+            return;
+        }
+        payload.insert(QStringLiteral("rpe"), rpe);
+    }
+    const QString pain24Text = m_observationPain24hEdit->text().trimmed();
+    if (!pain24Text.isEmpty()) {
+        bool ok = false; const int pain24 = pain24Text.toInt(&ok);
+        if (!ok || pain24 < 0 || pain24 > 10) {
+            m_observationStatusLabel->setText(tr("Ból po 24 godzinach musi być liczbą całkowitą 0–10."));
+            return;
+        }
+        payload.insert(QStringLiteral("pain_at_24h"), pain24);
+    }
+    QJsonObject created;
+    if (!m_resourceRepository->create(QStringLiteral("rehabilitation-observations"),
+                                      payload, created, &error)) {
+        m_observationStatusLabel->setText(tr("Nie udało się zapisać obserwacji: %1").arg(error));
+        return;
+    }
+    m_observationExerciseEdit->clear();
+    m_observationSetsEdit->clear();
+    m_observationRepetitionsEdit->clear();
+    m_observationDurationEdit->clear();
+    m_observationRpeEdit->clear();
+    m_observationPainBeforeEdit->clear();
+    m_observationPainAfterEdit->clear();
+    m_observationPain24hEdit->clear();
+    m_observationMovementQualityCombo->setCurrentIndex(0);
+    refreshRehabilitationObservations();
+}
+
 void OutlineTab::setMeasurementEngine(
     std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine)
 {
