@@ -18,7 +18,7 @@ Poza zakresem pierwszego etapu: samodzielne rozpoznawanie chorób, automatyczna 
 
 ### PatientReference
 
-Dane osobowe pozostają w istniejącym module pacjentów. Sesja rehabilitacyjna przechowuje wyłącznie wewnętrzny identyfikator pacjenta (UUID), bez PESEL, nazwiska, adresu i innych danych bezpośrednich. Widok może pobrać nazwę z modułu pacjentów po autoryzowanym powiązaniu. Eksport raportu wymaga świadomego wyboru wersji identyfikowanej albo zanonimizowanej.
+Dane osobowe pozostają w istniejącym module pacjentów. Sesja rehabilitacyjna przechowuje wyłącznie wewnętrzny identyfikator pacjenta (UUID), bez PESEL, nazwiska, adresu i innych danych bezpośrednich. Widok może pobrać nazwę z modułu pacjentów po autoryzowanym powiązaniu. Eksport PDF jest świadomą operacją użytkownika. Obecna wersja raportu zawiera nazwę wyświetlaną pacjenta z kontekstu interfejsu oraz UUID epizodu; nie zawiera PESEL. Wybór wariantu zanonimizowanego pozostaje osobnym zadaniem i nie jest jeszcze dostępny w interfejsie.
 
 Pola powiązania:
 - patient_id: UUID wymagany;
@@ -227,6 +227,10 @@ Porównanie musi zestawiać tę samą stronę, pozycję, metodę, urządzenie/pr
 - deterministyczny silnik reguł niezależny od GUI;
 - wynik wraz z uzasadnieniem i brakującymi danymi;
 - zatwierdzanie przez terapeutę i dziennik decyzji.
+
+### Eksport raportu PDF — implementacja
+
+W `OutlineTab` dostępny jest jawny przycisk eksportu raportu bieżącego epizodu. Raport pobiera dane z repozytorium i obejmuje oceny początkowe/kontrolne/końcowe, cele terapeutyczne, sesje, obserwacje ćwiczeń oraz aktualną ocenę ICF wraz z zapisanymi kwalifikatorami domen. Eksport jest przerywany, jeżeli nie można odczytać któregokolwiek wymaganego zbioru danych; aplikacja nie tworzy raportu częściowego jako kompletnego. Brak pomiaru pozostaje pusty, a nie jest zamieniany na zero. Raport zawiera nazwę wyświetlaną pacjenta i identyfikator epizodu, ale nie PESEL. Wersja zanonimizowana, podpis elektroniczny, niezmienny snapshot i ślad audytowy eksportu wymagają dalszej implementacji.
 
 ### Etap 5 — raport i walidacja
 - raport porównawczy z wykresami;
