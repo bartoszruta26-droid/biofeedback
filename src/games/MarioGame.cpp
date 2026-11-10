@@ -55,6 +55,39 @@ void MarioGame::initialize()
     }
 }
 
+double MarioGame::playerVerticalVelocity() const { return m_player.velocityY; }
+bool MarioGame::playerOnGround() const { return m_player.isOnGround; }
+bool MarioGame::playerCharging() const { return m_player.isCharging; }
+double MarioGame::jumpCharge() const { return m_player.chargeLevel; }
+int MarioGame::activeObstacleCount() const { return m_obstacles.size(); }
+int MarioGame::currentLevel() const { return m_currentLevel; }
+
+void MarioGame::paintEvent(QPaintEvent* event)
+{
+    Q_UNUSED(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    render(painter);
+
+    if (!isRunning()) {
+        const QRectF panel(width() * 0.12, height() * 0.34,
+                           width() * 0.76, height() * 0.30);
+        painter.fillRect(panel, QColor(0, 0, 0, 175));
+        painter.setPen(Qt::white);
+        painter.setFont(QFont("Arial", qMax(14, height() / 22), QFont::Bold));
+        const QString heading = getScore() > 0 ? QStringLiteral("KONIEC GRY")
+                                               : QStringLiteral("MARIO RUN");
+        painter.drawText(QRectF(panel.left() + 8, panel.top() + 8,
+                                panel.width() - 16, panel.height() * 0.40),
+                         Qt::AlignCenter, heading);
+        painter.setFont(QFont("Arial", qMax(10, height() / 38)));
+        painter.drawText(QRectF(panel.left() + 8, panel.top() + panel.height() * 0.42,
+                                panel.width() - 16, panel.height() * 0.48),
+                         Qt::AlignCenter,
+                         QStringLiteral("Przytrzymaj tensometr, aby naładować skok.\\nPuść, aby wykonać skok.\\nWynik: %1").arg(getScore()));
+    }
+}
+
 void MarioGame::resizeEvent(QResizeEvent* event)
 {
     const QSize oldSize = event->oldSize();
@@ -111,6 +144,7 @@ void MarioGame::initPlayer()
     m_player.isCharging = false;
     m_player.frame = 0;
     m_player.frameTimer = 0.0;
+    m_sensorPressed = false;
 }
 
 void MarioGame::resetLevel()
@@ -121,6 +155,7 @@ void MarioGame::resetLevel()
     m_obstacleSpawnInterval = 2.0;
     m_currentLevel = 1;
     m_obstaclesToNextLevel = 10;
+    m_sensorPressed = false;
 }
 
 void MarioGame::increaseDifficulty()
@@ -130,7 +165,7 @@ void MarioGame::increaseDifficulty()
     m_obstaclesToNextLevel = 10 + (m_currentLevel * 5);
     
     // Zmniejsz interwał spawnowania przeszkód
-    m_obstacleSpawnInterval = qMax(0.8, 2.0 - (m_currentLevel * 0.15));
+    m_obstacleSpawnInterval = qMax(1.0, 2.0 - ((m_currentLevel - 1) * 0.12));
 }
 
 void MarioGame::update(double deltaTime)
@@ -167,17 +202,36 @@ void MarioGame::update(double deltaTime)
 
 void MarioGame::updatePlayer(double deltaTime)
 {
-    double groundY = height() * GROUND_Y_RATIO;
-    
-    // Grawitacja
-    if (!m_player.isOnGround) {
+    const double groundY = height() * GROUND_Y_RATIO;
+    const QRectF previousBody = m_player.body;
+    const bool wasGrounded = m_player.isOnGround;
+
+    if (!m_player.isOnGround)
         m_player.velocityY += GRAVITY * deltaTime;
+
+    m_player.body.translate(0.0, m_player.velocityY * deltaTime);
+
+    // Floating platforms are one-way surfaces: land only while descending
+    // through their top face. They are not fatal side-wall obstacles.
+    bool landedOnPlatform = false;
+    if (m_player.velocityY >= 0.0) {
+        for (const auto& obstacle : m_obstacles) {
+            if (obstacle.type != Obstacle::PLATFORM)
+                continue;
+            const bool horizontalOverlap =
+                m_player.body.right() > obstacle.rect.left() &&
+                m_player.body.left() < obstacle.rect.right();
+            const bool crossedTop = previousBody.bottom() <= obstacle.rect.top() + 2.0 &&
+                                    m_player.body.bottom() >= obstacle.rect.top();
+            if (horizontalOverlap && crossedTop) {
+                m_player.body.moveBottom(obstacle.rect.top());
+                m_player.velocityY = 0.0;
+                landedOnPlatform = true;
+                break;
+            }
+        }
     }
-    
-    // Aktualizacja pozycji
-    m_player.body.setY(m_player.body.y() + m_player.velocityY * deltaTime);
-    
-    // Dziura jest rzeczywistą przerwą w podłożu.
+
     bool overGap = false;
     for (const auto& obstacle : m_obstacles) {
         if (obstacle.type == Obstacle::GAP &&
@@ -188,31 +242,32 @@ void MarioGame::updatePlayer(double deltaTime)
         }
     }
 
-    if (!overGap && m_player.body.bottom() >= groundY) {
-        const bool landed = !m_player.isOnGround;
+    const bool landed = !wasGrounded && (landedOnPlatform || (!overGap && m_player.body.bottom() >= groundY));
+    if (landedOnPlatform) {
+        m_player.isOnGround = true;
+        m_player.isJumping = false;
+    } else if (!overGap && m_player.body.bottom() >= groundY) {
         m_player.body.setBottom(groundY);
         m_player.velocityY = 0.0;
         m_player.isJumping = false;
         m_player.isOnGround = true;
-        if (landed) {
-            m_player.chargeLevel = 0.0;
-            m_player.isCharging = false;
-        }
     } else {
         m_player.isOnGround = false;
     }
 
-    // Ładowanie skoku odbywa się w czasie symulacji; pauza go nie nalicza.
-    if (m_player.isCharging && m_player.isOnGround) {
-        m_player.chargeLevel = qMin(1.0, m_player.chargeLevel + deltaTime / MAX_CHARGE_TIME);
+    if (landed) {
+        m_player.chargeLevel = 0.0;
+        m_player.isCharging = false;
     }
 
-    // Animacja biegu
+    if (m_player.isCharging && m_player.isOnGround)
+        m_player.chargeLevel = qMin(1.0, m_player.chargeLevel + deltaTime / MAX_CHARGE_TIME);
+
     if (m_player.isOnGround && !m_player.isCharging) {
         m_player.frameTimer += deltaTime;
-        if (m_player.frameTimer > 0.1) {
+        while (m_player.frameTimer >= 0.1) {
             m_player.frame = (m_player.frame + 1) % 4;
-            m_player.frameTimer = 0.0;
+            m_player.frameTimer -= 0.1;
         }
     }
 }
@@ -221,8 +276,8 @@ void MarioGame::generateObstacles(double deltaTime)
 {
     m_timeSinceLastObstacle += qMax(0.0, deltaTime);
     
-    if (m_timeSinceLastObstacle >= m_obstacleSpawnInterval) {
-        m_timeSinceLastObstacle = 0.0;
+    while (m_timeSinceLastObstacle >= m_obstacleSpawnInterval) {
+        m_timeSinceLastObstacle -= m_obstacleSpawnInterval;
         
         Obstacle obstacle;
         obstacle.passed = false;
@@ -303,38 +358,48 @@ bool MarioGame::checkCollision(const Player& player, const Obstacle& obstacle)
         return overlapsGap && player.body.bottom() > groundY + player.body.height();
     }
     
-    // Dla innych przeszkód sprawdzamy prostokąty
-    return player.body.intersects(obstacle.rect);
+    // Platforms are handled as one-way landing surfaces in updatePlayer().
+    if (obstacle.type == Obstacle::PLATFORM)
+        return false;
+
+    // Slightly inset the player hitbox so decorative sprite edges do not
+    // cause unfair collisions; narrow spike bounds to match their triangle.
+    const QRectF hitbox = player.body.adjusted(4.0, 3.0, -4.0, -2.0);
+    if (obstacle.type == Obstacle::SPIKE)
+        return hitbox.intersects(obstacle.rect.adjusted(6.0, 0.0, -6.0, 0.0));
+    return hitbox.intersects(obstacle.rect);
 }
 
 bool MarioGame::handleInput(double value)
 {
-    // Tensometr: wartość > threshold oznacza naciskanie
-    bool isPressing = value > m_sensorThreshold;
-    
-    if (isPressing && !m_player.isCharging && m_player.isOnGround) {
-        // Rozpoczęcie ładowania skoku
+    if (!std::isfinite(value))
+        return false;
+
+    // Schmitt trigger: 30% to press, 20% to release. This avoids repeated
+    // charge/release transitions when HX711 readings fluctuate near threshold.
+    const bool wasPressed = m_sensorPressed;
+    m_sensorPressed = wasPressed ? value > (m_sensorThreshold * 0.67)
+                                 : value >= m_sensorThreshold;
+
+    if (!wasPressed && m_sensorPressed && m_player.isOnGround) {
         m_player.isCharging = true;
-        m_player.frame = 0; // Zatrzymanie animacji biegu
+        m_player.frame = 0;
         m_player.chargeLevel = 0.0;
-    } else if (!isPressing && m_player.isCharging && m_player.isOnGround) {
-        // Zwolnienie tensometru - wykonanie skoku
-        // chargeLevel jest aktualizowany przez updatePlayer(deltaTime).
+        return true;
+    }
+
+    if (wasPressed && !m_sensorPressed && m_player.isCharging && m_player.isOnGround) {
         const double chargeRatio = qBound(0.0, m_player.chargeLevel, 1.0);
-        double jumpForce = JUMP_FORCE * (0.3 + 0.7 * chargeRatio);
-        
+        const double jumpForce = JUMP_FORCE * (0.3 + 0.7 * chargeRatio);
         m_player.velocityY = -jumpForce;
         m_player.isJumping = true;
         m_player.isOnGround = false;
         m_player.isCharging = false;
         m_player.chargeLevel = 0.0;
-        
         return true;
-    } else if (isPressing && m_player.isCharging) {
-        // Poziom ładowania aktualizuje pętla symulacji.
     }
-    
-    return false;
+
+    return m_sensorPressed && m_player.isCharging;
 }
 
 void MarioGame::render(QPainter& painter)
@@ -455,17 +520,16 @@ void MarioGame::renderObstacles(QPainter& painter)
     painter.setPen(QColor(0xA0, 0x30, 0x00));
     for (double x = 0; x < width(); x += 40) {
         for (double y = groundY + 10; y < height(); y += 30) {
-            bool inGap = false;
+            const QRectF tile(x, y, 30, 20);
+            bool intersectsGap = false;
             for (const auto& obs : m_obstacles) {
-                if (obs.type == Obstacle::GAP && 
-                    x > obs.rect.left() && x < obs.rect.right()) {
-                    inGap = true;
+                if (obs.type == Obstacle::GAP && tile.intersects(obs.rect)) {
+                    intersectsGap = true;
                     break;
                 }
             }
-            if (!inGap) {
-                painter.fillRect(QRectF(x, y, 30, 20), QColor(0xA0, 0x30, 0x00));
-            }
+            if (!intersectsGap)
+                painter.fillRect(tile, QColor(0xA0, 0x30, 0x00));
         }
     }
 }
@@ -543,12 +607,7 @@ void MarioGame::renderUI(QPainter& painter)
     painter.drawText(20, 90, QString("%1/%2").arg(m_obstaclesPassed).arg(m_obstaclesToNextLevel));
     
     // Instrukcja
-    if (!m_isRunning) {
-        painter.setFont(QFont("Arial", 9));
-        painter.drawText(rect(), Qt::AlignBottom | Qt::AlignHCenter, 
-                        "Przytrzymaj tensometr aby naładować skok, puść aby skoczyć!");
-    }
-    
+
     // Komunikat o braku połączenia z Arduino
     if (m_serialPort && !m_serialPort->isConnected()) {
         painter.setPen(QColor(255, 100, 100));
