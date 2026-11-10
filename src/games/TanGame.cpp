@@ -1,4 +1,5 @@
 #include "games/TanGame.hpp"
+
 #include <QPainter>
 #include <QPainterPath>
 #include <QPen>
@@ -12,6 +13,16 @@ namespace games {
 
 namespace {
 constexpr double kPi = 3.14159265358979323846;
+constexpr double kSampleTimeoutSeconds = 0.35;
+constexpr double kCursorTimeConstantSeconds = 0.055;
+constexpr double kAsymptoteGuard = 0.10;
+
+double tangentWave(double angle)
+{
+    // atan(tan(x)) is bounded to [-pi/2, pi/2] on each branch.
+    // The scale controls steepness without creating long clipped plateaus.
+    return (2.0 / kPi) * std::atan(0.70 * std::tan(angle));
+}
 }
 
 TanGame::TanGame(QWidget *parent)
@@ -21,10 +32,16 @@ TanGame::TanGame(QWidget *parent)
     , m_phase(0.0)
     , m_cursorY(0.0)
     , m_isHit(false)
+    , m_nearAsymptote(false)
     , m_difficultyLevel(1)
-    , m_scrollSpeed(120.0)
+    , m_scrollSpeed(105.0)
     , m_tolerance(42.0)
-    , m_frequency(0.016)
+    , m_frequency(0.0)
+    , m_inputAge(1.0)
+    , m_scoreFraction(0.0)
+    , m_trackingSeconds(0.0)
+    , m_combo(0)
+    , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
 {
 }
 
@@ -37,19 +54,38 @@ void TanGame::initialize()
 {
     setDifficultyLevel(1);
     m_currentForce = 0.0;
-    m_targetY = height() / 2.0;
-    m_cursorY = height() / 2.0;
+    m_targetY = height() * 0.5;
+    m_cursorY = height() * 0.5;
     m_phase = 0.0;
     m_isHit = false;
+    m_nearAsymptote = false;
+    m_inputAge = 1.0;
+    m_scoreFraction = 0.0;
+    m_trackingSeconds = 0.0;
+    m_combo = 0;
+    m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
+    updateSpatialFrequency();
+}
+
+void TanGame::updateSpatialFrequency()
+{
+    // 1.5 tangent periods are visible at every viewport width.
+    m_frequency = width() > 0
+        ? (kPi * 1.5 / static_cast<double>(width())) : 0.0;
 }
 
 void TanGame::setDifficultyLevel(int level)
 {
     m_difficultyLevel = qBound(1, level, 5);
-    m_scrollSpeed = 80.0 + m_difficultyLevel * 40.0;
-    m_tolerance = qMax(10.0, 50.0 - m_difficultyLevel * 8.0);
-    m_frequency = 0.010 + m_difficultyLevel * 0.004;
+    m_scrollSpeed = 75.0 + m_difficultyLevel * 30.0;
+    const double toleranceRatio = 0.115 - (m_difficultyLevel - 1) * 0.013;
+    m_tolerance = qMax(12.0,
+        qMin(48.0, qMax(240.0, static_cast<double>(height())) * toleranceRatio));
+    updateSpatialFrequency();
     m_isHit = false;
+    m_trackingSeconds = 0.0;
+    m_combo = 0;
+    m_scoreFraction = 0.0;
     setScore(0);
 }
 
@@ -75,27 +111,25 @@ bool TanGame::isSerialConnected() const
 
 bool TanGame::handleInput(double value)
 {
-    if (!std::isfinite(value) || !std::isfinite(MAX_FORCE) || MAX_FORCE <= 0.0)
+    if (!std::isfinite(value))
         return false;
 
-    const double normalized = value / MAX_FORCE;
-    if (!std::isfinite(normalized))
-        return false;
-    m_currentForce = qBound(MIN_FORCE, normalized, 1.0);
+    // TrainingTab provides force as a percentage of the exercise target.
+    m_currentForce = qBound(0.0, value / MAX_FORCE, 1.0);
+    m_inputAge = 0.0;
     return true;
 }
 
 void TanGame::calculateTargetY(double x)
 {
-    const double amplitude = height() * 0.38;
-    const double centerY = height() / 2.0;
-
-    // Tangens jest ograniczany do bezpiecznego zakresu, aby asymptoty
-    // nie generowały nieskończonych współrzędnych ani artefaktów QPainter.
     const double angle = std::remainder(x * m_frequency + m_phase, kPi);
-    const double tangent = std::tan(angle);
-    const double boundedTangent = qBound(-1.0, tangent, 1.0);
-    m_targetY = centerY - boundedTangent * amplitude;
+    const double cosine = std::abs(std::cos(angle));
+    m_nearAsymptote = cosine < kAsymptoteGuard;
+
+    const double normalized = qBound(-1.0, tangentWave(angle), 1.0);
+    const double amplitude = static_cast<double>(height()) * 0.38;
+    const double centerY = static_cast<double>(height()) * 0.5;
+    m_targetY = centerY - normalized * amplitude;
 }
 
 void TanGame::update(double deltaTime)
@@ -103,107 +137,195 @@ void TanGame::update(double deltaTime)
     if (!isRunning() || width() <= 0 || height() <= 0 ||
         !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
-    deltaTime = qMin(deltaTime, 0.1);
 
-    // Faza jest w radianach; prędkość przesuwania [px/s] przeliczamy
-    // przez częstotliwość przestrzenną [rad/px].
+    const double dt = qMin(deltaTime, 0.1);
+    updateSpatialFrequency();
     m_phase = std::remainder(
-        m_phase - m_scrollSpeed * m_frequency * deltaTime, kPi);
+        m_phase - m_scrollSpeed * m_frequency * dt, kPi);
+    m_inputAge += dt;
 
-    const double checkX = width() * 0.75;
-    calculateTargetY(checkX);
+    const double h = static_cast<double>(height());
+    const double w = static_cast<double>(width());
+    const double gateX = w * 0.72;
+    calculateTargetY(gateX);
 
-    const double desiredY = height() * (1.0 - m_currentForce);
-    m_cursorY = m_cursorY * 0.8 + desiredY * 0.2;
+    const double desiredY = h * (1.0 - m_currentForce);
+    const double alpha = 1.0 - std::exp(-dt / kCursorTimeConstantSeconds);
+    m_cursorY += (desiredY - m_cursorY) * alpha;
+
+    if (m_inputAge > kSampleTimeoutSeconds) {
+        m_isHit = false;
+        m_trackingSeconds = 0.0;
+        m_combo = 0;
+        m_feedbackText = QStringLiteral("Brak aktualnego sygnału — sprawdź czujnik");
+        return;
+    }
+
+    // The singularity is a transition, not a target to chase. Pause scoring
+    // around it so the unavoidable top-to-bottom jump is never penalized.
+    if (m_nearAsymptote) {
+        m_isHit = false;
+        m_trackingSeconds = 0.0;
+        m_combo = 0;
+        m_feedbackText = QStringLiteral("Przejście asymptoty — przygotuj się");
+        return;
+    }
 
     const double distance = std::abs(m_cursorY - m_targetY);
-    const double exitTolerance = m_tolerance * 1.5;
-    if (distance < (m_isHit ? exitTolerance : m_tolerance)) {
-        if (!m_isHit) {
-            m_isHit = true;
-            const double accuracy = qBound(
-                0.0, (m_tolerance - distance) / m_tolerance, 1.0);
-            addScore(qBound(1, static_cast<int>(std::ceil(accuracy * 10.0)), 10));
+    m_isHit = distance <= m_tolerance;
+
+    if (m_isHit) {
+        m_trackingSeconds += dt;
+        m_combo = qMin(5, 1 + static_cast<int>(m_trackingSeconds / 2.0));
+        const double accuracy = qBound(
+            0.0, 1.0 - distance / m_tolerance, 1.0);
+        const double pointsPerSecond = 2.0 + 4.0 * accuracy + 0.5 * m_combo;
+        m_scoreFraction += pointsPerSecond * dt;
+        const int earned = static_cast<int>(m_scoreFraction);
+        if (earned > 0) {
+            addScore(earned);
+            m_scoreFraction -= earned;
         }
+        m_feedbackText = QStringLiteral("Dobrze — utrzymaj siłę  •  dokładność %1%")
+            .arg(qRound(accuracy * 100.0));
     } else {
-        m_isHit = false;
+        m_trackingSeconds = 0.0;
+        m_combo = 0;
+        m_feedbackText = m_cursorY > m_targetY
+            ? QStringLiteral("Zwiększ siłę")
+            : QStringLiteral("Zmniejsz siłę");
     }
 }
 
 void TanGame::render(QPainter& painter)
 {
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
     const int w = width();
     const int h = height();
-    const double centerY = h / 2.0;
-    const double amplitude = h * 0.38;
-    const double checkX = w * 0.75;
+    if (w <= 0 || h <= 0) {
+        painter.restore();
+        return;
+    }
 
-    painter.fillRect(rect(), QColor(24, 18, 38));
-    painter.setRenderHint(QPainter::Antialiasing);
+    const double widthD = static_cast<double>(w);
+    const double heightD = static_cast<double>(h);
+    const double centerY = heightD * 0.5;
+    const double amplitude = heightD * 0.38;
+    const double gateX = widthD * 0.72;
 
-    painter.setPen(QPen(QColor(65, 55, 85), 1, Qt::DotLine));
-    for (int i = 1; i < 4; ++i)
-        painter.drawLine(0, h * i / 4, w, h * i / 4);
+    painter.fillRect(rect(), QColor(18, 20, 35));
+
+    painter.setPen(QPen(QColor(48, 58, 78), 1, Qt::DotLine));
+    for (int i = 1; i < 4; ++i) {
+        const int y = h * i / 4;
+        painter.drawLine(0, y, w, y);
+    }
+    painter.setPen(QPen(QColor(78, 91, 112), 1));
+    painter.drawLine(0, h / 2, w, h / 2);
 
     QPainterPath tangentPath;
     bool hasPrevious = false;
+    bool previousBranchPositive = false;
     double previousY = 0.0;
     for (int x = 0; x <= w; ++x) {
-        const double angle = std::remainder(x * m_frequency + m_phase, kPi);
-        const double tangent = std::tan(angle);
-        const double y = centerY - qBound(-1.0, tangent, 1.0) * amplitude;
+        const double angle = std::remainder(
+            static_cast<double>(x) * m_frequency + m_phase, kPi);
+        const double cosine = std::cos(angle);
+        const double normalized = qBound(-1.0, tangentWave(angle), 1.0);
+        const double y = centerY - normalized * amplitude;
+        const bool branchPositive = cosine >= 0.0;
 
-        // Przerwij ścieżkę na skoku przy asymptocie tangensa.
-        if (!hasPrevious || std::abs(y - previousY) > h * 0.45)
+        // Never connect the two sides of a tangent asymptote.
+        if (!hasPrevious || branchPositive != previousBranchPositive ||
+            std::abs(y - previousY) > heightD * 0.35) {
             tangentPath.moveTo(x, y);
-        else
+        } else {
             tangentPath.lineTo(x, y);
-
+        }
         previousY = y;
+        previousBranchPositive = branchPositive;
         hasPrevious = true;
     }
 
-    painter.setPen(QPen(getDifficultyColor(), 3));
+    painter.setPen(QPen(getDifficultyColor(), 3.0, Qt::SolidLine,
+                        Qt::RoundCap, Qt::RoundJoin));
     painter.setBrush(Qt::NoBrush);
     painter.drawPath(tangentPath);
 
-    painter.setPen(QPen(Qt::white, 1, Qt::DashLine));
-    painter.drawLine(QPointF(checkX, 0), QPointF(checkX, h));
+    // Target gate and its tolerance band.
+    painter.setPen(QPen(QColor(230, 238, 248, 150), 1.5, Qt::DashLine));
+    painter.drawLine(QPointF(gateX, 0), QPointF(gateX, heightD));
+    painter.setPen(QPen(QColor(90, 220, 160, 190), 1, Qt::DashLine));
+    painter.drawLine(QPointF(gateX - 22, m_targetY - m_tolerance),
+                     QPointF(gateX + 22, m_targetY - m_tolerance));
+    painter.drawLine(QPointF(gateX - 22, m_targetY + m_tolerance),
+                     QPointF(gateX + 22, m_targetY + m_tolerance));
 
+    const bool stale = m_inputAge > kSampleTimeoutSeconds;
+    const QColor cursorColor = stale ? QColor(145, 155, 170)
+        : (m_nearAsymptote ? QColor(255, 190, 85)
+                           : (m_isHit ? QColor(75, 235, 155) : QColor(75, 205, 245)));
+    painter.setPen(QPen(QColor(cursorColor.red(), cursorColor.green(),
+                               cursorColor.blue(), 105), 1));
+    painter.drawLine(QPointF(0, m_cursorY), QPointF(widthD, m_cursorY));
+    painter.setBrush(cursorColor);
+    painter.setPen(QPen(Qt::white, 2));
+    painter.drawEllipse(QPointF(gateX, m_cursorY), 10, 10);
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor(255, 255, 255, 190), 1.5));
+    painter.drawEllipse(QPointF(gateX, m_targetY), 7, 7);
+
+    const int margin = qMax(14, w / 80);
     painter.setPen(Qt::white);
-    painter.setFont(QFont(QStringLiteral("Arial"), 11));
-    painter.drawText(12, 22, QStringLiteral("Dopasuj siłę do wykresu tangensa"));
-    painter.drawText(12, 44, QStringLiteral("Siła: %1%").arg(qRound(m_currentForce * 100.0)));
-    painter.drawText(12, 66, QStringLiteral("Poziom: %1").arg(m_difficultyLevel));
-    painter.drawText(12, 88, QStringLiteral("Tolerancja: %1 px").arg(qRound(m_tolerance)));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(12, h / 34), QFont::Bold));
+    painter.drawText(QRect(margin, margin, w - 2 * margin, 34),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QStringLiteral("TANGENS FORCE  •  POZIOM %1").arg(m_difficultyLevel));
 
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(11, h / 42), QFont::DemiBold));
+    painter.setPen(stale ? QColor(255, 190, 90)
+        : (m_nearAsymptote ? QColor(255, 190, 90)
+                           : (m_isHit ? QColor(90, 245, 165) : QColor(255, 205, 105))));
+    painter.drawText(QRect(margin, margin + 38, w - 2 * margin, 30),
+                     Qt::AlignLeft | Qt::AlignVCenter, m_feedbackText);
+
+    painter.setPen(QColor(210, 220, 235));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(10, h / 52)));
+    painter.drawText(QRect(margin, h - 58, w - 2 * margin, 22),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3")
+            .arg(qRound(m_currentForce * 100.0)).arg(getScore()).arg(m_combo));
+    painter.drawText(QRect(margin, h - 34, w - 2 * margin, 20),
+        Qt::AlignLeft | Qt::AlignVCenter,
+        QStringLiteral("Utrzymuj kursor w zielonym pasie; przy asymptocie poczekaj na kolejny odcinek."));
+
+    const int meterW = qMax(12, qMin(22, w / 45));
+    const int meterX = w - margin - meterW;
+    const int meterY = margin + 8;
+    const int meterH = qMax(80, h - 2 * margin - 92);
+    painter.setPen(QPen(QColor(180, 195, 215), 1));
+    painter.setBrush(QColor(28, 39, 54));
+    painter.drawRoundedRect(QRect(meterX, meterY, meterW, meterH), 5, 5);
+    const int fillH = static_cast<int>(m_currentForce * meterH);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(Qt::cyan);
-    painter.drawEllipse(QPointF(checkX, m_cursorY), 9, 9);
+    painter.setBrush(QColor(245, 190, 75));
+    if (fillH > 0)
+        painter.drawRoundedRect(QRect(meterX + 2, meterY + meterH - fillH,
+                                      meterW - 4, qMax(1, fillH - 2)), 3, 3);
 
-    painter.setBrush(m_isHit ? Qt::green : Qt::red);
-    painter.drawEllipse(QPointF(checkX, m_targetY), m_isHit ? 13 : 6, m_isHit ? 13 : 6);
-
-    painter.setPen(Qt::white);
-    painter.setFont(QFont(QStringLiteral("Arial"), 20, QFont::Bold));
-    painter.drawText(w - 150, 32, QStringLiteral("Wynik: %1").arg(getScore()));
-
-    if (m_serialPort && !m_serialPort->isConnected()) {
-        painter.setPen(Qt::red);
-        painter.setFont(QFont(QStringLiteral("Arial"), 12, QFont::Bold));
-        painter.drawText(rect(), Qt::AlignTop | Qt::AlignHCenter,
-                         QStringLiteral("BRAK POŁĄCZENIA Z CZUJNIKIEM"));
-    }
+    painter.restore();
 }
 
 QColor TanGame::getDifficultyColor() const
 {
     switch (m_difficultyLevel) {
-        case 1: return QColor(90, 210, 150);
-        case 2: return QColor(70, 205, 190);
-        case 3: return QColor(230, 205, 80);
-        case 4: return QColor(240, 145, 70);
-        default: return QColor(235, 85, 100);
+        case 1: return QColor(90, 220, 150);
+        case 2: return QColor(75, 205, 210);
+        case 3: return QColor(240, 205, 90);
+        case 4: return QColor(245, 155, 85);
+        default: return QColor(245, 105, 105);
     }
 }
 
