@@ -247,6 +247,7 @@ private:
     void createRehabilitationEpisode();
     void refreshRehabilitationAssessments();
     void createRehabilitationAssessment();
+    void exportRehabilitationReportPdf();
     void refreshRehabilitationGoals();
     void createRehabilitationGoal();
     void refreshRehabilitationSession();
@@ -277,6 +278,7 @@ private:
     QLineEdit* m_assessmentSwellingEdit{nullptr};
     QLineEdit* m_assessmentFunctionalTestEdit{nullptr};
     QPushButton* m_saveAssessmentButton{nullptr};
+    QPushButton* m_exportAssessmentReportButton{nullptr};
     QLabel* m_assessmentStatusLabel{nullptr};
     QTextBrowser* m_assessmentHistoryBrowser{nullptr};
     QLineEdit* m_goalTitleEdit{nullptr};
