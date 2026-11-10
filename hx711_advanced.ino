@@ -65,7 +65,7 @@ unsigned long thread_timer_hx711 = 0;
 unsigned long thread_timer_serial = 0;
 unsigned long thread_timer_watchdog = 0;
 
-#define HX711_THREAD_INTERVAL 10    // Read HX711 every 10ms
+#define HX711_THREAD_INTERVAL 1     // Poll ready flag every 1ms; converter outputs at 80 SPS
 #define SERIAL_THREAD_INTERVAL 5    // Check serial every 5ms
 #define WATCHDOG_THREAD_INTERVAL 500 // Feed watchdog every 500ms
 
