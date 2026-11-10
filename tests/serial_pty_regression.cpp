@@ -359,23 +359,47 @@ int main() {
         return 1;
     }
     std::atomic<bool> callbackDisconnected{false};
-    serial.addDataCallback([&](const sensor::SensorData&) {
-        serial.disconnect();
-        callbackDisconnected.store(true, std::memory_order_release);
+    std::atomic<int> callbackCount{0};
+    serial.addDataCallback([&](const sensor::SensorData& data) {
+        if (data.isValid && data.hasTimestamp &&
+            callbackCount.fetch_add(1, std::memory_order_acq_rel) + 1 >= 2) {
+            serial.disconnect();
+            callbackDisconnected.store(true, std::memory_order_release);
+        }
     });
     serial.startAsyncReading();
-    // A repeated start while the worker is active must be a no-op.
-    serial.startAsyncReading();
-    if (!readLine(master, command, 1000) || command != "DATA\n") {
-        std::cerr << "Async reader did not issue DATA command\n";
+    serial.startAsyncReading(); // idempotent while the worker is active
+    if (!readLine(master, command, 1000) || command != "CONT\\n") {
+        std::cerr << "Async reader did not enable continuous stream mode\\n";
         serial.stopAsyncReading();
         serial.disconnect();
         ::close(master);
         return 1;
     }
-    const uint8_t callbackByte = 0x42;
-    if (::write(master, &callbackByte, sizeof(callbackByte)) != sizeof(callbackByte)) {
-        std::cerr << "Could not provide PTY data for async callback check\n";
+
+    // Two frames in one UART write exercise the persistent incremental parser.
+    std::vector<uint8_t> callbackFrames;
+    for (uint32_t index = 0; index < 2; ++index) {
+        uint8_t packet[11]{};
+        const uint32_t timestamp = 9000 + index * 12;
+        const int32_t value = 1000 + static_cast<int32_t>(index);
+        std::memcpy(packet, &timestamp, sizeof(timestamp));
+        std::memcpy(packet + 4, &value, sizeof(value));
+        uint8_t crc = 0xFF;
+        for (int i = 0; i < 8; ++i) {
+            crc ^= packet[i];
+            for (int bit = 0; bit < 8; ++bit)
+                crc = (crc & 0x80) ? static_cast<uint8_t>((crc << 1) ^ 0x07)
+                                   : static_cast<uint8_t>(crc << 1);
+        }
+        packet[8] = crc;
+        packet[9] = 0xAA;
+        packet[10] = 0x55;
+        callbackFrames.insert(callbackFrames.end(), std::begin(packet), std::end(packet));
+    }
+    if (::write(master, callbackFrames.data(), callbackFrames.size()) !=
+        static_cast<ssize_t>(callbackFrames.size())) {
+        std::cerr << "Could not provide continuous PTY frames for async callback check\\n";
         serial.stopAsyncReading();
         serial.disconnect();
         ::close(master);
@@ -387,10 +411,10 @@ int main() {
            std::chrono::steady_clock::now() < callbackDeadline) {
         std::this_thread::yield();
     }
-    // An external stop must reap the worker left joinable by its self-stop.
-    serial.stopAsyncReading();
-    if (!callbackDisconnected.load(std::memory_order_acquire) || serial.isConnected()) {
-        std::cerr << "Async callback disconnect did not complete safely\n";
+    serial.stopAsyncReading(); // reap the worker after its callback requested disconnect
+    if (!callbackDisconnected.load(std::memory_order_acquire) ||
+        callbackCount.load(std::memory_order_acquire) != 2 || serial.isConnected()) {
+        std::cerr << "Continuous async stream did not deliver two valid frames safely\\n";
         serial.disconnect();
         ::close(master);
         return 1;
