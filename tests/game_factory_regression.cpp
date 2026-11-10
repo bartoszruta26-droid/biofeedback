@@ -116,6 +116,7 @@ int main(int argc, char **argv)
 
     // Follow the moving sinusoid with the force signal. The game must reward
     // sustained tracking, not only a one-frame crossing of the target.
+    sinusGame->stop();
     sinusGame->setDifficultyLevel(1);
     sinusGame->start();
     constexpr double sinusDt = 1.0 / 120.0;
