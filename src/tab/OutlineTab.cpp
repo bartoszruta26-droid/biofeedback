@@ -1357,6 +1357,10 @@ void OutlineTab::refreshRehabilitationAssessments()
             item.value(QStringLiteral("episode_id")).toString() != m_currentEpisodeUuid)
             continue;
         QStringList fields;
+        const QString assessmentType = item.value(QStringLiteral("assessment_type")).toString();
+        if (assessmentType == QStringLiteral("baseline")) fields << tr("Ocena początkowa");
+        else if (assessmentType == QStringLiteral("follow_up")) fields << tr("Ocena kontrolna");
+        else if (assessmentType == QStringLiteral("final")) fields << tr("Ocena końcowa");
         if (item.contains(QStringLiteral("pain_nrs")))
             fields << tr("NRS: %1").arg(item.value(QStringLiteral("pain_nrs")).toInt());
         if (item.contains(QStringLiteral("rom_degrees")))
