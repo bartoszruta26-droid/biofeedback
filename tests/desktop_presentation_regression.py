@@ -180,6 +180,11 @@ assert "Zmiany liczbowe wymagają interpretacji klinicznej" in outline
 assert "createRehabilitationAssessment()" in read("include/tab/OutlineTab.hpp")
 assert 'QStringLiteral("pain_nrs")' in outline
 assert 'QStringLiteral("icf_assessment_ref")' in outline
+assert 'QStringLiteral("id"), QUuid::createUuid().toString(QUuid::WithoutBraces)' in patient
+assert 'currentIcf.value(QStringLiteral("id"))' in outline
+assert 'currentIcf.value(QStringLiteral("assessed_at"))' not in outline
+assert 'historicalId == icfReference' in read("src/data/JsonResourceRepository.cpp")
+
 assert 'rehabilitationAssessmentType' in outline
 assert 'QStringLiteral("follow_up")' in outline and 'QStringLiteral("final")' in outline
 assert 'INVALID_REHABILITATION_ASSESSMENT_TYPE' in read("src/data/JsonResourceRepository.cpp")
