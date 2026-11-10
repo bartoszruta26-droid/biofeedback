@@ -221,6 +221,46 @@ void OutlineTab::setupUI()
     goalsLayout->addWidget(m_goalStatusLabel);
     goalsLayout->addWidget(m_goalHistoryBrowser);
     m_leftLayout->addWidget(goalsGroup);
+
+    auto* sessionGroup = new QGroupBox(tr("Sesja rehabilitacyjna — ból i tolerancja"), visualPanel);
+    auto* sessionLayout = new QVBoxLayout(sessionGroup);
+    auto addSessionPainField = [sessionGroup, sessionLayout](const QString& label,
+                                                             QLineEdit*& field,
+                                                             const QString& placeholder) {
+        sessionLayout->addWidget(new QLabel(label, sessionGroup));
+        field = new QLineEdit(sessionGroup);
+        field->setPlaceholderText(placeholder);
+        sessionLayout->addWidget(field);
+    };
+    addSessionPainField(tr("Ból przed sesją — NRS (0–10)"), m_sessionPainBeforeEdit,
+                        tr("Wartość wymagana do rozpoczęcia"));
+    addSessionPainField(tr("Ból po sesji — NRS (0–10)"), m_sessionPainAfterEdit,
+                        tr("Wartość wymagana do zakończenia"));
+    addSessionPainField(tr("Ból po 24 godzinach — NRS (0–10)"), m_sessionPain24hEdit,
+                        tr("Uzupełnij po upływie około 24 godzin"));
+    m_startRehabilitationSessionButton = new QPushButton(tr("Rozpocznij sesję"), sessionGroup);
+    m_finishRehabilitationSessionButton = new QPushButton(tr("Zakończ sesję"), sessionGroup);
+    m_saveRehabilitation24hButton = new QPushButton(tr("Zapisz kontrolę po 24 godzinach"), sessionGroup);
+    m_rehabilitationSessionStatusLabel = new QLabel(tr("Wybierz pacjenta i epizod."), sessionGroup);
+    m_rehabilitationSessionStatusLabel->setWordWrap(true);
+    sessionLayout->addWidget(m_startRehabilitationSessionButton);
+    sessionLayout->addWidget(m_finishRehabilitationSessionButton);
+    sessionLayout->addWidget(m_saveRehabilitation24hButton);
+    sessionLayout->addWidget(m_rehabilitationSessionStatusLabel);
+    m_leftLayout->addWidget(sessionGroup);
+    connect(m_startRehabilitationSessionButton, &QPushButton::clicked,
+            this, &OutlineTab::startRehabilitationSession);
+    connect(m_finishRehabilitationSessionButton, &QPushButton::clicked,
+            this, &OutlineTab::finishRehabilitationSession);
+    connect(m_saveRehabilitation24hButton, &QPushButton::clicked,
+            this, &OutlineTab::recordRehabilitation24HourFollowUp);
+    m_startRehabilitationSessionButton->setEnabled(false);
+    m_finishRehabilitationSessionButton->setEnabled(false);
+    m_saveRehabilitation24hButton->setEnabled(false);
+    m_sessionPainBeforeEdit->setEnabled(false);
+    m_sessionPainAfterEdit->setEnabled(false);
+    m_sessionPain24hEdit->setEnabled(false);
+
     connect(m_createGoalButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationGoal);
     m_createGoalButton->setEnabled(false);
@@ -243,6 +283,7 @@ void OutlineTab::setupUI()
                     ? m_episodeSelector->itemData(index).toString() : QString();
                 refreshRehabilitationAssessments();
                 refreshRehabilitationGoals();
+                refreshRehabilitationSession();
             });
     connect(m_createEpisodeButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationEpisode);
@@ -1121,6 +1162,7 @@ void OutlineTab::setCurrentPatientContext(const QString& patientUuid, const QStr
         refreshRehabilitationEpisodes();
         refreshRehabilitationAssessments();
         refreshRehabilitationGoals();
+        refreshRehabilitationSession();
         return;
     }
     const QString safeName = displayName.trimmed().isEmpty()
@@ -1181,6 +1223,7 @@ void OutlineTab::refreshRehabilitationEpisodes()
     }
     refreshRehabilitationAssessments();
     refreshRehabilitationGoals();
+    refreshRehabilitationSession();
 }
 
 void OutlineTab::createRehabilitationEpisode()
@@ -1433,6 +1476,165 @@ void OutlineTab::createRehabilitationGoal()
     m_goalTargetDateEdit->clear();
     m_goalStatusLabel->setText(tr("Cel terapeutyczny zapisany w repozytorium."));
     refreshRehabilitationGoals();
+}
+
+void OutlineTab::refreshRehabilitationSession()
+{
+    const bool hasContext = m_resourceRepository && !m_currentPatientUuid.isEmpty() &&
+                            !m_currentEpisodeUuid.isEmpty();
+    m_currentRehabilitationSessionUuid.clear();
+    if (m_sessionPainBeforeEdit) m_sessionPainBeforeEdit->clear();
+    if (m_sessionPainAfterEdit) m_sessionPainAfterEdit->clear();
+    if (m_sessionPain24hEdit) m_sessionPain24hEdit->clear();
+    if (!hasContext) {
+        m_startRehabilitationSessionButton->setEnabled(false);
+        m_finishRehabilitationSessionButton->setEnabled(false);
+        m_saveRehabilitation24hButton->setEnabled(false);
+        m_sessionPainBeforeEdit->setEnabled(false);
+        m_sessionPainAfterEdit->setEnabled(false);
+        m_sessionPain24hEdit->setEnabled(false);
+        m_rehabilitationSessionStatusLabel->setText(tr("Wybierz pacjenta i epizod."));
+        return;
+    }
+    QString error;
+    const QJsonArray sessions = m_resourceRepository->list(
+        QStringLiteral("rehabilitation-sessions"), &error);
+    if (!error.isEmpty()) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Nie udało się odczytać sesji rehabilitacyjnych."));
+        return;
+    }
+    QJsonObject current;
+    QString latestStartedAt;
+    for (const QJsonValue& value : sessions) {
+        if (!value.isObject()) continue;
+        const QJsonObject candidate = value.toObject();
+        if (candidate.value(QStringLiteral("patient_id")).toString() != m_currentPatientUuid ||
+            candidate.value(QStringLiteral("episode_id")).toString() != m_currentEpisodeUuid)
+            continue;
+        const QString status = candidate.value(QStringLiteral("session_status")).toString();
+        if (status != QStringLiteral("active") && status != QStringLiteral("awaiting_24h"))
+            continue;
+        const QString startedAt = candidate.value(QStringLiteral("started_at")).toString();
+        if (current.isEmpty() || startedAt > latestStartedAt) {
+            current = candidate;
+            latestStartedAt = startedAt;
+        }
+    }
+    if (current.isEmpty()) {
+        m_startRehabilitationSessionButton->setEnabled(true);
+        m_finishRehabilitationSessionButton->setEnabled(false);
+        m_saveRehabilitation24hButton->setEnabled(false);
+        m_sessionPainBeforeEdit->setEnabled(true);
+        m_sessionPainAfterEdit->setEnabled(false);
+        m_sessionPain24hEdit->setEnabled(false);
+        m_rehabilitationSessionStatusLabel->setText(tr("Brak otwartej sesji. Wprowadź ból początkowy i rozpocznij sesję."));
+        return;
+    }
+    m_currentRehabilitationSessionUuid = current.value(QStringLiteral("id")).toString();
+    const QString status = current.value(QStringLiteral("session_status")).toString();
+    if (status == QStringLiteral("active")) {
+        m_startRehabilitationSessionButton->setEnabled(false);
+        m_finishRehabilitationSessionButton->setEnabled(true);
+        m_saveRehabilitation24hButton->setEnabled(false);
+        m_sessionPainBeforeEdit->setEnabled(false);
+        m_sessionPainAfterEdit->setEnabled(true);
+        m_sessionPain24hEdit->setEnabled(false);
+        m_rehabilitationSessionStatusLabel->setText(tr("Sesja trwa. Zapisano ból przed sesją: %1/10.")
+            .arg(current.value(QStringLiteral("pre_session_pain_nrs")).toInt()));
+    } else {
+        m_startRehabilitationSessionButton->setEnabled(false);
+        m_finishRehabilitationSessionButton->setEnabled(false);
+        m_saveRehabilitation24hButton->setEnabled(true);
+        m_sessionPainBeforeEdit->setEnabled(false);
+        m_sessionPainAfterEdit->setEnabled(false);
+        m_sessionPain24hEdit->setEnabled(true);
+        m_rehabilitationSessionStatusLabel->setText(tr("Sesja zakończona. Oczekuje na kontrolę bólu po 24 godzinach."));
+    }
+}
+
+void OutlineTab::startRehabilitationSession()
+{
+    bool ok = false;
+    const int pain = m_sessionPainBeforeEdit->text().trimmed().toInt(&ok);
+    if (!ok || pain < 0 || pain > 10) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Podaj ból przed sesją jako liczbę całkowitą 0–10."));
+        return;
+    }
+    QJsonObject payload{
+        {QStringLiteral("patient_id"), m_currentPatientUuid},
+        {QStringLiteral("episode_id"), m_currentEpisodeUuid},
+        {QStringLiteral("session_type"), QStringLiteral("treatment")},
+        {QStringLiteral("session_status"), QStringLiteral("active")},
+        {QStringLiteral("started_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+        {QStringLiteral("pre_session_pain_nrs"), pain}
+    };
+    QJsonObject created;
+    QString error;
+    if (!m_resourceRepository->create(QStringLiteral("rehabilitation-sessions"), payload, created, &error)) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Nie udało się rozpocząć sesji: %1").arg(error));
+        return;
+    }
+    m_sessionPainBeforeEdit->clear();
+    refreshRehabilitationSession();
+}
+
+void OutlineTab::finishRehabilitationSession()
+{
+    bool ok = false;
+    const int pain = m_sessionPainAfterEdit->text().trimmed().toInt(&ok);
+    if (!ok || pain < 0 || pain > 10) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Podaj ból po sesji jako liczbę całkowitą 0–10."));
+        return;
+    }
+    QJsonObject current;
+    QString error;
+    if (!m_resourceRepository->get(QStringLiteral("rehabilitation-sessions"),
+                                   m_currentRehabilitationSessionUuid, current, &error)) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Nie udało się odczytać sesji: %1").arg(error));
+        return;
+    }
+    current.insert(QStringLiteral("post_session_pain_nrs"), pain);
+    current.insert(QStringLiteral("ended_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    current.insert(QStringLiteral("session_status"), QStringLiteral("awaiting_24h"));
+    QJsonObject updated;
+    if (!m_resourceRepository->update(QStringLiteral("rehabilitation-sessions"),
+            m_currentRehabilitationSessionUuid, current.value(QStringLiteral("version")).toInt(),
+            current, updated, &error)) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Nie udało się zakończyć sesji: %1").arg(error));
+        return;
+    }
+    m_sessionPainAfterEdit->clear();
+    refreshRehabilitationSession();
+}
+
+void OutlineTab::recordRehabilitation24HourFollowUp()
+{
+    bool ok = false;
+    const int pain = m_sessionPain24hEdit->text().trimmed().toInt(&ok);
+    if (!ok || pain < 0 || pain > 10) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Podaj ból po 24 godzinach jako liczbę całkowitą 0–10."));
+        return;
+    }
+    QJsonObject current;
+    QString error;
+    if (!m_resourceRepository->get(QStringLiteral("rehabilitation-sessions"),
+                                   m_currentRehabilitationSessionUuid, current, &error)) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Nie udało się odczytać sesji: %1").arg(error));
+        return;
+    }
+    current.insert(QStringLiteral("pain_at_24h_nrs"), pain);
+    current.insert(QStringLiteral("follow_up_24h_at"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    current.insert(QStringLiteral("session_status"), QStringLiteral("completed"));
+    QJsonObject updated;
+    if (!m_resourceRepository->update(QStringLiteral("rehabilitation-sessions"),
+            m_currentRehabilitationSessionUuid, current.value(QStringLiteral("version")).toInt(),
+            current, updated, &error)) {
+        m_rehabilitationSessionStatusLabel->setText(tr("Nie udało się zapisać kontroli: %1").arg(error));
+        return;
+    }
+    m_sessionPain24hEdit->clear();
+    m_currentRehabilitationSessionUuid.clear();
+    refreshRehabilitationSession();
 }
 
 void OutlineTab::setMeasurementEngine(
