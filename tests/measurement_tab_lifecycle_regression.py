@@ -238,11 +238,13 @@ if destructor_body.index("m_measurementEngine->setCommitHook({})") > destructor_
     raise SystemExit("Teardown must disable and synchronize commit hook before closing journal")
 
 # Acquisition runs at 80 SPS; the plot uses a separate 120 Hz interpolated presentation clock.
-# Training labels/game input remain bounded to approximately 60 Hz.
+# Training labels/game input consume each real sample; Qt coalesces paint events.
 training_source = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
 game_engine_source = Path("src/games/GameEngine.cpp").read_text(encoding="utf-8")
-if "static constexpr qint64 LiveUiIntervalMs = 16;" not in training_source:
-    raise SystemExit("Training live widgets/game input must target approximately 60 Hz")
+if "m_currentGame->handleSensorInput(gameInput);" not in training_source:
+    raise SystemExit("Training must forward every acquired sample to the active game")
+if "m_lblCurrentForce->setText(QString(\"%1 N\").arg(force, 0, 'f', 2));" not in training_source:
+    raise SystemExit("Training force display must consume the newest acquired sample")
 if "m_repaintTimer.setInterval(8);" not in source:
     raise SystemExit("Measurement force plot repaint must target approximately 120 Hz")
 if "constexpr double displayStepSeconds = 1.0 / 120.0;" not in source:
