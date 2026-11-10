@@ -225,5 +225,43 @@ int main() {
     assert(isolatedSample.sequence == 1);
     assert(lockIsolationEngine.history().size() == 1);
 
+
+    // Clearing/replacing a commit hook is a lifecycle barrier: it must wait
+    // for a hook already captured by an ingest producer to finish.
+    MeasurementEngine hookBarrierEngine;
+    std::mutex barrierMutex;
+    std::condition_variable barrierEnteredCondition;
+    std::condition_variable barrierReleaseCondition;
+    bool barrierEntered = false;
+    bool barrierRelease = false;
+    std::atomic<bool> hookReplacementReturned{false};
+    hookBarrierEngine.setCommitHook([&](const MeasurementSample&) {
+        std::unique_lock<std::mutex> lock(barrierMutex);
+        barrierEntered = true;
+        barrierEnteredCondition.notify_one();
+        barrierReleaseCondition.wait(lock, [&] { return barrierRelease; });
+        return true;
+    });
+    std::thread barrierProducer([&] { hookBarrierEngine.ingest(concurrentInput); });
+    {
+        std::unique_lock<std::mutex> lock(barrierMutex);
+        barrierEnteredCondition.wait(lock, [&] { return barrierEntered; });
+    }
+    std::thread hookReplacer([&] {
+        hookBarrierEngine.setCommitHook({});
+        hookReplacementReturned.store(true, std::memory_order_release);
+    });
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    assert(!hookReplacementReturned.load(std::memory_order_acquire));
+    {
+        std::lock_guard<std::mutex> lock(barrierMutex);
+        barrierRelease = true;
+    }
+    barrierReleaseCondition.notify_one();
+    barrierProducer.join();
+    hookReplacer.join();
+    assert(hookReplacementReturned.load(std::memory_order_acquire));
+    assert(hookBarrierEngine.history().size() == 1);
+
     return 0;
 }
