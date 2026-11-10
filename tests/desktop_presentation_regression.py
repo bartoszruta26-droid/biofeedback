@@ -198,6 +198,14 @@ assert 'm_startRehabilitationSessionButton->setEnabled(false);' in outline[outli
 assert 'const bool hasClinicalValue' in outline
 assert 'payload.contains(QStringLiteral("functional_test"))' in outline
 assert 'Powiązano z konkretną wersją oceny ICF' in outline
+assert 'exportRehabilitationReportPdf()' in read("include/tab/OutlineTab.hpp")
+assert 'Eksportuj raport epizodu do PDF' in outline
+assert 'QPdfWriter writer(&pdfFile)' in outline
+assert 'rehabilitation-assessments' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'rehabilitation-observations' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'icfResponses.constBegin()' in outline[outline.index('void OutlineTab::exportRehabilitationReportPdf()'):]
+assert 'PDF' in read("docs/rehabilitation/OUTLINE_PATIENT_WORKFLOW.md")
+
 
 
 
