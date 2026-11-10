@@ -660,6 +660,9 @@ void Application::setupConnections()
                 const int version = existing.value(QStringLiteral("version")).toInt();
                 const int cachedVersion = patientVersions->value(pesel, version);
                 if (cachedVersion != version) {
+                    m_patientTab->setPatientIcfAssessment(
+                        pesel, existing.value(QStringLiteral("icf_assessment")).toObject(),
+                        existing.value(QStringLiteral("icf_assessment_history")).toArray());
                     if (m_logger) m_logger->warning("ICF assessment update rejected due to stale patient version.");
                     if (m_mainWindow)
                         m_mainWindow->addDebugMessage("Ocena ICF nie została zapisana: kartoteka została zmieniona w innym miejscu. Odśwież dane pacjenta.", "WARNING");
@@ -676,12 +679,16 @@ void Application::setupConnections()
                 QJsonObject updated;
                 if (!m_sharedResources->update(QStringLiteral("patients"),
                         existing.value(QStringLiteral("id")).toString(), version, payload, updated, &error)) {
+                    m_patientTab->setPatientIcfAssessment(
+                        pesel, existing.value(QStringLiteral("icf_assessment")).toObject(),
+                        existing.value(QStringLiteral("icf_assessment_history")).toArray());
                     if (m_logger) m_logger->error("ICF assessment persistence failed: " + error.toStdString());
                     if (m_mainWindow)
                         m_mainWindow->addDebugMessage("Nie udało się trwale zapisać oceny ICF: " + error, "ERROR");
                     return;
                 }
                 patientVersions->insert(pesel, updated.value(QStringLiteral("version")).toInt());
+                m_patientTab->setPatientIcfAssessment(pesel, assessment, assessmentHistory);
                 if (m_logger) m_logger->info("Patient ICF functional assessment saved [personal fields redacted]");
             });
 
