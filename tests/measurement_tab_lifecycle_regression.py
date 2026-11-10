@@ -207,7 +207,7 @@ if "scheduleAgain" not in training_drain or "QMetaObject::invokeMethod" not in t
 # game control are refreshed from the latest value at a bounded 60 Hz cadence.
 for required in (
     "m_repetitionDetector.process(sample.deviceTimestampMs, force, true, repetition)",
-    "m_liveUiTimer->setInterval(16)",
+    "m_liveUiTimer->setInterval(8)",
     "m_liveUiTimer->setTimerType(Qt::PreciseTimer)",
     "sample.ingestMonotonicNs",
     "Opóźnienie ingest→GUI treningu [ms]: p50=%1, p95=%2, p99=%3",
