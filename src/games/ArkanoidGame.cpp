@@ -17,7 +17,7 @@ namespace games {
 namespace {
 constexpr double kSensorTimeoutMs = 500.0;
 constexpr double kForceSmoothingSeconds = 0.065;
-constexpr double kPaddleResponseSeconds = 0.045;
+constexpr double kPaddleResponseSeconds = 0.025;
 constexpr double kServeDelaySeconds = 0.85;
 constexpr double kMaximumDelta = 0.1;
 constexpr double kPhysicsStep = 1.0 / 120.0;
