@@ -223,7 +223,7 @@ void SinGame::render(QPainter &painter) {
     
     // Tekst informacyjny
     painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 12));
+    painter.setFont(QFont("Arial", 8));
     painter.drawText(10, 20, "Celuj w linię przerywaną");
     painter.drawText(10, 40, QString("Siła: %1%").arg(static_cast<int>(m_currentForce * 100)));
     painter.drawText(10, 60, QString("Tolerancja: %1 px").arg(static_cast<int>(m_tolerance)));
@@ -268,7 +268,7 @@ void SinGame::render(QPainter &painter) {
     // 6. Status połączenia serial
     if (m_serialPort && !m_serialPort->isConnected()) {
         painter.setPen(QPen(Qt::red, 2));
-        painter.setFont(QFont("Arial", 14, QFont::Bold));
+        painter.setFont(QFont("Arial", 9, QFont::Bold));
         painter.drawText(w/2 - 100, 30, "BRAK POŁĄCZENIA Z SENSOREM");
     }
 }
