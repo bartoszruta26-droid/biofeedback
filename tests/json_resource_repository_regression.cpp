@@ -143,6 +143,19 @@ int main(int argc, char** argv) {
     assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), invalidAssessment,
                              rejectedAssessment, &error));
     assert(error == QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_OUT_OF_RANGE"));
+    QJsonObject emptyAssessment{
+        {QStringLiteral("patient_id"), id},
+        {QStringLiteral("episode_id"), episodeId},
+        {QStringLiteral("assessment_type"), QStringLiteral("baseline")}
+    };
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), emptyAssessment,
+                             rejectedAssessment, &error));
+    assert(error == QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_REQUIRED"));
+    QJsonObject fractionalStrength = assessmentPayload;
+    fractionalStrength.insert(QStringLiteral("strength_mrc"), 3.5);
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), fractionalStrength,
+                             rejectedAssessment, &error));
+    assert(error == QStringLiteral("REHABILITATION_ASSESSMENT_VALUE_OUT_OF_RANGE"));
 
     QJsonObject goalPayload{
         {QStringLiteral("patient_id"), id},
