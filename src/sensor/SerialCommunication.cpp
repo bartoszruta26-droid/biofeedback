@@ -486,7 +486,11 @@ bool SerialCommunication::openPort(const std::string& portName, int baudRate) {
         m_impl->markActivity();
         connectionLock.unlock();
         notifyConnectionCallbacks(true, std::string("Connected to ") + portName);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // Opening an Arduino Nano USB-UART port commonly toggles DTR and
+        // resets the MCU. Its bootloader can consume the first command sent
+        // too early; 500 ms was insufficient on some Nano/USB-serial setups.
+        // Wait for bootloader + firmware setup before startAsyncReading sends CONT.
+        std::this_thread::sleep_for(std::chrono::milliseconds(1500));
         
 #if DEBUG_CONNECTION
         core::DebugManager::instance().sendDebugMessage(
