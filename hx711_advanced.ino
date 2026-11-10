@@ -33,6 +33,7 @@
 // Pin definitions
 #define HX711_DT_PIN  2   // Data pin (canonical Nano pin map)
 #define HX711_SCK_PIN 3   // Clock pin (canonical Nano pin map)
+#define HX711_RATE_PIN A0  // Connect HX711 RATE pad to Nano A0; HIGH selects 80 SPS
 
 // Number of samples for averaging (1 sample for 80Hz output)
 #define HX711_SAMPLES 1
@@ -151,6 +152,10 @@ long readHX711Raw() {
     // Send 24 clock pulses to read data
     pinMode(HX711_SCK_PIN, OUTPUT);
     digitalWrite(HX711_SCK_PIN, LOW);
+    // HX711 RATE=HIGH selects 80 samples/second (RATE=LOW is only 10 SPS).
+    // Wire the module's RATE pad to Nano A0; do not average multiple conversions.
+    pinMode(HX711_RATE_PIN, OUTPUT);
+    digitalWrite(HX711_RATE_PIN, HIGH);
     
     for (uint8_t i = 0; i < 24; i++) {
         digitalWrite(HX711_SCK_PIN, HIGH);
@@ -367,9 +372,9 @@ void processSerialCommand() {
 // PSEUDO-THREADING (Cooperative Multitasking)
 // ============================================================
 
-// Thread: HX711 Reader - poll readiness; physical SPS is set by the HX711 RATE pin.
+// Thread: HX711 Reader - poll readiness at 1ms; RATE=HIGH configures 80 physical SPS.
 void threadHX711() {
-    if (millis() - thread_timer_hx711 >= 12) {  // Poll often; do not assume this sets the ADC conversion rate.
+    if (millis() - thread_timer_hx711 >= HX711_THREAD_INTERVAL) {
         thread_timer_hx711 = millis();
         
         // Check if HX711 is ready
