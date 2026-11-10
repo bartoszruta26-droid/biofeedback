@@ -447,6 +447,8 @@ private:
     double m_targetForce;     // N
     double m_sessionStartTime;
     QElapsedTimer m_sessionElapsedTimer;
+    std::uint32_t m_deviceTimestampOriginMs{0};
+    bool m_hasDeviceTimestampOrigin{false};
     double m_sessionElapsedOffsetSeconds{0.0};
     
     // Bufory danych
