@@ -1,5 +1,6 @@
 #include "games/GalagaGame.hpp"
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
@@ -22,6 +23,7 @@ GalagaGame::GalagaGame(QWidget *parent)
     , m_fireHeld(false)
 {
     setFocusPolicy(Qt::StrongFocus);
+    setMouseTracking(true);
 }
 
 QString GalagaGame::gameName() const
@@ -125,6 +127,8 @@ void GalagaGame::createWave()
 
 bool GalagaGame::handleInput(double value)
 {
+    if (!std::isfinite(value))
+        return false;
     m_force = qBound(0.0, value / 100.0, 1.0);
     return true;
 }
@@ -154,6 +158,30 @@ void GalagaGame::keyReleaseEvent(QKeyEvent* event)
     } else {
         GameEngine::keyReleaseEvent(event);
     }
+}
+
+void GalagaGame::mouseMoveEvent(QMouseEvent* event)
+{
+    const double available = qMax(0.0, static_cast<double>(width()) - 36.0 - m_player.width());
+    m_force = available > 0.0
+        ? qBound(0.0, (event->localPos().x() - 18.0) / available, 1.0)
+        : 0.5;
+    m_keyboardDirection = 0.0;
+    event->accept();
+}
+
+void GalagaGame::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        setFocus(Qt::MouseFocusReason);
+        if (m_fireCooldown <= 0.0) {
+            firePlayerShot();
+            m_fireCooldown = 0.24;
+        }
+        event->accept();
+        return;
+    }
+    QWidget::mousePressEvent(event);
 }
 
 void GalagaGame::firePlayerShot()
