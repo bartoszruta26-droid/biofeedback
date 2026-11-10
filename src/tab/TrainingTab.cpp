@@ -14,6 +14,7 @@
 #include <QStackedWidget>
 #include <QScrollArea>
 #include <QSplitter>
+#include <QTimer>
 #include <QDir>
 #include <QGuiApplication>
 #include <QScreen>
@@ -349,7 +350,13 @@ void TrainingTab::setupUI()
     workspaceSplitter->addWidget(optionsScroll);
     workspaceSplitter->setStretchFactor(0, 1);
     workspaceSplitter->setStretchFactor(1, 1);
-    workspaceSplitter->setSizes({89, 11});
+    // Initialize the actual pixel sizes after the splitter receives its layout width.
+    // QSplitter::setSizes({89, 11}) here would mean 89 and 11 pixels, not percentages.
+    QTimer::singleShot(0, workspaceSplitter, [workspaceSplitter] {
+        const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
+        workspaceSplitter->setSizes({availableWidth * 89 / 100,
+                                      availableWidth * 11 / 100});
+    });
     // The right-hand options sidebar is capped at 11% of the workspace.
     // It remains user-resizable toward a narrower width on large displays.
     connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
