@@ -113,12 +113,12 @@ public:
     tab::MeasurementTab* measurementTab() const { return m_measurementTab; }
 
     /**
-     * @brief Pobiera zakładkę treningu (Outline)
+     * @brief Pobiera zakładkę konspektów rehabilitacyjnych
      */
     tab::OutlineTab* outlineTab() const { return m_outlineTab; }
 
     /**
-     * @brief Pobiera zakładkę TrainingTab
+     * @brief Pobiera zakładkę gier
      */
     tab::TrainingTab* trainingTab() const { return m_trainingTab; }
 
@@ -128,7 +128,7 @@ public:
     tab::DebugTab* debugTab() const { return m_debugTab; }
 
     /**
-     * @brief Uruchamia grę w zakładce treningu
+     * @brief Uruchamia grę w zakładce gier
      * @param gameId ID gry do uruchomienia
      * @param exerciseData Dane ćwiczenia
      */
