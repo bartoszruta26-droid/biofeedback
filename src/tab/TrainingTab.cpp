@@ -489,7 +489,7 @@ void TrainingTab::setupUI()
     infoLayout->addWidget(m_lblCurrentRep);
     
     m_lblTimer = new QLabel("Czas: 00:00", this);
-    m_lblTimer->setFont(QFont("Arial", 9, QFont::Bold));
+    m_lblTimer->setFont(QFont("Arial", 7, QFont::Bold));
     infoLayout->addWidget(m_lblTimer);
     
     progressLayout->addLayout(infoLayout);
