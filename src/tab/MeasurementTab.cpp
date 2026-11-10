@@ -1,5 +1,6 @@
 #include "tab/MeasurementTab.hpp"
 #include <utility>
+#include <chrono>
 #include <vector>
 #include "measurement/Units.hpp"
 #include "core/RuntimePaths.hpp"
@@ -1384,6 +1385,8 @@ void MeasurementTab::startMeasurement()
         m_measurementDrainScheduled = false;
         m_droppedMeasurementSamples = 0;
         m_totalDroppedMeasurementSamples = 0;
+        m_uiDispatchLatencyWindowMs.clear();
+        m_lastDispatchLatencyReportMs = 0;
     }
     ensureCurrentSeriesInitialized();
     m_inContraction = false;
@@ -3232,6 +3235,44 @@ void MeasurementTab::onMeasurementSample(
     const biofeedback::measurement::MeasurementSample& sample)
 {
     if (!m_isMeasuring) return;
+
+    // Measure software queue age with the same monotonic clock used at engine
+    // ingress. Wall-clock timestamps are deliberately excluded from latency.
+    if (sample.ingestMonotonicNs != 0) {
+        const auto nowNs = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        if (nowNs >= sample.ingestMonotonicNs) {
+            m_uiDispatchLatencyWindowMs.append(
+                static_cast<double>(nowNs - sample.ingestMonotonicNs) / 1.0e6);
+            constexpr int MaximumLatencyWindow = 256;
+            if (m_uiDispatchLatencyWindowMs.size() > MaximumLatencyWindow)
+                m_uiDispatchLatencyWindowMs.remove(
+                    0, m_uiDispatchLatencyWindowMs.size() - MaximumLatencyWindow);
+
+            const qint64 elapsedMs = m_sessionElapsedTimer.elapsed();
+            if (elapsedMs - m_lastDispatchLatencyReportMs >= 5000 &&
+                !m_uiDispatchLatencyWindowMs.isEmpty()) {
+                QVector<double> sorted = m_uiDispatchLatencyWindowMs;
+                std::sort(sorted.begin(), sorted.end());
+                const int count = sorted.size();
+                const auto percentile = [&sorted, count](double fraction) {
+                    const int index = std::min(
+                        count - 1,
+                        std::max(0, static_cast<int>(std::ceil(fraction * count)) - 1));
+                    return sorted.at(index);
+                };
+                addDebugMessage(
+                    QString("Opóźnienie ingest→GUI [ms]: p50=%1, p95=%2, p99=%3")
+                        .arg(percentile(0.50), 0, 'f', 2)
+                        .arg(percentile(0.95), 0, 'f', 2)
+                        .arg(percentile(0.99), 0, 'f', 2),
+                    "LATENCY");
+                m_lastDispatchLatencyReportMs = elapsedMs;
+            }
+        }
+    }
+
     if (!sample.isValid() || sample.unit != "count") {
         m_repetitionDetector.reset();
         return;
