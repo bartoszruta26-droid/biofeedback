@@ -1,3 +1,5 @@
+> Instrukcja dla gracza: [GAME_CONTROLS.md](GAME_CONTROLS.md) — sterowanie czujnikiem, klawiaturą i zasady rozgrywki dla wszystkich gier.
+
 # Plan rozwoju silnika i gier
 
 ## Zakres wymagany
