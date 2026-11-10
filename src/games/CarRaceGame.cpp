@@ -3,6 +3,7 @@
 #include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
+#include <QPaintEvent>
 #include <algorithm>
 #include <cmath>
 
@@ -18,6 +19,8 @@ CarRaceGame::CarRaceGame(QWidget *parent)
     , m_lane(1)
     , m_lives(3)
     , m_spawnCount(0)
+    , m_collisionCooldown(0.0)
+    , m_sensorInitialized(false)
 {
     setFocusPolicy(Qt::StrongFocus);
 }
@@ -38,6 +41,8 @@ void CarRaceGame::initialize()
     m_lane = 1;
     m_lives = 3;
     m_spawnCount = 0;
+    m_collisionCooldown = 0.0;
+    m_sensorInitialized = false;
     m_player = QRectF(0.0, height() - 105.0, 38.0, 66.0);
     setLane(m_lane);
 }
@@ -78,17 +83,42 @@ void CarRaceGame::setLane(int lane)
 
 bool CarRaceGame::handleInput(double value)
 {
+    if (!std::isfinite(value))
+        return false;
+
     m_force = qBound(0.0, value / 100.0, 1.0);
-    setLane(qBound(0, static_cast<int>(m_force * 3.0), 2));
+    const double forcePercent = m_force * 100.0;
+    int nextLane = m_lane;
+
+    if (!m_sensorInitialized) {
+        nextLane = forcePercent < 33.333 ? 0 : (forcePercent >= 66.667 ? 2 : 1);
+        m_sensorInitialized = true;
+    } else if (m_lane == 0) {
+        if (forcePercent >= 70.0) nextLane = 2;
+        else if (forcePercent >= 38.0) nextLane = 1;
+    } else if (m_lane == 1) {
+        if (forcePercent <= 30.0) nextLane = 0;
+        else if (forcePercent >= 70.0) nextLane = 2;
+    } else {
+        if (forcePercent <= 30.0) nextLane = 0;
+        else if (forcePercent <= 62.0) nextLane = 1;
+    }
+
+    setLane(nextLane);
     return true;
 }
 
 void CarRaceGame::keyPressEvent(QKeyEvent* event)
 {
-    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_A)
+    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_A) {
         setLane(m_lane - 1);
-    else if (event->key() == Qt::Key_Right || event->key() == Qt::Key_D)
+        m_force = (m_lane + 0.5) / 3.0;
+        m_sensorInitialized = false;
+    } else if (event->key() == Qt::Key_Right || event->key() == Qt::Key_D) {
         setLane(m_lane + 1);
+        m_force = (m_lane + 0.5) / 3.0;
+        m_sensorInitialized = false;
+    }
     else
         GameEngine::keyPressEvent(event);
 }
@@ -129,10 +159,11 @@ void CarRaceGame::update(double deltaTime)
     m_roadSpeed = qMin(520.0, 220.0 + m_distance * 0.012);
     m_spawnInterval = qMax(0.58, 1.25 - m_distance / 12000.0);
     m_spawnTimer += deltaTime;
-    if (m_spawnTimer >= m_spawnInterval) {
+    while (m_spawnTimer >= m_spawnInterval) {
         m_spawnTimer -= m_spawnInterval;
         spawnObstacle();
     }
+    m_collisionCooldown = qMax(0.0, m_collisionCooldown - deltaTime);
 
     for (Obstacle& obstacle : m_obstacles) {
         obstacle.rect.translate(0.0, m_roadSpeed * deltaTime);
@@ -142,9 +173,11 @@ void CarRaceGame::update(double deltaTime)
         }
         if (obstacle.rect.intersects(m_player)) {
             obstacle.rect = QRectF();
-            loseLife();
-            if (!isRunning())
-                return;
+            if (m_collisionCooldown <= 0.0) {
+                m_collisionCooldown = 0.85;
+                loseLife();
+                if (!isRunning()) return;
+            }
         }
     }
 
