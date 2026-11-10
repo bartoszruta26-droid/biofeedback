@@ -638,6 +638,40 @@ void Application::setupConnections()
                 }
             });
 
+    connect(m_patientTab, &tab::PatientTab::patientIcfAssessmentChanged,
+            this, [this, findPatientByPesel, patientVersions](const QString& pesel,
+                                                               const QJsonObject& assessment) {
+                if (!m_sharedResources || pesel.isEmpty()) return;
+                QJsonObject existing;
+                QString error;
+                if (!findPatientByPesel(pesel, existing, &error) || !error.isEmpty()) {
+                    if (m_logger) m_logger->error("ICF assessment patient lookup failed: " + error.toStdString());
+                    if (m_mainWindow)
+                        m_mainWindow->addDebugMessage("Nie udało się odnaleźć kartoteki pacjenta dla oceny ICF.", "ERROR");
+                    return;
+                }
+                const int version = existing.value(QStringLiteral("version")).toInt();
+                const int cachedVersion = patientVersions->value(pesel, version);
+                if (cachedVersion != version) {
+                    if (m_logger) m_logger->warning("ICF assessment update rejected due to stale patient version.");
+                    if (m_mainWindow)
+                        m_mainWindow->addDebugMessage("Ocena ICF nie została zapisana: kartoteka została zmieniona w innym miejscu. Odśwież dane pacjenta.", "WARNING");
+                    return;
+                }
+                QJsonObject payload = existing;
+                payload.insert(QStringLiteral("icf_assessment"), assessment);
+                QJsonObject updated;
+                if (!m_sharedResources->update(QStringLiteral("patients"),
+                        existing.value(QStringLiteral("id")).toString(), version, payload, updated, &error)) {
+                    if (m_logger) m_logger->error("ICF assessment persistence failed: " + error.toStdString());
+                    if (m_mainWindow)
+                        m_mainWindow->addDebugMessage("Nie udało się trwale zapisać oceny ICF: " + error, "ERROR");
+                    return;
+                }
+                patientVersions->insert(pesel, updated.value(QStringLiteral("version")).toInt());
+                if (m_logger) m_logger->info("Patient ICF functional assessment saved [personal fields redacted]");
+            });
+
     connect(m_patientTab, &tab::PatientTab::patientRecordDeleted,
             this, [this, findPatientByPesel, patientVersions](const QString& pesel) {
                 if (!m_sharedResources || pesel.isEmpty()) return;
@@ -697,6 +731,8 @@ void Application::setupConnections()
             QDate::fromString(patient.value(QStringLiteral("birthDate")).toString(), Qt::ISODate),
             patient.value(QStringLiteral("gender")).toString(),
             patient.value(QStringLiteral("medicalHistory")).toString());
+        m_patientTab->setPatientIcfAssessment(
+            pesel, patient.value(QStringLiteral("icf_assessment")).toObject());
     }
 
     // One-time, non-destructive migration from the former per-patient files.
