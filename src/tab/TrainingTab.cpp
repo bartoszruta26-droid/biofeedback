@@ -1283,7 +1283,7 @@ void TrainingTab::enqueueMeasurementSample(
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-        constexpr std::size_t MaximumQueuedSamples = 128;
+        constexpr std::size_t MaximumQueuedSamples = 64;
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
             m_droppedMeasurementSamples += m_measurementQueue.size() + 1;
             m_measurementQueue.clear();
