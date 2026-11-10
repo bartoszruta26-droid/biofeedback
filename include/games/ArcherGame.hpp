@@ -7,6 +7,7 @@
 #include <QVector>
 
 class QKeyEvent;
+class QMouseEvent;
 class QResizeEvent;
 
 namespace games {
@@ -20,6 +21,7 @@ public:
     QString gameName() const override;
     double targetSpeed() const { return m_targetSpeed; }
     int activeArrowCount() const;
+    double aimAngleRadians() const { return m_aimAngle; }
 
 protected:
     void initialize() override;
@@ -27,6 +29,8 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void keyPressEvent(QKeyEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
