@@ -93,7 +93,10 @@ int main(int argc, char** argv) {
 
     const QString currentIcfTimestamp = QStringLiteral("2026-11-10T10:00:00.000Z");
     const QString historicalIcfTimestamp = QStringLiteral("2026-10-10T10:00:00.000Z");
+    const QString currentIcfId = QStringLiteral("icf-current-version-001");
+    const QString historicalIcfId = QStringLiteral("icf-historical-version-001");
     const QJsonObject currentIcfAssessment{
+        {QStringLiteral("id"), currentIcfId},
         {QStringLiteral("schema"), QStringLiteral("icf-functional-screening-v1")},
         {QStringLiteral("assessed_at"), currentIcfTimestamp},
         {QStringLiteral("responses"), QJsonObject{
@@ -101,6 +104,7 @@ int main(int argc, char** argv) {
         }}
     };
     const QJsonObject historicalIcfAssessment{
+        {QStringLiteral("id"), historicalIcfId},
         {QStringLiteral("schema"), QStringLiteral("icf-functional-screening-v1")},
         {QStringLiteral("assessed_at"), historicalIcfTimestamp},
         {QStringLiteral("responses"), QJsonObject{
@@ -150,7 +154,7 @@ int main(int argc, char** argv) {
         {QStringLiteral("patient_id"), id},
         {QStringLiteral("episode_id"), episodeId},
         {QStringLiteral("assessment_type"), QStringLiteral("baseline")},
-        {QStringLiteral("icf_assessment_ref"), currentIcfTimestamp},
+        {QStringLiteral("icf_assessment_ref"), currentIcfId},
         {QStringLiteral("pain_nrs"), 0},
         {QStringLiteral("rom_degrees"), 0}
     };
@@ -158,20 +162,37 @@ int main(int argc, char** argv) {
     assert(restarted.create(QStringLiteral("rehabilitation-assessments"), assessmentPayload, assessment, &error));
     assert(assessment.value(QStringLiteral("pain_nrs")).toInt(-1) == 0);
     assert(assessment.value(QStringLiteral("rom_degrees")).toInt(-1) == 0);
-    assert(assessment.value(QStringLiteral("icf_assessment_ref")).toString() == currentIcfTimestamp);
+    assert(assessment.value(QStringLiteral("icf_assessment_ref")).toString() == currentIcfId);
 
     QJsonObject historicalAssessmentPayload = assessmentPayload;
-    historicalAssessmentPayload.insert(QStringLiteral("icf_assessment_ref"), historicalIcfTimestamp);
+    historicalAssessmentPayload.insert(QStringLiteral("icf_assessment_ref"), historicalIcfId);
     QJsonObject historicalLinkedAssessment;
     assert(restarted.create(QStringLiteral("rehabilitation-assessments"), historicalAssessmentPayload,
                             historicalLinkedAssessment, &error));
     QJsonObject invalidIcfReferencePayload = assessmentPayload;
     invalidIcfReferencePayload.insert(QStringLiteral("icf_assessment_ref"),
-                                      QStringLiteral("2025-01-01T00:00:00.000Z"));
+                                      QStringLiteral("icf-nonexistent-version-999"));
     QJsonObject rejectedIcfReference;
     assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), invalidIcfReferencePayload,
                              rejectedIcfReference, &error));
     assert(error == QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
+    // Timestamp collisions must not make a different assessment version resolve.
+    QJsonObject collidingTimestamp = historicalIcfAssessment;
+    collidingTimestamp.insert(QStringLiteral("assessed_at"), currentIcfTimestamp);
+    QJsonObject collisionPatient = updated;
+    collisionPatient.insert(QStringLiteral("icf_assessment_history"),
+        QJsonArray{collidingTimestamp, historicalIcfAssessment, currentIcfAssessment});
+    QJsonObject collisionUpdate;
+    assert(restarted.update(QStringLiteral("patients"), id, 2, collisionPatient,
+                             collisionUpdate, &error));
+    QJsonObject wrongVersionPayload = assessmentPayload;
+    wrongVersionPayload.insert(QStringLiteral("icf_assessment_ref"),
+                               QStringLiteral("icf-wrong-version-same-timestamp"));
+    QJsonObject rejectedWrongVersion;
+    assert(!restarted.create(QStringLiteral("rehabilitation-assessments"), wrongVersionPayload,
+                             rejectedWrongVersion, &error));
+    assert(error == QStringLiteral("REHABILITATION_ICF_ASSESSMENT_NOT_FOUND"));
+
     QJsonObject invalidAssessmentType = assessmentPayload;
     invalidAssessmentType.insert(QStringLiteral("assessment_type"), QStringLiteral("unknown"));
     QJsonObject rejectedAssessmentType;
