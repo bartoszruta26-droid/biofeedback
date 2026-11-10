@@ -1,6 +1,7 @@
 #include "sensor/MeasurementSerialAdapter.hpp"
 
 #include <utility>
+#include <chrono>
 
 namespace sensor {
 
@@ -28,8 +29,13 @@ MeasurementSerialAdapter::MeasurementSerialAdapter(
             if (!engineLocked) return;
 
             biofeedback::measurement::MeasurementInput input;
-            input.deviceTimestampMs = data.timestamp;
-            input.hasTimestamp = data.hasTimestamp;
+            input.deviceTimestampMs = data.hasTimestamp
+                ? data.timestamp
+                : static_cast<std::uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count());
+            // Older Nano firmware frames may omit TS. Keep valid RAW samples
+            // flowing by assigning a host-monotonic timestamp at ingress.
+            input.hasTimestamp = true;
             input.rawValue = data.value;
             input.value = unitCopy == "count" ? static_cast<double>(data.value)
                                                : data.calibratedValue;
@@ -48,8 +54,11 @@ MeasurementSerialAdapter::~MeasurementSerialAdapter() {
 biofeedback::measurement::MeasurementSample MeasurementSerialAdapter::processSample(const SensorData& data) {
     if (!m_engine) return {};
     biofeedback::measurement::MeasurementInput input;
-    input.deviceTimestampMs = data.timestamp;
-    input.hasTimestamp = data.hasTimestamp;
+    input.deviceTimestampMs = data.hasTimestamp
+        ? data.timestamp
+        : static_cast<std::uint32_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    input.hasTimestamp = true;
     input.rawValue = data.value;
     input.value = m_unit == "count" ? static_cast<double>(data.value) : data.calibratedValue;
     input.sensorValid = data.isValid && (m_unit == "count" || data.hasCalibratedValue);
