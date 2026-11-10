@@ -246,6 +246,8 @@ private:
     QVBoxLayout* m_leftLayout{nullptr};
     QVBoxLayout* m_rightLayout{nullptr};
     gui::GraphWidget* m_forceGraph{nullptr};
+    QLabel* m_patientContextLabel{nullptr};
+    QString m_currentPatientUuid;
     QTextBrowser* m_clinicalProtocolBrowser{nullptr};
     
     // Sekcja wyboru konspektu
@@ -344,6 +346,9 @@ public:
      */
     void setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial);
     void setMeasurementEngine(std::shared_ptr<biofeedback::measurement::MeasurementEngine> engine);
+    // UUID from the canonical shared patient repository; never a PESEL.
+    void setCurrentPatientContext(const QString& patientUuid, const QString& displayName);
+    QString currentPatientUuid() const { return m_currentPatientUuid; }
     
     /**
      * @brief Sprawdza czy połączenie z Arduino jest aktywne
