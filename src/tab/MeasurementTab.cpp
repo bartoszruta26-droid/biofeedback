@@ -3146,16 +3146,19 @@ void MeasurementTab::enqueueMeasurementSample(
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-        constexpr std::size_t MaximumQueuedSamples = 4096;
+        constexpr std::size_t MaximumQueuedSamples = 128;
         if (!m_measurementQueueAccepting ||
             sessionGeneration != m_measurementSessionGeneration.load(std::memory_order_acquire))
             return;
-        // This queue serves only GUI presentation and derived repetition
-        // analysis. The durable journal has already committed this sample.
+        // The durable journal already holds every acquired sample. This queue
+        // is a low-latency analysis/UI buffer: on overload discard stale queued
+        // frames, keep the newest frame, and reset the repetition detector in
+        // the GUI drain rather than displaying seconds-old force values.
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
-            ++m_droppedMeasurementSamples;
-            ++m_totalDroppedMeasurementSamples;
-            return;
+            const quint64 discarded = static_cast<quint64>(m_measurementQueue.size()) + 1;
+            m_droppedMeasurementSamples += static_cast<std::size_t>(discarded);
+            m_totalDroppedMeasurementSamples += discarded;
+            m_measurementQueue.clear();
         }
         m_measurementQueue.push_back(sample);
         if (!m_measurementDrainScheduled) {
@@ -3179,7 +3182,7 @@ void MeasurementTab::enqueueMeasurementSample(
 
 void MeasurementTab::drainMeasurementSamples()
 {
-    constexpr std::size_t MaximumBatch = 128;
+    constexpr std::size_t MaximumBatch = 16;
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
     quint64 totalDropped = 0;
