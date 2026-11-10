@@ -22,7 +22,13 @@ const QStringList Collections = {
     QStringLiteral("training-sessions"),
     QStringLiteral("training-results"),
     QStringLiteral("game-sessions"),
-    QStringLiteral("game-results")
+    QStringLiteral("game-results"),
+    QStringLiteral("rehabilitation-episodes"),
+    QStringLiteral("rehabilitation-assessments"),
+    QStringLiteral("rehabilitation-goals"),
+    QStringLiteral("rehabilitation-sessions"),
+    QStringLiteral("rehabilitation-observations"),
+    QStringLiteral("rehabilitation-decisions")
 };
 }
 
@@ -187,6 +193,41 @@ bool JsonResourceRepository::remove(const QString& collection, const QString& id
         setError(error, QStringLiteral("VERSION_CONFLICT"));
         return false;
     }
+    if (collection == QStringLiteral("rehabilitation-episodes") ||
+        collection == QStringLiteral("rehabilitation-sessions")) {
+        const QStringList dependents = collection == QStringLiteral("rehabilitation-episodes")
+            ? QStringList{QStringLiteral("rehabilitation-assessments"),
+                          QStringLiteral("rehabilitation-goals"),
+                          QStringLiteral("rehabilitation-sessions"),
+                          QStringLiteral("rehabilitation-observations"),
+                          QStringLiteral("rehabilitation-decisions")}
+            : QStringList{QStringLiteral("rehabilitation-observations"),
+                          QStringLiteral("rehabilitation-decisions")};
+        const QString referenceField = collection == QStringLiteral("rehabilitation-episodes")
+            ? QStringLiteral("episode_id") : QStringLiteral("session_id");
+        for (const QString& dependentCollection : dependents) {
+            const QDir directory(collectionPath(dependentCollection));
+            if (!directory.exists()) continue;
+            const QFileInfoList files = directory.entryInfoList(
+                QStringList{QStringLiteral("*.json")}, QDir::Files | QDir::Readable, QDir::Name);
+            for (const QFileInfo& fileInfo : files) {
+                const QString dependentId = fileInfo.completeBaseName();
+                if (!validId(dependentId)) continue;
+                QJsonObject dependent;
+                QString readError;
+                if (!readRecord(dependentCollection, dependentId, dependent, &readError)) {
+                    setError(error, readError);
+                    return false;
+                }
+                if (dependent.value(referenceField).toString().compare(id, Qt::CaseInsensitive) == 0) {
+                    setError(error, collection == QStringLiteral("rehabilitation-episodes")
+                        ? QStringLiteral("REHABILITATION_EPISODE_HAS_REFERENCES")
+                        : QStringLiteral("REHABILITATION_SESSION_HAS_REFERENCES"));
+                    return false;
+                }
+            }
+        }
+    }
     if (collection == QStringLiteral("training-sessions")) {
         const QDir directory(collectionPath(QStringLiteral("training-results")));
         if (directory.exists()) {
@@ -214,7 +255,10 @@ bool JsonResourceRepository::remove(const QString& collection, const QString& id
         for (const QString& dependentCollection : {
                  QStringLiteral("measurements"), QStringLiteral("training-sessions"),
                  QStringLiteral("training-results"), QStringLiteral("game-sessions"),
-                 QStringLiteral("game-results")}) {
+                 QStringLiteral("game-results"), QStringLiteral("rehabilitation-episodes"),
+                 QStringLiteral("rehabilitation-assessments"), QStringLiteral("rehabilitation-goals"),
+                 QStringLiteral("rehabilitation-sessions"), QStringLiteral("rehabilitation-observations"),
+                 QStringLiteral("rehabilitation-decisions")}) {
             const QDir directory(collectionPath(dependentCollection));
             if (!directory.exists()) continue;
             const QFileInfoList files = directory.entryInfoList(
@@ -292,6 +336,64 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
             setError(error, patientError == QStringLiteral("RESOURCE_NOT_FOUND")
                 ? QStringLiteral("PATIENT_NOT_FOUND") : patientError);
             return false;
+        }
+    }
+
+    const QStringList rehabilitationCollections = {
+        QStringLiteral("rehabilitation-episodes"),
+        QStringLiteral("rehabilitation-assessments"),
+        QStringLiteral("rehabilitation-goals"),
+        QStringLiteral("rehabilitation-sessions"),
+        QStringLiteral("rehabilitation-observations"),
+        QStringLiteral("rehabilitation-decisions")
+    };
+    if (rehabilitationCollections.contains(collection)) {
+        if (patientId.isEmpty()) {
+            setError(error, QStringLiteral("REHABILITATION_PATIENT_REQUIRED"));
+            return false;
+        }
+        const bool isEpisode = collection == QStringLiteral("rehabilitation-episodes");
+        const QString episodeId = payload.value(QStringLiteral("episode_id")).toString().trimmed();
+        if (!isEpisode) {
+            if (!validId(episodeId)) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_EPISODE_REFERENCE"));
+                return false;
+            }
+            QJsonObject episode;
+            QString episodeError;
+            if (!readRecord(QStringLiteral("rehabilitation-episodes"), episodeId, episode, &episodeError)) {
+                setError(error, episodeError == QStringLiteral("RESOURCE_NOT_FOUND")
+                    ? QStringLiteral("REHABILITATION_EPISODE_NOT_FOUND") : episodeError);
+                return false;
+            }
+            if (episode.value(QStringLiteral("patient_id")).toString().compare(
+                    patientId, Qt::CaseInsensitive) != 0) {
+                setError(error, QStringLiteral("REHABILITATION_EPISODE_PATIENT_MISMATCH"));
+                return false;
+            }
+        }
+        const bool needsSession = collection == QStringLiteral("rehabilitation-observations") ||
+                                  collection == QStringLiteral("rehabilitation-decisions");
+        if (needsSession) {
+            const QString sessionId = payload.value(QStringLiteral("session_id")).toString().trimmed();
+            if (!validId(sessionId)) {
+                setError(error, QStringLiteral("INVALID_REHABILITATION_SESSION_REFERENCE"));
+                return false;
+            }
+            QJsonObject session;
+            QString sessionError;
+            if (!readRecord(QStringLiteral("rehabilitation-sessions"), sessionId, session, &sessionError)) {
+                setError(error, sessionError == QStringLiteral("RESOURCE_NOT_FOUND")
+                    ? QStringLiteral("REHABILITATION_SESSION_NOT_FOUND") : sessionError);
+                return false;
+            }
+            if (session.value(QStringLiteral("patient_id")).toString().compare(
+                    patientId, Qt::CaseInsensitive) != 0 ||
+                session.value(QStringLiteral("episode_id")).toString().compare(
+                    episodeId, Qt::CaseInsensitive) != 0) {
+                setError(error, QStringLiteral("REHABILITATION_SESSION_CONTEXT_MISMATCH"));
+                return false;
+            }
         }
     }
 
