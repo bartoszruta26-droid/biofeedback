@@ -1249,6 +1249,11 @@ void OutlineTab::refreshRehabilitationEpisodes()
     if (!canUseRepository) {
         if (m_episodeStatusLabel)
             m_episodeStatusLabel->setText(tr("Wybierz pacjenta, aby zarządzać epizodami."));
+        // Clear every patient-scoped panel immediately when patient context is removed.
+        refreshRehabilitationAssessments();
+        refreshRehabilitationGoals();
+        refreshRehabilitationSession();
+        refreshRehabilitationObservations();
         return;
     }
     QString error;
@@ -1258,6 +1263,10 @@ void OutlineTab::refreshRehabilitationEpisodes()
         m_episodeStatusLabel->setText(tr("Nie udało się odczytać epizodów rehabilitacji."));
         m_episodeSelector->setEnabled(false);
         m_createEpisodeButton->setEnabled(false);
+        refreshRehabilitationAssessments();
+        refreshRehabilitationGoals();
+        refreshRehabilitationSession();
+        refreshRehabilitationObservations();
         return;
     }
     for (const QJsonValue& value : episodes) {
@@ -1350,6 +1359,7 @@ void OutlineTab::refreshRehabilitationAssessments()
         return;
     }
     QStringList entries;
+    int assessmentCount = 0;
     QJsonObject baselineAssessment;
     QJsonObject latestAssessment;
     QString latestAssessmentAt;
@@ -1359,6 +1369,7 @@ void OutlineTab::refreshRehabilitationAssessments()
         if (item.value(QStringLiteral("patient_id")).toString() != m_currentPatientUuid ||
             item.value(QStringLiteral("episode_id")).toString() != m_currentEpisodeUuid)
             continue;
+        ++assessmentCount;
         const QString assessedAt = item.value(QStringLiteral("assessed_at")).toString();
         if (item.value(QStringLiteral("assessment_type")).toString() == QStringLiteral("baseline") &&
             (baselineAssessment.isEmpty() ||
@@ -1422,7 +1433,7 @@ void OutlineTab::refreshRehabilitationAssessments()
     }
     m_assessmentHistoryBrowser->setPlainText(entries.isEmpty()
         ? tr("Brak zapisanych ocen dla tego epizodu.") : entries.join(QStringLiteral("\n")));
-    m_assessmentStatusLabel->setText(tr("Historia ocen: %1").arg(entries.size()));
+    m_assessmentStatusLabel->setText(tr("Historia ocen: %1").arg(assessmentCount));
 }
 
 void OutlineTab::createRehabilitationAssessment()
