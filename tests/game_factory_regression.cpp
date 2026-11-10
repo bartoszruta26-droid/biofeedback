@@ -240,6 +240,7 @@ int main(int argc, char **argv)
     carRaceGame->resize(640, 480);
     carRaceGame->start();
     REQUIRE(carRaceGame->currentLane() == 1);
+    carRaceGame->handleSensorInput(50.0); // Establish the calibrated centre lane.
     carRaceGame->handleSensorInput(31.0);
     REQUIRE(carRaceGame->currentLane() == 1); // Noise around the boundary must not change lanes.
     carRaceGame->handleSensorInput(29.0);
