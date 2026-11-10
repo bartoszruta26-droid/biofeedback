@@ -49,6 +49,8 @@ checks.update({
     "async reader dispatches each parsed frame": "while (const auto frame = m_impl->streamParser.takeFrame())" in source,
     "async reader does not poll DATA once per batch": "readDataBatch(100)" not in source[source.index("void SerialCommunication::startAsyncReading"):],
     "async reader no longer reads a single sample": "SensorData data = readData(100);" not in source[source.index("void SerialCommunication::startAsyncReading"):],
+    "text commands pause continuous acquisition": "if (resumeStream) stopAsyncReading();" in source,
+    "text commands resume continuous acquisition": "if (resumeStream && m_impl->isConnected) startAsyncReading();" in source,
 })
 
 failed = [label for label, passed in checks.items() if not passed]
