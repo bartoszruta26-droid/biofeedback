@@ -153,6 +153,8 @@ void TanGame::keyPressEvent(QKeyEvent* event)
         case Qt::Key_Minus:
         case Qt::Key_Down: setDifficultyLevel(m_difficultyLevel - 1); break;
         case Qt::Key_A: setAutomaticDifficulty(!m_automaticDifficulty); break;
+        case Qt::Key_Comma: setTangentSharpness(m_tangentSharpness - 0.05); break;
+        case Qt::Key_Period: setTangentSharpness(m_tangentSharpness + 0.05); break;
         case Qt::Key_BracketLeft:
             if (m_lastRawForce < m_calibrationMaximum)
                 setForceCalibration(m_lastRawForce, m_calibrationMaximum);
@@ -410,7 +412,7 @@ void TanGame::render(QPainter& painter)
             .arg(qRound(targetAccuracy)));
     painter.drawText(QRect(margin, h - 52, w - 2 * margin, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Trudność: +/- | Auto: A | Kalibracja: [ minimum, ] maksimum | Nachylenie: %1")
+        QStringLiteral("Trudność: +/- | Auto: A | Kalibracja: [ minimum, ] maksimum | Ostrość: , / . (%1)")
             .arg(m_tangentSharpness, 0, 'f', 2));
 
     const int meterW = qMax(12, qMin(22, w / 45));
