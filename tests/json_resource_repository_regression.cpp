@@ -218,12 +218,27 @@ int main(int argc, char** argv) {
         {QStringLiteral("patient_id"), id},
         {QStringLiteral("episode_id"), episodeId},
         {QStringLiteral("session_id"), rehabSessionId},
+        {QStringLiteral("exercise_name"), QStringLiteral("Zgięcie kolana w odciążeniu")},
+        {QStringLiteral("completed_sets"), 3},
+        {QStringLiteral("completed_repetitions"), 10},
         {QStringLiteral("pain_before"), 4},
-        {QStringLiteral("pain_after"), 2}
+        {QStringLiteral("pain_after"), 2},
+        {QStringLiteral("movement_quality"), QStringLiteral("acceptable")}
     };
     QJsonObject observation;
     assert(restarted.create(QStringLiteral("rehabilitation-observations"), observationPayload,
                             observation, &error));
+    QJsonObject invalidObservation = observationPayload;
+    invalidObservation.insert(QStringLiteral("pain_after"), 11);
+    QJsonObject rejectedObservation;
+    assert(!restarted.create(QStringLiteral("rehabilitation-observations"), invalidObservation,
+                             rejectedObservation, &error));
+    assert(error == QStringLiteral("REHABILITATION_OBSERVATION_VALUE_OUT_OF_RANGE"));
+    invalidObservation = observationPayload;
+    invalidObservation.insert(QStringLiteral("completed_sets"), 1.5);
+    assert(!restarted.create(QStringLiteral("rehabilitation-observations"), invalidObservation,
+                             rejectedObservation, &error));
+    assert(error == QStringLiteral("INVALID_REHABILITATION_OBSERVATION_VALUE"));
 
     QJsonObject decisionPayload{
         {QStringLiteral("patient_id"), id},
