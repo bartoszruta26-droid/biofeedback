@@ -166,6 +166,13 @@ void OutlineTab::setupUI()
 
     auto* assessmentGroup = new QGroupBox(tr("Ocena kliniczna pacjenta"), visualPanel);
     auto* assessmentLayout = new QVBoxLayout(assessmentGroup);
+    assessmentLayout->addWidget(new QLabel(tr("Rodzaj oceny"), assessmentGroup));
+    m_assessmentTypeCombo = new QComboBox(assessmentGroup);
+    m_assessmentTypeCombo->addItem(tr("Początkowa"), QStringLiteral("baseline"));
+    m_assessmentTypeCombo->addItem(tr("Kontrolna"), QStringLiteral("follow_up"));
+    m_assessmentTypeCombo->addItem(tr("Końcowa"), QStringLiteral("final"));
+    m_assessmentTypeCombo->setObjectName(QStringLiteral("rehabilitationAssessmentType"));
+    assessmentLayout->addWidget(m_assessmentTypeCombo);
     auto addAssessmentField = [assessmentGroup, assessmentLayout](const QString& label,
                                                                   QLineEdit*& field,
                                                                   const QString& placeholder) {
@@ -184,7 +191,7 @@ void OutlineTab::setupUI()
                        tr("Wartość w cm; pozostaw puste, jeśli nie zmierzono"));
     addAssessmentField(tr("Test funkcjonalny / wynik"), m_assessmentFunctionalTestEdit,
                        tr("Nazwa testu i wynik, np. TUG: 12,4 s"));
-    m_saveAssessmentButton = new QPushButton(tr("Zapisz ocenę początkową"), assessmentGroup);
+    m_saveAssessmentButton = new QPushButton(tr("Zapisz ocenę"), assessmentGroup);
     m_assessmentStatusLabel = new QLabel(tr("Wybierz pacjenta i epizod, aby zapisać ocenę."), assessmentGroup);
     m_assessmentStatusLabel->setWordWrap(true);
     m_assessmentHistoryBrowser = new QTextBrowser(assessmentGroup);
@@ -318,6 +325,7 @@ void OutlineTab::setupUI()
     connect(m_saveAssessmentButton, &QPushButton::clicked,
             this, &OutlineTab::createRehabilitationAssessment);
     m_saveAssessmentButton->setEnabled(false);
+    if (m_assessmentTypeCombo) m_assessmentTypeCombo->setEnabled(false);
     for (QLineEdit* field : {m_assessmentPainNrsEdit, m_assessmentRomEdit,
                              m_assessmentStrengthEdit, m_assessmentSwellingEdit,
                              m_assessmentFunctionalTestEdit}) {
@@ -1319,6 +1327,7 @@ void OutlineTab::refreshRehabilitationAssessments()
     const bool canSave = m_resourceRepository && !m_currentPatientUuid.isEmpty() &&
                          !m_currentEpisodeUuid.isEmpty();
     if (m_saveAssessmentButton) m_saveAssessmentButton->setEnabled(canSave);
+    if (m_assessmentTypeCombo) m_assessmentTypeCombo->setEnabled(canSave);
     for (QLineEdit* field : {m_assessmentPainNrsEdit, m_assessmentRomEdit,
                              m_assessmentStrengthEdit, m_assessmentSwellingEdit,
                              m_assessmentFunctionalTestEdit}) {
@@ -1381,7 +1390,8 @@ void OutlineTab::createRehabilitationAssessment()
     QJsonObject payload{
         {QStringLiteral("patient_id"), m_currentPatientUuid},
         {QStringLiteral("episode_id"), m_currentEpisodeUuid},
-        {QStringLiteral("assessment_type"), QStringLiteral("baseline")},
+        {QStringLiteral("assessment_type"), m_assessmentTypeCombo
+            ? m_assessmentTypeCombo->currentData().toString() : QStringLiteral("baseline")},
         {QStringLiteral("assessed_at"),
          QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
     };
@@ -1447,8 +1457,8 @@ void OutlineTab::createRehabilitationAssessment()
     m_assessmentSwellingEdit->clear();
     m_assessmentFunctionalTestEdit->clear();
     m_assessmentStatusLabel->setText(linkedIcfAssessment
-        ? tr("Ocena początkowa została zapisana i powiązana z aktualną wersją oceny ICF.")
-        : tr("Ocena początkowa została trwale zapisana. Brak aktualnej oceny ICF do powiązania."));
+        ? tr("Ocena została zapisana i powiązana z aktualną wersją oceny ICF.")
+        : tr("Ocena została zapisana. Brak aktualnej oceny ICF do powiązania."));
     refreshRehabilitationAssessments();
 }
 
