@@ -500,11 +500,19 @@ bool JsonResourceRepository::validatePayload(const QString& collection,
                 setError(error, patientError);
                 return false;
             }
-            bool referenceFound = patient.value(QStringLiteral("icf_assessment"))
-                .toObject().value(QStringLiteral("assessed_at")).toString() == icfReference;
+            const QJsonObject currentIcf = patient.value(QStringLiteral("icf_assessment")).toObject();
+            // New records use immutable assessment UUIDs. Timestamp matching remains
+            // supported only for legacy records created before UUID references existed.
+            bool referenceFound = currentIcf.value(QStringLiteral("id")).toString() == icfReference ||
+                (currentIcf.value(QStringLiteral("id")).toString().isEmpty() &&
+                 currentIcf.value(QStringLiteral("assessed_at")).toString() == icfReference);
             const QJsonArray icfHistory = patient.value(QStringLiteral("icf_assessment_history")).toArray();
             for (const QJsonValue& entry : icfHistory) {
-                if (entry.toObject().value(QStringLiteral("assessed_at")).toString() == icfReference) {
+                const QJsonObject historical = entry.toObject();
+                const QString historicalId = historical.value(QStringLiteral("id")).toString();
+                if (historicalId == icfReference ||
+                    (historicalId.isEmpty() &&
+                     historical.value(QStringLiteral("assessed_at")).toString() == icfReference)) {
                     referenceFound = true;
                     break;
                 }
