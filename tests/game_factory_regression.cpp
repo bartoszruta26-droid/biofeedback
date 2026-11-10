@@ -78,6 +78,7 @@ int main(int argc, char **argv)
     arkanoidGame->start();
     REQUIRE(arkanoidGame->livesRemaining() == 3);
     REQUIRE(arkanoidGame->activeBrickCount() >= 24);
+    const int initialArkanoidBricks = arkanoidGame->activeBrickCount();
     REQUIRE(!arkanoidGame->isBallLaunched());
 
     // No sensor samples: the game must wait without moving or losing lives.
@@ -105,7 +106,7 @@ int main(int argc, char **argv)
     }
     REQUIRE(arkanoidGame->isBallLaunched());
     REQUIRE(arkanoidGame->getScore() > 0);
-    REQUIRE(arkanoidGame->activeBrickCount() < 32);
+    REQUIRE(arkanoidGame->activeBrickCount() < initialArkanoidBricks);
 
     // Sensor loss freezes the ball and prevents hidden life loss.
     waitForEvents(550);
