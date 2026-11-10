@@ -367,10 +367,6 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     if (m_forces.size() < 2)
         return;
 
-    const double minTime = m_times.front();
-    const double maxTime = m_times.back();
-    const double timeRange = (maxTime > minTime) ? (maxTime - minTime) : 1.0;
-
     // Shape-preserving cubic Hermite interpolation is evaluated on a 120 Hz
     // presentation grid. It never mutates the acquired sample buffer and is
     // therefore visual-only: repetition detection and records use real 80 SPS
