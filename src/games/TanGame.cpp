@@ -5,6 +5,8 @@
 #include <QPen>
 #include <QBrush>
 #include <QFont>
+#include <QKeyEvent>
+#include <QResizeEvent>
 #include <QtMath>
 #include <cmath>
 #include <utility>
@@ -17,17 +19,21 @@ constexpr double kSampleTimeoutSeconds = 0.35;
 constexpr double kCursorTimeConstantSeconds = 0.055;
 constexpr double kAsymptoteGuard = 0.10;
 
-double tangentWave(double angle)
+double tangentWave(double angle, double sharpness)
 {
     // atan(tan(x)) is bounded to [-pi/2, pi/2] on each branch.
     // The scale controls steepness without creating long clipped plateaus.
-    return (2.0 / kPi) * std::atan(0.70 * std::tan(angle));
+    return (2.0 / kPi) * std::atan(sharpness * std::tan(angle));
 }
 }
 
 TanGame::TanGame(QWidget *parent)
     : GameEngine(parent)
     , m_currentForce(0.0)
+    , m_calibrationMinimum(0.0)
+    , m_calibrationMaximum(100.0)
+    , m_lastRawForce(0.0)
+    , m_tangentSharpness(0.70)
     , m_targetY(0.0)
     , m_phase(0.0)
     , m_cursorY(0.0)
@@ -40,6 +46,11 @@ TanGame::TanGame(QWidget *parent)
     , m_inputAge(1.0)
     , m_scoreFraction(0.0)
     , m_trackingSeconds(0.0)
+    , m_sessionSeconds(0.0)
+    , m_timeInTarget(0.0)
+    , m_accuracyWindowSeconds(0.0)
+    , m_accuracyWindowHitSeconds(0.0)
+    , m_automaticDifficulty(false)
     , m_combo(0)
     , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
 {
@@ -63,6 +74,10 @@ void TanGame::initialize()
     m_scoreFraction = 0.0;
     m_trackingSeconds = 0.0;
     m_combo = 0;
+    m_sessionSeconds = 0.0;
+    m_timeInTarget = 0.0;
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     updateSpatialFrequency();
 }
@@ -86,12 +101,92 @@ void TanGame::setDifficultyLevel(int level)
     m_trackingSeconds = 0.0;
     m_combo = 0;
     m_scoreFraction = 0.0;
-    setScore(0);
 }
 
 int TanGame::getDifficultyLevel() const
 {
     return m_difficultyLevel;
+}
+
+void TanGame::setForceCalibration(double minimum, double maximum)
+{
+    if (!std::isfinite(minimum) || !std::isfinite(maximum) || maximum <= minimum)
+        return;
+    m_calibrationMinimum = minimum;
+    m_calibrationMaximum = maximum;
+    m_currentForce = 0.0;
+    m_inputAge = 1.0;
+    m_trackingSeconds = 0.0;
+    m_combo = 0;
+    m_feedbackText = QStringLiteral("Kalibracja zmieniona — oczekiwanie na nowy pomiar");
+}
+
+double TanGame::forceCalibrationMinimum() const { return m_calibrationMinimum; }
+double TanGame::forceCalibrationMaximum() const { return m_calibrationMaximum; }
+double TanGame::normalizedForce() const { return m_currentForce; }
+void TanGame::setAutomaticDifficulty(bool enabled)
+{
+    m_automaticDifficulty = enabled;
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
+}
+bool TanGame::automaticDifficulty() const { return m_automaticDifficulty; }
+void TanGame::setTangentSharpness(double sharpness)
+{
+    if (std::isfinite(sharpness))
+        m_tangentSharpness = qBound(0.25, sharpness, 1.5);
+}
+double TanGame::tangentSharpness() const { return m_tangentSharpness; }
+
+void TanGame::keyPressEvent(QKeyEvent* event)
+{
+    if (!event || event->isAutoRepeat()) {
+        if (event) event->accept();
+        return;
+    }
+    switch (event->key()) {
+        case Qt::Key_Plus:
+        case Qt::Key_Equal:
+        case Qt::Key_Up: setDifficultyLevel(m_difficultyLevel + 1); break;
+        case Qt::Key_Minus:
+        case Qt::Key_Down: setDifficultyLevel(m_difficultyLevel - 1); break;
+        case Qt::Key_A: setAutomaticDifficulty(!m_automaticDifficulty); break;
+        case Qt::Key_BracketLeft:
+            if (m_lastRawForce < m_calibrationMaximum)
+                setForceCalibration(m_lastRawForce, m_calibrationMaximum);
+            break;
+        case Qt::Key_BracketRight:
+            if (m_lastRawForce > m_calibrationMinimum)
+                setForceCalibration(m_calibrationMinimum, m_lastRawForce);
+            break;
+        default: QWidget::keyPressEvent(event); return;
+    }
+    event->accept();
+}
+
+void TanGame::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    updateSpatialFrequency();
+    const double ratio = 0.115 - (m_difficultyLevel - 1) * 0.013;
+    m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, static_cast<double>(height())) * ratio));
+    QWidget::update();
+}
+
+void TanGame::updateAutomaticDifficulty(double deltaTime)
+{
+    if (!m_automaticDifficulty || m_inputAge > kSampleTimeoutSeconds)
+        return;
+    m_accuracyWindowSeconds += deltaTime;
+    if (m_accuracyWindowSeconds < 12.0)
+        return;
+    const double ratio = m_accuracyWindowHitSeconds / m_accuracyWindowSeconds;
+    if (ratio >= 0.82 && m_difficultyLevel < 5)
+        setDifficultyLevel(m_difficultyLevel + 1);
+    else if (ratio < 0.42 && m_difficultyLevel > 1)
+        setDifficultyLevel(m_difficultyLevel - 1);
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
 }
 
 void TanGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
@@ -114,8 +209,13 @@ bool TanGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
 
-    // TrainingTab provides force as a percentage of the exercise target.
-    m_currentForce = qBound(0.0, value / MAX_FORCE, 1.0);
+    m_lastRawForce = value;
+    const double span = m_calibrationMaximum - m_calibrationMinimum;
+    if (!std::isfinite(span) || span <= 0.0)
+        return false;
+    // TrainingTab normally provides a percentage. The calibration interval
+    // can also be captured from raw force values for a dedicated sensor range.
+    m_currentForce = qBound(0.0, (value - m_calibrationMinimum) / span, 1.0);
     m_inputAge = 0.0;
     return true;
 }
@@ -126,7 +226,7 @@ void TanGame::calculateTargetY(double x)
     const double cosine = std::abs(std::cos(angle));
     m_nearAsymptote = cosine < kAsymptoteGuard;
 
-    const double normalized = qBound(-1.0, tangentWave(angle), 1.0);
+    const double normalized = qBound(-1.0, tangentWave(angle, m_tangentSharpness), 1.0);
     const double amplitude = static_cast<double>(height()) * 0.38;
     const double centerY = static_cast<double>(height()) * 0.5;
     m_targetY = centerY - normalized * amplitude;
@@ -143,6 +243,7 @@ void TanGame::update(double deltaTime)
     m_phase = std::remainder(
         m_phase - m_scrollSpeed * m_frequency * dt, kPi);
     m_inputAge += dt;
+    m_sessionSeconds += dt;
 
     const double h = static_cast<double>(height());
     const double w = static_cast<double>(width());
@@ -174,7 +275,10 @@ void TanGame::update(double deltaTime)
     const double distance = std::abs(m_cursorY - m_targetY);
     m_isHit = distance <= m_tolerance;
 
+    m_accuracyWindowSeconds += dt;
     if (m_isHit) {
+        m_accuracyWindowHitSeconds += dt;
+        m_timeInTarget += dt;
         m_trackingSeconds += dt;
         m_combo = qMin(5, 1 + static_cast<int>(m_trackingSeconds / 2.0));
         const double accuracy = qBound(
@@ -188,12 +292,14 @@ void TanGame::update(double deltaTime)
         }
         m_feedbackText = QStringLiteral("Dobrze — utrzymaj siłę  •  dokładność %1%")
             .arg(qRound(accuracy * 100.0));
+        updateAutomaticDifficulty(dt);
     } else {
         m_trackingSeconds = 0.0;
         m_combo = 0;
         m_feedbackText = m_cursorY > m_targetY
             ? QStringLiteral("Zwiększ siłę")
             : QStringLiteral("Zmniejsz siłę");
+        updateAutomaticDifficulty(dt);
     }
 }
 
@@ -293,13 +399,17 @@ void TanGame::render(QPainter& painter)
 
     painter.setPen(QColor(210, 220, 235));
     painter.setFont(QFont(QStringLiteral("Arial"), qMax(10, h / 52)));
-    painter.drawText(QRect(margin, h - 58, w - 2 * margin, 22),
+    const double targetAccuracy = m_sessionSeconds > 0.0
+        ? 100.0 * m_timeInTarget / m_sessionSeconds : 0.0;
+    painter.drawText(QRect(margin, h - 78, w - 2 * margin, 22),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3")
-            .arg(qRound(m_currentForce * 100.0)).arg(getScore()).arg(m_combo));
-    painter.drawText(QRect(margin, h - 34, w - 2 * margin, 20),
+        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3    Czas w celu: %4%")
+            .arg(qRound(m_currentForce * 100.0)).arg(getScore()).arg(m_combo)
+            .arg(qRound(targetAccuracy)));
+    painter.drawText(QRect(margin, h - 52, w - 2 * margin, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Utrzymuj kursor w zielonym pasie; przy asymptocie poczekaj na kolejny odcinek."));
+        QStringLiteral("Trudność: +/- | Auto: A | Kalibracja: [ minimum, ] maksimum | Nachylenie: %1")
+            .arg(m_tangentSharpness, 0, 'f', 2));
 
     const int meterW = qMax(12, qMin(22, w / 45));
     const int meterX = w - margin - meterW;
