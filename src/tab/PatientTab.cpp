@@ -30,6 +30,7 @@ PatientTab::PatientTab(QWidget *parent)
     , m_deleteButton(nullptr)
     , m_clearButton(nullptr)
     , m_icfButton(nullptr)
+    , m_icfHistoryButton(nullptr)
     , m_tableGroup(nullptr)
     , m_patientTable(nullptr)
     , m_actionButtonsLayout(nullptr)
@@ -151,6 +152,11 @@ void PatientTab::setupPatientForm()
     m_icfButton->setMinimumHeight(35);
     m_icfButton->setEnabled(false);
     m_formButtonsLayout->addWidget(m_icfButton);
+    m_icfHistoryButton = new QPushButton(tr("Historia ICF"), this);
+    m_icfHistoryButton->setToolTip(tr("Przeglądaj wcześniejsze oceny funkcjonalne pacjenta"));
+    m_icfHistoryButton->setMinimumHeight(35);
+    m_icfHistoryButton->setEnabled(false);
+    m_formButtonsLayout->addWidget(m_icfHistoryButton);
     m_formButtonsLayout->addStretch();
 
     m_mainLayout->addLayout(m_formButtonsLayout);
@@ -249,14 +255,64 @@ void PatientTab::createConnections()
     connect(m_patientTable, &QTableWidget::cellDoubleClicked,
             this, &PatientTab::onTableRowDoubleClicked);
     connect(m_icfButton, &QPushButton::clicked, this, &PatientTab::openIcfAssessmentDialog);
+    connect(m_icfHistoryButton, &QPushButton::clicked, this, &PatientTab::openIcfAssessmentHistoryDialog);
 }
 
-void PatientTab::setPatientIcfAssessment(const QString& pesel, const QJsonObject& assessment)
+void PatientTab::setPatientIcfAssessment(const QString& pesel, const QJsonObject& assessment, const QJsonArray& history)
 {
     const QString key = pesel.trimmed();
     if (key.isEmpty()) return;
     if (assessment.isEmpty()) m_icfAssessments.remove(key);
     else m_icfAssessments.insert(key, assessment);
+    m_icfAssessmentHistories.insert(key, history);
+}
+
+void PatientTab::openIcfAssessmentHistoryDialog()
+{
+    const QString pesel = getCurrentPatientPesel().trimmed();
+    if (pesel.isEmpty()) return;
+
+    const QJsonArray history = m_icfAssessmentHistories.value(pesel);
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Historia ocen funkcjonalnych ICF"));
+    dialog.resize(760, 480);
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* table = new QTableWidget(&dialog);
+    table->setColumnCount(3);
+    table->setHorizontalHeaderLabels({tr("Data oceny"), tr("Ocenione domeny"), tr("Opis / priorytety")});
+    table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    table->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
+    table->setRowCount(history.size());
+    for (int row = 0; row < history.size(); ++row) {
+        const QJsonObject assessment = history.at(row).toObject();
+        const QDateTime date = QDateTime::fromString(
+            assessment.value(QStringLiteral("assessed_at")).toString(), Qt::ISODateWithMs);
+        const QJsonObject responses = assessment.value(QStringLiteral("responses")).toObject();
+        int assessed = 0;
+        for (auto it = responses.constBegin(); it != responses.constEnd(); ++it) {
+            const QJsonObject response = it.value().toObject();
+            const int qualifier = response.contains(QStringLiteral("qualifier"))
+                ? response.value(QStringLiteral("qualifier")).toInt(-99)
+                : response.value(QStringLiteral("performance")).toInt(-99);
+            if (qualifier != -99) ++assessed;
+        }
+        table->setItem(row, 0, new QTableWidgetItem(
+            date.isValid() ? date.toLocalTime().toString(QStringLiteral("yyyy-MM-dd HH:mm")) : tr("Brak daty")));
+        table->setItem(row, 1, new QTableWidgetItem(QString::number(assessed)));
+        table->setItem(row, 2, new QTableWidgetItem(
+            assessment.value(QStringLiteral("narrative")).toString()));
+    }
+    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setSelectionBehavior(QAbstractItemView::SelectRows);
+    layout->addWidget(table);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Close, &dialog);
+    buttons->button(QDialogButtonBox::Close)->setText(tr("Zamknij"));
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    if (history.isEmpty())
+        layout->insertWidget(0, new QLabel(tr("Brak zapisanych ocen ICF."), &dialog));
+    dialog.exec();
 }
 
 void PatientTab::openIcfAssessmentDialog()
@@ -777,6 +833,7 @@ void PatientTab::onSelectionChanged()
     m_editButton->setEnabled(hasSelection);
     m_deleteButton->setEnabled(hasSelection);
     m_icfButton->setEnabled(hasSelection);
+    m_icfHistoryButton->setEnabled(hasSelection);
     
     // Emituj sygnał patientSelected gdy wybrano pacjenta
     if (hasSelection) {
