@@ -681,6 +681,8 @@ void TrainingTab::startTraining()
     m_lastCheckpointSeconds = -1;
     m_trainingClock.reset();
     m_sessionClock.start();
+    m_uiDispatchLatencyWindowMs.clear();
+    m_lastDispatchLatencyReportMs = 0;
     m_progressWidget->clearForceHistory();
     m_activeSessionId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     m_sessionStartedAtUtc = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
