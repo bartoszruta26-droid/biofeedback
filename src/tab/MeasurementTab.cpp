@@ -113,7 +113,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     painter.drawLine(margin, margin, margin, margin + plotHeight);
     
     // Etykiety osi Y
-    painter.setFont(QFont("Arial", 8));
+    painter.setFont(QFont("Arial", 7));
     painter.setPen(Qt::black);
     for (int i = 0; i <= 5; ++i) {
         int y = margin + plotHeight - (plotHeight * i / 5);
@@ -158,7 +158,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     }
     
     // Legenda
-    painter.setFont(QFont("Arial", 9, QFont::Bold));
+    painter.setFont(QFont("Arial", 7, QFont::Bold));
     painter.setPen(QColor(0, 100, 200));
     painter.drawText(margin + 10, margin + 15, "Średnia Siła");
     painter.setPen(QColor(200, 50, 50));
@@ -166,7 +166,7 @@ void TrendsPlotWidget::paintEvent(QPaintEvent *event)
     
     // Etykiety
     painter.setPen(Qt::black);
-    painter.setFont(QFont("Arial", 9));
+    painter.setFont(QFont("Arial", 7));
     painter.drawText(margin + plotWidth / 2 - 60, height - 10, "Kolejne Sesje");
     painter.drawText(5, margin - 5, "Siła [N]");
 }
@@ -339,7 +339,7 @@ void ForcePlotWidget::paintEvent(QPaintEvent *event)
     painter.drawLine(margin, margin + plotHeight, margin + plotWidth, margin + plotHeight);
     painter.drawLine(margin, margin, margin, margin + plotHeight);
 
-    painter.setFont(QFont("Arial", 8));
+    painter.setFont(QFont("Arial", 7));
     painter.setPen(Qt::black);
     for (int i = 0; i <= 10; ++i) {
         const int y = margin + plotHeight - (plotHeight * i / 10);
@@ -957,8 +957,8 @@ void MeasurementTab::setupUI()
     optionsScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto* optionsPanel = new QWidget(optionsScroll);
     auto* optionsLayout = new QVBoxLayout(optionsPanel);
-    optionsLayout->setSpacing(8);
-    optionsLayout->setContentsMargins(8, 8, 8, 8);
+    optionsLayout->setSpacing(4);
+    optionsLayout->setContentsMargins(3, 3, 3, 3);
     auto* optionsHeading = new QLabel(tr("STEROWANIE I OPCJE"), optionsPanel);
     optionsHeading->setStyleSheet("font-weight:700;color:#40516a;");
     optionsLayout->addWidget(optionsHeading);
@@ -967,16 +967,15 @@ void MeasurementTab::setupUI()
     optionsScroll->setWidget(optionsPanel);
     workspaceSplitter->addWidget(visualScroll);
     workspaceSplitter->addWidget(optionsScroll);
-    workspaceSplitter->setStretchFactor(0, 3);
-    workspaceSplitter->setStretchFactor(1, 1);
-    workspaceSplitter->setSizes({900, 300});
-    // The sidebar remains user-resizable, but dragging cannot make it wider
-    // than 25% of the available workspace. QSplitter scales the saved ratio
-    // when the window is resized, so the same limit follows other resolutions.
+    workspaceSplitter->setStretchFactor(0, 89);
+    workspaceSplitter->setStretchFactor(1, 11);
+    workspaceSplitter->setSizes({89, 11});
+    // The right-hand options sidebar is capped at 11% of the workspace.
+    // It remains user-resizable toward a narrower width on large displays.
     connect(workspaceSplitter, &QSplitter::splitterMoved, workspaceSplitter,
             [workspaceSplitter](int position, int) {
         const int availableWidth = workspaceSplitter->width() - workspaceSplitter->handleWidth();
-        const int maxVisualWidth = availableWidth * 3 / 4;
+        const int maxVisualWidth = availableWidth * 89 / 100;
         if (position < maxVisualWidth) {
             workspaceSplitter->setSizes({maxVisualWidth, availableWidth - maxVisualWidth});
         }
@@ -985,36 +984,37 @@ void MeasurementTab::setupUI()
 
     // Sekcja kontrolna w prawej, wąskiej kolumnie.
     m_controlLayout = new QVBoxLayout();
+    m_controlLayout->setSpacing(4);
     
     m_btnStartStop = new QPushButton("START POMIARU", this);
     m_btnStartStop->setMinimumHeight(45);
-    m_btnStartStop->setFont(QFont("Arial", 9, QFont::Bold));
+    m_btnStartStop->setFont(QFont("Arial", 7, QFont::Bold));
     m_btnStartStop->setStyleSheet("background-color: #4CAF50; color: white;");
     connect(m_btnStartStop, &QPushButton::clicked, this, &MeasurementTab::onToggleMeasurement);
     
     m_btnReadManual = new QPushButton("WCZYTAJ POJEDYNCZO", this);
     m_btnReadManual->setMinimumHeight(35);
-    m_btnReadManual->setFont(QFont("Arial", 9));
+    m_btnReadManual->setFont(QFont("Arial", 7));
     connect(m_btnReadManual, &QPushButton::clicked, this, &MeasurementTab::onReadSingleSample);
     
     m_btnSave = new QPushButton("ZAPISZ CSV", this);
     m_btnSave->setMinimumHeight(35);
-    m_btnSave->setFont(QFont("Arial", 9));
+    m_btnSave->setFont(QFont("Arial", 7));
     connect(m_btnSave, &QPushButton::clicked, this, &MeasurementTab::onSaveData);
     
     m_btnLoad = new QPushButton("WCZYTAJ CSV", this);
     m_btnLoad->setMinimumHeight(35);
-    m_btnLoad->setFont(QFont("Arial", 9));
+    m_btnLoad->setFont(QFont("Arial", 7));
     connect(m_btnLoad, &QPushButton::clicked, this, &MeasurementTab::onLoadData);
     
     m_btnSaveJSON = new QPushButton("ZAPISZ POMIAR JSON", this);
     m_btnSaveJSON->setMinimumHeight(35);
-    m_btnSaveJSON->setFont(QFont("Arial", 9));
+    m_btnSaveJSON->setFont(QFont("Arial", 7));
     connect(m_btnSaveJSON, &QPushButton::clicked, this, &MeasurementTab::onSaveMeasurementJSON);
     
     m_btnLoadJSON = new QPushButton("OTWÓRZ POMIAR JSON", this);
     m_btnLoadJSON->setMinimumHeight(35);
-    m_btnLoadJSON->setFont(QFont("Arial", 9));
+    m_btnLoadJSON->setFont(QFont("Arial", 7));
     connect(m_btnLoadJSON, &QPushButton::clicked, this, &MeasurementTab::onLoadMeasurementJSON);
     
     // Przełącznik RAW jest dostępny przed pierwszą próbką; tryb jest blokowany, aby nie mieszać jednostek w jednej sesji.
@@ -1023,7 +1023,7 @@ void MeasurementTab::setupUI()
     m_btnToggleRaw->setChecked(true); // Domyślnie rejestruj i pokazuj surowe próbki
     m_btnToggleRaw->setEnabled(true);  // Tryb diagnostyczny RAW dostępny poza pomiarem
     m_btnToggleRaw->setMinimumHeight(35);
-    m_btnToggleRaw->setFont(QFont("Arial", 9));
+    m_btnToggleRaw->setFont(QFont("Arial", 7));
     connect(m_btnToggleRaw, &QPushButton::toggled, this, [this](bool checked) {
         if (checked) {
             setCurrentUnit(ForceUnit::Raw);
@@ -1038,7 +1038,7 @@ void MeasurementTab::setupUI()
     
     m_btnReset = new QPushButton("RESET SESJI", this);
     m_btnReset->setMinimumHeight(35);
-    m_btnReset->setFont(QFont("Arial", 9));
+    m_btnReset->setFont(QFont("Arial", 7));
     connect(m_btnReset, &QPushButton::clicked, this, [this]() { resetSession(); });
     
     // Wybór jednostki siły
@@ -1048,7 +1048,7 @@ void MeasurementTab::setupUI()
     m_unitSelector->addItem("Kilogramy (kg)", static_cast<int>(ForceUnit::Kilograms));
     m_unitSelector->setCurrentIndex(0);  // Domyślnie RAW; bez kalibracji
     m_unitSelector->setMinimumHeight(35);
-    m_unitSelector->setFont(QFont("Arial", 9));
+    m_unitSelector->setFont(QFont("Arial", 7));
     connect(m_unitSelector, QOverload<int>::of(&QComboBox::currentIndexChanged), 
             this, [this](int index) {
         int unitValue = m_unitSelector->itemData(index).toInt();
@@ -1056,7 +1056,7 @@ void MeasurementTab::setupUI()
     });
     
     m_chkShowTrends = new QCheckBox("POKAŻ TRENDY DŁUGOTERMINOWE", this);
-    m_chkShowTrends->setFont(QFont("Arial", 9, QFont::Bold));
+    m_chkShowTrends->setFont(QFont("Arial", 7, QFont::Bold));
     m_chkShowTrends->setMinimumHeight(35);
     connect(m_chkShowTrends, &QCheckBox::toggled, this, &MeasurementTab::onShowTrends);
     
@@ -1075,7 +1075,7 @@ void MeasurementTab::setupUI()
     
     // Panel żywy z wykresem
     m_liveBox = new QGroupBox("Podgląd Na Żywo", this);
-    m_liveBox->setFont(QFont("Arial", 9, QFont::Bold));
+    m_liveBox->setFont(QFont("Arial", 7, QFont::Bold));
     QVBoxLayout* liveLayout = new QVBoxLayout();
     liveLayout->setSpacing(10);
     
@@ -1086,7 +1086,7 @@ void MeasurementTab::setupUI()
     m_forcePlot->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
     m_lblCurrentForce = new QLabel("Aktualna siła: 0.0 N", this);
-    m_lblCurrentForce->setFont(QFont("Arial", 12, QFont::Bold));
+    m_lblCurrentForce->setFont(QFont("Arial", 8, QFont::Bold));
     m_lblCurrentForce->setAlignment(Qt::AlignCenter);
     m_lblCurrentForce->setMinimumHeight(30);
     
@@ -1097,12 +1097,12 @@ void MeasurementTab::setupUI()
     m_forceBar->setMinimumHeight(25);
     
     m_lblStatus = new QLabel("Status: GOTOWY", this);
-    m_lblStatus->setFont(QFont("Arial", 9, QFont::Bold));
+    m_lblStatus->setFont(QFont("Arial", 7, QFont::Bold));
     m_lblStatus->setStyleSheet("color: blue; font-weight: bold;");
     m_lblStatus->setMinimumHeight(25);
     
     m_lblSeriesInfo = new QLabel("Seria: 0/3 | Powtórzenia: 0/8", this);
-    m_lblSeriesInfo->setFont(QFont("Arial", 9));
+    m_lblSeriesInfo->setFont(QFont("Arial", 7));
     m_lblSeriesInfo->setMinimumHeight(25);
     
     m_seriesProgress = new QProgressBar(this);
@@ -1128,7 +1128,7 @@ void MeasurementTab::setupUI()
     
     // Tabela statystyk
     m_statsBox = new QGroupBox("Statystyki Serii i Powtórzeń", this);
-    m_statsBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_statsBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* statsLayout = new QVBoxLayout();
     
     m_statsTable = new QTableWidget(this);
@@ -1140,7 +1140,7 @@ void MeasurementTab::setupUI()
     });
     m_statsTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_statsTable->setAlternatingRowColors(true);
-    m_statsTable->setFont(QFont("Arial", 9));
+    m_statsTable->setFont(QFont("Arial", 7));
     m_statsTable->setMinimumHeight(200);
     
     statsLayout->addWidget(m_statsTable);
@@ -1149,7 +1149,7 @@ void MeasurementTab::setupUI()
 
     // Pełna tabela 65 wskaźników; status oddziela wynik liczbowy od braku danych.
     m_biomechBox = new QGroupBox("Parametry biomechaniczne (65)", this);
-    m_biomechBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_biomechBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* biomechLayout = new QVBoxLayout();
     QHBoxLayout* calibrationLayout = new QHBoxLayout();
     calibrationLayout->addWidget(new QLabel(tr("Sztywność układu [N/m]:"), this));
@@ -1193,7 +1193,7 @@ void MeasurementTab::setupUI()
     m_biomechTable->setRowCount(static_cast<int>(BiomechanicalParams::ParameterCount));
     m_biomechTable->setAlternatingRowColors(true);
     m_biomechTable->setMaximumHeight(480);
-    m_biomechTable->setFont(QFont("Arial", 9));
+    m_biomechTable->setFont(QFont("Arial", 7));
     biomechLayout->addWidget(m_biomechTable);
     m_biomechBox->setLayout(biomechLayout);
     m_visualLayout->addWidget(m_biomechBox);
@@ -1201,7 +1201,7 @@ void MeasurementTab::setupUI()
 
     // Tabela surowych danych
     m_rawBox = new QGroupBox("Surowe Dane (ostatnie 100 próbek)", this);
-    m_rawBox->setFont(QFont("Arial", 11, QFont::Bold));
+    m_rawBox->setFont(QFont("Arial", 8, QFont::Bold));
     QVBoxLayout* rawLayout = new QVBoxLayout();
     
     m_rawTable = new QTableWidget(this);
@@ -1209,7 +1209,7 @@ void MeasurementTab::setupUI()
     m_rawTable->setHorizontalHeaderLabels({"Czas [s]", "Siła [N]"});
     m_rawTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_rawTable->setMaximumHeight(150);
-    m_rawTable->setFont(QFont("Arial", 9));
+    m_rawTable->setFont(QFont("Arial", 7));
     
     rawLayout->addWidget(m_rawTable);
     m_rawBox->setLayout(rawLayout);
@@ -1232,7 +1232,7 @@ void MeasurementTab::setupTrendsUI()
     QVBoxLayout* contentLayout = new QVBoxLayout(m_trendsContent);
     
     QLabel* lblInfo = new QLabel("Wykresy trendów długoterminowych dla pacjenta: " + m_patientId, this);
-    lblInfo->setFont(QFont("Arial", 11, QFont::Bold));
+    lblInfo->setFont(QFont("Arial", 8, QFont::Bold));
     contentLayout->addWidget(lblInfo);
     
     m_trendsScrollArea->setWidget(m_trendsContent);
@@ -2745,7 +2745,7 @@ void MeasurementTab::updateTrendsView()
     
     QLabel* lblInfo = new QLabel("Wczytano " + QString::number(m_patientSessions.size()) + 
                                   " sesji pomiarowych dla pacjenta: " + m_patientId, this);
-    lblInfo->setFont(QFont("Arial", 11, QFont::Bold));
+    lblInfo->setFont(QFont("Arial", 8, QFont::Bold));
     layout->addWidget(lblInfo);
     
     QTableWidget* trendsTable = new QTableWidget(this);
