@@ -272,8 +272,8 @@ if "QPainterPath trace;" not in training_source or "Qt::RoundJoin" not in traini
     raise SystemExit("Training live trace must use antialiased rounded vector rendering")
 if "trace.cubicTo(control1, control2, p2);" not in training_source:
     raise SystemExit("Training live trace must use shape-preserving cubic interpolation")
-if "m_lastLiveUiRefreshMs = -16;" not in source or "m_lastGameInputRefreshMs = -16;" not in training_source:
-    raise SystemExit("Live refresh clocks must reset when a new session starts")
+if "LiveUiIntervalMs" in training_source:
+    raise SystemExit("Training must not drop real sensor samples using a host-clock UI throttle")
 
 print("Measurement, training and game realtime dispatch regression passed")
 
