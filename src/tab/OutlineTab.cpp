@@ -1382,6 +1382,22 @@ void OutlineTab::createRehabilitationAssessment()
         {QStringLiteral("assessed_at"),
          QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}
     };
+
+    // Link the rehabilitation assessment to the exact ICF assessment version.
+    // Only the timestamp reference is stored; the ICF response set stays in the patient chart.
+    QJsonObject patientRecord;
+    QString patientReadError;
+    bool linkedIcfAssessment = false;
+    if (m_resourceRepository->get(QStringLiteral("patients"), m_currentPatientUuid,
+                                  patientRecord, &patientReadError)) {
+        const QJsonObject currentIcf = patientRecord.value(QStringLiteral("icf_assessment")).toObject();
+        const QString icfTimestamp = currentIcf.value(QStringLiteral("assessed_at")).toString().trimmed();
+        if (!icfTimestamp.isEmpty()) {
+            payload.insert(QStringLiteral("icf_assessment_ref"), icfTimestamp);
+            linkedIcfAssessment = true;
+        }
+    }
+
     auto parseOptionalNumber = [this, &payload](QLineEdit* field, const QString& key,
                                       double minimum, double maximum,
                                       bool integerOnly, QString& error) -> bool {
@@ -1427,7 +1443,9 @@ void OutlineTab::createRehabilitationAssessment()
     m_assessmentStrengthEdit->clear();
     m_assessmentSwellingEdit->clear();
     m_assessmentFunctionalTestEdit->clear();
-    m_assessmentStatusLabel->setText(tr("Ocena początkowa została trwale zapisana."));
+    m_assessmentStatusLabel->setText(linkedIcfAssessment
+        ? tr("Ocena początkowa została zapisana i powiązana z aktualną wersją oceny ICF.")
+        : tr("Ocena początkowa została trwale zapisana. Brak aktualnej oceny ICF do powiązania."));
     refreshRehabilitationAssessments();
 }
 
