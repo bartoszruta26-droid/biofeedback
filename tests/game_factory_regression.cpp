@@ -8,6 +8,7 @@
 #include "games/ArcherGame.hpp"
 #include "games/CarRaceGame.hpp"
 #include "games/ScorchedEarthGame.hpp"
+#include "games/MarioGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -304,6 +305,48 @@ int main(int argc, char **argv)
     std::unique_ptr<games::GameEngine> legacyScoredEarth(
         games::createGame(QStringLiteral("scored_earth")));
     REQUIRE(dynamic_cast<games::ScorchedEarthGame*>(legacyScoredEarth.get()) != nullptr);
+
+    // Mario Run: sensor charging uses hysteresis and release triggers one
+    // variable-height jump; held/noisy samples cannot retrigger it.
+    std::unique_ptr<games::GameEngine> marioControls(games::createGame(QStringLiteral("mario")));
+    auto* marioControlsGame = dynamic_cast<games::MarioGame*>(marioControls.get());
+    REQUIRE(marioControlsGame != nullptr);
+    marioControlsGame->resize(640, 480);
+    marioControlsGame->start();
+    REQUIRE(marioControlsGame->playerOnGround());
+    marioControlsGame->handleSensorInput(40.0); // Press: begin charge.
+    waitForEvents(180);
+    REQUIRE(marioControlsGame->playerCharging());
+    const double initialCharge = marioControlsGame->jumpCharge();
+    REQUIRE(initialCharge > 0.0);
+    marioControlsGame->handleSensorInput(24.0); // Between thresholds: remain pressed.
+    waitForEvents(100);
+    REQUIRE(marioControlsGame->playerCharging());
+    REQUIRE(marioControlsGame->jumpCharge() > initialCharge);
+    marioControlsGame->handleSensorInput(15.0); // Release: execute jump.
+    REQUIRE(!marioControlsGame->playerCharging());
+    REQUIRE(!marioControlsGame->playerOnGround());
+    REQUIRE(marioControlsGame->playerVerticalVelocity() < 0.0);
+    const double jumpVelocity = marioControlsGame->playerVerticalVelocity();
+    marioControlsGame->handleSensorInput(0.0); // A second release must not retrigger.
+    waitForEvents(80);
+    REQUIRE(marioControlsGame->playerVerticalVelocity() > jumpVelocity);
+    marioControlsGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    marioControlsGame->handleSensorInput(std::numeric_limits<double>::infinity());
+    REQUIRE(marioControlsGame->isRunning());
+    marioControlsGame->stop();
+
+    // Obstacle generation preserves its elapsed-time remainder and is active
+    // without a serial device.
+    std::unique_ptr<games::GameEngine> marioObstacles(games::createGame(QStringLiteral("mario")));
+    auto* marioObstaclesGame = dynamic_cast<games::MarioGame*>(marioObstacles.get());
+    REQUIRE(marioObstaclesGame != nullptr);
+    marioObstaclesGame->resize(640, 480);
+    marioObstaclesGame->start();
+    waitForEvents(2150);
+    REQUIRE(marioObstaclesGame->activeObstacleCount() >= 1);
+    REQUIRE(marioObstaclesGame->isRunning());
+    marioObstaclesGame->stop();
 
     // Public reset must be safe before a widget receives its final size.
     std::unique_ptr<games::GameEngine> marioReset(games::createGame(QStringLiteral("mario")));
