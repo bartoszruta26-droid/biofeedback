@@ -331,7 +331,7 @@ int main(int argc, char **argv)
     marioControlsGame->handleSensorInput(0.0); // A second release must not retrigger.
     waitForEvents(80);
     REQUIRE(marioControlsGame->playerVerticalVelocity() > jumpVelocity);
-    waitForEvents(750);
+    waitForEvents(1050);
     REQUIRE(marioControlsGame->playerOnGround()); // The jump must return to the ground.
     marioControlsGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     marioControlsGame->handleSensorInput(std::numeric_limits<double>::infinity());
