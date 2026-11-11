@@ -59,6 +59,8 @@ private:
     int m_falls{0};
     double m_targetPosition{0.0};
     double m_targetDepth{0.0};
+    double m_targetPositionGoal{0.0};
+    double m_targetDepthGoal{0.0};
     double m_previousTargetPosition{0.0};
     double m_previousTargetDepth{0.0};
     double m_previousTilt{0.0};
