@@ -1,0 +1,2789 @@
+#!/bin/bash
+
+# ==============================================================================
+# BioFeedback Installer & Manager
+# Opis: Skrypt TUI do zarządzania instalacją, kompilacją i wgrywaniem firmware
+#       do mikrokontrolerów (ESP32, STM32 itp.)
+# Repozytorium: https://github.com/bartoszruta26-droid/biofeedback
+# ==============================================================================
+
+# Konfiguracja globalna
+REPO_URL="https://github.com/bartoszruta26-droid/biofeedback"
+REPO_DIR="biofeedback"
+BUILD_DIR="build"
+LANG="pl" # domyślny język
+
+# Kolory ANSI
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# ------------------------------------------------------------------------------
+# Funkcje pomocnicze (Utils)
+# ------------------------------------------------------------------------------
+
+print_header() {
+    clear
+    echo -e "${CYAN}==============================================================================${NC}"
+    echo -e "${CYAN}          BioFeedback Installer & Manager - Menu Główne                       ${NC}"
+    echo -e "${CYAN}==============================================================================${NC}"
+    echo ""
+}
+
+print_error() {
+    echo -e "${RED}[BŁĄD]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}[SUKCES]${NC} $1"
+}
+
+print_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+print_warning() {
+    echo -e "${YELLOW}[OSTRZEŻENIE]${NC} $1"
+}
+
+wait_for_key() {
+    echo ""
+    read -p "Naciśnij Enter, aby kontynuować..."
+}
+
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 3: Git Pull & Kompilacja (Zaimplementowana wcześniej)
+# ------------------------------------------------------------------------------
+option_3_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Opcja 3: Zarządzanie Kodem i Kompilacja ---${NC}"
+        echo "1. Git Pull (Pobierz zmiany)"
+        echo "2. Kompiluj projekt (CMake)"
+        echo "3. Rekompiluj (Czysty build)"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        read -p "Wybierz opcję: " sub_choice
+
+        case $sub_choice in
+            1)
+                print_info "Aktualizowanie repozytorium..."
+                if [ -d "$REPO_DIR/.git" ]; then
+                    cd "$REPO_DIR" || exit
+                    git fetch origin
+                    git pull origin main
+                    cd ..
+                else
+                    print_warning "Repozytorium nie istnieje. Klonowanie..."
+                    git clone "$REPO_URL"
+                fi
+                wait_for_key
+                ;;
+            2)
+                print_info "Kompilowanie projektu..."
+                if [ ! -d "$REPO_DIR" ]; then print_error "Brak katalogu źródłowego!"; wait_for_key; continue; fi
+                mkdir -p "$REPO_DIR/$BUILD_DIR"
+                cd "$REPO_DIR/$BUILD_DIR" || exit
+                cmake .. && make -j$(nproc)
+                cd ../..
+                wait_for_key
+                ;;
+            3)
+                print_warning "Czyszczenie i ponowna kompilacja..."
+                if [ -d "$REPO_DIR/$BUILD_DIR" ]; then
+                    rm -rf "$REPO_DIR/$BUILD_DIR"
+                fi
+                mkdir -p "$REPO_DIR/$BUILD_DIR"
+                cd "$REPO_DIR/$BUILD_DIR" || exit
+                cmake .. && make -j$(nproc)
+                cd ../..
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 4: Wgrywanie kodu do mikrokontrolera (NOWE)
+# ------------------------------------------------------------------------------
+
+# Funkcja do wykrywania dostępnych portów szeregowych
+detect_serial_ports() {
+    local ports=()
+    
+    # Sprawdź typowe lokalizacje portów w Linux
+    if command -v lsusb &> /dev/null; then
+        echo -e "${BLUE}Skonfigurowane urządzenia USB:${NC}"
+        lsusb | grep -i "serial\|ftdi\|silicon\|cp210x\|ch34\|esp32\|stm32" || echo "Brak typowych konwerterów w lsusb."
+        echo ""
+    fi
+
+    echo -e "${BLUE}Wykryte porty szeregowe:${NC}"
+    
+    # Linux: ttyUSB, ttyACM - sprawdzaj osobno aby uniknąć błędów przy nieistniejących globach
+    for port in /dev/ttyUSB*; do
+        if [ -e "$port" ]; then
+            ports+=("$port")
+            echo "  - $port"
+        fi
+    done
+    
+    for port in /dev/ttyACM*; do
+        if [ -e "$port" ]; then
+            ports+=("$port")
+            echo "  - $port"
+        fi
+    done
+
+option_install_dependencies() {
+    echo ""
+    echo -e "${BLUE}--- ${LANG[OPT2]} ---${NC}"
+    echo -e "${YELLOW}${LANG[DEP_INSTALL]}${NC}"
+    echo ""
+    
+    # Detect package manager
+    local pkg_manager=""
+    local update_cmd=""
+    local install_cmd=""
+    
+    if command -v apt &> /dev/null; then
+        pkg_manager="apt"
+        update_cmd="sudo apt update"
+        install_cmd="sudo apt install -y"
+    elif command -v dnf &> /dev/null; then
+        pkg_manager="dnf"
+        update_cmd="sudo dnf makecache --refresh"
+        install_cmd="sudo dnf install -y"
+    elif command -v yum &> /dev/null; then
+        pkg_manager="yum"
+        update_cmd="sudo yum makecache"
+        install_cmd="sudo yum install -y"
+    elif command -v pacman &> /dev/null; then
+        pkg_manager="pacman"
+        update_cmd="sudo pacman -Sy"
+        install_cmd="sudo pacman -S --noconfirm"
+    elif command -v zypper &> /dev/null; then
+        pkg_manager="zypper"
+        update_cmd="sudo zypper refresh"
+        install_cmd="sudo zypper install -y"
+    else
+        echo -e "${RED}Error: No supported package manager found (apt, dnf, yum, pacman, zypper)${NC}"
+        wait_for_key
+        return 1
+    fi
+    
+    echo -e "${CYAN}Detected package manager: ${pkg_manager}${NC}"
+    echo ""
+    
+    # Update package lists
+    echo -e "${YELLOW}[1/4] Updating package lists...${NC}"
+    eval $update_cmd
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to update package lists${NC}"
+        wait_for_key
+        return 1
+    fi
+    echo -e "${GREEN}Package lists updated successfully${NC}"
+    echo ""
+    
+    # Install core build tools
+    echo -e "${YELLOW}[2/4] Installing core build tools...${NC}"
+    
+    if [ "$pkg_manager" = "apt" ]; then
+        eval $install_cmd build-essential cmake git pkg-config
+    elif [ "$pkg_manager" = "dnf" ] || [ "$pkg_manager" = "yum" ]; then
+        eval $install_cmd gcc-c++ make cmake git pkgconfig
+    elif [ "$pkg_manager" = "pacman" ]; then
+        eval $install_cmd base-devel cmake git pkg-config
+    elif [ "$pkg_manager" = "zypper" ]; then
+        eval $install_cmd gcc-c++ make cmake git pkg-config
+    fi
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to install core build tools${NC}"
+        wait_for_key
+        return 1
+    fi
+    echo -e "${GREEN}Core build tools installed successfully${NC}"
+    echo ""
+    
+    # Install Qt5 dependencies
+    echo -e "${YELLOW}[3/4] Installing Qt5 development libraries...${NC}"
+    
+    if [ "$pkg_manager" = "apt" ]; then
+        # Try primary package names first
+        eval $install_cmd qtbase5-dev libqt5charts5-dev
+        if [ $? -ne 0 ]; then
+            # Fallback to alternative package names (some Raspberry Pi OS versions)
+            echo -e "${YELLOW}Primary Qt5 packages failed, trying alternatives...${NC}"
+            eval $install_cmd qtbase5-dev qtcharts5-dev
+        fi
+    elif [ "$pkg_manager" = "dnf" ] || [ "$pkg_manager" = "yum" ]; then
+        eval $install_cmd qt5-qtbase-devel qt5-qtcharts-devel
+    elif [ "$pkg_manager" = "pacman" ]; then
+        eval $install_cmd qt5-base qt5-charts
+    elif [ "$pkg_manager" = "zypper" ]; then
+        eval $install_cmd libQt5Core-devel libQt5Charts-devel
+    fi
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Warning: Some Qt5 packages may have failed to install${NC}"
+        echo -e "${YELLOW}You may need to install Qt5 manually${NC}"
+    else
+        echo -e "${GREEN}Qt5 development libraries installed successfully${NC}"
+    fi
+    echo ""
+    
+    # Install additional dependencies
+    echo -e "${YELLOW}[4/4] Installing additional dependencies...${NC}"
+    
+    if [ "$pkg_manager" = "apt" ]; then
+        eval $install_cmd libserialport-dev nlohmann-json3-dev libssl-dev
+    elif [ "$pkg_manager" = "dnf" ] || [ "$pkg_manager" = "yum" ]; then
+        eval $install_cmd libserialport-devel nlohmann-json-devel openssl-devel
+    elif [ "$pkg_manager" = "pacman" ]; then
+        eval $install_cmd libserialport nlohmann-json openssl
+    elif [ "$pkg_manager" = "zypper" ]; then
+        eval $install_cmd libserialport-devel jsoncpp-devel libopenssl-devel
+    fi
+    
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Warning: Some additional packages may have failed to install${NC}"
+    else
+        echo -e "${GREEN}Additional dependencies installed successfully${NC}"
+    fi
+    echo ""
+    
+    # Configure serial port permissions (Debian/Ubuntu based only)
+    if [ "$pkg_manager" = "apt" ]; then
+        echo -e "${YELLOW}Configuring serial port permissions...${NC}"
+        sudo usermod -a -G dialout $(whoami) 2>/dev/null || true
+        
+        # Create udev rule for Arduino
+        echo -e "${CYAN}Creating udev rule for Arduino...${NC}"
+        echo 'SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", MODE="0666"' | sudo tee /etc/udev/rules.d/50-arduino.rules > /dev/null 2>&1
+        
+        # Reload udev rules
+        sudo udevadm control --reload-rules 2>/dev/null || true
+        sudo udevadm trigger 2>/dev/null || true
+        
+        echo -e "${GREEN}Serial port permissions configured${NC}"
+        echo -e "${YELLOW}Note: You may need to log out and log back in for group changes to take effect${NC}"
+        echo ""
+    fi
+    
+    # Verify installations
+    echo -e "${CYAN}Verifying installations...${NC}"
+    echo ""
+    
+    local verify_ok=true
+    
+    # Check g++
+    if command -v g++ &> /dev/null; then
+        local gcc_ver=$(g++ --version | head -n1)
+        echo -e "${GREEN}✓${NC} g++: ${gcc_ver}"
+    else
+        echo -e "${RED}✗${NC} g++: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check cmake
+    if command -v cmake &> /dev/null; then
+        local cmake_ver=$(cmake --version | head -n1)
+        echo -e "${GREEN}✓${NC} cmake: ${cmake_ver}"
+    else
+        echo -e "${RED}✗${NC} cmake: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check git
+    if command -v git &> /dev/null; then
+        local git_ver=$(git --version)
+        echo -e "${GREEN}✓${NC} git: ${git_ver}"
+    else
+        echo -e "${RED}✗${NC} git: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check pkg-config
+    if command -v pkg-config &> /dev/null; then
+        echo -e "${GREEN}✓${NC} pkg-config: installed"
+    else
+        echo -e "${RED}✗${NC} pkg-config: NOT INSTALLED"
+        verify_ok=false
+    fi
+    
+    # Check Qt5
+    if pkg-config --exists Qt5Core 2>/dev/null; then
+        local qt5_ver=$(pkg-config --modversion Qt5Core 2>/dev/null)
+        echo -e "${GREEN}✓${NC} Qt5 Core: version ${qt5_ver}"
+    else
+        echo -e "${YELLOW}!${NC} Qt5 Core: NOT DETECTED by pkg-config"
+    fi
+    
+    if pkg-config --exists Qt5Charts 2>/dev/null; then
+        local qt5charts_ver=$(pkg-config --modversion Qt5Charts 2>/dev/null)
+        echo -e "${GREEN}✓${NC} Qt5 Charts: version ${qt5charts_ver}"
+    else
+        echo -e "${YELLOW}!${NC} Qt5 Charts: NOT DETECTED by pkg-config"
+    fi
+    
+    # Check OpenSSL
+    if pkg-config --exists OpenSSL 2>/dev/null; then
+        local openssl_ver=$(pkg-config --modversion OpenSSL 2>/dev/null)
+        echo -e "${GREEN}✓${NC} OpenSSL: version ${openssl_ver}"
+    else
+        echo -e "${YELLOW}!${NC} OpenSSL: NOT DETECTED by pkg-config"
+    fi
+    
+    # Check nlohmann-json
+    if pkg-config --exists nlohmann_json 2>/dev/null; then
+        local json_ver=$(pkg-config --modversion nlohmann_json 2>/dev/null)
+        echo -e "${GREEN}✓${NC} nlohmann-json: version ${json_ver}"
+    else
+        # Check if header exists
+        if [ -f "/usr/include/nlohmann/json.hpp" ] || [ -f "/usr/local/include/nlohmann/json.hpp" ]; then
+            echo -e "${GREEN}✓${NC} nlohmann-json: installed (header found)"
+        else
+            echo -e "${YELLOW}!${NC} nlohmann-json: NOT DETECTED"
+        fi
+    fi
+    
+    # Check libserialport
+    if pkg-config --exists libserialport 2>/dev/null; then
+        local serialport_ver=$(pkg-config --modversion libserialport 2>/dev/null)
+        echo -e "${GREEN}✓${NC} libserialport: version ${serialport_ver}"
+    else
+        echo -e "${YELLOW}!${NC} libserialport: NOT DETECTED by pkg-config"
+    fi
+    
+    echo ""
+    
+    if [ "$verify_ok" = true ]; then
+        echo -e "${GREEN}============================================${NC}"
+        echo -e "${GREEN}  ${LANG[DEP_DONE]}${NC}"
+        echo -e "${GREEN}============================================${NC}"
+        echo ""
+        echo -e "${CYAN}Next steps:${NC}"
+        echo "  1. Log out and log back in (for group permissions)"
+        echo "  2. Run 'git pull' to download the source code"
+        echo "  3. Create build directory: mkdir build && cd build"
+        echo "  4. Configure: cmake .."
+        echo "  5. Build: make -j\$(nproc)"
+        echo "  6. Run: ./biofeedback"
+    else
+        echo -e "${YELLOW}============================================${NC}"
+        echo -e "${YELLOW}  Some critical dependencies are missing${NC}"
+        echo -e "${YELLOW}  Please install them manually${NC}"
+        echo -e "${YELLOW}============================================${NC}"
+    fi
+    
+    echo ""
+    wait_for_key
+}
+
+    if [ ${#ports[@]} -eq 0 ]; then
+        echo "  Brak wykrytych portów szeregowych."
+        return 1
+    fi
+    
+    # Zwracamy listę portów jako wynik (w bashu trudno zwrócić tablicę, więc drukujemy)
+    echo "${ports[@]}" > /tmp/detected_ports.txt
+    return 0
+}
+
+# Funkcja szukająca pliki binarne w katalogu build
+find_firmware_file() {
+    local search_dir="$REPO_DIR/$BUILD_DIR"
+    local file_ext="$1" # np. "bin" lub "hex"
+    
+    if [ ! -d "$search_dir" ]; then
+        return 1
+    fi
+
+    find "$search_dir" -name "*.$file_ext" -type f 2>/dev/null | head -n 1
+}
+
+# Główna funkcja opcji 4
+option_4_menu() {
+    local selected_port=""
+    
+    while true; do
+        clear
+        echo -e "${CYAN}--- Opcja 4: Wgrywanie Firmware do Mikrokontrolera ---${NC}"
+        echo ""
+        echo "1. Wykryj podłączone urządzenia"
+        echo "2. Wybierz port ręcznie"
+        echo "3. Wgraj firmware (ESP32 / esptool)"
+        echo "4. Wgraj firmware (STM32 / st-flash)"
+        echo "5. Wgraj przez USB-CDC / DFU (Mass Storage)"
+        echo "6. Monitor portu szeregowego (Logi startowe)"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
+        if [ -n "$selected_port" ]; then
+            echo -e "${GREEN}Aktywny port: $selected_port${NC}"
+        else
+            echo -e "${YELLOW}Aktywny port: NIEWYBRANY${NC}"
+        fi
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+
+        case $sub_choice in
+            1)
+                detect_serial_ports
+                if [ -f /tmp/detected_ports.txt ]; then
+                    read -p "Czy chcesz ustawić pierwszy wykryty port jako aktywny? (t/n): " confirm
+                    if [[ "$confirm" == "t" || "$confirm" == "T" ]]; then
+                        selected_port=$(head -n 1 /tmp/detected_ports.txt | awk '{print $1}')
+                        print_success "Wybrano port: $selected_port"
+                    fi
+                fi
+                wait_for_key
+                ;;
+                
+            2)
+                read -p "Podaj ścieżkę do portu (np. /dev/ttyUSB0): " selected_port
+                if [ -e "$selected_port" ]; then
+                    print_success "Port $selected_port istnieje."
+                else
+                    print_warning "Port $selected_port nie istnieje w systemie!"
+                fi
+                wait_for_key
+                ;;
+
+            3)
+                # Logika dla ESP32
+                if [ -z "$selected_port" ]; then
+                    print_error "Najpierw wybierz port (opcja 1 lub 2)!"
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Szukanie pliku firmware (.bin)..."
+                fw_file=$(find_firmware_file "bin")
+                
+                if [ -z "$fw_file" ]; then
+                    print_error "Nie znaleziono pliku .bin w katalogu $REPO_DIR/$BUILD_DIR"
+                    print_info "Czy chcesz wskazać plik ręcznie?"
+                    read -p "Ścieżka do pliku .bin: " fw_file
+                fi
+
+                if [ ! -f "$fw_file" ]; then
+                    print_error "Plik firmware nie istnieje!"
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Wykrywanie esptool..."
+                if command -v esptool.py &> /dev/null; then
+                    ESPTOOL_CMD="esptool.py"
+                elif command -v esptool &> /dev/null; then
+                    ESPTOOL_CMD="esptool"
+                else
+                    print_error "Nie znaleziono narzędzia esptool. Zainstaluj: pip install esptool"
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Wgrywanie $fw_file na $selected_port ..."
+                # Przykładowa komenda dla ESP32 (może wymagać dostosowania adresu 0x1000)
+                $ESPTOOL_CMD --chip esp32 --port "$selected_port" write_flash 0x1000 "$fw_file"
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Wgrywanie zakończone powodzeniem!"
+                else
+                    print_error "Błąd wgrywania firmware."
+                fi
+                wait_for_key
+                ;;
+
+            4)
+                # Logika dla STM32 (st-link)
+                if [ -z "$selected_port" ]; then
+                     # Dla ST-Link port nie zawsze jest potrzebny w trybie SWD, ale warto mieć wybrane urządzenie
+                     print_info "Tryb ST-Link często nie wymaga wyboru portu COM, ale upewnij się, że urządzenie jest podłączone USB."
+                fi
+
+                print_info "Szukanie pliku firmware (.bin lub .hex)..."
+                fw_file=$(find_firmware_file "bin")
+                if [ -z "$fw_file" ]; then
+                    fw_file=$(find_firmware_file "hex")
+                fi
+
+                if [ -z "$fw_file" ] || [ ! -f "$fw_file" ]; then
+                    print_error "Nie znaleziono pliku .bin ani .hex do wgrania."
+                    wait_for_key
+                    continue
+                fi
+
+                if ! command -v st-flash &> /dev/null; then
+                    print_error "Nie znaleziono narzędzia 'st-flash'. Zainstaluj pakiet stlink-tools."
+                    wait_for_key
+                    continue
+                fi
+
+                print_info "Wgrywanie $fw_file przez ST-Link..."
+                # Przykład: st-flash write firmware.bin 0x8000000
+                # Adres zależy od konkretnego modelu STM32, zakładamy standardowy 0x8000000
+                st-flash write "$fw_file" 0x8000000
+
+                if [ $? -eq 0 ]; then
+                    print_success "Wgrywanie na STM32 zakończone!"
+                else
+                    print_error "Błąd komunikacji ze ST-Link lub błędny adres flasha."
+                fi
+                wait_for_key
+                ;;
+
+            5)
+                # Logika DFU / Mass Storage
+                print_info "Tryb DFU / Disk Copy."
+                read -p "Podaj ścieżkę do montowania (np. /media/user/DEVICE lub urządzenie DFU): " target_path
+                
+                if [ -d "$target_path" ]; then
+                    print_info "Kopiowanie pliku bin/hex na urządzenie..."
+                    # Szukaj dowolnego pliku wykonywalnego
+                    fw_file=$(find_firmware_file "bin")
+                    if [ -z "$fw_file" ]; then fw_file=$(find_firmware_file "hex"); fi
+                    
+                    if [ -n "$fw_file" ]; then
+                        cp "$fw_file" "$target_path/"
+                        sync
+                        print_success "Kopiowanie zakończone. Odłącz device aby zresetować."
+                    else
+                        print_error "Brak pliku do skopiowania."
+                    fi
+                else
+                    # Próba użycia dfu-util jeśli ścieżka nie jest katalogiem
+                    if command -v dfu-util &> /dev/null; then
+                        read -p "Podaj ID urządzenia DFU (np. 0483:df11): " dfu_id
+                        fw_file=$(find_firmware_file "bin")
+                        if [ -n "$fw_file" ]; then
+                            dfu-util -d "$dfu_id" -D "$fw_file"
+                        else
+                            print_error "Brak pliku bin."
+                        fi
+                    else
+                        print_error "Ścieżka nie istnieje i brak dfu-util."
+                    fi
+                fi
+                wait_for_key
+                ;;
+
+            6)
+                # Monitor szeregowy
+                if [ -z "$selected_port" ]; then
+                    print_error "Wybierz port najpierw!"
+                    wait_for_key
+                    continue
+                fi
+                
+                print_info "Uruchamianie monitora szeregowego na $selected_port (Baud: 115200)..."
+                print_info "Naciśnij Ctrl+A, potem X aby wyjść (screen) lub Ctrl+C (minicom/cat)."
+                
+                if command -v screen &> /dev/null; then
+                    screen "$selected_port" 115200
+                elif command -v minicom &> /dev/null; then
+                    minicom -D "$selected_port" -b 115200
+                elif command -v cat &> /dev/null; then
+                    # Prosty podgląd
+                    cat "$selected_port"
+                else
+                    print_error "Brak dostępnego programu terminala (screen, minicom)."
+                fi
+                wait_for_key
+                ;;
+
+            0)
+                return
+                ;;
+            *)
+                print_error "Nieprawidłowa opcja."
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# ------------------------------------------------------------------------------
+# Pozostałe opcje (Szkielet)
+# ------------------------------------------------------------------------------
+
+option_1_language() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Wybór Języka / Language Selection ---${NC}"
+        echo ""
+        echo "1. Polski (PL)"
+        echo "2. English (EN)"
+        echo "0. Powrót"
+        echo ""
+        echo -e "Aktualny język / Current language: ${GREEN}$LANG${NC}"
+        echo ""
+        
+        read -p "Wybierz opcję / Choose option: " sub_choice
+        
+        case $sub_choice in
+            1)
+                LANG="pl"
+                print_success "Wybrano język polski."
+                wait_for_key
+                ;;
+            2)
+                LANG="en"
+                print_success "English language selected."
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja / Invalid option"; sleep 1 ;;
+        esac
+    done
+}
+
+option_2_deps() {
+    option_install_dependencies
+}
+
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 5: Ustawienia i Pliki Konfiguracyjne
+# ------------------------------------------------------------------------------
+
+CONFIG_FILE="config/config.json"
+CONFIG_BACKUP_DIR="config/backup"
+
+# Funkcja do tworzenia kopii zapasowej konfiguracji
+backup_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_warning "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    mkdir -p "$CONFIG_BACKUP_DIR"
+    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    cp "$CONFIG_FILE" "$CONFIG_BACKUP_DIR/config_${timestamp}.json"
+    print_success "Utworzono kopię zapasową: config_${timestamp}.json"
+    return 0
+}
+
+# Funkcja do wyświetlania obecnej konfiguracji w czytelnej formie
+show_current_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_warning "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    echo -e "${CYAN}=== Obecna konfiguracja ===${NC}"
+    echo ""
+    
+    # Sprawdź czy jq jest dostępne
+    if command -v jq &> /dev/null; then
+        jq '.' "$CONFIG_FILE"
+    else
+        # Fallback - wyświetl surowy JSON z kolorowaniem
+        cat "$CONFIG_FILE" | while IFS= read -r line; do
+            echo -e "${BLUE}$line${NC}"
+        done
+    fi
+    echo ""
+}
+
+# Funkcja do zmiany wartości w config.json przy użyciu jq
+update_config_value() {
+    local key_path="$1"
+    local new_value="$2"
+    local value_type="$3" # string, number, boolean
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_error "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    if ! command -v jq &> /dev/null; then
+        print_error "jq nie jest zainstalowane. Instaluję..."
+        if command -v apt &> /dev/null; then
+            sudo apt install -y jq
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y jq
+        elif command -v pacman &> /dev/null; then
+            sudo pacman -S --noconfirm jq
+        else
+            print_error "Nie można automatycznie zainstalować jq. Zainstaluj ręcznie."
+            return 1
+        fi
+    fi
+    
+    # Tworzenie kopii zapasowej przed modyfikacją
+    backup_config
+    
+    local typed_value
+    case "$value_type" in
+        string)
+            typed_value="$new_value"
+            ;;
+        number)
+            typed_value="$new_value"
+            ;;
+        boolean)
+            if [[ "$new_value" == "true" || "$new_value" == "t" || "$new_value" == "1" ]]; then
+                typed_value="true"
+            else
+                typed_value="false"
+            fi
+            ;;
+        *)
+            typed_value="$new_value"
+            ;;
+    esac
+    
+    # Aktualizacja pliku JSON
+    if jq --argjson val "$typed_value" ".${key_path} = \$val" "$CONFIG_FILE" > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"; then
+        print_success "Zaktualizowano: $key_path = $typed_value"
+        return 0
+    else
+        print_error "Błąd podczas aktualizacji konfiguracji."
+        rm -f "${CONFIG_FILE}.tmp"
+        return 1
+    fi
+}
+
+# Funkcja do zmiany wartości w config.json bez jq (sed-based)
+update_config_value_sed() {
+    local key="$1"
+    local new_value="$2"
+    local value_type="$3"
+    
+    if [ ! -f "$CONFIG_FILE" ]; then
+        print_error "Plik konfiguracyjny nie istnieje."
+        return 1
+    fi
+    
+    backup_config
+    
+    local typed_value
+    case "$value_type" in
+        string)
+            typed_value="\"$new_value\""
+            ;;
+        number|boolean)
+            typed_value="$new_value"
+            ;;
+    esac
+    
+    # Prosta zamiana sed (działa dla prostych przypadków)
+    # Escape special characters in the replacement value for sed
+    local escaped_value
+    # Escape special characters for sed replacement with | delimiter: \ & and |
+    escaped_value=$(printf '%s\n' "$typed_value" | sed 's/[&|\]/\\&/g')
+    # Use | as delimiter to avoid issues with / in values like /dev/ttyUSB0
+    if sed -i "s|\"$key\": .*|\"$key\": $escaped_value|" "$CONFIG_FILE"; then
+        print_success "Zaktualizowano: $key = $typed_value"
+        return 0
+    else
+        print_error "Błąd podczas aktualizacji konfiguracji."
+        return 1
+    fi
+}
+
+# Podmenu: Konfiguracja Portu Szeregowego
+config_serial_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Portu Szeregowego ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Port:     $(jq -r '.serial.port' "$CONFIG_FILE")"
+                echo "BaudRate: $(jq -r '.serial.baud_rate' "$CONFIG_FILE")"
+                echo "Timeout:  $(jq -r '.serial.timeout_ms' "$CONFIG_FILE") ms"
+                echo "Retries:  $(jq -r '.serial.retry_count' "$CONFIG_FILE")"
+            else
+                grep -E '"port"|"baud_rate"|"timeout_ms"|"retry_count"' "$CONFIG_FILE" | head -4
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień port szeregowy"
+        echo "2. Zmień baud rate"
+        echo "3. Zmień timeout (ms)"
+        echo "4. Zmień liczbę retry"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                read -p "Podaj nowy port (np. /dev/ttyUSB0): " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "serial.port" "\"$new_val\"" string || \
+                    update_config_value_sed "port" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            2)
+                read -p "Podaj baud rate (np. 115200): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "serial.baud_rate" "$new_val" number || \
+                    update_config_value_sed "baud_rate" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            3)
+                read -p "Podaj timeout w ms (np. 1000): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "serial.timeout_ms" "$new_val" number || \
+                    update_config_value_sed "timeout_ms" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Podaj liczbę retry (np. 3): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "serial.retry_count" "$new_val" number || \
+                    update_config_value_sed "retry_count" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Konfiguracja UI
+config_ui_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Interfejsu Użytkownika (UI) ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Theme:       $(jq -r '.ui.theme' "$CONFIG_FILE")"
+                echo "Language:    $(jq -r '.ui.language' "$CONFIG_FILE")"
+                echo "Font Size:   $(jq -r '.ui.font_size' "$CONFIG_FILE")"
+                echo "Update Int.: $(jq -r '.ui.graph_update_interval_ms' "$CONFIG_FILE") ms"
+                echo "Samples:     $(jq -r '.ui.graph_samples_visible' "$CONFIG_FILE")"
+            else
+                grep -E '"theme"|"language"|"font_size"|"graph_update_interval_ms"|"graph_samples_visible"' "$CONFIG_FILE" | head -5
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień motyw (theme)"
+        echo "2. Zmień język (pl/en)"
+        echo "3. Zmień rozmiar czcionki"
+        echo "4. Zmień interwał odświeżania wykresu (ms)"
+        echo "5. Zmień liczbę widocznych próbek na wykresie"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                echo "Dostępne motywy: default, dark, light"
+                read -p "Podaj nazwę motywu: " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "ui.theme" "\"$new_val\"" string || \
+                    update_config_value_sed "theme" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            2)
+                echo "Dostępne języki: pl, en"
+                read -p "Podaj kod języka (pl/en): " new_val
+                if [[ "$new_val" == "pl" || "$new_val" == "en" ]]; then
+                    update_config_value "ui.language" "\"$new_val\"" string || \
+                    update_config_value_sed "language" "$new_val" string
+                    LANG="$new_val"
+                    print_success "Język zmieniony na: $new_val"
+                else
+                    print_error "Nieprawidłowy kod języka!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            3)
+                read -p "Podaj rozmiar czcionki (np. 12): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "ui.font_size" "$new_val" number || \
+                    update_config_value_sed "font_size" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Podaj interwał w ms (np. 100): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "ui.graph_update_interval_ms" "$new_val" number || \
+                    update_config_value_sed "graph_update_interval_ms" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            5)
+                read -p "Podaj liczbę próbek (np. 300): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "ui.graph_samples_visible" "$new_val" number || \
+                    update_config_value_sed "graph_samples_visible" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Konfiguracja Sensora
+config_sensor_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Sensora (HX711) ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Type:              $(jq -r '.sensor.type' "$CONFIG_FILE")"
+                echo "Sample Rate (Hz):  $(jq -r '.sensor.sample_rate_hz' "$CONFIG_FILE")"
+                echo "Gain:              $(jq -r '.sensor.gain' "$CONFIG_FILE")"
+                echo "Calibration:       $(jq -r '.sensor.calibration_enabled' "$CONFIG_FILE")"
+                echo "Zero Threshold:    $(jq -r '.sensor.zero_threshold' "$CONFIG_FILE")"
+            else
+                grep -E '"type"|"sample_rate_hz"|"gain"|"calibration_enabled"|"zero_threshold"' "$CONFIG_FILE" | head -5
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień typ sensora"
+        echo "2. Zmień sample rate (Hz)"
+        echo "3. Zmień gain (wzmocnienie)"
+        echo "4. Włącz/Wyłącz kalibrację"
+        echo "5. Zmień zero threshold"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                read -p "Podaj typ sensora (np. HX711): " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "sensor.type" "\"$new_val\"" string || \
+                    update_config_value_sed "type" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            2)
+                echo "Dostępne wartości: 10, 80"
+                read -p "Podaj sample rate (Hz): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "sensor.sample_rate_hz" "$new_val" number || \
+                    update_config_value_sed "sample_rate_hz" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            3)
+                echo "Dostępne wartości: 32, 64, 128"
+                read -p "Podaj gain: " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "sensor.gain" "$new_val" number || \
+                    update_config_value_sed "gain" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                if command -v jq &> /dev/null; then
+                    current=$(jq -r '.sensor.calibration_enabled' "$CONFIG_FILE")
+                else
+                    current=$(grep '"calibration_enabled"' "$CONFIG_FILE" | grep -o 'true\|false')
+                fi
+                
+                if [[ "$current" == "true" ]]; then
+                    new_val="false"
+                else
+                    new_val="true"
+                fi
+                
+                update_config_value "sensor.calibration_enabled" "$new_val" boolean || \
+                update_config_value_sed "calibration_enabled" "$new_val" boolean
+                wait_for_key
+                ;;
+            5)
+                read -p "Podaj zero threshold (np. 0.5): " new_val
+                if [[ "$new_val" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+                    update_config_value "sensor.zero_threshold" "$new_val" number || \
+                    update_config_value_sed "zero_threshold" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Konfiguracja Logowania
+config_logging_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Konfiguracja Logowania ---${NC}"
+        echo ""
+        
+        if [ -f "$CONFIG_FILE" ]; then
+            if command -v jq &> /dev/null; then
+                echo "Level:         $(jq -r '.logging.level' "$CONFIG_FILE")"
+                echo "File:          $(jq -r '.logging.file' "$CONFIG_FILE")"
+                echo "Max Size (MB): $(jq -r '.logging.max_size_mb' "$CONFIG_FILE")"
+                echo "Rotate Count:  $(jq -r '.logging.rotate_count' "$CONFIG_FILE")"
+                echo "Console Out:   $(jq -r '.logging.console_output' "$CONFIG_FILE")"
+            else
+                grep -E '"level"|"file"|"max_size_mb"|"rotate_count"|"console_output"' "$CONFIG_FILE" | head -5
+            fi
+        else
+            echo -e "${YELLOW}Brak pliku konfiguracyjnego${NC}"
+        fi
+        
+        echo ""
+        echo "1. Zmień poziom logowania (DEBUG/INFO/WARNING/ERROR)"
+        echo "2. Zmień ścieżkę do pliku logów"
+        echo "3. Zmień maksymalny rozmiar pliku (MB)"
+        echo "4. Zmień liczbę rotacji plików"
+        echo "5. Włącz/Wyłącz output na konsolę"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                echo "Dostępne poziomy: DEBUG, INFO, WARNING, ERROR"
+                read -p "Podaj poziom logowania: " new_val
+                new_val=$(echo "$new_val" | tr '[:lower:]' '[:upper:]')
+                if [[ "$new_val" == "DEBUG" || "$new_val" == "INFO" || "$new_val" == "WARNING" || "$new_val" == "ERROR" ]]; then
+                    update_config_value "logging.level" "\"$new_val\"" string || \
+                    update_config_value_sed "level" "$new_val" string
+                else
+                    print_error "Nieprawidłowy poziom logowania!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            2)
+                read -p "Podaj ścieżkę do pliku logów: " new_val
+                if [ -n "$new_val" ]; then
+                    update_config_value "logging.file" "\"$new_val\"" string || \
+                    update_config_value_sed "file" "$new_val" string
+                fi
+                wait_for_key
+                ;;
+            3)
+                read -p "Podaj maksymalny rozmiar w MB (np. 10): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "logging.max_size_mb" "$new_val" number || \
+                    update_config_value_sed "max_size_mb" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Podaj liczbę rotacji (np. 5): " new_val
+                if [[ "$new_val" =~ ^[0-9]+$ ]]; then
+                    update_config_value "logging.rotate_count" "$new_val" number || \
+                    update_config_value_sed "rotate_count" "$new_val" number
+                else
+                    print_error "Nieprawidłowa wartość!"
+                    sleep 1
+                fi
+                wait_for_key
+                ;;
+            5)
+                if command -v jq &> /dev/null; then
+                    current=$(jq -r '.logging.console_output' "$CONFIG_FILE")
+                else
+                    current=$(grep '"console_output"' "$CONFIG_FILE" | grep -o 'true\|false')
+                fi
+                
+                if [[ "$current" == "true" ]]; then
+                    new_val="false"
+                else
+                    new_val="true"
+                fi
+                
+                update_config_value "logging.console_output" "$new_val" boolean || \
+                update_config_value_sed "console_output" "$new_val" boolean
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Podmenu: Zarządzanie Kopiami Zapasowymi
+config_backup_menu() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Zarządzanie Kopiami Zapasowymi Konfiguracji ---${NC}"
+        echo ""
+        
+        if [ -d "$CONFIG_BACKUP_DIR" ]; then
+            echo -e "${BLUE}Dostępne kopie zapasowe:${NC}"
+            ls -la "$CONFIG_BACKUP_DIR"/*.json 2>/dev/null || echo "Brak kopii zapasowych"
+        else
+            echo "Brak katalogu z kopiami zapasowymi."
+        fi
+        
+        echo ""
+        echo "1. Utwórz kopię zapasową TERAZ"
+        echo "2. Przywróć z ostatniej kopii"
+        echo "3. Przywróć z wybranej kopii"
+        echo "4. Usuń wszystkie kopie zapasowe"
+        echo "0. Powrót"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                backup_config
+                wait_for_key
+                ;;
+            2)
+                if [ -d "$CONFIG_BACKUP_DIR" ]; then
+                    latest=$(ls -t "$CONFIG_BACKUP_DIR"/*.json 2>/dev/null | head -n 1)
+                    if [ -n "$latest" ]; then
+                        print_info "Przywracanie z: $latest"
+                        cp "$latest" "$CONFIG_FILE"
+                        print_success "Przywrócono konfigurację!"
+                    else
+                        print_warning "Brak kopii zapasowych do przywrócenia."
+                    fi
+                else
+                    print_warning "Brak katalogu z kopiami zapasowymi."
+                fi
+                wait_for_key
+                ;;
+            3)
+                if [ -d "$CONFIG_BACKUP_DIR" ]; then
+                    echo "Dostępne kopie:"
+                    select backup_file in "$CONFIG_BACKUP_DIR"/*.json; do
+                        if [ -n "$backup_file" ] && [ -f "$backup_file" ]; then
+                            print_info "Przywracanie z: $backup_file"
+                            cp "$backup_file" "$CONFIG_FILE"
+                            print_success "Przywrócono konfigurację!"
+                            break
+                        else
+                            print_error "Nieprawidłowy wybór."
+                        fi
+                    done
+                else
+                    print_warning "Brak katalogu z kopiami zapasowymi."
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Czy na pewno usunąć wszystkie kopie zapasowe? (t/n): " confirm
+                if [[ "$confirm" == "t" || "$confirm" == "T" ]]; then
+                    rm -rf "$CONFIG_BACKUP_DIR"
+                    print_success "Usunięto wszystkie kopie zapasowe."
+                fi
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# Główna funkcja Opcji 5
+option_5_config() {
+    while true; do
+        clear
+        echo -e "${CYAN}--- Opcja 5: Ustawienia i Pliki Konfiguracyjne ---${NC}"
+        echo ""
+        echo "1. Wyświetl aktualną konfigurację"
+        echo "2. Edytuj plik konfiguracyjny (nano)"
+        echo "3. Edytuj plik konfiguracyjny (vim)"
+        echo "4. Zmień parametry połączenia szeregowego"
+        echo "5. Zmień ścieżkę repozytorium"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                print_info "Aktualna konfiguracja:"
+                echo "  REPO_URL: $REPO_URL"
+                echo "  REPO_DIR: $REPO_DIR"
+                echo "  BUILD_DIR: $BUILD_DIR"
+                echo "  LANG: $LANG"
+                
+                if [ -f "$REPO_DIR/config/default.conf" ]; then
+                    echo ""
+                    echo -e "${BLUE}Zawartość pliku konfiguracyjnego:${NC}"
+                    cat "$REPO_DIR/config/default.conf"
+                fi
+                wait_for_key
+                ;;
+            2)
+                if command -v nano &> /dev/null; then
+                    if [ -f "$REPO_DIR/config/default.conf" ]; then
+                        nano "$REPO_DIR/config/default.conf"
+                    else
+                        print_warning "Plik konfiguracyjny nie istnieje. Tworzenie..."
+                        mkdir -p "$REPO_DIR/config"
+                        touch "$REPO_DIR/config/default.conf"
+                        nano "$REPO_DIR/config/default.conf"
+                    fi
+                else
+                    print_error "Brak nano. Zainstaluj: sudo apt install nano"
+                fi
+                wait_for_key
+                ;;
+            3)
+                if command -v vim &> /dev/null; then
+                    if [ -f "$REPO_DIR/config/default.conf" ]; then
+                        vim "$REPO_DIR/config/default.conf"
+                    else
+                        print_warning "Plik konfiguracyjny nie istnieje. Tworzenie..."
+                        mkdir -p "$REPO_DIR/config"
+                        touch "$REPO_DIR/config/default.conf"
+                        vim "$REPO_DIR/config/default.conf"
+                    fi
+                else
+                    print_error "Brak vim. Zainstaluj: sudo apt install vim"
+                fi
+                wait_for_key
+                ;;
+            4)
+                read -p "Podaj nowy port szeregowy (np. /dev/ttyUSB0): " new_port
+                read -p "Podaj nową szybkość baud (np. 115200): " new_baud
+                SERIAL_PORT="$new_port"
+                BAUD_RATE="$new_baud"
+                print_success "Zmieniono ustawienia połączenia."
+                echo "  Port: $SERIAL_PORT"
+                echo "  Baud: $BAUD_RATE"
+                wait_for_key
+                ;;
+            5)
+                read -p "Podaj nową ścieżkę repozytorium: " new_repo
+                REPO_DIR="$new_repo"
+                print_success "Zmieniono ścieżkę repozytorium na: $REPO_DIR"
+                wait_for_key
+                ;;
+            0) return ;;
+            *) print_error "Nieprawidłowa opcja"; sleep 1 ;;
+        esac
+    done
+}
+
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 6: Przywracanie ustawień domyślnych (NOWE)
+# ------------------------------------------------------------------------------
+
+option_6_defaults() {
+    local config_dir="$REPO_DIR/config"
+    local backup_dir="$REPO_DIR/backups"
+    local user_config_file="$HOME/.biofeedback_config"
+    local default_serial_baud="115200"
+    local default_log_level="INFO"
+    local default_language="pl"
+    
+    while true; do
+        clear
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo -e "${CYAN}     Opcja 6: Przywracanie Ustawień Domyślnych                               ${NC}"
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo ""
+        echo -e "${YELLOW}UWAGA:${NC} Ta opcja przywróci wybrane konfiguracje do wartości fabrycznych."
+        echo -e "${YELLOW}      Zalecane jest wykonanie kopii zapasowej przed kontynuacją.${NC}"
+        echo ""
+        echo "1. Przywróć domyślne ustawienia komunikacji szeregowej"
+        echo "2. Przywróć domyślne ustawienia interfeusu użytkownika (GUI)"
+        echo "3. Przywróć domyślne ustawienia rejestracji danych (Logging)"
+        echo "4. Przywróć domyślne ustawienia kalibracji sensorów"
+        echo "5. Przywróć WSZYSTKIE ustawienia do wartości domyślnych"
+        echo "6. Wykonaj kopię zapasową obecnych ustawień"
+        echo "7. Przywróć z kopii zapasowej"
+        echo "8. Pokaż obecne ustawienia"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
+        read -p "Wybierz opcję [0-8]: " sub_choice
+        
+        case $sub_choice in
+            1)
+                # Przywracanie ustawień komunikacji szeregowej
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień komunikacji szeregowej ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia szeregowe? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                # Tworzenie/aktualizacja pliku konfiguracyjnego
+                mkdir -p "$config_dir"
+                
+                cat > "$config_dir/serial.conf" << EOF
+# BioFeedback Serial Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+BAUD_RATE=$default_serial_baud
+DATA_BITS=8
+PARITY=none
+STOP_BITS=1
+FLOW_CONTROL=none
+TIMEOUT_MS=1000
+RECONNECT_ATTEMPTS=3
+RECONNECT_DELAY_MS=500
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia komunikacji szeregowej!"
+                    echo ""
+                    echo "Parametry:"
+                    echo "  - Baud Rate: $default_serial_baud"
+                    echo "  - Data Bits: 8"
+                    echo "  - Parity: none"
+                    echo "  - Stop Bits: 1"
+                    echo "  - Flow Control: none"
+                else
+                    print_error "Nie udało się zapisać konfiguracji szeregowej."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            2)
+                # Przywracanie ustawień GUI
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień interfejsu użytkownika ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia GUI? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                mkdir -p "$config_dir"
+                
+                cat > "$config_dir/gui.conf" << EOF
+# BioFeedback GUI Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+LANGUAGE=$default_language
+WINDOW_WIDTH=1280
+WINDOW_HEIGHT=720
+THEME=default
+REFRESH_RATE_MS=100
+SHOW_GRID=true
+SHOW_LEGEND=true
+CHART_TYPE=line
+COLOR_SCHEME=default
+FONT_SIZE=12
+AUTO_SCALE=true
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia interfejsu użytkownika!"
+                    echo ""
+                    echo "Parametry:"
+                    echo "  - Język: $default_language"
+                    echo "  - Rozmiar okna: 1280x720"
+                    echo "  - Motyw: default"
+                    echo "  - Częstotliwość odświeżania: 100ms"
+                else
+                    print_error "Nie udało się zapisać konfiguracji GUI."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            3)
+                # Przywracanie ustawień logowania
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień rejestracji danych ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia logowania? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                mkdir -p "$config_dir"
+                mkdir -p "$REPO_DIR/logs"
+                
+                cat > "$config_dir/logging.conf" << EOF
+# BioFeedback Logging Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+LOG_LEVEL=$default_log_level
+LOG_TO_FILE=true
+LOG_TO_CONSOLE=true
+LOG_DIRECTORY=$REPO_DIR/logs
+MAX_LOG_SIZE_MB=10
+MAX_LOG_FILES=5
+LOG_FORMAT=%(asctime)s - %(levelname)s - %(message)s
+LOG_DATE_FORMAT=%Y-%m-%d %H:%M:%S
+ENABLE_DEBUG=false
+ENABLE_TIMESTAMP=true
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia rejestracji danych!"
+                    echo ""
+                    echo "Parametry:"
+                    echo "  - Poziom logowania: $default_log_level"
+                    echo "  - Logowanie do pliku: tak"
+                    echo "  - Logowanie do konsoli: tak"
+                    echo "  - Maksymalny rozmiar pliku: 10MB"
+                    echo "  - Maksymalna liczba plików: 5"
+                else
+                    print_error "Nie udało się zapisać konfiguracji logowania."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            4)
+                # Przywracanie ustawień kalibracji
+                clear
+                echo -e "${CYAN}--- Przywracanie ustawień kalibracji sensorów ---${NC}"
+                echo ""
+                
+                read -p "Czy na pewno chcesz przywrócić domyślne ustawienia kalibracji? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                mkdir -p "$config_dir"
+                
+                cat > "$config_dir/calibration.conf" << EOF
+# BioFeedback Sensor Calibration Configuration
+# Przywrócono ustawienia domyślne: $(date)
+
+# EKG/EMG Settings
+ECG_GAIN=1000
+ECG_OFFSET=0
+ECG_FILTER_ENABLED=true
+ECG_LOW_CUTOFF_HZ=0.5
+ECG_HIGH_CUTOFF_HZ=100
+
+# GSR (Galvanic Skin Response) Settings
+GSR_GAIN=1
+GSR_OFFSET=0
+GSR_FILTER_ENABLED=true
+
+# Temperature Settings
+TEMP_OFFSET=0
+TEMP_SCALE=1.0
+
+# Accelerometer Settings
+ACC_ENABLED=true
+ACC_RANGE=2
+ACC_FILTER_ENABLED=true
+
+# Auto-calibration
+AUTO_CALIBRATE_ON_START=false
+CALIBRATION_INTERVAL_SEC=3600
+EOF
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Przywrócono domyślne ustawienia kalibracji sensorów!"
+                    echo ""
+                    echo "Przywrócono parametry dla:"
+                    echo "  - EKG/EMG (wzmocnienie, filtry)"
+                    echo "  - GSR (reakcja skórna)"
+                    echo "  - Temperatura"
+                    echo "  - Akcelerometr"
+                else
+                    print_error "Nie udało się zapisać konfiguracji kalibracji."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            5)
+                # Przywracanie WSZYSTKICH ustawień
+                clear
+                echo -e "${RED}==============================================================================${NC}"
+                echo -e "${RED}     PRZYWRACANIE WSZYSTKICH USTAWIEŃ DO WARTOŚCI DOMYŚLNYCH                ${NC}"
+                echo -e "${RED}==============================================================================${NC}"
+                echo ""
+                echo -e "${RED}OSTRZEŻENIE:${NC} Ta operacja usunie wszystkie niestandardowe konfiguracje!"
+                echo ""
+                read -p "Czy jesteś ABSOLUTNIE pewien? (wpisz 'TAK' aby potwierdzić): " confirm
+                
+                if [[ "$confirm" != "TAK" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                # Usuwanie istniejących plików konfiguracyjnych
+                if [ -d "$config_dir" ]; then
+                    rm -rf "$config_dir"
+                fi
+                
+                # Przywracanie wszystkich ustawień poprzez wywołanie poprzednich funkcji
+                mkdir -p "$config_dir"
+                mkdir -p "$REPO_DIR/logs"
+                
+                # Serial config
+                cat > "$config_dir/serial.conf" << EOF
+# BioFeedback Serial Configuration
+# Przywrócono wszystkie ustawienia domyślne: $(date)
+
+BAUD_RATE=$default_serial_baud
+DATA_BITS=8
+PARITY=none
+STOP_BITS=1
+FLOW_CONTROL=none
+TIMEOUT_MS=1000
+RECONNECT_ATTEMPTS=3
+RECONNECT_DELAY_MS=500
+EOF
+                
+                # GUI config
+                cat > "$config_dir/gui.conf" << EOF
+# BioFeedback GUI Configuration
+
+LANGUAGE=$default_language
+WINDOW_WIDTH=1280
+WINDOW_HEIGHT=720
+THEME=default
+REFRESH_RATE_MS=100
+SHOW_GRID=true
+SHOW_LEGEND=true
+CHART_TYPE=line
+COLOR_SCHEME=default
+FONT_SIZE=12
+AUTO_SCALE=true
+EOF
+                
+                # Logging config
+                cat > "$config_dir/logging.conf" << EOF
+# BioFeedback Logging Configuration
+
+LOG_LEVEL=$default_log_level
+LOG_TO_FILE=true
+LOG_TO_CONSOLE=true
+LOG_DIRECTORY=$REPO_DIR/logs
+MAX_LOG_SIZE_MB=10
+MAX_LOG_FILES=5
+LOG_FORMAT=%(asctime)s - %(levelname)s - %(message)s
+LOG_DATE_FORMAT=%Y-%m-%d %H:%M:%S
+ENABLE_DEBUG=false
+ENABLE_TIMESTAMP=true
+EOF
+                
+                # Calibration config
+                cat > "$config_dir/calibration.conf" << EOF
+# BioFeedback Sensor Calibration Configuration
+
+ECG_GAIN=1000
+ECG_OFFSET=0
+ECG_FILTER_ENABLED=true
+ECG_LOW_CUTOFF_HZ=0.5
+ECG_HIGH_CUTOFF_HZ=100
+GSR_GAIN=1
+GSR_OFFSET=0
+GSR_FILTER_ENABLED=true
+TEMP_OFFSET=0
+TEMP_SCALE=1.0
+ACC_ENABLED=true
+ACC_RANGE=2
+ACC_FILTER_ENABLED=true
+AUTO_CALIBRATE_ON_START=false
+CALIBRATION_INTERVAL_SEC=3600
+EOF
+                
+                # User config file
+                cat > "$user_config_file" << EOF
+# BioFeedback User Configuration
+# Created: $(date)
+
+DEFAULT_LANGUAGE=$default_language
+LAST_USED_PORT=
+LAST_USED_BAUD=$default_serial_baud
+FAVORITE_PROFILES=
+EOF
+                
+                print_success "Przywrócono WSZYSTKIE ustawienia do wartości domyślnych!"
+                echo ""
+                echo "Przywrócone konfiguracje:"
+                echo "  ✓ Komunikacja szeregowa"
+                echo "  ✓ Interfejs użytkownika (GUI)"
+                echo "  ✓ Rejestracja danych (Logging)"
+                echo "  ✓ Kalibracja sensorów"
+                echo "  ✓ Konfiguracja użytkownika"
+                
+                wait_for_key
+                ;;
+                
+            6)
+                # Wykonywanie kopii zapasowej
+                clear
+                echo -e "${CYAN}--- Wykonywanie kopii zapasowej ustawień ---${NC}"
+                echo ""
+                
+                mkdir -p "$backup_dir"
+                local backup_timestamp=$(date +%Y%m%d_%H%M%S)
+                local backup_archive="$backup_dir/biofeedback_backup_$backup_timestamp.tar.gz"
+                
+                # Backup both config directory and user config file if they exist
+                local has_backup_items=false
+                
+                # Create temporary directory for backup contents
+                local temp_backup_dir=$(mktemp -d)
+                
+                # Copy config directory if it exists
+                if [ -d "$config_dir" ] && [ "$(ls -A $config_dir 2>/dev/null)" ]; then
+                    cp -r "$config_dir" "$temp_backup_dir/"
+                    has_backup_items=true
+                fi
+                
+                # Copy user config file if it exists
+                if [ -f "$user_config_file" ]; then
+                    cp "$user_config_file" "$temp_backup_dir/"
+                    has_backup_items=true
+                fi
+                
+                if [ "$has_backup_items" = true ]; then
+                    tar -czf "$backup_archive" -C "$temp_backup_dir" .
+                    rm -rf "$temp_backup_dir"
+                    if [ $? -eq 0 ]; then
+                        print_success "Wykonano kopię zapasową!"
+                        echo ""
+                        echo "Lokalizacja: $backup_archive"
+                        echo "Rozmiar: $(du -h "$backup_archive" | cut -f1)"
+                        echo ""
+                        echo "Zapisane konfiguracje:"
+                        [ -d "$config_dir" ] && echo "  ✓ Katalog config/"
+                        [ -f "$user_config_file" ] && echo "  ✓ Plik ~/.biofeedback_config"
+                    else
+                        rm -rf "$temp_backup_dir"
+                        print_error "Nie udało się wykonać kopii zapasowej."
+                    fi
+                else
+                    print_warning "Brak plików konfiguracyjnych do skopiowania."
+                fi
+                
+                wait_for_key
+                ;;
+                
+            7)
+                # Przywracanie z kopii zapasowej
+                clear
+                echo -e "${CYAN}--- Przywracanie z kopii zapasowej ---${NC}"
+                echo ""
+                
+                if [ ! -d "$backup_dir" ] || [ -z "$(ls -A $backup_dir 2>/dev/null)" ]; then
+                    print_warning "Brak dostępnych kopii zapasowych w katalogu $backup_dir"
+                    wait_for_key
+                    continue
+                fi
+                
+                echo "Dostępne kopie zapasowe:"
+                echo ""
+                # List both tar.gz archives and legacy user_config_backup files
+                ls -lht "$backup_dir"/*.tar.gz 2>/dev/null | head -10
+                ls -lht "$backup_dir"/user_config_backup_* 2>/dev/null | head -10
+                echo ""
+                
+                read -p "Podaj nazwę pliku kopii zapasowej (lub naciśnij Enter dla najnowszej): " backup_file
+                
+                if [ -z "$backup_file" ]; then
+                    # Try tar.gz first, then legacy user_config_backup files
+                    backup_file=$(ls -t "$backup_dir"/*.tar.gz 2>/dev/null | head -1)
+                    if [ -z "$backup_file" ]; then
+                        backup_file=$(ls -t "$backup_dir"/user_config_backup_* 2>/dev/null | head -1)
+                    fi
+                else
+                    backup_file="$backup_dir/$backup_file"
+                fi
+                
+                if [ ! -f "$backup_file" ]; then
+                    print_error "Nie znaleziono podanego pliku kopii zapasowej."
+                    wait_for_key
+                    continue
+                fi
+                
+                read -p "Czy przywrócić konfigurację z $backup_file? (t/n): " confirm
+                if [[ "$confirm" != "t" && "$confirm" != "T" ]]; then
+                    print_info "Anulowano."
+                    wait_for_key
+                    continue
+                fi
+                
+                # Check if it's a tar.gz archive or a legacy user config file
+                if [[ "$backup_file" == *.tar.gz ]]; then
+                    # Extract tar.gz archive to temp dir first
+                    local temp_restore_dir=$(mktemp -d)
+                    tar -xzf "$backup_file" -C "$temp_restore_dir"
+                    if [ $? -eq 0 ]; then
+                        # Restore config directory if it exists in archive
+                        if [ -d "$temp_restore_dir/config" ]; then
+                            mkdir -p "$REPO_DIR"
+                            cp -r "$temp_restore_dir/config" "$REPO_DIR/"
+                        fi
+                        # Restore user config file if it exists in archive
+                        if [ -f "$temp_restore_dir/.biofeedback_config" ]; then
+                            cp "$temp_restore_dir/.biofeedback_config" "$HOME/"
+                        fi
+                        rm -rf "$temp_restore_dir"
+                        print_success "Przywrócono konfigurację z kopii zapasowej!"
+                        echo ""
+                        echo "Plik: $backup_file"
+                    else
+                        rm -rf "$temp_restore_dir"
+                        print_error "Nie udało się przywrócić konfiguracji."
+                    fi
+                else
+                    # Legacy user config backup file - restore to ~/.biofeedback_config
+                    cp "$backup_file" "$HOME/.biofeedback_config"
+                    if [ $? -eq 0 ]; then
+                        print_success "Przywrócono konfigurację użytkownika z kopii zapasowej!"
+                        echo ""
+                        echo "Plik: $backup_file"
+                        echo "Przywrócono do: $HOME/.biofeedback_config"
+                    else
+                        print_error "Nie udało się przywrócić konfiguracji."
+                    fi
+                fi
+                
+                wait_for_key
+                ;;
+                
+            8)
+                # Pokazywanie obecnych ustawień
+                clear
+                echo -e "${CYAN}--- Obecne ustawienia ---${NC}"
+                echo ""
+                
+                if [ -d "$config_dir" ] && [ "$(ls -A $config_dir 2>/dev/null)" ]; then
+                    echo -e "${BLUE}Pliki konfiguracyjne w $config_dir:${NC}"
+                    echo ""
+                    
+                    for conf_file in "$config_dir"/*.conf; do
+                        if [ -f "$conf_file" ]; then
+                            echo -e "${GREEN}=== $(basename "$conf_file") ===${NC}"
+                            grep -v "^#" "$conf_file" | grep -v "^$" | head -10
+                            echo ""
+                        fi
+                    done
+                else
+                    print_warning "Brak plików konfiguracyjnych w katalogu $config_dir"
+                fi
+                
+                if [ -f "$user_config_file" ]; then
+                    echo -e "${BLUE}Konfiguracja użytkownika ($user_config_file):${NC}"
+                    grep -v "^#" "$user_config_file" | grep -v "^$"
+                    echo ""
+                fi
+                
+                echo -e "${BLUE}Domyślne wartości:${NC}"
+                echo "  - Baud Rate: $default_serial_baud"
+                echo "  - Log Level: $default_log_level"
+                echo "  - Language: $default_language"
+                echo ""
+                
+                wait_for_key
+                ;;
+                
+            0)
+                return
+                ;;
+                
+            *)
+                print_error "Nieprawidłowa opcja."
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# ------------------------------------------------------------------------------
+# Implementacja Opcji 8: Przywrócenie ustawień fabrycznych (FACTORY RESET)
+# ------------------------------------------------------------------------------
+# Różnica między opcją 6 a 8:
+# - Opcja 6 (defaults): Resetuje tylko pliki konfiguracyjne do domyślnych wartości
+# - Opcja 8 (factory): Całkowite czyszczenie projektu - usuwa build, cache, config,
+#   logi, dane użytkownika, przywraca repozytorium do czystego stanu po clone
+
+option_8_factory() {
+    local confirm_reset=""
+    
+    clear
+    echo -e "${RED}==============================================================================${NC}"
+    echo -e "${RED}          PRZYWRÓCENIE USTAWIEŃ FABRYCZNYCH (FACTORY RESET)                   ${NC}"
+    echo -e "${RED}==============================================================================${NC}"
+    echo ""
+    echo -e "${YELLOW}OSTRZEŻENIE: Ta operacja jest NIEODWRACALNA!${NC}"
+    echo ""
+    echo "Ta opcja spowoduje:"
+    echo "  ✓ Usunięcie całego katalogu build/ (wyniki kompilacji)"
+    echo "  ✓ Usunięcie plików cache CMake (CMakeCache.txt, CMakeFiles/)"
+    echo "  ✓ Usunięcie wszystkich plików konfiguracyjnych użytkownika"
+    echo "  ✓ Usunięcie logów i danych sesyjnych"
+    echo "  ✓ Usunięcie pobranych danych pomiarowych (data/)"
+    echo "  ✓ Przywrócenie repozytorium do czystego stanu (git reset --hard)"
+    echo "  ✓ Usunięcie tymczasowych plików instalacyjnych"
+    echo ""
+    echo -e "${RED}UWAGA: Twoje dane pomiarowe i konfiguracje zostaną trwale utracone!${NC}"
+    echo ""
+    
+    read -p "Czy na pewno chcesz kontynuować? (wpisz 'TAK' aby potwierdzić): " confirm_reset
+    
+    if [ "$confirm_reset" != "TAK" ]; then
+        echo ""
+        print_info "Operacja anulowana przez użytkownika."
+        wait_for_key
+        return 1
+    fi
+    
+    echo ""
+    echo -e "${CYAN}Rozpoczynanie procesu przywracania ustawień fabrycznych...${NC}"
+    echo ""
+    
+    # Krok 1: Zatrzymanie ewentualnych procesów
+    print_info "[Krok 1/7] Zatrzymywanie procesów biofeedback..."
+    pkill -f "biofeedback" 2>/dev/null && echo "  - Zatrzymano procesy biofeedback" || echo "  - Brak aktywnych procesów"
+    sleep 1
+    
+    # Krok 2: Usunięcie katalogu build
+    print_info "[Krok 2/7] Usuwanie katalogu build..."
+    if [ -d "$REPO_DIR/$BUILD_DIR" ]; then
+        rm -rf "$REPO_DIR/$BUILD_DIR"
+        print_success "  - Usunięto: $REPO_DIR/$BUILD_DIR"
+    else
+        echo "  - Katalog build nie istnieje"
+    fi
+    
+    # Krok 3: Czyszczenie cache CMake w głównym katalogu
+    print_info "[Krok 3/7] Czyszczenie plików cache CMake..."
+    local cmake_cache_removed=0
+    if [ -f "CMakeCache.txt" ]; then
+        rm -f CMakeCache.txt
+        echo "  - Usunięto: CMakeCache.txt"
+        cmake_cache_removed=1
+    fi
+    if [ -d "CMakeFiles" ]; then
+        rm -rf CMakeFiles
+        echo "  - Usunięto: CMakeFiles/"
+        cmake_cache_removed=1
+    fi
+    if [ $cmake_cache_removed -eq 0 ]; then
+        echo "  - Brak plików cache CMake do usunięcia"
+    fi
+    
+    # Krok 4: Usunięcie plików konfiguracyjnych użytkownika
+    print_info "[Krok 4/7] Usuwanie plików konfiguracyjnych..."
+    local config_files=(
+        "config/user_config.json"
+        "config/settings.ini"
+        "config/calibration.dat"
+        ".biofeedback_config"
+        "config/custom_profiles.json"
+    )
+    
+    local config_removed=0
+    for cfg in "${config_files[@]}"; do
+        if [ -f "$cfg" ]; then
+            rm -f "$cfg"
+            echo "  - Usunięto: $cfg"
+            config_removed=1
+        fi
+    done
+    
+    # Sprawdź również wewnątrz repozytorium
+    if [ -d "$REPO_DIR/config" ]; then
+        for cfg in "$REPO_DIR/config"/*.user "$REPO_DIR/config"/*.bak "$REPO_DIR/config"/*.old; do
+            if [ -f "$cfg" ]; then
+                rm -f "$cfg"
+                echo "  - Usunięto: $cfg"
+                config_removed=1
+            fi
+        done
+    fi
+    
+    if [ $config_removed -eq 0 ]; then
+        echo "  - Brak plików konfiguracyjnych do usunięcia"
+    fi
+    
+    # Krok 5: Usunięcie logów i danych tymczasowych
+    print_info "[Krok 5/7] Czyszczenie logów i danych tymczasowych..."
+    local logs_removed=0
+    
+    if [ -d "logs" ]; then
+        find logs -type f -name "*.log" -delete 2>/dev/null
+        echo "  - Wyczyszczono pliki .log z logs/"
+        logs_removed=1
+    fi
+    
+    if [ -d "$REPO_DIR/logs" ]; then
+        find "$REPO_DIR/logs" -type f -name "*.log" -delete 2>/dev/null
+        echo "  - Wyczyszczono pliki .log z $REPO_DIR/logs/"
+        logs_removed=1
+    fi
+    
+    # Usuń pliki tymczasowe
+    rm -f /tmp/detected_ports.txt 2>/dev/null
+    rm -f /tmp/biofeedback_*.tmp 2>/dev/null
+    echo "  - Usunięto pliki tymczasowe z /tmp/"
+    
+    if [ $logs_removed -eq 0 ]; then
+        echo "  - Brak logów do czyszczenia"
+    fi
+    
+    # Krok 6: Usunięcie danych pomiarowych użytkownika
+    print_info "[Krok 6/7] Usuwanie danych pomiarowych..."
+    local data_removed=0
+    
+    if [ -d "data" ]; then
+        local data_count=$(find data -type f 2>/dev/null | wc -l)
+        if [ $data_count -gt 0 ]; then
+            rm -rf data/*
+            echo "  - Usunięto $data_count plików z data/"
+            data_removed=1
+        fi
+    fi
+    
+    if [ -d "$REPO_DIR/data" ]; then
+        local repo_data_count=$(find "$REPO_DIR/data" -type f 2>/dev/null | wc -l)
+        if [ $repo_data_count -gt 0 ]; then
+            rm -rf "$REPO_DIR/data"/*
+            echo "  - Usunięto $repo_data_count plików z $REPO_DIR/data/"
+            data_removed=1
+        fi
+    fi
+    
+    if [ $data_removed -eq 0 ]; then
+        echo "  - Brak danych pomiarowych do usunięcia"
+    fi
+    
+    # Krok 7: Reset repozytorium Git do czystego stanu
+    print_info "[Krok 7/7] Przywracanie repozytorium do czystego stanu..."
+    if [ -d "$REPO_DIR/.git" ]; then
+        cd "$REPO_DIR" || exit
+        
+        # Usuń wszystkie nieśledzone pliki
+        git clean -fdx 2>/dev/null && echo "  - Usunięto nieśledzone pliki i katalogi"
+        
+        # Przywróć wszystkie śledzone pliki do ostatniego commita
+        git reset --hard HEAD 2>/dev/null && echo "  - Przywrócono pliki do ostatniego commita"
+        
+        # Sprawdź aktualny branch
+        local current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        echo "  - Aktualny branch: $current_branch"
+        
+        cd ..
+    else
+        echo "  - Katalog nie jest repozytorium Git lub nie istnieje"
+    fi
+    
+    # Podsumowanie
+    echo ""
+    echo -e "${GREEN}==============================================================================${NC}"
+    echo -e "${GREEN}  PRZYWRÓCENIE USTAWIEŃ FABRYCZNYCH ZAKOŃCZONE POWODZENIEM                    ${NC}"
+    echo -e "${GREEN}==============================================================================${NC}"
+    echo ""
+    echo "Co zostało wykonane:"
+    echo "  ✓ Katalog build został usunięty"
+    echo "  ✓ Cache CMake wyczyszczone"
+    echo "  ✓ Pliki konfiguracyjne usunięte"
+    echo "  ✓ Logi i dane tymczasowe wyczyszczone"
+    echo "  ✓ Dane pomiarowe usunięte"
+    echo "  ✓ Repozytorium przywrócone do czystego stanu"
+    echo ""
+    echo -e "${YELLOW}Następne kroki:${NC}"
+    echo "  1. Uruchom ponownie skrypt instalacyjny"
+    echo "  2. Wybierz opcję 2 (Instalacja zależności) jeśli potrzebna"
+    echo "  3. Wybierz opcję 3 (Git Pull & Kompilacja) aby pobrać i zbudować projekt"
+    echo "  4. Skonfiguruj aplikację od nowa"
+    echo ""
+    
+    wait_for_key
+}
+
+# ------------------------------------------------------------------------------
+# Opcja 7: Czysty Terminal Monitor Danych (SZCZEGÓŁOWA IMPLEMENTACJA)
+# ------------------------------------------------------------------------------
+
+# Funkcja do wykrywania dostępnych portów dla monitora
+detect_ports_for_monitor() {
+    local ports=()
+    
+    # Sprawdź porty ttyUSB i ttyACM - osobno aby uniknąć błędów przy nieistniejących globach
+    for port in /dev/ttyUSB*; do
+        if [ -e "$port" ]; then
+            ports+=("$port")
+        fi
+    done
+    
+    for port in /dev/ttyACM*; do
+        if [ -e "$port" ]; then
+            ports+=("$port")
+        fi
+    done
+    
+    # Sprawdź też porty ttyS (szeregowe sprzętowe)
+    for port in /dev/ttyS*; do
+        if [ -e "$port" ]; then
+            # Pomiń ttyS0 jeśli to konsola systemowa
+            if [ "$port" != "/dev/ttyS0" ] || ! mount | grep -q "on / "; then
+                ports+=("$port")
+            fi
+        fi
+    done
+    
+    echo "${ports[@]}"
+}
+
+
+# ------------------------------------------------------------------------------
+# Opcja 8: Diagnostyka i Testowanie Mikrokontrolera
+# ------------------------------------------------------------------------------
+
+option_8_diagnostics() {
+    clear
+    echo -e "${CYAN}==============================================================================${NC}"
+    echo -e "${CYAN}          OPCJA 8: DIAGNOSTYKA I TESTOWANIE MIKROKONTROLERA                   ${NC}"
+    echo -e "${CYAN}==============================================================================${NC}"
+    echo ""
+    
+    while true; do
+        echo "1. Test połączenia szeregowego"
+        echo "2. Sprawdź wykryte urządzenia USB"
+        echo "3. Test prędkości transmisji (Baud Rate)"
+        echo "4. Monitoruj sygnały DTR/RTS"
+        echo "5. Wykryj chip ID (ESP32)"
+        echo "6. Test pamięci Flash"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
+        read -p "Wybierz opcję: " diag_choice
+        
+        case $diag_choice in
+            1)
+                clear
+                echo -e "${CYAN}--- Test Połączenia Szeregowego ---${NC}"
+                echo ""
+                
+                # Wykryj porty - osobno aby uniknąć błędów przy nieistniejących globach
+                local ports=()
+                for port in /dev/ttyUSB*; do
+                    if [ -e "$port" ]; then
+                        ports+=("$port")
+                    fi
+                done
+                for port in /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        ports+=("$port")
+                    fi
+                done
+                
+                if [ ${#ports[@]} -eq 0 ]; then
+                    print_error "Brak wykrytych portów szeregowych!"
+                    print_info "Podłącz mikrokontroler i spróbuj ponownie."
+                else
+                    print_success "Wykryto ${#ports[@]} port(ów):"
+                    for p in "${ports[@]}"; do
+                        echo "  - $p"
+                    done
+                    echo ""
+                    
+                    read -p "Podaj numer portu do testu (1-${#ports[@]}): " port_num
+                    if [[ "$port_num" =~ ^[0-9]+$ ]] && [ "$port_num" -le "${#ports[@]}" ] && [ "$port_num" -ge 1 ]; then
+                        selected_port="${ports[$((port_num-1))]}"
+                        echo ""
+                        print_info "Testowanie portu $selected_port..."
+                        
+                        # Sprawdź uprawnienia
+                        if [ -r "$selected_port" ] && [ -w "$selected_port" ]; then
+                            print_success "Port jest dostępny do odczytu i zapisu."
+                        else
+                            print_warning "Brak uprawnień do portu. Spróbuj: sudo usermod -a -G dialout \$USER"
+                        fi
+                        
+                        # Sprawdź czy port nie jest zajęty
+                        if command -v lsof &> /dev/null; then
+                            local users=$(lsof "$selected_port" 2>/dev/null)
+                            if [ -n "$users" ]; then
+                                print_warning "Port jest używany przez inny proces:"
+                                echo "$users"
+                            else
+                                print_success "Port jest wolny."
+                            fi
+                        fi
+                    else
+                        print_error "Nieprawidłowy numer portu."
+                    fi
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            2)
+                clear
+                echo -e "${CYAN}--- Wykryte Urządzenia USB ---${NC}"
+                echo ""
+                
+                if command -v lsusb &> /dev/null; then
+                    print_info "Lista urządzeń USB:"
+                    lsusb
+                    echo ""
+                    
+                    print_info "Urządzenia związane z UART/Serial:"
+                    lsusb | grep -iE "serial|ftdi|cp210|ch340|ch341|esp32|stm32|arduino|silicon|tty" || echo "  Brak typowych konwerterów UART."
+                else
+                    print_warning "Narzędzie lsusb niedostępne."
+                fi
+                
+                echo ""
+                echo -e "${BLUE}Porty szeregowe w systemie:${NC}"
+                
+                local found_ports=false
+                
+                # Sprawdź /dev/ttyUSB*
+                for port in /dev/ttyUSB*; do
+                    if [ -e "$port" ]; then
+                        ls -la "$port"
+                        found_ports=true
+                    fi
+                done
+                
+                # Sprawdź /dev/ttyACM*
+                for port in /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        ls -la "$port"
+                        found_ports=true
+                    fi
+                done
+                
+                if [ "$found_ports" = false ]; then
+                    echo "  Brak portów ttyUSB/ttyACM"
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            3)
+                clear
+                echo -e "${CYAN}--- Test Prędkości Transmisji ---${NC}"
+                echo ""
+                
+                read -p "Podaj port (np. /dev/ttyUSB0): " test_port
+                if [ ! -e "$test_port" ]; then
+                    print_error "Port nie istnieje!"
+                    wait_for_key
+                    continue
+                fi
+                
+                echo ""
+                echo "Dostępne prędkości:"
+                echo "1. 9600"
+                echo "2. 19200"
+                echo "3. 57600"
+                echo "4. 115200 (domyślna)"
+                echo "5. 230400"
+                echo "6. 460800"
+                echo "7. 921600"
+                echo ""
+                
+                read -p "Wybierz prędkość (1-7): " baud_choice
+                case $baud_choice in
+                    1) test_baud=9600 ;;
+                    2) test_baud=19200 ;;
+                    3) test_baud=57600 ;;
+                    4) test_baud=115200 ;;
+                    5) test_baud=230400 ;;
+                    6) test_baud=460800 ;;
+                    7) test_baud=921600 ;;
+                    *) test_baud=115200 ;;
+                esac
+                
+                echo ""
+                print_info "Monitorowanie portu $test_port z prędkością $test_baud..."
+                print_info "Naciśnij Ctrl+C aby przerwać."
+                echo ""
+                
+                if command -v screen &> /dev/null; then
+                    screen "$test_port" "$test_baud"
+                elif command -v minicom &> /dev/null; then
+                    minicom -D "$test_port" -b "$test_baud"
+                elif command -v picocom &> /dev/null; then
+                    picocom -b "$test_baud" "$test_port"
+                else
+                    print_warning "Brak narzędzi screen/minicom/picocom."
+                    print_info "Spróbuj: cat $test_port"
+                    timeout 5 cat "$test_port"
+                fi
+                
+                wait_for_key
+                ;;
+                
+            4)
+                clear
+                echo -e "${CYAN}--- Monitor Sygnałów DTR/RTS ---${NC}"
+                echo ""
+                
+                print_info "Sygnały sterujące w portach szeregowych:"
+                echo ""
+                
+                local found_any=false
+                
+                for port in /dev/ttyUSB*; do
+                    if [ -e "$port" ]; then
+                        echo "Port: $port"
+                        if command -v setserial &> /dev/null; then
+                            setserial "$port" 2>/dev/null || echo "  Nie można odczytać"
+                        else
+                            echo "  Narzędzie setserial niedostępne"
+                        fi
+                        echo ""
+                        found_any=true
+                    fi
+                done
+                
+                for port in /dev/ttyACM*; do
+                    if [ -e "$port" ]; then
+                        echo "Port: $port"
+                        if command -v setserial &> /dev/null; then
+                            setserial "$port" 2>/dev/null || echo "  Nie można odczytać"
+                        else
+                            echo "  Narzędzie setserial niedostępne"
+                        fi
+                        echo ""
+                        found_any=true
+                    fi
+                done
+                
+                if [ "$found_any" = false ]; then
+                    echo "  Brak portów ttyUSB/ttyACM"
+                    echo ""
+                fi
+                
+                print_info "DTR (Data Terminal Ready) i RTS (Request To Send) to sygnały sterujące."
+                print_info "Używane m.in. do resetowania Arduino/ESP32 podczas wgrywania."
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            5)
+                clear
+                echo -e "${CYAN}--- Wykrywanie Chip ID (ESP32) ---${NC}"
+                echo ""
+                
+                if ! command -v esptool.py &> /dev/null && ! command -v esptool &> /dev/null; then
+                    print_warning "Narzędzie esptool nie jest zainstalowane."
+                    print_info "Zainstaluj: pip3 install esptool"
+                else
+                    read -p "Podaj port ESP32 (np. /dev/ttyUSB0): " esp_port
+                    if [ -e "$esp_port" ]; then
+                        print_info "Odczytywanie Chip ID..."
+                        
+                        if command -v esptool.py &> /dev/null; then
+                            esptool.py --port "$esp_port" chip_id
+                        else
+                            esptool --port "$esp_port" chip_id
+                        fi
+                    else
+                        print_error "Port nie istnieje!"
+                    fi
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            6)
+                clear
+                echo -e "${CYAN}--- Test Pamięci Flash ---${NC}"
+                echo ""
+                
+                if ! command -v esptool.py &> /dev/null && ! command -v esptool &> /dev/null; then
+                    print_warning "Narzędzie esptool nie jest zainstalowane."
+                    print_info "Zainstaluj: pip3 install esptool"
+                else
+                    read -p "Podaj port (np. /dev/ttyUSB0): " flash_port
+                    if [ -e "$flash_port" ]; then
+                        print_info "Odczytywanie informacji o pamięci Flash..."
+                        
+                        if command -v esptool.py &> /dev/null; then
+                            esptool.py --port "$flash_port" flash_id
+                        else
+                            esptool --port "$flash_port" flash_id
+                        fi
+                    else
+                        print_error "Port nie istnieje!"
+                    fi
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            0)
+                return
+                ;;
+            *)
+                print_error "Nieprawidłowa opcja."
+                sleep 1
+                ;;
+        esac
+        
+        # Wyczyść ekran przed następną iteracją
+        clear
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo -e "${CYAN}          OPCJA 8: DIAGNOSTYKA I TESTOWANIE MIKROKONTROLERA                   ${NC}"
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo ""
+    done
+}
+
+# ------------------------------------------------------------------------------
+# Opcja 9: Inne Opcje (Dodatkowe Funkcje)
+# ------------------------------------------------------------------------------
+
+option_9_extra() {
+    while true; do
+        clear
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo -e "${CYAN}          OPCJA 9: INNE OPCJE I NARZĘDZIA                                     ${NC}"
+        echo -e "${CYAN}==============================================================================${NC}"
+        echo ""
+        echo "1. Informacje o systemie"
+        echo "2. Sprawdź dostępne narzędzia"
+        echo "3. Backup konfiguracji"
+        echo "4. Przywróć backup konfiguracji"
+        echo "5. Podgląd logów systemowych"
+        echo "6. Test dostępności repozytorium"
+        echo "7. Wyczyść terminal"
+        echo "0. Powrót do menu głównego"
+        echo ""
+        
+        read -p "Wybierz opcję: " sub_choice
+        
+        case $sub_choice in
+            1)
+                clear
+                echo -e "${CYAN}--- Informacje o Systemie ---${NC}"
+                echo ""
+                
+                echo -e "${BLUE}System operacyjny:${NC}"
+                if [ -f /etc/os-release ]; then
+                    cat /etc/os-release | grep -E "^PRETTY_NAME|^NAME|^VERSION"
+                fi
+                echo ""
+                
+                echo -e "${BLUE}Informacje o kernelu:${NC}"
+                uname -a
+                echo ""
+                
+                echo -e "${BLUE}Architektura:${NC}"
+                dpkg --print-architecture 2>/dev/null || echo "nieznana"
+                echo ""
+                
+                echo -e "${BLUE}Uptime:${NC}"
+                uptime
+                echo ""
+                
+                echo -e "${BLUE}Pamięć RAM:${NC}"
+                free -h 2>/dev/null || cat /proc/meminfo | head -n 3
+                echo ""
+                
+                echo -e "${BLUE}Przestrzeń dyskowa:${NC}"
+                df -h . | tail -n 1
+                echo ""
+                
+                echo -e "${BLUE}Użytkownik:${NC}"
+                whoami
+                echo "Grupy: $(groups)"
+                echo ""
+                
+                wait_for_key
+                ;;
+                
+            2)
+                clear
+                echo -e "${CYAN}--- Sprawdzenie Dostępnych Narzędzi ---${NC}"
+                echo ""
+                
+                local tools=(
+                    "g++"
+                    "cmake"
+                    "git"
+                    "make"
+                    "pkg-config"
+                    "nano"
+                    "vim"
+                    "screen"
+                    "minicom"
+                    "esptool.py"
+                    "esptool"
+                    "st-flash"
+                    "dfu-util"
+                    "lsusb"
+                    "setserial"
+                )
+                
+                for tool in "${tools[@]}"; do
+                    if command -v "$tool" &> /dev/null; then
+                        local ver=""
+                        case $tool in
+                            g++) ver=$($tool --version | head -n1) ;;
+                            cmake) ver=$($tool --version | head -n1) ;;
+                            git) ver=$($tool --version) ;;
+                            *) ver="zainstalowany" ;;
+                        esac
+                        echo -e "${GREEN}✓${NC} $tool: $ver"
+                    else
+                        echo -e "${RED}✗${NC} $tool: NIE ZNALEZIONO"
+                    fi
+                done
+                
+                echo ""
+                echo -e "${BLUE}Sprawdzenie pakietów Qt5:${NC}"
+                if pkg-config --exists Qt5Core 2>/dev/null; then
+                    echo -e "${GREEN}✓${NC} Qt5Core: $(pkg-config --modversion Qt5Core)"
+                else
+                    echo -e "${YELLOW}!${NC} Qt5Core: nie wykryto"
+                fi
+                
+                if pkg-config --exists Qt5Charts 2>/dev/null; then
+                    echo -e "${GREEN}✓${NC} Qt5Charts: $(pkg-config --modversion Qt5Charts)"
+                else
+                    echo -e "${YELLOW}!${NC} Qt5Charts: nie wykryto"
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            3)
+                clear
+                echo -e "${CYAN}--- Backup Konfiguracji ---${NC}"
+                echo ""
+                
+                local timestamp=$(date +%Y%m%d_%H%M%S)
+                local backup_dir="backup_config_${timestamp}"
+                
+                mkdir -p "$backup_dir"
+                
+                print_info "Tworzenie backupu w katalogu: $backup_dir"
+                echo ""
+                
+                # Backup plików konfiguracyjnych
+                if [ -d "config" ]; then
+                    echo "Kopiowanie katalogu config..."
+                    cp -r config "$backup_dir/"
+                fi
+                
+                # Backup plików .conf z głównego katalogu
+                for conf in *.conf; do
+                    if [ -f "$conf" ]; then
+                        echo "Kopiowanie $conf..."
+                        cp "$conf" "$backup_dir/"
+                    fi
+                done
+                
+                # Backup ukrytych plików konfiguracyjnych
+                if [ -f ~/.biofeedback.conf ]; then
+                    echo "Kopiowanie ~/.biofeedback.conf..."
+                    cp ~/.biofeedback.conf "$backup_dir/"
+                fi
+                
+                # Spakuj backup
+                if [ -d "$backup_dir" ]; then
+                    tar -czf "${backup_dir}.tar.gz" "$backup_dir" 2>/dev/null
+                    rm -rf "$backup_dir"
+                    
+                    local size=$(du -h "${backup_dir}.tar.gz" | cut -f1)
+                    echo ""
+                    print_success "Utworzono backup: ${backup_dir}.tar.gz (rozmiar: $size)"
+                else
+                    print_warning "Brak plików do backupu."
+                    rmdir "$backup_dir" 2>/dev/null
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            4)
+                clear
+                echo -e "${CYAN}--- Przywracanie Backupu Konfiguracji ---${NC}"
+                echo ""
+                
+                echo "Dostępne backupy:"
+                ls -la backup_config_*.tar.gz 2>/dev/null || echo "Brak znalezionych backupów."
+                echo ""
+                
+                read -p "Podaj nazwę pliku backupu: " backup_file
+                
+                if [ -f "$backup_file" ]; then
+                    print_info "Przywracanie z $backup_file..."
+                    
+                    # Rozpakuj
+                    tar -xzf "$backup_file"
+                    
+                    # Znajdź rozpakowany katalog
+                    local extract_dir=$(tar -tzf "$backup_file" | head -n1 | cut -f1 -d/)
+                    
+                    if [ -d "$extract_dir" ]; then
+                        # Przywróć config
+                        if [ -d "$extract_dir/config" ]; then
+                            cp -r "$extract_dir/config/"* config/ 2>/dev/null
+                            echo -e "${GREEN}Przywrócono pliki konfiguracyjne.${NC}"
+                        fi
+                        
+                        # Przywróć pliki .conf
+                        for conf in "$extract_dir"/*.conf; do
+                            if [ -f "$conf" ]; then
+                                cp "$conf" .
+                                echo -e "${GREEN}Przywrócono $(basename $conf).${NC}"
+                            fi
+                        done
+                        
+                        # Posprzątaj
+                        rm -rf "$extract_dir"
+                        
+                        print_success "Przywracanie zakończone!"
+                    else
+                        print_error "Błąd podczas przywracania."
+                    fi
+                else
+                    print_error "Plik $backup_file nie istnieje!"
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            5)
+                clear
+                echo -e "${CYAN}--- Podgląd Logów Systemowych ---${NC}"
+                echo ""
+                
+                echo "Wybierz typ logów:"
+                echo "1. Ostatnie logi systemowe (dmesg)"
+                echo "2. Logi USB (podłączenia urządzeń)"
+                echo "3. Logi szeregowe"
+                echo "4. Logi aplikacji biofeedback"
+                echo ""
+                
+                read -p "Wybierz: " log_choice
+                
+                case $log_choice in
+                    1)
+                        echo -e "${BLUE}--- Ostatnie komunikaty kernela (dmesg) ---${NC}"
+                        dmesg | tail -n 50
+                        ;;
+                    2)
+                        echo -e "${BLUE}--- Logi USB ---${NC}"
+                        dmesg | grep -i usb | tail -n 30
+                        ;;
+                    3)
+                        echo -e "${BLUE}--- Logi Szeregowe ---${NC}"
+                        dmesg | grep -iE "tty|serial" | tail -n 30
+                        ;;
+                    4)
+                        echo -e "${BLUE}--- Logi Aplikacji ---${NC}"
+                        if [ -d "logs" ]; then
+                            ls -la logs/
+                            echo ""
+                            read -p "Podaj nazwę pliku logu (Enter dla ostatniego): " logfile
+                            
+                            if [ -z "$logfile" ]; then
+                                logfile=$(ls -t logs/*.log 2>/dev/null | head -n1)
+                            fi
+                            
+                            if [ -f "$logfile" ]; then
+                                tail -n 100 "$logfile"
+                            else
+                                echo "Brak logów."
+                            fi
+                        else
+                            echo "Katalog logs nie istnieje."
+                        fi
+                        ;;
+                    *)
+                        print_error "Nieprawidłowy wybór."
+                        ;;
+                esac
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            6)
+                clear
+                echo -e "${CYAN}--- Test Dostępności Repozytorium ---${NC}"
+                echo ""
+                
+                print_info "Testowanie połączenia z GitHub..."
+                echo ""
+                
+                if command -v curl &> /dev/null; then
+                    echo "Sprawdzanie dostępności github.com..."
+                    if curl -s --head --connect-timeout 5 https://github.com > /dev/null; then
+                        print_success "GitHub jest dostępny."
+                    else
+                        print_error "Brak połączenia z GitHub."
+                    fi
+                elif command -v ping &> /dev/null; then
+                    echo "Pingowanie github.com..."
+                    ping -c 3 github.com
+                else
+                    print_warning "Brak narzędzi curl lub ping."
+                fi
+                
+                echo ""
+                print_info "Sprawdzanie lokalnego repozytorium..."
+                
+                if [ -d "$REPO_DIR/.git" ]; then
+                    cd "$REPO_DIR" || exit
+                    
+                    echo "Status repozytorium:"
+                    git status --short
+                    
+                    echo ""
+                    echo "Ostatni commit:"
+                    git log -1 --oneline
+                    
+                    echo ""
+                    echo "Zdalne repozytorium:"
+                    git remote -v
+                    
+                    cd ..
+                else
+                    print_warning "Lokalne repozytorium nie istnieje."
+                    print_info "Użyj opcji 3 aby pobrać kod."
+                fi
+                
+                echo ""
+                wait_for_key
+                ;;
+                
+            7)
+                clear
+                print_success "Terminal wyczyszczony."
+                sleep 1
+                return
+                ;;
+                
+            0)
+                return
+                ;;
+            *)
+                print_error "Nieprawidłowa opcja."
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# ------------------------------------------------------------------------------
+# Pętla Główna Menu
+# ------------------------------------------------------------------------------
+
+main_menu() {
+    while true; do
+        print_header
+        
+        echo "1. Wybór języka (pl/en)"
+        echo "2. Instalacja zależności"
+        echo "3. Git Pull & Kompilacja"
+        echo "4. Wgrywanie kodu do mikrokontrolera"
+        echo "5. Ustawienia i pliki konfiguracyjne"
+        echo "6. Przywracanie ustawień domyślnych"
+        echo "7. Czysty terminal monitor danych"
+        echo "8. Diagnostyka i testowanie mikrokontrolera"
+        echo "9. Inne opcje"
+        echo "0. Wyjście"
+        echo ""
+        
+        read -p "Wybierz opcję [0-9]: " choice
+
+        case $choice in
+            1) option_1_language ;;
+            2) option_2_deps ;;
+            3) option_3_menu ;;
+            4) option_4_menu ;;
+            5) option_5_config ;;
+            6) option_6_defaults ;;
+            7) option_7_monitor ;;
+            8) option_8_diagnostics ;;
+            9) option_9_extra ;;
+            0) 
+                clear
+                echo "Do widzenia!"
+                exit 0
+                ;;
+            *) 
+                print_error "Nieprawidłowy wybór. Spróbuj ponownie."
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# Uruchomienie skryptu
+main_menu
