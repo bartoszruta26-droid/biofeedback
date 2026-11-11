@@ -304,6 +304,7 @@ private:
     QComboBox* m_gameTypeCombo;
     QComboBox* m_sinusWaveformCombo{nullptr};
     QSpinBox* m_sinusDifficultySpin{nullptr};
+    QSpinBox* m_reactionForceDifficultySpin{nullptr};
     QCheckBox* m_sinusAutoDifficultyCheck{nullptr};
     
     // Panel sterowania
