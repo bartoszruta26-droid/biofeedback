@@ -19,6 +19,9 @@ public:
     QString gameName() const override;
     int livesRemaining() const { return m_lives; }
     int obstacleCount() const { return m_obstacles.size(); }
+    int currentLane() const { return m_lane; }
+    bool boostActive() const { return m_boostTimer > 0.0; }
+    double boostCooldownRemaining() const { return m_boostCooldown; }
 
 protected:
     void initialize() override;
@@ -38,6 +41,8 @@ private:
     void setLane(int lane);
     void spawnObstacle();
     void loseLife();
+    void activateBoost();
+    QRectF laneRect(int lane, double top, double objectWidth, double objectHeight) const;
 
     QVector<Obstacle> m_obstacles;
     QRectF m_player;
@@ -46,6 +51,10 @@ private:
     double m_spawnInterval;
     double m_roadSpeed;
     double m_distance;
+    double m_boostTimer;
+    double m_boostCooldown;
+    double m_collisionTimer;
+    double m_scoreDistanceAccumulator;
     int m_lane;
     int m_lives;
     int m_spawnCount;
