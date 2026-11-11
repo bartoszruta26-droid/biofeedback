@@ -29,7 +29,7 @@ public:
     CargoType cargoType() const { return m_cargoType; }
     double cargoMassKg() const { return m_cargoMassKg; }
     int missionNumber() const { return qMin(5, m_missionIndex + 1); }
-    int missionDeliveriesRemaining() const { return qMax(0, 3 - (m_delivered % 3)); }
+    int missionDeliveriesRemaining() const { return m_campaignCompleted ? 0 : qMax(0, 3 - (m_delivered % 3)); }
     bool campaignCompleted() const { return m_campaignCompleted; }
     int obstacleCount() const { return 2; }
     int collisionCount() const { return m_collisionCount; }
