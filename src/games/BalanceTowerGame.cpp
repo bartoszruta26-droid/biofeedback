@@ -61,6 +61,11 @@ void BalanceTowerGame::initialize()
     m_gameOver = false;
     m_campaignClean = true;
     m_status = QStringLiteral("Ustaw nacisk w strefie neutralnej 10–30%");
+    m_previousTargetPosition = m_targetPosition;
+    m_previousTargetDepth = m_targetDepth;
+    m_previousTilt = m_tilt;
+    m_previousStability = m_stability;
+    m_previousVisualTime = m_visualTime;
     setScore(0);
 }
 
