@@ -91,7 +91,7 @@ Aktualny opis zachowania znajduje się w `docs/GAME_CONTROLS.md`. Audyt tej inst
 - Firmware Nano jest kompilowany w workflow `.github/workflows/arduino-nano.yml`. Test protokołu znajduje się w `tests/hx711_calibration_protocol_regression.py`.
 - Firmware Nano używa HX711, transmisji szeregowej 115200 baud, ramek binarnych z CRC i raportowania próbek z częstotliwością do 80 SPS (zależnie od modułu i warunków sprzętowych).
 - Istnieje osobny workflow dla Raspberry Pi Pico. Plan gier nie powinien wymagać zmiany protokołu czujnika tylko po to, aby dodać nową grę.
-- Ostatnie widoczne przebiegi CI dla wskazanego `main` zakończyły się sukcesem: Linux desktop GUI build, security regression, patient-log privacy regression oraz pakiet Raspberry Pi ARM64. Są to wyniki CI, a nie testy z fizycznym tensometrem.
+- Dla commita `16a5693e8b7e8e197d997c2be7be4b54e313565b` wszystkie cztery kontrole CI zakończyły się sukcesem: Linux desktop GUI build, security regression, patient-log privacy regression oraz pakiet Raspberry Pi ARM64 Debian Trixie. Linux uruchomił 34/34 testy CTest (0 błędów), w tym `game_factory_regression`; ARM64 pomyślnie zbudował cele regresyjne i uruchomił testy. Są to wyniki testów automatycznych, a nie testy z fizycznym tensometrem.
 - Nie potwierdzono w tym audycie fizycznych testów wszystkich gier z urządzeniem HX711.
 
 ## 3. Katalog istniejących gier — docelowa specyfikacja
@@ -194,7 +194,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 ### 4.1. Precision Crane — dźwig precyzyjny
 
-**Status:** pierwsza grywalna wersja zaimplementowana i scalona do `main` (PR #270). Uzupełniono zabezpieczenie fail-closed po utracie świeżości sygnału: po 350 ms ruch zostaje zatrzymany, gest anulowany, a wskazanie siły zerowane do prezentacji neutralnej; próbki NaN/Inf nie odświeżają watchdogu. Dodano regresje utraty/przywrócenia sygnału i rozróżniania krótkiego impulsu od gestu poniżej minimalnego czasu. Ostatni potwierdzony zestaw CI dla commita `9622d1fd` zakończył się sukcesem na Linux Qt5, Raspberry Pi ARM64 Debian Trixie, regresji bezpieczeństwa i prywatności. Test integracyjny obejmuje pełną dostawę oraz kolejność aktualizacji najlepszego wyniku. Dalsze rozszerzenie testów na `main` sprawdza rotację trzech typów ładunków po trzech pełnych dostawach (commit `c0daf848`); jego CI jest uruchomione.
+**Status:** zaimplementowana i rozwijana gra na `main`. Obejmuje sterowanie jednym tensometrem, model wahadła tłumionego, ruchome kontenery i kolizje, trzy typy ładunków, pięć misji po trzy dostawy, premię precyzji oraz trwały zapis statystyk JSON z atomowym zapisem przez `QSaveFile`. Testy regresyjne obejmują rotację ładunków, ruch przeszkód i kolizję w niezerowej fazie ruchu, pełną kampanię 15 dostaw, zakończenie kampanii oraz odczyt rekordów po utworzeniu nowego obiektu gry. Commit `16a5693e8b7e8e197d997c2be7be4b54e313565b` przeszedł wszystkie cztery kontrole CI; Linux zaliczył 34/34 testy CTest, w tym `game_factory_regression`, a ARM64 zaliczył kompilację i testy regresyjne. Fizyczny test Nano/HX711/tensometru pozostaje odrębnym etapem odbioru.
 
 - **Grafika:** port w widoku bocznym, suwnica z prowadnicą, wózek jezdny, lina, hak, ładunek, strefa odbioru, woda i tło portowe. Kołysanie podwieszonego ładunku sygnalizuje bezwładność.
 - **Funkcje:** podnoszenie i opuszczanie ładunku, transport poziomy, precyzyjne dostawy, serie udanych dostaw, premie punktowe, trzy pomyłki na sesję i pięć poziomów trudności ze zwężającą się strefą celu.
@@ -206,7 +206,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 - **Rekordy i historia:** najlepszy wynik oraz podsumowanie dostaw, średniej precyzji i kolizji są zapisywane atomowo w pliku JSON w katalogu danych aplikacji.
 - **Tensometr:** skalibrowana siła 0–100% jest jedynym źródłem sterowania. W zakresie roboczym 18–70% mapuje się płynnie na pozycję wózka albo wysokość haka; zakres 0–18% jest strefą zwolnienia, która utrzymuje bieżącą pozycję bez skoku do skrajnego położenia. Długie przytrzymanie wysokiej siły (co najmniej 82%) i zwolnienie przełącza oś poziomą/pionową. Krótkie przytrzymanie (0,15–0,85 s) i zwolnienie wywołuje chwyt albo zwolnienie ładunku. W danej chwili regulowany jest tylko jeden parametr.
 - **Bezpieczeństwo wejścia:** nieprawidłowe próbki są ignorowane; po 350 ms bez świeżej próbki ruch i gesty są wstrzymywane. Utrata sygnału nie jest interpretowana jako polecenie.
-- **Status zakresu:** dostępna jest pierwsza grywalna wersja z podstawowym cyklem przenoszenia i punktacją. Zaawansowane przeszkody, kampania i zapisywanie rekordów pozostają dalszymi etapami.
+- **Status zakresu:** podstawowy cykl przenoszenia, przeszkody, kampania, punktacja i trwałe rekordy są zaimplementowane. Automatyczne testy regresyjne obejmują kolizje, pełną kampanię oraz odtworzenie zapisanych statystyk po restarcie obiektu gry.
 - **Wyróżnik:** zręcznościowa gra o precyzji i płynności ruchu, sterowana wyłącznie jednym tensometrem.
 
 ### 4.2. Rhythm Force — rytm siły
