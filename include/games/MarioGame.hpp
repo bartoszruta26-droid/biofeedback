@@ -10,6 +10,7 @@
 #include <memory>
 
 class QResizeEvent;
+class QPaintEvent;
 
 namespace games {
 
@@ -41,9 +42,18 @@ public:
      */
     QString gameName() const override;
 
+    // Read-only gameplay diagnostics for regression tests and telemetry.
+    double playerVerticalVelocity() const;
+    bool playerOnGround() const;
+    bool playerCharging() const;
+    double jumpCharge() const;
+    int activeObstacleCount() const;
+    int currentLevel() const;
+
 protected:
     void initialize() override;
     void resizeEvent(QResizeEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
@@ -151,7 +161,8 @@ private:
     double m_obstacleSpawnInterval;
     
     // Tensometr
-    double m_sensorThreshold;      // Próg aktywacji
+    double m_sensorThreshold;      // Próg aktywacji (skala 0–100)
+    bool m_sensorPressed = false;  // Histereza wejścia tensometru
     
     // Komunikacja szeregowa z Arduino Nano HX711
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
