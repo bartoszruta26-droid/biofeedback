@@ -39,7 +39,7 @@ GalagaGame::GalagaGame(QWidget *parent)
     , m_specialGestureActive(false)
     , m_sensorInputValid(false)
 {
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::NoFocus);
 }
 
 QString GalagaGame::gameName() const
