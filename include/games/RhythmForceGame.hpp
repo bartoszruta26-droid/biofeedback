@@ -68,7 +68,6 @@ private:
     int m_perfectHits;
     int m_combo;
     int m_bestCombo;
-    int m_score;
     double m_songTime;
     double m_inputAge;
     double m_pulseElapsed;
