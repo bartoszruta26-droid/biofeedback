@@ -901,8 +901,10 @@ int main(int argc, char **argv)
     REQUIRE(!rhythmSafety->hasFreshSignal());
     REQUIRE(!rhythmSafety->pulseActive());
     const double frozenRhythmTime = rhythmSafety->songTimeSeconds();
+    const double visualTimeAtTimeout = rhythmSafety->visualTimeSeconds();
     games::RhythmForceGameTestAccess::advance(*rhythmSafety, 0.10);
     REQUIRE(std::abs(rhythmSafety->songTimeSeconds() - frozenRhythmTime) < 0.001);
+    REQUIRE(rhythmSafety->visualTimeSeconds() > visualTimeAtTimeout);
     rhythmSafety->handleSensorInput(90.0);
     REQUIRE(!rhythmSafety->pulseActive());
     rhythmSafety->handleSensorInput(0.0);
@@ -923,6 +925,29 @@ int main(int argc, char **argv)
     REQUIRE(rhythmFinal->hitCount() == 1);
     REQUIRE(rhythmFinal->nextBeatNumber() == 33);
     REQUIRE(!rhythmFinal->isRunning());
+
+    // A complete perfect campaign unlocks long-form achievements and persists
+    // them across a game reset (the same storage used after application restart).
+    std::unique_ptr<games::RhythmForceGame> rhythmAchievements(new games::RhythmForceGame);
+    rhythmAchievements->resize(640, 480);
+    rhythmAchievements->start();
+    for (int beat = 1; beat <= rhythmAchievements->totalBeats(); ++beat) {
+        games::RhythmForceGameTestAccess::emitPulse(
+            *rhythmAchievements,
+            games::RhythmForceGameTestAccess::beatTime(*rhythmAchievements, beat),
+            0.12,
+            games::RhythmForceGameTestAccess::targetForce(*rhythmAchievements, beat));
+    }
+    REQUIRE(rhythmAchievements->roundCompleted());
+    REQUIRE(rhythmAchievements->hitCount() == 32);
+    REQUIRE(rhythmAchievements->missCount() == 0);
+    REQUIRE(rhythmAchievements->perfectCount() == 32);
+    REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("combo_8")));
+    REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("flawless_round")));
+    REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("perfect_16")));
+    REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("accuracy_90")));
+    rhythmAchievements->reset();
+    REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("flawless_round")));
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
