@@ -159,9 +159,14 @@ struct ReactionForceGameTestAccess
         game.handleInput(0.0);
     }
 
-    static void advance(ReactionForceGame& game, double deltaTime)
+    static void expireSignal(ReactionForceGame& game)
     {
-        game.update(deltaTime);
+        // Set a deterministic stale-sample age instead of relying on wall-clock
+        // time or the QTimer event loop in this regression test.
+        game.m_inputAge = ReactionForceGame::kSignalTimeout + 0.01;
+        game.m_awaitingNeutral = false;
+        game.m_phase = ReactionForceGame::Go;
+        game.update(0.01);
     }
 };
 
@@ -269,7 +274,7 @@ int main(int argc, char **argv)
 
     // Reconnection timeout cancels pending actions and cannot create a hit.
     const int reactionHitsBeforeTimeout = reaction->hits();
-    games::ReactionForceGameTestAccess::advance(*reaction, 0.40);
+    games::ReactionForceGameTestAccess::expireSignal(*reaction);
     REQUIRE(!reaction->hasFreshSignal());
     REQUIRE(reaction->awaitingNeutral());
     REQUIRE(reaction->phase() == games::ReactionForceGame::AwaitNeutral);
