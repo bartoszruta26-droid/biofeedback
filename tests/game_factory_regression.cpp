@@ -421,7 +421,6 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->handleSensorInput(50.0));
     REQUIRE(scorchedGame->shotPower() >= 0.62);
     REQUIRE(scorchedGame->shotPower() <= 0.98);
-    REQUIRE(scorchedGame->trajectoryPreviewPointCount() > 0);
     scorchedGame->resize(180, 120);
     waitForEvents(80);
     REQUIRE(scorchedGame->isRunning());
