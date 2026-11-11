@@ -328,7 +328,7 @@ void SinGame::update(double deltaTime)
     } else {
         m_comboSeconds = 0.0;
         m_combo = 0;
-        m_perfectStreak = 0;
+        m_perfectSeconds = 0.0;
         m_feedbackText = m_cursorY > m_targetY
             ? QStringLiteral("Zwiększ siłę")
             : QStringLiteral("Zmniejsz siłę");
