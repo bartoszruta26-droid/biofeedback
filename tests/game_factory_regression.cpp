@@ -8,6 +8,7 @@
 #include "games/ArcherGame.hpp"
 #include "games/CarRaceGame.hpp"
 #include "games/ScorchedEarthGame.hpp"
+#include "games/MarioGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -313,6 +314,41 @@ int main(int argc, char **argv)
     waitForEvents(1900);
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 0);
     REQUIRE(!carRaceGameOverInstance->isRunning());
+
+    // Mario Run: charge-and-release jump, one mid-air jump, keyboard restart,
+    // lives, and collectible diagnostics remain available to the game UI.
+    std::unique_ptr<games::GameEngine> marioControls(games::createGame(QStringLiteral("mario")));
+    auto* marioGame = dynamic_cast<games::MarioGame*>(marioControls.get());
+    REQUIRE(marioGame != nullptr);
+    marioGame->resize(640, 480);
+    marioGame->start();
+    REQUIRE(marioGame->livesRemaining() == 3);
+    REQUIRE(marioGame->coinsCollected() == 0);
+    marioGame->handleSensorInput(100.0);
+    waitForEvents(420);
+    REQUIRE(marioGame->playerCharging());
+    REQUIRE(marioGame->jumpCharge() > 0.0);
+    marioGame->handleSensorInput(0.0);
+    REQUIRE(marioGame->playerVerticalVelocity() < 0.0);
+    REQUIRE(marioGame->doubleJumpAvailable());
+    marioGame->handleSensorInput(100.0);
+    REQUIRE(!marioGame->doubleJumpAvailable());
+    REQUIRE(marioGame->playerVerticalVelocity() < 0.0);
+    marioGame->stop();
+
+    std::unique_ptr<games::GameEngine> marioKeyboard(games::createGame(QStringLiteral("mario")));
+    auto* marioKeyboardGame = dynamic_cast<games::MarioGame*>(marioKeyboard.get());
+    REQUIRE(marioKeyboardGame != nullptr);
+    marioKeyboardGame->resize(640, 480);
+    marioKeyboardGame->start();
+    QKeyEvent marioJumpDown(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QKeyEvent marioJumpUp(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(marioKeyboardGame, &marioJumpDown);
+    waitForEvents(250);
+    QApplication::sendEvent(marioKeyboardGame, &marioJumpUp);
+    REQUIRE(marioKeyboardGame->playerVerticalVelocity() < 0.0);
+    REQUIRE(marioKeyboardGame->doubleJumpAvailable());
+    marioKeyboardGame->stop();
 
     std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
     auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
