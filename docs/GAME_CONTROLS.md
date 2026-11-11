@@ -69,12 +69,14 @@
 
 ### 7. Car Race
 
-**Cel:** omijaj przeszkody, zmieniając pas ruchu.
+**Cel:** prowadź samochód przez trzy pasy ruchu, omijaj nadjeżdżające pojazdy, buduj wynik i używaj dopalacza w odpowiednim momencie.
 
-- **Tensometr:** wybiera jeden z trzech pasów na podstawie wartości wejściowej: niski zakres — lewy pas, środkowy zakres — pas środkowy, wysoki zakres — prawy pas.
-- **Klawiatura:** `←` lub `A` — pas w lewo; `→` lub `D` — pas w prawo. Każde naciśnięcie przesuwa pojazd o jeden pas; pozycja jest ograniczona do trzech pasów.
-- **Punktacja:** minięcie przeszkody bez kolizji zwiększa wynik. Kolizja odbiera życie.
-- **Wskaźniki:** wynik, dystans i pozostałe życia.
+- **Tensometr:** steruje wyborem pasa. Niska wartość kieruje na lewy pas, środkowa utrzymuje pas środkowy, a wysoka wybiera prawy pas. Sterowanie jest filtrowane i ma strefę histerezy, więc niewielkie wahania pomiaru nie powodują ciągłego przeskakiwania między pasami.
+- **Klawiatura:** `←` lub `A` — zmiana o jeden pas w lewo; `→` lub `D` — zmiana o jeden pas w prawo; `SPACJA` lub `B` — uruchomienie dopalacza.
+- **Dopalacz:** zapewnia krótkotrwały wzrost prędkości. Po użyciu ładuje się przez kilka sekund; pasek pod górnymi wskaźnikami pokazuje gotowość. Ponowne naciśnięcie podczas ładowania nie uruchamia kolejnego dopalacza.
+- **Punktacja:** wynik rośnie za przejechany dystans oraz za każdą bezpiecznie miniętą przeszkodę. Prędkość i częstotliwość ruchu rosną wraz z dystansem.
+- **Kolizje:** zderzenie odbiera jedno życie. Krótka ochrona po uderzeniu zapobiega wielokrotnemu odejmowaniu żyć w tej samej serii kontaktów; miganie samochodu sygnalizuje ochronę.
+- **Wskaźniki:** wynik, dystans, prędkość, liczba żyć i pasek dopalacza. Po utracie wszystkich żyć wyświetlany jest ekran końca gry.
 
 ### 8. Archer
 
@@ -113,13 +115,13 @@
 | Arkanoid | poziome położenie paletki | brak skrótów gry |
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
-| Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
+| Car Race | wybór jednego z trzech pasów z filtrowaniem i histerezą | `←`/`A`, `→`/`D`, `SPACJA`/`B` — dopalacz |
 | Archer | kąt celowania | `W`/`↑`, `S`/`↓`, `SPACJA` |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, przytrzymaj `SPACJĘ` |
 | Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
 
 ## Uwaga o wersjach i rozszerzeniach
 
-Niektóre usprawnienia sterowania są rozwijane w osobnych gałęziach i PR-ach. Dopóki nie zostaną scalone z gałęzią integracyjną, nie należy traktować ich jako dostępnych w tej wersji aplikacji. Dotyczy to między innymi dodatkowych skrótów kalibracji, adaptacyjnej trudności, alternatywnych przebiegów ćwiczeń oraz sterowania myszą w wybranych grach.
+Niektóre usprawnienia sterowania są rozwijane w osobnych gałęziach i PR-ach. Dopóki nie zostaną scalone z gałęzią integracyjną, nie należy traktować ich jako dostępnych w tej wersji aplikacji. Dotyczy to między innymi dodatkowych skrótów kalibracji, alternatywnych przebiegów ćwiczeń oraz sterowania myszą w wybranych grach. Opis dopalacza Car Race odpowiada implementacji w gałęzi, do której odnosi się ta aktualizacja.
 
 Przy zmianie sterowania w kodzie należy zaktualizować ten plik oraz teksty instruktażowe wyświetlane bezpośrednio w grze. Każdy skrót powinien mieć test regresyjny, a opis powinien odpowiadać faktycznej implementacji.
