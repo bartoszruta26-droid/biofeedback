@@ -31,6 +31,7 @@ CarRaceGame::CarRaceGame(QWidget *parent)
     , m_visualLane(1.0)
     , m_cameraShakeTimer(0.0)
     , m_passStreak(0)
+    , m_collectiblesCollected(0)
     , m_lane(1)
     , m_lives(3)
     , m_spawnCount(0)
@@ -59,6 +60,7 @@ void CarRaceGame::initialize()
     m_visualLane = 1.0;
     m_cameraShakeTimer = 0.0;
     m_passStreak = 0;
+    m_collectiblesCollected = 0;
     m_lane = 1;
     m_lives = 3;
     m_spawnCount = 0;
@@ -184,6 +186,7 @@ void CarRaceGame::spawnObstacle()
     Obstacle obstacle;
     obstacle.lane = lane;
     obstacle.passed = false;
+    obstacle.boostCell = (m_spawnCount % 5 == 4);
     obstacle.rect = laneRect(lane, -obstacleHeight - 6.0, obstacleWidth, obstacleHeight);
     m_obstacles.push_back(obstacle);
 }
@@ -230,12 +233,22 @@ void CarRaceGame::update(double deltaTime)
 
     for (Obstacle& obstacle : m_obstacles) {
         obstacle.rect.translate(0.0, m_roadSpeed * deltaTime);
+        if (obstacle.boostCell && !obstacle.passed && obstacle.rect.intersects(m_player)) {
+            obstacle.passed = true;
+            obstacle.rect = QRectF();
+            ++m_collectiblesCollected;
+            addScore(25);
+            m_boostCooldown = qMax(0.0, m_boostCooldown - 2.0);
+            continue;
+        }
         if (!obstacle.passed && obstacle.rect.top() > m_player.bottom()) {
             obstacle.passed = true;
-            ++m_passStreak;
-            addScore(5 + qMin(m_passStreak - 1, 5) * 2);
+            if (!obstacle.boostCell) {
+                ++m_passStreak;
+                addScore(5 + qMin(m_passStreak - 1, 5) * 2);
+            }
         }
-        if (m_collisionTimer <= 0.0 && obstacle.rect.intersects(m_player)) {
+        if (!obstacle.boostCell && m_collisionTimer <= 0.0 && obstacle.rect.intersects(m_player)) {
             obstacle.rect = QRectF();
             m_passStreak = 0;
             m_cameraShakeTimer = 0.32;
@@ -333,6 +346,19 @@ void CarRaceGame::render(QPainter& painter)
         painter.setBrush(QColor(18, 22, 28, 75));
         painter.drawEllipse(QRectF(obstacle.rect.left() - 3.0, obstacle.rect.bottom() - 3.0,
                                    obstacle.rect.width() + 6.0, 9.0 + depth * 5.0));
+        if (obstacle.boostCell) {
+            const double bob = std::sin(m_animationTime * 5.0 + obstacle.rect.y() * 0.03) * 3.0;
+            const QRectF token(obstacle.rect.center().x() - obstacle.rect.width() * 0.30,
+                               obstacle.rect.center().y() - obstacle.rect.height() * 0.30 + bob,
+                               obstacle.rect.width() * 0.60, obstacle.rect.height() * 0.60);
+            painter.setPen(QPen(QColor(255, 245, 180), 2.0));
+            painter.setBrush(QColor(255, 183, 42, 220));
+            painter.drawEllipse(token);
+            painter.setPen(QPen(QColor(255, 255, 225), 2.0));
+            painter.drawLine(QPointF(token.center().x(), token.top() + 5.0),
+                             QPointF(token.center().x(), token.bottom() - 5.0));
+            continue;
+        }
         painter.setBrush(QColor(190 + static_cast<int>(pulse * 35.0), 61, 58));
         painter.drawRoundedRect(obstacle.rect, 7.0, 7.0);
         const QRectF window(obstacle.rect.left() + obstacle.rect.width() * 0.18,
@@ -388,6 +414,8 @@ void CarRaceGame::render(QPainter& painter)
     painter.drawText(width() - 112, 23, QStringLiteral("Życia: %1").arg(m_lives));
     painter.drawText(width() - 112, 43, QStringLiteral("Prędkość: %1").arg(qRound(m_roadSpeed / 4.0)));
     if (m_passStreak > 1) painter.drawText(12, 80, QStringLiteral("SERIA x%1").arg(m_passStreak));
+    painter.drawText(width() - 150, 64, QStringLiteral("Poziom: %1").arg(difficultyLevel()));
+    painter.drawText(width() - 150, 84, QStringLiteral("Dopalacze: %1").arg(m_collectiblesCollected));
     const QRectF track(12.0, 55.0, 112.0, 9.0);
     painter.setPen(QPen(QColor(255, 255, 255, 180), 1));
     painter.setBrush(QColor(20, 25, 30, 170));

@@ -76,9 +76,10 @@
 - **Płynność kierowania:** samochód wizualnie dojeżdża do wybranego pasa z krótką animacją. Pozycja kolizji nadal odpowiada wybranemu pasowi.
 - **Dopalacz:** przez 1,8 s zwiększa prędkość ruchu planszy. Po użyciu obowiązuje 5 s odnowienia; pasek HUD pokazuje stopień gotowości. Animowany płomień za samochodem sygnalizuje aktywne przyspieszenie.
 - **Punktacja:** punkty są przyznawane za pokonany dystans oraz za bezpieczne minięcie pojazdu. Kolejne bezkolizyjne minięcia budują serię i zwiększają premię punktową. Kolizja zeruje serię.
+- **Żetony dopalacza:** co kilka pojazdów pojawia się złoty żeton. Zebranie go daje 25 punktów i skraca czas odnowienia dopalacza o 2 sekundy. Żetony trzeba zebrać, przejeżdżając przez ich pas.
 - **Kolizje:** zderzenie odbiera jedno życie. Po uderzeniu działa ochrona przez 1,1 s; miganie samochodu i lekkie drżenie obrazu sygnalizują trafienie.
 - **Animacja i perspektywa:** tło ma kilka warstw przesuwających się z różną prędkością. Odległe pasma krajobrazu poruszają się wolniej niż drzewa przy drodze; znaczniki pobocza i przerywane linie pasa przesuwają się w rytmie prędkości, a ich rozmiar rośnie ku dolnej krawędzi ekranu. Koła, zawieszenie, światła pojazdów i płomień dopalacza są animowane.
-- **Wskaźniki:** wynik, dystans, prędkość, liczba żyć, seria minięć i pasek gotowości dopalacza. Po utracie wszystkich żyć pojawia się ekran końca gry.
+- **Wskaźniki:** wynik, dystans, prędkość, liczba żyć, poziom trudności, liczba zebranych żetonów, seria minięć i pasek gotowości dopalacza. Po utracie wszystkich żyć pojawia się ekran końca gry.
 - **Wskazówka:** planuj zmianę pasa z wyprzedzeniem. Nie zmieniaj pasa w ostatniej chwili, gdy pojazd jest już blisko dolnej części ekranu.
 
 ### 8. Archer Force Trainer
