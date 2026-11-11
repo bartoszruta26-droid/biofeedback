@@ -9,7 +9,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-#include <QLinearGradient>
 #include <QResizeEvent>
 #include <QFont>
 #include <QtMath>
@@ -431,10 +430,7 @@ void PrecisionCraneGame::render(QPainter& painter)
     const double w = width(), h = height();
     const double ground = floorY();
 
-    QLinearGradient sky(0, 0, 0, h);
-    sky.setColorAt(0.0, QColor(12, 34, 62));
-    sky.setColorAt(1.0, QColor(30, 88, 112));
-    painter.fillRect(rect(), sky);
+    painter.fillRect(rect(), QColor(18, 51, 72));
 
     // Distant harbour skyline and water.
     painter.setPen(Qt::NoPen);
