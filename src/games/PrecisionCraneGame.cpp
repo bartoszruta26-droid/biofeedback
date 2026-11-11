@@ -1,6 +1,13 @@
 #include "games/PrecisionCraneGame.hpp"
 
 #include <QPainter>
+#include <QFile>
+#include <QDir>
+#include <QSaveFile>
+#include <QStandardPaths>
+#include <QJsonDocument>
+#include <QJsonObject>
+
 #include <QLinearGradient>
 #include <QResizeEvent>
 #include <QFont>
@@ -23,6 +30,10 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_swayVelocity(0.0)
     , m_previousCarriageX(0.0)
     , m_trolleyVelocity(0.0)
+    , m_cargoMassKg(1.0)
+    , m_ropeLength(150.0)
+    , m_precisionTotal(0.0)
+    , m_obstacleClock(0.0)
     , m_cargoX(0.25)
     , m_targetX(0.76)
     , m_targetWidth(0.13)
@@ -31,11 +42,19 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_mistakesRemaining(3)
     , m_lastPrecisionBonus(0)
     , m_combo(0)
+    , m_missionIndex(0)
+    , m_collisionCount(0)
+    , m_bestScore(0)
+    , m_precisionSamples(0)
+    , m_cargoType(StandardCargo)
+    , m_campaignCompleted(false)
     , m_axis(HorizontalAxis)
     , m_gestureActive(false)
     , m_loadAttached(false)
     , m_status(QStringLiteral("Oczekiwanie na sygnał tensometru"))
 {
+    m_obstacles = {{0.40, 34.0, 28.0, 0.42, 0.0},
+                   {0.58, 42.0, 32.0, 0.31, 2.1}};
     setFocusPolicy(Qt::NoFocus);
 }
 
@@ -64,7 +83,7 @@ double PrecisionCraneGame::clampCarriage(double x) const
 
 QRectF PrecisionCraneGame::cargoRect() const
 {
-    const double size = qBound(22.0, width() * 0.055, 48.0);
+    const double size = qBound(22.0, width() * 0.055 * std::sqrt(m_cargoMassKg), 56.0);
     const double y = m_loadAttached ? qMin(m_hookY + 18.0, floorY() - size) : floorY() - size;
     const double x = m_loadAttached ? m_carriageX + m_sway - size * 0.5 : m_cargoX * width() - size * 0.5;
     return QRectF(x, y, size, size);
@@ -87,6 +106,7 @@ void PrecisionCraneGame::resetRound()
     m_targetX = 0.76 - (m_delivered % 3) * 0.12;
     m_gestureActive = false;
     m_gestureSeconds = 0.0;
+    configureCargo();
     m_swayVelocity = 0.0;
     m_previousCarriageX = m_carriageX;
     m_trolleyVelocity = 0.0;
@@ -97,12 +117,19 @@ void PrecisionCraneGame::initialize()
     m_force = 0.0;
     m_inputAge = 1.0;
     m_animationTime = 0.0;
+    m_obstacleClock = 0.0;
     m_sway = 0.0;
     m_swayVelocity = 0.0;
     m_previousCarriageX = m_carriageX;
     m_trolleyVelocity = 0.0;
     m_delivered = 0;
+    m_missionIndex = 0;
+    m_collisionCount = 0;
+    m_campaignCompleted = false;
+    m_precisionTotal = 0.0;
+    m_precisionSamples = 0;
     m_mistakesRemaining = 3;
+    loadRecords();
     m_lastPrecisionBonus = 0;
     m_combo = 0;
     m_status = QStringLiteral("Krótki impuls: chwyt/zwolnienie • długi: zmiana osi");
@@ -186,7 +213,11 @@ void PrecisionCraneGame::deliverOrDropLoad()
         const double precisionRadius = qMax(1.0, target.width() * 0.5);
         const double precision = qBound(0.0, 1.0 - deliveryError / precisionRadius, 1.0);
         m_lastPrecisionBonus = qRound(precision * 100.0);
+        m_precisionTotal += m_lastPrecisionBonus;
+        ++m_precisionSamples;
         ++m_delivered;
+        m_missionIndex = m_delivered / 3;
+        saveRecords();
         ++m_combo;
         addScore(100 + m_lastPrecisionBonus +
                  qMin(m_combo - 1, 10) * 20 + m_difficulty * 10);
@@ -194,6 +225,12 @@ void PrecisionCraneGame::deliverOrDropLoad()
                        .arg(m_lastPrecisionBonus).arg(m_combo);
         if (m_delivered % 4 == 0)
             setDifficultyLevel(m_difficulty + 1);
+        if (m_delivered >= 15) {
+            m_campaignCompleted = true;
+            m_status = QStringLiteral("Kampania ukończona! Dostarczono 15 ładunków.");
+            stop();
+            return;
+        }
         resetRound();
     } else {
         m_loadAttached = false;
@@ -216,6 +253,7 @@ void PrecisionCraneGame::update(double deltaTime)
     const double dt = qMin(deltaTime, 0.1);
     const double h = static_cast<double>(height());
     m_animationTime += dt;
+    m_obstacleClock += dt;
     m_inputAge += dt;
 
     if (m_inputAge > kSignalTimeoutSeconds) {
@@ -247,6 +285,17 @@ void PrecisionCraneGame::update(double deltaTime)
         }
     }
 
+    if (m_loadAttached && checkObstacleCollision()) {
+        m_loadAttached = false;
+        m_cargoX = qBound(0.08, (m_carriageX + m_sway) / qMax(1, width()), 0.92);
+        ++m_collisionCount;
+        --m_mistakesRemaining;
+        m_combo = 0;
+        m_swayVelocity = 0.0;
+        m_status = QStringLiteral("Kolizja z przeszkodą portową — pozostało prób: %1").arg(m_mistakesRemaining);
+        if (m_mistakesRemaining <= 0) stop();
+    }
+
     // Damped-pendulum model: trolley acceleration excites the suspended load.
     // The single force sensor remains the only player input; sway is simulation state.
     const double trolleyVelocity = (m_carriageX - m_previousCarriageX) / dt;
@@ -254,9 +303,9 @@ void PrecisionCraneGame::update(double deltaTime)
     m_previousCarriageX = m_carriageX;
     m_trolleyVelocity = trolleyVelocity;
     if (m_loadAttached) {
-        const double ropeLength = qBound(70.0, m_hookY - h * 0.20, qMax(71.0, floorY() - h * 0.20));
-        const double naturalFrequencySquared = 980.0 / ropeLength;
-        const double damping = 1.15;
+        const double ropeLength = qBound(70.0, m_ropeLength, qMax(71.0, floorY() - h * 0.20));
+        const double naturalFrequencySquared = 980.0 / (ropeLength * m_cargoMassKg);
+        const double damping = 1.15 / std::sqrt(m_cargoMassKg);
         const double swayAcceleration = -naturalFrequencySquared * m_sway
                                         - damping * m_swayVelocity
                                         - trolleyAcceleration * 0.72;
@@ -268,6 +317,66 @@ void PrecisionCraneGame::update(double deltaTime)
         m_sway *= std::exp(-5.0 * dt);
         if (std::abs(m_sway) < 0.05) m_sway = 0.0;
     }
+}
+
+
+QRectF PrecisionCraneGame::obstacleRect(int index) const
+{
+    if (index < 0 || index >= m_obstacles.size()) return QRectF();
+    const MovingObstacle& obstacle = m_obstacles.at(index);
+    const double travel = qMax(0.0, width() - obstacle.width - 2.0 * width() * 0.12);
+    const double phase = m_obstacleClock * obstacle.speed + obstacle.phase;
+    const double x = width() * 0.12 + (travel * 0.5) * (1.0 + std::sin(phase));
+    return QRectF(x, obstacle.y * height(), obstacle.width, obstacle.height);
+}
+
+bool PrecisionCraneGame::checkObstacleCollision()
+{
+    const QRectF load = cargoRect();
+    for (int i = 0; i < m_obstacles.size(); ++i) {
+        if (load.intersects(obstacleRect(i))) return true;
+    }
+    return false;
+}
+
+void PrecisionCraneGame::configureCargo()
+{
+    const int variant = m_delivered % 3;
+    m_cargoType = variant == 0 ? LightCargo : (variant == 1 ? StandardCargo : HeavyCargo);
+    m_cargoMassKg = m_cargoType == LightCargo ? 0.65 :
+                    (m_cargoType == HeavyCargo ? 1.65 : 1.0);
+    m_ropeLength = m_cargoType == LightCargo ? 118.0 :
+                   (m_cargoType == HeavyCargo ? 205.0 : 155.0);
+}
+
+void PrecisionCraneGame::loadRecords()
+{
+    const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                         + QStringLiteral("/precision_crane_records.json");
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return;
+    const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
+    if (!document.isObject()) return;
+    const QJsonObject record = document.object();
+    m_bestScore = qMax(0, record.value(QStringLiteral("bestScore")).toInt());
+}
+
+void PrecisionCraneGame::saveRecords()
+{
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (directory.isEmpty() || !QDir().mkpath(directory)) return;
+    const QString path = directory + QStringLiteral("/precision_crane_records.json");
+    m_bestScore = qMax(m_bestScore, getScore());
+    QJsonObject record;
+    record.insert(QStringLiteral("schemaVersion"), 1);
+    record.insert(QStringLiteral("bestScore"), m_bestScore);
+    record.insert(QStringLiteral("totalDeliveries"), m_delivered);
+    record.insert(QStringLiteral("averagePrecision"), averagePrecision());
+    record.insert(QStringLiteral("collisionCount"), m_collisionCount);
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) return;
+    file.write(QJsonDocument(record).toJson(QJsonDocument::Indented));
+    file.commit();
 }
 
 void PrecisionCraneGame::resizeEvent(QResizeEvent *event)
@@ -329,6 +438,20 @@ void PrecisionCraneGame::render(QPainter& painter)
     painter.setPen(QPen(QColor(245, 192, 89), 4.0, Qt::SolidLine, Qt::RoundCap));
     painter.drawArc(QRectF(hookX - 9.0, m_hookY - 2.0, 18.0, 22.0), 0, -180 * 16);
 
+    // Dynamic port obstacles occupy the middle air corridor.
+    painter.setPen(QPen(QColor(25, 34, 43), 2.0));
+    for (int i = 0; i < m_obstacles.size(); ++i) {
+        const QRectF obstacle = obstacleRect(i);
+        painter.setBrush(i == 0 ? QColor(198, 92, 65) : QColor(86, 139, 177));
+        painter.drawRoundedRect(obstacle, 4.0, 4.0);
+        painter.setPen(QPen(QColor(255, 225, 185, 150), 1.0));
+        for (int stripe = 1; stripe < 4; ++stripe) {
+            const double x = obstacle.left() + obstacle.width() * stripe / 4.0;
+            painter.drawLine(QPointF(x, obstacle.top() + 3.0), QPointF(x, obstacle.bottom() - 3.0));
+        }
+        painter.setPen(QPen(QColor(25, 34, 43), 2.0));
+    }
+
     // Target bay.
     const QRectF target = targetRect();
     painter.setPen(QPen(QColor(95, 232, 178), 2.0, Qt::DashLine));
@@ -368,6 +491,13 @@ void PrecisionCraneGame::render(QPainter& painter)
             .arg(m_axis == HorizontalAxis ? QStringLiteral("POZIOMA") : QStringLiteral("PIONOWA"))
             .arg(static_cast<int>(std::round(m_force * 100.0))).arg(m_combo)
             .arg(m_lastPrecisionBonus));
+    painter.setPen(QColor(210, 230, 238));
+    painter.drawText(QRectF(16.0, 94.0, w - 32.0, 18.0), Qt::AlignCenter,
+        QStringLiteral("MISJA %1/5 • ŁADUNEK %2 • MASA %3 kg • REKORD %4")
+            .arg(qMin(5, m_missionIndex + 1))
+            .arg(m_cargoType == LightCargo ? QStringLiteral("LEKKI") :
+                 (m_cargoType == HeavyCargo ? QStringLiteral("CIĘŻKI") : QStringLiteral("STANDARDOWY")))
+            .arg(m_cargoMassKg, 0, 'f', 1).arg(m_bestScore));
 
     painter.setPen(QColor(255, 245, 218));
     painter.drawText(QRectF(16.0, h - 34.0, w - 32.0, 24.0), Qt::AlignCenter, m_status);
