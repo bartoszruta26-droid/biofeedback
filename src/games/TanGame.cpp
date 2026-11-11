@@ -5,7 +5,6 @@
 #include <QPen>
 #include <QBrush>
 #include <QFont>
-#include <QKeyEvent>
 #include <QResizeEvent>
 #include <QtMath>
 #include <cmath>
@@ -142,34 +141,6 @@ void TanGame::setTangentSharpness(double sharpness)
         m_tangentSharpness = qBound(0.25, sharpness, 1.5);
 }
 double TanGame::tangentSharpness() const { return m_tangentSharpness; }
-
-void TanGame::keyPressEvent(QKeyEvent* event)
-{
-    if (!event || event->isAutoRepeat()) {
-        if (event) event->accept();
-        return;
-    }
-    switch (event->key()) {
-        case Qt::Key_Plus:
-        case Qt::Key_Equal:
-        case Qt::Key_Up: setDifficultyLevel(m_difficultyLevel + 1); break;
-        case Qt::Key_Minus:
-        case Qt::Key_Down: setDifficultyLevel(m_difficultyLevel - 1); break;
-        case Qt::Key_A: setAutomaticDifficulty(!m_automaticDifficulty); break;
-        case Qt::Key_Comma: setTangentSharpness(m_tangentSharpness - 0.05); break;
-        case Qt::Key_Period: setTangentSharpness(m_tangentSharpness + 0.05); break;
-        case Qt::Key_BracketLeft:
-            if (m_lastRawForce < m_calibrationMaximum)
-                setForceCalibration(m_lastRawForce, m_calibrationMaximum);
-            break;
-        case Qt::Key_BracketRight:
-            if (m_lastRawForce > m_calibrationMinimum)
-                setForceCalibration(m_calibrationMinimum, m_lastRawForce);
-            break;
-        default: QWidget::keyPressEvent(event); return;
-    }
-    event->accept();
-}
 
 void TanGame::resizeEvent(QResizeEvent* event)
 {
