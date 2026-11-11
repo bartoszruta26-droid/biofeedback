@@ -1,6 +1,6 @@
 # Instrukcja sterowania grami Biofeedback
 
-> Dokument opisuje sterowanie zaimplementowane w aktualnej gałęzi integracyjnej Biofeedback. Skróty klawiaturowe odnoszą się do aktywnego widoku gry. Funkcje, które są dopiero w osobnych gałęziach lub Pull Requestach, nie są przedstawiane jako dostępne w tej wersji.
+> Dokument opisuje sterowanie zaimplementowane w aktualnej gałęzi integracyjnej Biofeedback. Tensometr jest kontrolerem położenia/kąta w grach, które go obsługują; strzały w Archer i Scorched Earth są wyzwalane automatycznie przez zegar gry. Skróty klawiaturowe odnoszą się wyłącznie do gier, w których są jawnie wymienione.
 
 ## Zasady wspólne
 
@@ -86,13 +86,13 @@
 
 **Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego i synchronizację strzału z ruchem celu.
 
-- **Tensometr/HX711:** ustawia kąt łuku w zakresie gry. Wartość siły 0–100% jest mapowana na kąt od około +31° (niższe celowanie) do około −52° (wyższe celowanie). Zmiana siły natychmiast aktualizuje kąt.
-- **Klawiatura:** przytrzymaj `W` lub `↑`, aby płynnie podnosić kąt; przytrzymaj `S` lub `↓`, aby go obniżać. Po zwolnieniu klawisza regulacja zatrzymuje się. Podczas przytrzymania klawisza sterowanie klawiaturą ma pierwszeństwo przed próbkami tensometru; po zwolnieniu wraca sterowanie czujnikiem. `SPACJA` oddaje pojedynczy strzał; kolejne strzały są ograniczone czasem odnowienia około 320 ms.
+- **Tensometr/HX711:** jest jedynym kontrolerem celowania. Wartość siły 0–100% ustawia kąt łuku; nie ma alternatywnego sterowania klawiaturą ani myszą.
+- **Automatyczny strzał:** po uruchomieniu gry pierwszy strzał następuje po 2,4 s, a następne co 2,4 s. Klawisz spacji nie wyzwala strzału.
 - **Tor lotu:** kropkowana linia pokazuje przewidywany tor strzały z uwzględnieniem grawitacji i bieżącego kąta. Jest wskazówką, a poruszający się cel może zmienić położenie przed trafieniem.
 - **Strefy celu:** zewnętrzna część tarczy daje 10 punktów, środkowa 20, a środek 30. Trafienie zwiększa prędkość celu, maksymalnie do 150 jednostek na sekundę.
 - **Statystyki:** wynik, kąt celowania, łączna liczba oddanych strzałów, trafień, pudeł i strzał w locie.
 - **Ograniczenia:** jednocześnie może istnieć maksymalnie 8 aktywnych strzał. Strzała, która opuści planszę, jest liczona jako pudło.
-- **Praktyka:** najpierw ustaw kąt tensometrem, następnie koryguj go krótkimi przytrzymaniami klawiszy. Obserwuj kropkowany tor oraz kierunek ruchu celu i oddaj strzał z wyprzedzeniem.
+- **Praktyka:** obserwuj kropkowany tor lotu i ruch celu. Utrzymuj tensometr na wartości odpowiadającej potrzebnemu kątowi; strzał zostanie oddany automatycznie po upływie czasu.
 
 ### 9. Galaga
 
@@ -111,10 +111,10 @@
 
 **Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, dobierając kąt i siłę strzału oraz uwzględniając wiatr.
 
-- **Tensometr:** ustawia kąt działa w zakresie gry.
-- **Klawiatura:** `W` lub `↑` — zwiększ kąt; `S` lub `↓` — zmniejsz kąt; `+` lub `=` — zwiększ siłę; `-` — zmniejsz siłę; `SPACJA` — oddaj strzał, gdy trwa tura gracza.
+- **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału pozostaje ustawiona na stałym, zbalansowanym poziomie.
+- **Automatyczny strzał:** po rozpoczęciu tury gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Klawiatura, mysz i spacja nie zmieniają kąta, mocy ani chwili strzału.
 - **Wskaźniki:** zdrowie obu czołgów, runda, wynik i siła/wiatr zgodnie z informacją na ekranie.
-- **Wskazówka:** wiatr wpływa na tor pocisku. Po oddaniu strzału poczekaj na zakończenie lotu i ruch przeciwnika; nie można oddać kolejnego strzału w trakcie aktywnego pocisku.
+- **Wskazówka:** wiatr wpływa na tor pocisku. Po strzale poczekaj na zakończenie lotu i ruch przeciwnika; następna tura gracza rozpoczyna nowe dwusekundowe odliczanie.
 
 ## Skrócona tabela sterowania
 
@@ -127,9 +127,9 @@
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
-| Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
+| Archer | kąt celowania 0–100% | automatyczny strzał co 2,4 s |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, `SPACJA` — ogień, `X` — EMP |
-| Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
+| Scorched Earth | kąt działa | automatyczny strzał po 2 s |
 
 ## Uwaga o wersjach i rozszerzeniach
 
