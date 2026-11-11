@@ -68,3 +68,28 @@ Wszystkie wymienione migrowane gry zachowują oryginalne wejście czujnika i log
 ## Etap 3 — kolejne gry
 
 W tej iteracji migrację rozszerzono o Force Maze, Balance Tower i Precision Crane. Do migracji pozostają Galaga, Sin, Tan i Rhythm Force. Konieczna jest też kontrola wszystkich skalowań fizyki i kolizji, ponieważ interpolacja renderowania sama w sobie nie naprawia błędnej prędkości ani przenikania przez przeszkody.
+
+
+## Etap 4 — pełna migracja prezentacji
+
+Wspólny interfejs interpolacji został wdrożony dla wszystkich 15 gier z katalogu:
+
+1. Pong
+2. Arkanoid
+3. Archer
+4. Mario
+5. Scorched Earth
+6. Flappy Bird
+7. Car Race
+8. Reaction Force
+9. Force Maze
+10. Balance Tower
+11. Precision Crane
+12. Sin
+13. Tan
+14. Rhythm Force
+15. Galaga
+
+Każda gra interpoluje odpowiednie dla swojej mechaniki elementy ruchome lub zegar wizualny. Dodano też test regresyjny, który przeprowadza wszystkie gry przez rozdzielczości 640×480, 1280×720, 1920×1080 i 2560×1440 oraz powrót do 640×480, sprawdzając, czy sesja pozostaje aktywna.
+
+To jest test odporności na zmianę rozmiaru, a nie jeszcze dowód identycznej prędkości fizycznej w każdym formacie. Niezależny test trajektorii, czasu przelotu, kolizji i proporcji obiektów wymaga dalszej walidacji per gra. W szczególności trzeba zweryfikować skalowanie prędkości, grawitacji, wymiarów obiektów i granic pola gry — interpolacja usuwa nierówności prezentacji, ale nie koryguje automatycznie błędów modelu fizycznego.
