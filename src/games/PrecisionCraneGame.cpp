@@ -228,10 +228,11 @@ void PrecisionCraneGame::deliverOrDropLoad()
         ++m_lifetimePrecisionSamples;
         ++m_delivered;
         m_missionIndex = m_delivered / 3;
-        saveRecords();
         ++m_combo;
         addScore(100 + m_lastPrecisionBonus +
                  qMin(m_combo - 1, 10) * 20 + m_difficulty * 10);
+        // Persist only after scoring so bestScore includes this delivery.
+        saveRecords();
         m_status = QStringLiteral("Dostawa! Premia precyzji: +%1 • Seria: %2")
                        .arg(m_lastPrecisionBonus).arg(m_combo);
         if (m_delivered % 4 == 0)
