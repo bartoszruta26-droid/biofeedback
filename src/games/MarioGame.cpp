@@ -372,7 +372,10 @@ void MarioGame::paintEvent(QPaintEvent* event)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, false);
     painter.setRenderHint(QPainter::TextAntialiasing, false);
-    render(painter);
+    if (isRunning())
+        renderInterpolated(painter, renderInterpolationAlpha());
+    else
+        render(painter);
 
     if (!isRunning()) {
         const QRectF panel(width() * 0.12, height() * 0.34,
