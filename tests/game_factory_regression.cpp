@@ -408,7 +408,7 @@ int main(int argc, char **argv)
     REQUIRE(sinusGame->isRunning());
     sinusGame->stop();
 
-    // Scorched Earth: validate sensor input, trajectory availability, and safe resize.
+    // Scorched Earth: validate the single HX711 input and safe resize lifecycle.
     std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
     auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
     REQUIRE(scorchedGame != nullptr);
@@ -419,8 +419,8 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
     REQUIRE(scorchedGame->handleSensorInput(50.0));
-    REQUIRE(scorchedGame->shotPower() >= 0.62);
-    REQUIRE(scorchedGame->shotPower() <= 0.98);
+    REQUIRE(scorchedGame->aimDegrees() >= 15.0);
+    REQUIRE(scorchedGame->aimDegrees() <= 80.0);
     scorchedGame->resize(180, 120);
     waitForEvents(80);
     REQUIRE(scorchedGame->isRunning());
