@@ -10,7 +10,7 @@
 4. **Pauza**, **wznowienie**, **zatrzymanie** i **reset** są obsługiwane przez wspólny interfejs modułu treningowego/silnika gry, a nie przez uniwersalny skrót klawiszowy.
 5. Jeżeli gra pokazuje komunikat o braku połączenia z czujnikiem, sprawdź połączenie urządzenia i strumień pomiarowy. Nie traktuj braku sygnału jako wartości zerowej ani jako polecenia wykonania ruchu.
 6. Po zmianie gry lub ponownym uruchomieniu sprawdź, czy gra rozpoczęła nową sesję i czy wynik/życia zostały zresetowane zgodnie z mechaniką gry.
-7. Silnik gier ma docelowy krok symulacji 90 Hz i żąda odświeżania w odstępach około 11 ms. Renderowanie używa lekkiej grafiki pikselowej, bez antyaliasingu i zbędnych gradientów pełnoekranowych. Rzeczywista liczba wyświetlonych klatek zależy od odświeżania monitora, kompozytora pulpitu i obciążenia Raspberry Pi 4; 90 Hz wymaga również odpowiedniego trybu wyświetlacza.
+7. Silnik gier ma docelowy krok symulacji 120 Hz i żąda odświeżania w odstępach około 8 ms. Renderowanie używa lekkiej grafiki pikselowej, bez antyaliasingu i zbędnych gradientów pełnoekranowych. Rzeczywista liczba wyświetlonych klatek zależy od odświeżania monitora, kompozytora pulpitu i obciążenia Raspberry Pi 4; 90 Hz wymaga również odpowiedniego trybu wyświetlacza.
 8. Automatyczne strzały w Archer i Scorched Earth wymagają świeżych próbek tensometru. Po utracie sygnału odliczanie jest wstrzymywane i rozpoczyna się ponownie po odzyskaniu pomiaru.
 
 ## Sterowanie poszczególnymi grami
@@ -23,7 +23,7 @@
 - **Przebieg celu:** pięć ustawianych przed sesją trybów: sinusoidalny, trójkątny, łagodne plateau, piłokształtny i impulsowy. Obszar tolerancji podąża za wybranym przebiegiem.
 - **Punktacja:** wynik rośnie za utrzymanie kursora w paśmie celu; dokładność zwiększa liczbę punktów, seria rośnie wraz z czasem trafienia, a utrzymanie dokładności co najmniej 90% przez 3 i 5 sekund uruchamia premie precyzji.
 - **Rekord serii:** HUD pokazuje bieżącą oraz najlepszą serię w sesji.
-- **Kalibracja i trudność:** zakres kalibracji, poziom 1–5, tryb fali i automatyczną zmianę trudności ustawia się przed rozpoczęciem sesji. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
+- **Panel przed sesją:** wybór przebiegu celu, poziom trudności 1–5 oraz automatyczna zmiana trudności. Kalibracja zakresu siły jest odrębną procedurą pomiarową i nie jest częścią tego panelu. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
 
 ### 2. Tan Force Trainer (Tangens)
 
