@@ -8,7 +8,6 @@
 #include <QVector>
 #include <memory>
 
-class QKeyEvent;
 class QResizeEvent;
 
 namespace games {
@@ -39,8 +38,6 @@ protected:
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void keyReleaseEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -75,6 +72,8 @@ private:
     QVector<PowerUp> m_powerUps;
     double m_force;
     double m_sensorInputAge;
+    double m_forceBeforeSpecialGesture;
+    double m_specialGestureSeconds;
     double m_fireCooldown;
     double m_enemyDirection;
     double m_enemyFireCooldown;
@@ -90,7 +89,7 @@ private:
     int m_firePowerLevel;
     int m_enemiesDefeated;
     int m_combo;
-    bool m_fireHeld;
+    bool m_specialGestureActive;
     bool m_sensorInputValid;
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
 };
