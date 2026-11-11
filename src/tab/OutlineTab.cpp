@@ -863,7 +863,9 @@ void OutlineTab::setupUI()
                                                    pair.at(1).toDouble()));
             }
             if (samples.size() < 2) continue;
-            const QString label = item.value(QStringLiteral("label")).toString();
+            const QString label = QDateTime::fromString(
+                item.value(QStringLiteral("start_at")).toString(), Qt::ISODateWithMs)
+                    .toLocalTime().toString(QStringLiteral("yyyy-MM-dd hh:mm:ss"));
             selected.push_back({label, samples});
             comparisons.push_back({label, calculateForceMetrics(samples)});
         }
