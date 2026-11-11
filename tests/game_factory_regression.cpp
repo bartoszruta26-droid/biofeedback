@@ -541,6 +541,7 @@ int main(int argc, char **argv)
     REQUIRE(craneDelivery->averagePrecision() > 0.0);
     REQUIRE(craneDelivery->lastPrecisionBonus() > 0);
     REQUIRE(craneDelivery->getScore() >= 110 + craneDelivery->lastPrecisionBonus());
+    REQUIRE(craneDelivery->bestScore() >= craneDelivery->getScore());
     craneDelivery->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
