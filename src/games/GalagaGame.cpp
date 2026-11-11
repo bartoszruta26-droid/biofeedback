@@ -146,7 +146,7 @@ void GalagaGame::createWave()
     const double scaleX = qMax(0.5, width() / 640.0);
     const double scaleY = qMax(0.5, height() / 480.0);
     const int desiredRows = qBound(3, 3 + (m_wave - 1) / 3, 5);
-    const int maxRows = qMax(1, (height() - 72.0 * scaleY) / (30.0 * scaleY));
+    const int maxRows = qMax(1, qRound((height() - 72.0 * scaleY) / (30.0 * scaleY)));
     const int rows = qMin(desiredRows, maxRows);
     const int columns = qBound(1, width() / qMax(1, qRound(40.0 * scaleX)), 8);
     const double margin = qMin(24.0 * scaleX, qMax(4.0 * scaleX, width() * 0.05));
