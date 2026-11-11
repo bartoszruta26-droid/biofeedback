@@ -555,7 +555,7 @@ int main(int argc, char **argv)
     carRaceGame->resize(640, 480);
     carRaceGame->start();
     carRaceGame->handleSensorInput(50.0); // Stay in the first obstacle's deterministic lane.
-    waitForEvents(4000); // First obstacle spawns at 1.25 s and reaches the player after ~2 s.
+    waitForEvents(4000); // The first obstacle reaches the player's lane after the eased spawn and travel interval.
     REQUIRE(carRaceGame->livesRemaining() < 3);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->resize(180, 120);
@@ -580,7 +580,7 @@ int main(int argc, char **argv)
     waitForEvents(3600);
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 2);
     carRaceGameOverInstance->handleSensorInput(0.0); // Second obstacle: left lane.
-    waitForEvents(1100);
+    waitForEvents(1500);
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 1);
     // Allow the collision-protection window to expire before exposing the next lane.
     waitForEvents(1200);
