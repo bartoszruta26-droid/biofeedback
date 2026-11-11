@@ -33,7 +33,7 @@ public:
     double forceCalibrationMaximum() const;
     double normalizedForce() const;
 
-    // 0 = sinusoidal, 1 = triangular, 2 = smooth plateau.
+    // 0 = sinusoidal, 1 = triangular, 2 = smooth plateau, 3 = sawtooth, 4 = pulse.
     void setWaveformMode(int mode);
     int waveformMode() const;
 
@@ -71,6 +71,8 @@ private:
     double m_scoreFraction;      // Fractional points accumulated between frames
     double m_comboSeconds;
     int m_combo;
+    int m_bestCombo;
+    double m_perfectSeconds;
     double m_lastDistance;
     QString m_feedbackText;
     double m_calibrationMinimum;
