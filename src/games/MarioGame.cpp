@@ -389,9 +389,13 @@ bool MarioGame::checkCollision(const Player& player, const Obstacle& obstacle)
 
     // Slightly inset the player hitbox so decorative sprite edges do not
     // cause unfair collisions; narrow spike bounds to match their triangle.
-    const QRectF hitbox = player.body.adjusted(4.0, 3.0, -4.0, -2.0);
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const QRectF hitbox = player.body.adjusted(4.0 * scaleX, 3.0 * scaleY,
+                                               -4.0 * scaleX, -2.0 * scaleY);
     if (obstacle.type == Obstacle::SPIKE)
-        return hitbox.intersects(obstacle.rect.adjusted(6.0, 0.0, -6.0, 0.0));
+        return hitbox.intersects(obstacle.rect.adjusted(6.0 * scaleX, 0.0,
+                                                        -6.0 * scaleX, 0.0));
     return hitbox.intersects(obstacle.rect);
 }
 
