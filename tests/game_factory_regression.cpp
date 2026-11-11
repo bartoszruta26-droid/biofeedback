@@ -223,6 +223,10 @@ int main(int argc, char **argv)
     forceMaze->handleSensorInput(20.0); // Re-arm in the neutral band after switching.
     REQUIRE(!forceMaze->awaitingNeutral());
     forceMaze->handleSensorInput(0.0); // Right-hand mapping: low force steers left.
+    REQUIRE(forceMaze->targetColumn() < 4.0);
+    // A near-neutral left input moves the player without immediately steering
+    // outside the first corridor row during this short deterministic check.
+    forceMaze->handleSensorInput(9.9);
     games::ForceMazeGameTestAccess::advance(*forceMaze, 0.25);
     REQUIRE(forceMaze->hasFreshSignal());
     REQUIRE(forceMaze->playerColumn() < 4.0);
@@ -234,7 +238,7 @@ int main(int argc, char **argv)
     REQUIRE(std::abs(forceMaze->progressRows() - forceMazeFrozenProgress) < 0.0001);
     forceMaze->handleSensorInput(90.0);
     REQUIRE(forceMaze->awaitingNeutral());
-    forceMaze->handleSensorInput(0.0);
+    forceMaze->handleSensorInput(20.0); // Fresh neutral sample re-arms after timeout.
     REQUIRE(!forceMaze->awaitingNeutral());
     forceMaze->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     REQUIRE(forceMaze->hasFreshSignal());
