@@ -112,7 +112,7 @@
 
 ### 10. Scorched Earth
 
-**Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, dobierając kąt i siłę strzału oraz uwzględniając wiatr.
+**Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, ustawiając kąt działa tensometrem i uwzględniając wiatr.
 
 - **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału pozostaje ustawiona na stałym, zbalansowanym poziomie.
 - **Automatyczny strzał:** po uzyskaniu świeżego sygnału w turze gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Po utracie sygnału odliczanie rozpoczyna się od nowa. Klawiatura, mysz i spacja nie zmieniają kąta, mocy ani chwili strzału.
@@ -121,7 +121,7 @@
 
 ## Skrócona tabela sterowania
 
-| Gra | Tensometr | Klawiatura |
+| Gra | Tensometr | Automatyka / dodatkowe sterowanie |
 |---|---|---|
 | Sinus | pionowe położenie kursora względem celu | brak skrótów gry |
 | Tangens | pionowe położenie kursora względem celu | brak skrótów gry |
