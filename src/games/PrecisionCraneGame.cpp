@@ -110,8 +110,11 @@ bool PrecisionCraneGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
     // GameEngine's sensor pipeline provides calibrated force in the 0–100 range.
+    const bool signalWasStale = m_inputAge > 0.35;
     m_force = qBound(0.0, value / 100.0, 1.0);
     m_inputAge = 0.0;
+    if (signalWasStale)
+        m_status = QStringLiteral("Sygnał przywrócony — steruj położeniem haka i wózka");
     return true;
 }
 
@@ -208,8 +211,11 @@ void PrecisionCraneGame::update(double deltaTime)
         m_gestureSeconds += dt;
     processGesture();
 
-    if (m_inputAge <= 0.35 && !m_gestureActive) {
-        const double control = qBound(0.0, m_force / 0.70, 1.0);
+    if (m_inputAge <= 0.35 && !m_gestureActive &&
+        m_force > kReleaseForce && m_force < kGestureForce) {
+        // The release band is a dead zone: it holds the current position,
+        // so finishing a gesture never snaps the crane to an endpoint.
+        const double control = qBound(0.0, (m_force - kReleaseForce) / (0.70 - kReleaseForce), 1.0);
         if (m_axis == HorizontalAxis) {
             const double left = width() * 0.08;
             const double right = width() * 0.92;
