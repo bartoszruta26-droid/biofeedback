@@ -65,6 +65,8 @@
 
 ### 6. Mario Run
 
+<!-- Aktualizacja dokumentacji po wyrównaniu bazowej regresji silnika 120 Hz. -->
+
 **Cel:** przebiegaj kolejne poziomy, omijaj przeszkody, pokonuj przeciwników, zbieraj monety i premie. Sceneria przewija się wielowarstwowo, a tempo oraz częstotliwość przeciwników rosną wraz z poziomem.
 
 - **Tensometr/HX711:** jedyny kontroler. Nacisk co najmniej 30% rozpoczyna ładowanie skoku, spadek poniżej 20% wykonuje skok; ponowne przekroczenie progu w powietrzu wykonuje pojedynczy podwójny skok. Histereza chroni przed drganiami progu.
