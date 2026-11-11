@@ -37,8 +37,8 @@ void ScorchedEarthGame::initialize()
     m_wind = 0.0;
     m_enemyDelay = 0.0;
     m_playerShotDelay = m_playerShotInterval;
-    const double scale = qMax(0.5, qMin(width() / 960.0, height() / 540.0));
-    m_gravity = 220.0 * scale;
+    const double scaleY = qMax(0.25, height() / 480.0);
+    m_gravity = 220.0 * scaleY;
     m_playerHealth = 100;
     m_enemyHealth = 100;
     m_round = 1;
@@ -71,6 +71,8 @@ void ScorchedEarthGame::resizeEvent(QResizeEvent* event)
         }
     }
     GameEngine::resizeEvent(event);
+    if (width() > 0 && height() > 0)
+        m_gravity = 220.0 * qMax(0.25, height() / 480.0);
     if (m_terrain.isEmpty() && width() > 0 && height() > 0) {
         buildTerrain();
         updateTankPositions();
@@ -80,10 +82,10 @@ void ScorchedEarthGame::resizeEvent(QResizeEvent* event)
 void ScorchedEarthGame::buildTerrain()
 {
     m_terrain.clear();
-    const double scale = qMax(0.5, qMin(width() / 960.0, height() / 540.0));
-    const int step = qMax(4, qRound(16.0 * scale));
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const int step = qMax(2, qRound(16.0 * scaleX));
     for (int x = 0; x <= width(); x += step) {
-        const double logicalX = x / scale;
+        const double logicalX = x / scaleX;
         const double y = height() * 0.70
             + std::sin(logicalX * 0.009) * height() * 0.075
             + std::sin(logicalX * 0.021 + 0.8) * height() * 0.025;
@@ -112,11 +114,12 @@ double ScorchedEarthGame::terrainY(double x) const
 
 void ScorchedEarthGame::updateTankPositions()
 {
-    const double scale = qMax(0.5, qMin(width() / 960.0, height() / 540.0));
-    const double tankWidth = 36.0 * scale;
-    const double tankHeight = 20.0 * scale;
-    const double playerX = qMin(72.0 * scale, width() * 0.18);
-    const double enemyX = qMax(playerX + 80.0 * scale, width() - 108.0 * scale);
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
+    const double tankWidth = 36.0 * scaleX;
+    const double tankHeight = 20.0 * scaleY;
+    const double playerX = qMin(72.0 * scaleX, width() * 0.18);
+    const double enemyX = qMax(playerX + 80.0 * scaleX, width() - 108.0 * scaleX);
     m_playerTank = QRectF(playerX, terrainY(playerX + tankWidth * 0.5) - tankHeight,
                           tankWidth, tankHeight);
     m_enemyTank = QRectF(enemyX, terrainY(enemyX + tankWidth * 0.5) - tankHeight,
@@ -138,14 +141,15 @@ void ScorchedEarthGame::fireProjectile(bool playerOwned)
         return;
     const QRectF& tank = playerOwned ? m_playerTank : m_enemyTank;
     const double angle = (playerOwned ? m_aimDegrees : 42.0) * 3.14159265358979323846 / 180.0;
-    const double scale = qMax(0.5, qMin(width() / 960.0, height() / 540.0));
-    const double speed = 420.0 * scale * (playerOwned ? m_power : 0.78);
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
+    const double speed = 420.0 * (playerOwned ? m_power : 0.78);
     const double direction = playerOwned ? 1.0 : -1.0;
     Projectile projectile;
     projectile.position = QPointF(playerOwned ? tank.right() : tank.left(),
                                   tank.top() + 2.0);
-    projectile.velocity = QPointF(direction * std::cos(angle) * speed,
-                                  -std::sin(angle) * speed);
+    projectile.velocity = QPointF(direction * std::cos(angle) * speed * scaleX,
+                                  -std::sin(angle) * speed * scaleY);
     projectile.playerOwned = playerOwned;
     projectile.active = true;
     m_projectiles.push_back(projectile);
@@ -155,13 +159,14 @@ void ScorchedEarthGame::fireProjectile(bool playerOwned)
 
 void ScorchedEarthGame::applyCrater(double x)
 {
-    const double scale = qMax(0.5, qMin(width() / 960.0, height() / 540.0));
-    const double radius = 38.0 * scale;
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
+    const double radius = 38.0 * scaleX;
     for (QPointF& point : m_terrain) {
         const double distance = std::abs(point.x() - x);
         if (distance >= radius)
             continue;
-        const double depth = 22.0 * scale * (1.0 - distance / radius);
+        const double depth = 22.0 * scaleY * (1.0 - distance / radius);
         point.setY(qMin(static_cast<double>(height() - 12), point.y() + depth));
     }
     updateTankPositions();
@@ -213,8 +218,9 @@ void ScorchedEarthGame::update(double deltaTime)
             fireProjectile(false);
     }
 
-    const double scale = qMax(0.5, qMin(width() / 960.0, height() / 540.0));
-    const double maxSegmentLength = 4.0 * scale;
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
+    const double maxSegmentLength = 4.0 * qMin(scaleX, scaleY);
     for (Projectile& projectile : m_projectiles) {
         if (!projectile.active)
             continue;
@@ -224,7 +230,7 @@ void ScorchedEarthGame::update(double deltaTime)
         const QPointF oldPosition = projectile.position;
         const QPointF oldVelocity = projectile.velocity;
         projectile.velocity.ry() += m_gravity * deltaTime;
-        projectile.velocity.rx() += m_wind * 0.08 * deltaTime;
+        projectile.velocity.rx() += m_wind * 0.08 * scaleX * deltaTime;
         const QPointF displacement = projectile.velocity * deltaTime;
         const int samples = qBound(1, static_cast<int>(std::ceil(
             std::hypot(displacement.x(), displacement.y()) / maxSegmentLength)), 256);
@@ -233,7 +239,7 @@ void ScorchedEarthGame::update(double deltaTime)
         for (int sample = 1; sample <= samples; ++sample) {
             const double fraction = static_cast<double>(sample) / samples;
             const QPointF current = oldPosition + oldVelocity * (deltaTime * fraction) +
-                QPointF(0.5 * m_wind * 0.08 * deltaTime * deltaTime * fraction * fraction,
+                QPointF(0.5 * m_wind * 0.08 * scaleX * deltaTime * deltaTime * fraction * fraction,
                         0.5 * m_gravity * deltaTime * deltaTime * fraction * fraction);
             const bool outside = current.x() < 0.0 || current.x() > width() ||
                 current.y() > height() || current.y() < -height();
@@ -295,10 +301,11 @@ void ScorchedEarthGame::render(QPainter& painter)
     painter.drawRoundedRect(m_enemyTank, 5.0, 5.0);
 
     painter.setPen(QPen(QColor(245, 235, 190), 4));
-    const double scale = qMax(0.5, qMin(width() / 960.0, height() / 540.0));
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
     painter.drawLine(m_playerTank.center(),
-        m_playerTank.center() + QPointF(std::cos(m_aimDegrees * 3.14159265358979323846 / 180.0) * 28.0 * scale,
-                                        -std::sin(m_aimDegrees * 3.14159265358979323846 / 180.0) * 28.0 * scale));
+        m_playerTank.center() + QPointF(std::cos(m_aimDegrees * 3.14159265358979323846 / 180.0) * 28.0 * scaleX,
+                                        -std::sin(m_aimDegrees * 3.14159265358979323846 / 180.0) * 28.0 * scaleY));
 
     painter.setPen(Qt::NoPen);
     painter.setBrush(Qt::white);
