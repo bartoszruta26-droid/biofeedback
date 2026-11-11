@@ -171,7 +171,7 @@ void BalanceTowerGame::placeBlock()
     }
 
     const double precision = qBound(0.0, 1.0 - (std::abs(x - top.x) + std::abs(z - top.z)) / 0.84, 1.0);
-    const double width = qMax(0.38, qMin(m_blockWidth, qMin(overlapX, overlapZ)));
+    const double width = qMin(m_blockWidth, qMin(overlapX, overlapZ));
     const double depth = width;
     const double mass = 1.0 + (m_blocks.size() % 3) * 0.12;
     m_blocks.append({x, z, width, depth, mass});
@@ -180,8 +180,28 @@ void BalanceTowerGame::placeBlock()
     addScore(50 + static_cast<int>(precision * 100.0) + qMin(m_combo, 10) * 5);
     const double comX = std::abs(centerOfMassX());
     const double comZ = std::abs(centerOfMassZ());
-    m_stability = qBound(0.0, 1.0 - qMax(comX, comZ) / 0.62, 1.0);
+    const double centerOffset = qMax(comX, comZ);
+    m_stability = qBound(0.0, 1.0 - centerOffset / 0.42, 1.0);
     m_tilt = qBound(-0.35, (centerOfMassX() + centerOfMassZ()) * 0.42, 0.35);
+    if (centerOffset > 0.42) {
+        ++m_falls;
+        --m_lives;
+        m_campaignClean = false;
+        m_combo = 0;
+        addScore(-40);
+        m_blocks.clear();
+        m_blocks.append({0.0, 0.0, 1.0, 1.0, 1.0});
+        m_targetPosition = 0.0;
+        m_targetDepth = 0.0;
+        m_stability = 1.0;
+        m_tilt = 0.0;
+        m_status = QStringLiteral("Środek ciężkości poza podstawą — wieża się przewróciła");
+        if (m_lives <= 0) {
+            m_gameOver = true;
+            finishRound(false);
+        }
+        return;
+    }
     if (m_blocks.size() == 2)
         unlockAchievement(QStringLiteral("first_block"));
     if (m_blocks.size() >= 6)
