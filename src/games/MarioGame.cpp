@@ -730,48 +730,107 @@ void MarioGame::renderCollectibles(QPainter& painter)
 
 void MarioGame::renderPlayer(QPainter& painter, const Player& player)
 {
-    double x = player.body.x();
-    double y = player.body.y();
-    double w = player.body.width();
-    double h = player.body.height();
-    
-    // Styl 4-bitowy - proste kształty geometryczne
-    
-    // Ciało (czerwone)
-    painter.fillRect(QRectF(x, y + h * 0.4, w, h * 0.4), COLOR_MARIO_RED);
-    
-    // Głowa (kolor skóry)
-    painter.fillRect(QRectF(x + w * 0.1, y, w * 0.8, h * 0.4), COLOR_MARIO_SKIN);
-    
-    // Czapka (czerwona)
-    painter.fillRect(QRectF(x, y, w, h * 0.15), COLOR_MARIO_RED);
-    painter.fillRect(QRectF(x + w * 0.5, y + h * 0.1, w * 0.6, h * 0.05), COLOR_MARIO_RED);
-    
-    // Włosy/brody (brązowe)
-    painter.fillRect(QRectF(x + w * 0.1, y + h * 0.25, w * 0.2, h * 0.1), COLOR_MARIO_BROWN);
-    
-    // Buty (brązowe)
+    const double x = player.body.x();
+    const double y = player.body.y();
+    const double w = player.body.width();
+    const double h = player.body.height();
+    const double u = qMin(w / 16.0, h / 20.0); // Pixel-art unit, scales with widget size.
+    const double ox = x + (w - 16.0 * u) * 0.5;
+    const double oy = y + (h - 20.0 * u) * 0.5;
+    const auto px = [&](double gx, double gy, double gw, double gh) {
+        return QRectF(ox + gx * u, oy + gy * u, gw * u, gh * u);
+    };
+
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, false);
+
+    // Ground shadow gives the sprite a clear sense of height while jumping.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0, 0, 0, player.isOnGround ? 65 : 28));
+    const double groundY = height() * GROUND_Y_RATIO;
+    painter.drawEllipse(QRectF(x - 3 * u, groundY - 2 * u, w + 6 * u, 3 * u));
+
+    // Back arm and glove.
+    painter.setPen(QPen(QColor(0x6E, 0x25, 0x1B), 0.7 * u));
+    painter.setBrush(COLOR_MARIO_RED);
+    painter.drawRect(px(2, 10, 3, 4));
+    painter.setBrush(Qt::white);
+    painter.drawRect(px(1, 13, 3, 2));
+
+    // Overalls and shirt.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0xD9, 0x32, 0x27));
+    painter.drawRect(px(5, 9, 7, 5));
+    painter.setBrush(QColor(0x20, 0x55, 0xB8));
+    painter.drawRect(px(4, 12, 8, 5));
+    painter.drawRect(px(5, 10, 2, 4));
+    painter.drawRect(px(9, 10, 2, 4));
+    painter.setBrush(QColor(0xFF, 0xD9, 0x43));
+    painter.drawRect(px(5, 12, 1, 1));
+    painter.drawRect(px(10, 12, 1, 1));
+
+    // Head, ear, hair and face.
+    painter.setBrush(COLOR_MARIO_SKIN);
+    painter.drawRect(px(5, 4, 8, 6));
+    painter.drawRect(px(4, 6, 2, 3));
+    painter.setBrush(COLOR_MARIO_BROWN);
+    painter.drawRect(px(4, 5, 2, 3));
+    painter.drawRect(px(5, 8, 3, 2));
+    painter.drawRect(px(9, 8, 4, 1));
+    painter.setBrush(QColor(0x20, 0x18, 0x18));
+    painter.drawRect(px(10, 6, 1, 2));
+    painter.setBrush(QColor(0xFF, 0xD1, 0xA0));
+    painter.drawRect(px(11, 7, 2, 1));
+
+    // Cap with a visible brim and badge.
+    painter.setBrush(COLOR_MARIO_RED);
+    painter.drawRect(px(4, 3, 10, 2));
+    painter.drawRect(px(6, 2, 7, 2));
+    painter.drawRect(px(12, 4, 3, 1));
+    painter.setBrush(Qt::white);
+    painter.drawRect(px(8, 3, 2, 1));
+
+    // Front arm and glove.
+    painter.setBrush(COLOR_MARIO_RED);
+    painter.drawRect(px(11, 10, 3, 3));
+    painter.setBrush(Qt::white);
+    painter.drawRect(px(13, 12, 2, 2));
+
+    // Animated legs and sturdy brown shoes.
+    const bool stride = !player.isJumping && !player.isCharging && (player.frame % 2 == 0);
     if (player.isJumping) {
-        // Nogi podciągnięte podczas skoku
-        painter.fillRect(QRectF(x + w * 0.1, y + h * 0.75, w * 0.35, h * 0.2), COLOR_MARIO_BROWN);
-        painter.fillRect(QRectF(x + w * 0.55, y + h * 0.75, w * 0.35, h * 0.2), COLOR_MARIO_BROWN);
+        painter.setBrush(COLOR_MARIO_BROWN);
+        painter.drawRect(px(4, 16, 4, 2));
+        painter.drawRect(px(9, 16, 4, 2));
+        painter.setBrush(QColor(0xB5, 0x72, 0x32));
+        painter.drawRect(px(3, 17, 4, 2));
+        painter.drawRect(px(10, 17, 4, 2));
     } else if (player.isCharging) {
-        // Pozycja przygotowawcza do skoku
-        painter.fillRect(QRectF(x + w * 0.1, y + h * 0.8, w * 0.35, h * 0.15), COLOR_MARIO_BROWN);
-        painter.fillRect(QRectF(x + w * 0.55, y + h * 0.8, w * 0.35, h * 0.15), COLOR_MARIO_BROWN);
+        painter.setBrush(COLOR_MARIO_BROWN);
+        painter.drawRect(px(3, 17, 5, 2));
+        painter.drawRect(px(9, 17, 5, 2));
+    } else if (stride) {
+        painter.setBrush(COLOR_MARIO_BROWN);
+        painter.drawRect(px(4, 16, 3, 2));
+        painter.drawRect(px(9, 15, 3, 3));
+        painter.setBrush(QColor(0xB5, 0x72, 0x32));
+        painter.drawRect(px(2, 18, 5, 2));
+        painter.drawRect(px(10, 17, 5, 2));
     } else {
-        // Animacja biegu
-        int frame = player.frame;
-        if (frame == 0 || frame == 2) {
-            // Noga w przód
-            painter.fillRect(QRectF(x + w * 0.1, y + h * 0.8, w * 0.35, h * 0.15), COLOR_MARIO_BROWN);
-            painter.fillRect(QRectF(x + w * 0.55, y + h * 0.75, w * 0.35, h * 0.2), COLOR_MARIO_BROWN);
-        } else {
-            // Druga noga w przód
-            painter.fillRect(QRectF(x + w * 0.1, y + h * 0.75, w * 0.35, h * 0.2), COLOR_MARIO_BROWN);
-            painter.fillRect(QRectF(x + w * 0.55, y + h * 0.8, w * 0.35, h * 0.15), COLOR_MARIO_BROWN);
-        }
+        painter.setBrush(COLOR_MARIO_BROWN);
+        painter.drawRect(px(4, 15, 3, 3));
+        painter.drawRect(px(9, 16, 3, 2));
+        painter.setBrush(QColor(0xB5, 0x72, 0x32));
+        painter.drawRect(px(3, 17, 5, 2));
+        painter.drawRect(px(9, 18, 5, 2));
     }
+
+    // Dark pixel outline around the silhouette.
+    painter.setBrush(Qt::NoBrush);
+    painter.setPen(QPen(QColor(0x4A, 0x20, 0x18), qMax(1.0, 0.65 * u)));
+    painter.drawRect(px(4, 2, 10, 8));
+    painter.drawRect(px(4, 9, 9, 8));
+    painter.restore();
 }
 
 void MarioGame::renderObstacles(QPainter& painter)
