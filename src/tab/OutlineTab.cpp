@@ -124,8 +124,35 @@ protected:
                                   area.bottom() - yRatio * area.height());
                 if (!begun) { path.moveTo(pos); begun = true; } else path.lineTo(pos);
             }
-            p.setPen(QPen(colors[index % colors.size()], 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            const QColor seriesColor = colors[index % colors.size()];
+            p.setPen(QPen(seriesColor, 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
             p.drawPath(path);
+
+            double seriesSum = 0.0;
+            double seriesPeak = std::numeric_limits<double>::lowest();
+            qint64 peakTime = 0;
+            for (const auto& point : series.points) {
+                seriesSum += point.value;
+                if (point.value > seriesPeak) {
+                    seriesPeak = point.value;
+                    peakTime = point.timestamp.toMSecsSinceEpoch() - start;
+                }
+            }
+            const double seriesMean = seriesSum / series.points.size();
+            const double meanY = area.bottom()
+                - qBound(0.0, (seriesMean - minValue) / (maxValue - minValue), 1.0) * area.height();
+            p.setPen(QPen(seriesColor, 1, Qt::DashLine));
+            p.drawLine(QPointF(area.left(), meanY), QPointF(area.right(), meanY));
+            const double peakXRatio = qBound(0.0, static_cast<double>(peakTime) / maxTime, 1.0);
+            const double peakYRatio = qBound(0.0, (seriesPeak - minValue) / (maxValue - minValue), 1.0);
+            const QPointF peakPos(area.left() + peakXRatio * area.width(),
+                                  area.bottom() - peakYRatio * area.height());
+            p.setPen(QPen(seriesColor, 2));
+            p.setBrush(palette().base());
+            p.drawEllipse(peakPos, 4.5, 4.5);
+            p.setPen(seriesColor);
+            p.drawText(peakPos + QPointF(6, -6), QString("max %1 N").arg(seriesPeak, 0, 'f', 1));
+
             const QString legend = series.label;
             const int legendX = 64 + (index % 3) * qMax(110, (width() - 80) / 3);
             const int legendY = height() - 18 + (index / 3) * 14;
@@ -806,6 +833,7 @@ void OutlineTab::setupUI()
     });
     connect(compareSeriesButton, &QPushButton::clicked, this,
             [this, savedSeriesCombo, overlay, metricsBrowser, comparisonBrowser]() {
+        comparisonBrowser->clear();
         QVector<ForceSeries> selected;
         if (m_forceGraph && m_forceGraph->dataPointCount() >= 2)
             selected.push_back({tr("Bieżący przebieg"), m_forceGraph->getData()});
