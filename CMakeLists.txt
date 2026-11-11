@@ -651,6 +651,11 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/desktop_presentation_regression.py)
     set_tests_properties(desktop_presentation_regression PROPERTIES
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+    add_test(NAME game_input_ownership_regression
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tests/game_input_ownership_regression.py)
+    set_tests_properties(game_input_ownership_regression PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 endif()
 
 enable_testing()
