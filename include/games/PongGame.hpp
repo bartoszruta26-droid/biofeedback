@@ -53,6 +53,7 @@ private slots:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     QRectF m_leftPaddle;
@@ -62,7 +63,10 @@ private:
 
     QPointF m_ballPos;
     QPointF m_ballVel;
+    QPointF m_previousBallPos;
     float m_ballRadius;
+    float m_previousLeftPaddleY;
+    float m_previousRightPaddleY;
 
     int m_playerScore;
     int m_aiScore;
