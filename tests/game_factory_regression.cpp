@@ -611,6 +611,13 @@ int main(int argc, char **argv)
     REQUIRE(pongGame != nullptr);
     pongGame->resize(640, 480);
     pongGame->start();
+    REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
+    const double referencePaddleAspect = pongGame->paddleHeight() / pongGame->paddleWidth();
+    pongGame->resize(1920, 1080);
+    REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
+    REQUIRE(std::abs(pongGame->paddleHeight() / pongGame->paddleWidth() -
+                     referencePaddleAspect) < 1.0);
+    pongGame->resize(640, 480);
     pongGame->update(std::numeric_limits<double>::max());
     REQUIRE(pongGame->isRunning()); // Huge finite deltas are bounded before substep conversion.
     pongGame->update(std::numeric_limits<double>::quiet_NaN());
