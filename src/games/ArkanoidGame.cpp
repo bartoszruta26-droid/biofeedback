@@ -94,7 +94,7 @@ QColor ArkanoidGame::brickColor(const Brick& b) const{
  if(b.hits>1)return QColor(245,90,90);switch(b.row%5){case 0:return QColor(245,110,110);case 1:return QColor(245,170,80);case 2:return QColor(235,215,90);case 3:return QColor(100,200,130);default:return QColor(90,160,230);}
 }
 void ArkanoidGame::render(QPainter& p){
- p.setRenderHint(QPainter::Antialiasing);p.fillRect(rect(),QColor(12,18,32));p.setPen(QPen(QColor(35,48,68),1));
+ p.setRenderHint(QPainter::Antialiasing, false);p.fillRect(rect(),QColor(12,18,32));p.setPen(QPen(QColor(35,48,68),1));
  for(int x=20;x<width();x+=40)p.drawLine(x,55,x,height()-28);
  for(const Brick& b:m_bricks){if(!b.active)continue;p.setBrush(brickColor(b));p.setPen(QPen(QColor(20,25,40),1));p.drawRoundedRect(b.rect,3,3);if(b.hits>1){p.setPen(QPen(QColor(255,235,235),1.5));p.drawLine(b.rect.left()+5,b.rect.center().y(),b.rect.right()-5,b.rect.center().y());}}
  p.setPen(Qt::NoPen);p.setBrush(QColor(90,210,235,35));p.drawRoundedRect(m_paddle.adjusted(-4,-3,4,3),8,8);p.setBrush(QColor(90,210,235));p.drawRoundedRect(m_paddle,6,6);
