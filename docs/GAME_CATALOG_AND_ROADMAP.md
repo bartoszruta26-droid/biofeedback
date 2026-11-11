@@ -198,6 +198,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 - **Grafika:** port w widoku bocznym, suwnica z prowadnicą, wózek jezdny, lina, hak, ładunek, strefa odbioru, woda i tło portowe. Kołysanie podwieszonego ładunku sygnalizuje bezwładność.
 - **Funkcje:** podnoszenie i opuszczanie ładunku, transport poziomy, precyzyjne dostawy, serie udanych dostaw, premie punktowe, trzy pomyłki na sesję i pięć poziomów trudności ze zwężającą się strefą celu.
+- **Punktacja precyzji:** każda poprawna dostawa otrzymuje premię 0–100 pkt zależną od odległości środka ładunku od środka strefy celu; premia jest pokazywana w HUD i sumowana z punktami bazowymi, serią oraz poziomem trudności.
 - **Tensometr:** skalibrowana siła 0–100% jest jedynym źródłem sterowania. W zakresie roboczym 18–70% mapuje się płynnie na pozycję wózka albo wysokość haka; zakres 0–18% jest strefą zwolnienia, która utrzymuje bieżącą pozycję bez skoku do skrajnego położenia. Długie przytrzymanie wysokiej siły (co najmniej 82%) i zwolnienie przełącza oś poziomą/pionową. Krótkie przytrzymanie (0,15–0,85 s) i zwolnienie wywołuje chwyt albo zwolnienie ładunku. W danej chwili regulowany jest tylko jeden parametr.
 - **Bezpieczeństwo wejścia:** nieprawidłowe próbki są ignorowane; po 350 ms bez świeżej próbki ruch i gesty są wstrzymywane. Utrata sygnału nie jest interpretowana jako polecenie.
 - **Status zakresu:** dostępna jest pierwsza grywalna wersja z podstawowym cyklem przenoszenia i punktacją. Zaawansowane przeszkody, kampania i zapisywanie rekordów pozostają dalszymi etapami.
