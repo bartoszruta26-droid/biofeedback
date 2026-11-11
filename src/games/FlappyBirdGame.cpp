@@ -458,10 +458,7 @@ void FlappyBirdGame::render(QPainter &painter) {
     int h = height();
     
     // 1. Tło - gradient niebieski (niebo)
-    QLinearGradient skyGradient(0, 0, 0, h);
-    skyGradient.setColorAt(0, QColor(135, 206, 235));  // Jasnoniebieski
-    skyGradient.setColorAt(1, QColor(70, 130, 180));   // Stalowy niebieski
-    painter.fillRect(rect(), skyGradient);
+    painter.fillRect(rect(), QColor(105, 174, 215));
     
     // 2. Chmury (dekoracyjne)
     painter.setBrush(QColor(255, 255, 255, 150));
@@ -536,11 +533,9 @@ void FlappyBirdGame::render(QPainter &painter) {
     painter.drawRect(barX, barY, barW, barH);
     
     int fillH = static_cast<int>(m_currentForce * barH);
-    QLinearGradient barGradient(barX, barY + barH, barX, barY);
-    barGradient.setColorAt(0, Qt::green);
-    barGradient.setColorAt(0.5, Qt::yellow);
-    barGradient.setColorAt(1, Qt::red);
-    painter.setBrush(QBrush(barGradient));
+    const QColor forceColor = m_currentForce < 0.45f ? QColor(75, 205, 125)
+        : (m_currentForce < 0.75f ? QColor(235, 195, 65) : QColor(225, 85, 75));
+    painter.setBrush(forceColor);
     painter.drawRect(barX, barY + barH - fillH, barW, fillH);
     
     // 8. Linia ziemi
