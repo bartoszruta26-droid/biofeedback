@@ -119,6 +119,10 @@ void ForceMazeGame::initialize()
     m_status = QStringLiteral("Zwolnij tensometr do strefy neutralnej");
     m_collectedCrystals.clear();
     m_reachedCheckpoints.clear();
+    m_previousProgressRows = m_progressRows;
+    m_previousPlayerColumn = m_playerColumn;
+    m_previousVisualTime = m_visualTime;
+    m_previousCameraShake = m_cameraShake;
     setScore(0);
 }
 
