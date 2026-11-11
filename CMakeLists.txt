@@ -346,6 +346,7 @@ if(Qt5_FOUND)
         src/games/PrecisionCraneGame.cpp
         src/games/RhythmForceGame.cpp
         src/games/ForceMazeGame.cpp
+        src/games/BalanceTowerGame.cpp
         src/formulas.cpp
     )
 
@@ -384,6 +385,7 @@ if(Qt5_FOUND)
         include/games/PrecisionCraneGame.hpp
         include/games/RhythmForceGame.hpp
         include/games/ForceMazeGame.hpp
+        include/games/BalanceTowerGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -457,6 +459,7 @@ if(Qt5_FOUND)
         src/games/PrecisionCraneGame.cpp
         src/games/RhythmForceGame.cpp
         src/games/ForceMazeGame.cpp
+        src/games/BalanceTowerGame.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
         include/games/GameEngine.hpp
@@ -473,6 +476,7 @@ if(Qt5_FOUND)
         include/games/PrecisionCraneGame.hpp
         include/games/RhythmForceGame.hpp
         include/games/ForceMazeGame.hpp
+        include/games/BalanceTowerGame.hpp
         include/sensor/SerialCommunication.hpp
         include/core/DebugManager.hpp
     )
