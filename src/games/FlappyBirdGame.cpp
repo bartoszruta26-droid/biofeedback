@@ -9,6 +9,8 @@
 #include <QFont>
 #include <QRectF>
 #include <QRandomGenerator>
+#include <QKeyEvent>
+#include <QMouseEvent>
 #include <cmath>
 
 namespace games {
@@ -34,6 +36,7 @@ FlappyBirdGame::FlappyBirdGame(QWidget *parent)
     , m_wasFlapping(false)
     , m_obstaclesPassed(0)
 {
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 FlappyBirdGame::~FlappyBirdGame() {
@@ -49,6 +52,7 @@ void FlappyBirdGame::initialize() {
     m_gameSpeed = 1.0f;
     m_currentForce = 0.0;
     m_wasFlapping = false;
+    m_flapRequested = false;
     m_obstaclesPassed = 0;
     
     // Zachowaj rozmiar logiczny także wtedy, gdy widget jest jeszcze ukryty.
@@ -167,7 +171,7 @@ void FlappyBirdGame::onSensorDataReceived(const sensor::SensorData& data) {
         return;
     }
     
-    normalizeForceValue(data.calibratedValue);
+    handleSensorInput(data.calibratedValue);
 }
 
 void FlappyBirdGame::onConnectionStatusChanged(bool connected, const std::string& message) {
@@ -182,17 +186,62 @@ void FlappyBirdGame::onConnectionStatusChanged(bool connected, const std::string
 }
 
 void FlappyBirdGame::normalizeForceValue(double rawValue) {
-    double normalizedForce = rawValue / m_maxForce;
+    if (!std::isfinite(rawValue))
+        return;
+    const double normalizedForce = rawValue / m_maxForce;
     m_currentForce = qBound(0.0, normalizedForce, 1.0);
 }
 
 bool FlappyBirdGame::handleInput(double value) {
+    if (!std::isfinite(value))
+        return false;
+
     normalizeForceValue(value);
-    const bool isPressing = m_currentForce > 0.1;
-    if (isPressing && !m_wasFlapping && isRunning())
-        m_birdVelocity.setY(static_cast<float>(m_currentForce) * m_flapForce);
+    // Hysteresis prevents noisy samples around the activation threshold from
+    // generating repeated flaps. A new flap requires a real release first.
+    const bool isPressing = m_wasFlapping
+        ? m_currentForce > 0.08
+        : m_currentForce >= 0.12;
+    if (isRunning() && isPressing && !m_wasFlapping)
+        m_flapRequested = true;
     m_wasFlapping = isPressing;
     return true;
+}
+
+double FlappyBirdGame::birdVerticalVelocity() const {
+    return m_birdVelocity.y();
+}
+
+int FlappyBirdGame::activeObstacleCount() const {
+    return static_cast<int>(m_obstacles.size());
+}
+
+void FlappyBirdGame::keyPressEvent(QKeyEvent* event) {
+    if (!event->isAutoRepeat() &&
+        (event->key() == Qt::Key_Space || event->key() == Qt::Key_Up ||
+         event->key() == Qt::Key_W || event->key() == Qt::Key_Return ||
+         event->key() == Qt::Key_Enter)) {
+        if (!isRunning())
+            start();
+        if (isRunning())
+            m_flapRequested = true;
+        event->accept();
+        return;
+    }
+    GameEngine::keyPressEvent(event);
+}
+
+void FlappyBirdGame::mousePressEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        if (!isRunning())
+            start();
+        if (isRunning())
+            m_flapRequested = true;
+        setFocus(Qt::MouseFocusReason);
+        event->accept();
+        return;
+    }
+    GameEngine::mousePressEvent(event);
 }
 
 void FlappyBirdGame::resetBird() {
@@ -257,6 +306,18 @@ void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
     }
 }
 
+void FlappyBirdGame::paintEvent(QPaintEvent* event) {
+    if (isRunning()) {
+        GameEngine::paintEvent(event);
+        return;
+    }
+    Q_UNUSED(event);
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.fillRect(rect(), Qt::black);
+    render(painter);
+}
+
 void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
     const QSize newSize = event->size();
     adaptToSize(m_lastKnownSize, newSize);
@@ -283,12 +344,14 @@ void FlappyBirdGame::spawnObstacle() {
 }
 
 void FlappyBirdGame::updateBird(double deltaTime) {
-    // Grawitacja działa stale; naciśnięcie wyzwala pojedynczy impuls w górę.
+    // Gravity is continuous; sensor, keyboard and pointer input request discrete
+    // impulses. Holding a key or sensor force cannot pin the bird in the air.
+    if (m_flapRequested) {
+        const float strength = static_cast<float>(qMax(0.55, m_currentForce));
+        m_birdVelocity.setY(m_flapForce * strength);
+        m_flapRequested = false;
+    }
     m_birdVelocity.setY(m_birdVelocity.y() + m_gravity * deltaTime);
-    const bool flapping = m_currentForce > 0.1;
-    if (flapping && !m_wasFlapping)
-        m_birdVelocity.setY(m_flapForce * static_cast<float>(m_currentForce));
-    m_wasFlapping = flapping;
 
     // Aktualizacja pozycji
     m_birdPos.setY(m_birdPos.y() + m_birdVelocity.y() * deltaTime);
@@ -315,7 +378,7 @@ void FlappyBirdGame::updateObstacles(double deltaTime) {
     // Spawnowanie nowych przeszkód
     if (m_obstacleSpawnTimer >= m_obstacleSpawnInterval / m_gameSpeed) {
         spawnObstacle();
-        m_obstacleSpawnTimer = 0.0f;
+        m_obstacleSpawnTimer -= m_obstacleSpawnInterval / m_gameSpeed;
     }
     
     // Aktualizacja pozycji przeszkód
@@ -485,6 +548,18 @@ void FlappyBirdGame::render(QPainter &painter) {
     painter.setBrush(QBrush(QColor(139, 90, 43)));
     painter.drawRect(0, h - 10, w, 10);
     
+    if (!isRunning() && !isPaused()) {
+        painter.fillRect(QRectF(w * 0.15, h * 0.38, w * 0.70, h * 0.22),
+                         QColor(0, 0, 0, 155));
+        painter.setPen(Qt::white);
+        painter.setFont(QFont("Arial", qMax(12, h / 24), QFont::Bold));
+        painter.drawText(QRectF(w * 0.17, h * 0.40, w * 0.66, h * 0.09),
+                         Qt::AlignCenter, "KONIEC GRY");
+        painter.setFont(QFont("Arial", qMax(9, h / 38)));
+        painter.drawText(QRectF(w * 0.17, h * 0.49, w * 0.66, h * 0.08),
+                         Qt::AlignCenter, "Spacja / kliknięcie — zagraj ponownie");
+    }
+
     // 9. Status połączenia serial
     if (m_serialPort && !m_serialPort->isConnected()) {
         painter.setPen(QPen(Qt::red, 2));
