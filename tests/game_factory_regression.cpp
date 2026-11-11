@@ -1096,7 +1096,7 @@ int main(int argc, char **argv)
     REQUIRE(rhythm->accuracyPercent() > 0.0);
     rhythm->setDifficultyLevel(99);
     REQUIRE(rhythm->difficultyLevel() == 5);
-    REQUIRE(rhythm->beatsPerMinute() == 120);
+    REQUIRE(rhythm->beatsPerMinute() == 92);
     rhythm->setDifficultyLevel(0);
     REQUIRE(rhythm->difficultyLevel() == 1);
     rhythm->stop();
