@@ -2,7 +2,6 @@
 #include <QKeyEvent>
 #include <QResizeEvent>
 #include <QPainter>
-#include <QLinearGradient>
 #include <QPolygonF>
 #include <QFont>
 #include <algorithm>
@@ -273,10 +272,7 @@ void CarRaceGame::render(QPainter& painter)
     const double roadLeft = (w - roadWidth) / 2.0;
     const double laneWidth = roadWidth / 3.0;
 
-    QLinearGradient skyGradient(0.0, 0.0, 0.0, h);
-    skyGradient.setColorAt(0.0, QColor(100, 174, 220));
-    skyGradient.setColorAt(1.0, QColor(220, 235, 244));
-    painter.fillRect(rect(), skyGradient);
+    painter.fillRect(rect(), QColor(100, 174, 220));
     painter.fillRect(QRectF(0.0, h * 0.34, w, h * 0.66), QColor(55, 132, 72));
 
     // Dalekie wzgórza i bliższa roślinność poruszają się z różną prędkością.
