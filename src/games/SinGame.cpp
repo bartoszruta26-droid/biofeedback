@@ -81,7 +81,6 @@ void SinGame::setDifficultyLevel(int level)
     // Keep the waveform's logical speed and hit window proportional to the
     // reference 640x480 playfield, not to physical display pixels.
     refreshGeometryParameters();
-    refreshGeometryParameters();
     m_comboSeconds = 0.0;
     m_combo = 0;
 }
