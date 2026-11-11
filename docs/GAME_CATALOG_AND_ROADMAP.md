@@ -82,6 +82,7 @@ W katalogach `src/games` i `include/games` znajduje się dwanaście gier:
 10. Scorched Earth — `ScorchedEarthGame.cpp`
 11. Precision Crane — `PrecisionCraneGame.cpp`
 12. Rhythm Force — `RhythmForceGame.cpp`
+13. Force Maze — `ForceMazeGame.cpp`
 
 Aktualny opis zachowania znajduje się w `docs/GAME_CONTROLS.md`. Audyt tej instrukcji wykazał rozbieżność z nową zasadą: dokument nadal opisuje skróty klawiaturowe, a w Car Race, Archer, Galaga i Scorched Earth klawiatura jest opisana jako część sterowania. Przed uznaniem całego katalogu za zgodny należy usunąć te ścieżki wejściowe i dodać testy, które wykryją ich ponowne wprowadzenie. Należy również sprawdzić zmiany w otwartych PR-ach dotyczących Mario Run, Archer i Scorched Earth — część opisów tych prac wymienia sterowanie klawiaturą.
 
@@ -232,10 +233,19 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 ### 4.3. Force Maze — labirynt siły
 
-- **Grafika:** labirynt 2D z kulką, ścianami, bramkami, pułapkami i punktami kontrolnymi.
-- **Funkcje:** przejście trasy bez dotykania ścian, zbieranie kryształów, poziomy o rosnącej złożoności.
-- **Tensometr:** siła steruje położeniem kulki wzdłuż osi aktywnej. Gest wyboru trybu przełącza oś poziomą/pionową. Alternatywnie plansza może być projektowana jako tor jednokierunkowy, aby cały czas używać tylko jednej osi.
-- **Wyróżnik:** zręcznościowe wyzwania przestrzenne bez dodatkowego kontrolera.
+**Status:** pierwsza grywalna implementacja dodana do `main`, zarejestrowana w fabryce i selektorze zakładki treningowej. Gra wykorzystuje wspólny `GameEngine`, a wejście otrzymuje wyłącznie przez istniejący strumień próbek tensometru.
+
+- **Koncepcja rozgrywki:** gracz prowadzi świetlną kulkę przez przewijający się labirynt. Trasa składa się z 18 odcinków na poziom i pięciu poziomów kampanii. Korytarz zmienia położenie stopniowo, a tempo przesuwu rośnie po ukończeniu kolejnych poziomów.
+- **Grafika i perspektywa:** ciemna plansza w stylistyce futurystycznego labiryntu, kafle ścian i bezpiecznego korytarza, poświata kulki, ślad ruchu, pulsujące kryształy, znaczniki punktów kontrolnych oraz nakładki końca kampanii i utraty wszystkich żyć. Plansza przewija się płynnie, niezależnie od częstotliwości próbkowania.
+- **Sterowanie jednym tensometrem:** skalibrowana siła jest mapowana na położenie poziome kulki. Strefa neutralna 0–18% odpowiada środkowi pola; zakres powyżej 18% steruje pozycją w korytarzu. Oś postępu jest automatyczna, więc gra nie wymaga przełączania osi ani drugiego gestu sterującego.
+- **Przebieg i trudność:** pięć poziomów po 18 odcinków, trzy życia na kampanię, stopniowo rosnąca prędkość przewijania i deterministycznie generowana trasa. Punkty kontrolne rozmieszczone są co pięć odcinków; kolizja odbiera życie i cofa gracza do ostatniego punktu kontrolnego.
+- **Kryształy i punktacja:** kryształy są rozmieszczane deterministycznie w bezpiecznym korytarzu. Zebranie kryształu daje 100 pkt plus premię poziomu, osiągnięcie punktu kontrolnego 150 pkt, ukończenie poziomu 250 pkt razy numer poziomu, a ukończenie kampanii dodatkowe 1000 pkt. Kolizja odejmuje 25 pkt.
+- **Informacja zwrotna:** HUD pokazuje poziom, wynik, liczbę kryształów, pozostałe życia i punkty kontrolne. Kolizja daje czerwony błysk, punkt kontrolny złotą obwódkę, a kryształ pulsującą animację. Pasek statusu informuje o gotowości wejścia, sterowaniu i stanie bezpieczeństwa.
+- **Osiągnięcia:** pierwszy kryształ (`first_crystal`), kolekcjoner 10 kryształów (`crystal_collector`), pierwszy punkt kontrolny (`checkpoint`), ukończenie poziomu bez kolizji (`clean_level`) i ukończenie kampanii (`maze_master`). Odblokowania są zapisywane lokalnie w `QSettings`.
+- **Rekordy:** najlepszy wynik i największa liczba kryształów są trwale przechowywane w `QSettings` pod `games/force_maze/records`.
+- **Bezpieczeństwo sygnału:** wartości niefinitywne są odrzucane, wartości siły ograniczane do 0–100%, a po 350 ms bez świeżej próbki ruch świata i sterowanie zostają zatrzymane. Po uruchomieniu lub utracie sygnału wymagane jest ponowne uzbrojenie przez próbkę neutralną. Brak sygnału nie jest interpretowany jako zerowa siła ani ruch w stronę krawędzi.
+- **Testy regresyjne:** utworzenie przez fabrykę, sterowanie jednym kanałem, neutralne uzbrojenie, odrzucenie NaN oraz zamrożenie postępu po przekroczeniu limitu świeżości sygnału. Testy symulują próbki; nie zastępują odbioru fizycznego Nano/HX711/tensometru.
+- **Granice zastosowania:** wynik jest wynikiem gry zręcznościowej, a nie diagnozą ani oceną sprawności klinicznej.
 
 ### 4.4. Balance Tower — wieża równowagi
 
