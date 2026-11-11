@@ -29,6 +29,7 @@ protected:
  void render(QPainter& painter) override;
  bool handleInput(double value) override;
  void resizeEvent(QResizeEvent *event) override;
+ void renderInterpolated(QPainter& painter, double alpha) override;
 private:
  struct Brick{QRectF rect;int hits{1};bool active{true};int row{0};};
  void updatePhysicsStep(double deltaTime);
@@ -39,7 +40,9 @@ private:
  QColor brickColor(const Brick& brick) const;
  QRectF m_paddle;
  QPointF m_ballPosition;
+ QPointF m_previousBallPosition;
  QPointF m_ballVelocity;
+ QRectF m_previousPaddle;
  QVector<QPointF> m_ballTrail;
  std::vector<Brick> m_bricks;
  double m_currentForce,m_ballRadius,m_ballSpeed,m_paddleWidth,m_paddleHeight,m_comboRemaining;
