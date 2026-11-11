@@ -310,7 +310,7 @@ void TanGame::update(double deltaTime)
 void TanGame::render(QPainter& painter)
 {
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::Antialiasing, false);
 
     const int w = width();
     const int h = height();
