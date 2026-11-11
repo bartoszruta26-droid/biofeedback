@@ -34,6 +34,7 @@ ForceMazeGame::ForceMazeGame(QWidget *parent)
     , m_checkpointFlash(0.0)
     , m_crystalPulse(0.0)
     , m_playerTrailPhase(0.0)
+    , m_currentForce(0.0)
     , m_cameraShake(0.0)
     , m_hasSensorSample(false)
     , m_awaitingNeutral(true)
@@ -112,6 +113,7 @@ void ForceMazeGame::initialize()
     m_cleanLevels = 0;
     m_campaignDeaths = 0;
     m_playerTrailPhase = 0.0;
+    m_currentForce = 0.0;
     m_cameraShake = 0.0;
     m_status = QStringLiteral("Zwolnij tensometr do strefy neutralnej");
     m_collectedCrystals.clear();
@@ -125,6 +127,7 @@ bool ForceMazeGame::handleInput(double value)
         return false;
 
     const double force = qBound(0.0, value, 100.0);
+    m_currentForce = force;
     m_hasSensorSample = true;
     m_inputAge = 0.0;
 
@@ -342,6 +345,12 @@ void ForceMazeGame::render(QPainter &painter)
     background.setColorAt(0.0, QColor(8, 18, 34));
     background.setColorAt(1.0, QColor(17, 42, 55));
     painter.fillRect(bounds, background);
+    painter.save();
+    if (m_cameraShake > 0.0) {
+        const qreal shake = m_cameraShake * 9.0;
+        painter.translate(std::sin(m_visualTime * 73.0) * shake,
+                          std::cos(m_visualTime * 61.0) * shake * 0.55);
+    }
 
     const qreal margin = qMax<qreal>(14.0, width() * 0.045);
     const qreal hudHeight = qMax<qreal>(58.0, height() * 0.15);
@@ -462,6 +471,7 @@ void ForceMazeGame::render(QPainter &painter)
     painter.drawArc(QRectF(playerX - ballRadius * 0.72, playerY - ballRadius * 0.72,
                            ballRadius * 1.44, ballRadius * 1.44),
                     static_cast<int>(m_visualTime * 800) % 5760, 2300);
+    painter.restore();
 
     painter.setPen(Qt::white);
     painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(8, height() / 42), QFont::DemiBold));
@@ -473,6 +483,18 @@ void ForceMazeGame::render(QPainter &painter)
                      QStringLiteral("Wynik %1    Kryształy %2/%3    Życia %4    Punkty kontrolne %5")
                          .arg(getScore()).arg(m_crystals).arg(m_totalCrystals)
                          .arg(m_lives).arg(m_checkpoints));
+    const QRectF forceTrack(margin, 54, width() - 2 * margin, 5);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(45, 67, 78));
+    painter.drawRoundedRect(forceTrack, 2.5, 2.5);
+    const QRectF forceFill(forceTrack.left(), forceTrack.top(),
+                           forceTrack.width() * m_currentForce / 100.0, forceTrack.height());
+    painter.setBrush(QColor(77, 224, 211));
+    painter.drawRoundedRect(forceFill, 2.5, 2.5);
+    const qreal neutralX = forceTrack.left() + forceTrack.width() * kNeutralThreshold / 100.0;
+    painter.setPen(QPen(QColor(255, 220, 130), 1.5));
+    painter.drawLine(QPointF(neutralX, forceTrack.top() - 2),
+                     QPointF(neutralX, forceTrack.bottom() + 2));
 
     const QRectF footer(margin, height() - 38, width() - 2 * margin, 28);
     painter.setPen(QColor(180, 211, 220));
