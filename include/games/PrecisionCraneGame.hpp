@@ -26,6 +26,9 @@ public:
     double carriagePosition() const { return m_carriageX; }
     double hookPosition() const { return m_hookY; }
     double normalizedForce() const { return m_force; }
+    bool hasFreshSignal() const { return m_inputAge <= kSignalTimeoutSeconds; }
+    bool gestureActive() const { return m_gestureActive; }
+    double gestureDuration() const { return m_gestureSeconds; }
 
 protected:
     void initialize() override;
@@ -35,6 +38,14 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
+    static constexpr double kGestureForce = 0.82;
+    static constexpr double kReleaseForce = 0.18;
+    static constexpr double kLongGestureSeconds = 0.85;
+    static constexpr double kMinimumGestureSeconds = 0.15;
+    static constexpr double kSignalTimeoutSeconds = 0.35;
+    static constexpr double kMinimumControlForce = 0.18;
+    static constexpr double kMaximumControlForce = 0.70;
+
     void resetRound();
     void processGesture();
     void toggleGrip();
