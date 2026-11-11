@@ -77,44 +77,44 @@ void FlappyBirdGame::setDifficultyLevel(int level) {
     // Poziom 5: szybkie przeszkody, małe luki, szybkie generowanie
     switch (m_difficultyLevel) {
         case 1:
-            m_obstacleSpeed = 150.0f;
-            m_minGapHeight = 160.0f;
-            m_maxGapHeight = 220.0f;
-            m_obstacleSpawnInterval = 2.5f;
-            m_gravity = 400.0f;
-            m_flapForce = -300.0f;
+            m_obstacleSpeed = 125.0f;
+            m_minGapHeight = 190.0f;
+            m_maxGapHeight = 240.0f;
+            m_obstacleSpawnInterval = 2.9f;
+            m_gravity = 330.0f;
+            m_flapForce = -270.0f;
             break;
         case 2:
-            m_obstacleSpeed = 180.0f;
-            m_minGapHeight = 140.0f;
-            m_maxGapHeight = 200.0f;
-            m_obstacleSpawnInterval = 2.2f;
-            m_gravity = 450.0f;
-            m_flapForce = -320.0f;
+            m_obstacleSpeed = 145.0f;
+            m_minGapHeight = 180.0f;
+            m_maxGapHeight = 225.0f;
+            m_obstacleSpawnInterval = 2.7f;
+            m_gravity = 355.0f;
+            m_flapForce = -285.0f;
             break;
         case 3:
-            m_obstacleSpeed = 220.0f;
-            m_minGapHeight = 120.0f;
-            m_maxGapHeight = 180.0f;
-            m_obstacleSpawnInterval = 2.0f;
-            m_gravity = 500.0f;
-            m_flapForce = -350.0f;
+            m_obstacleSpeed = 165.0f;
+            m_minGapHeight = 170.0f;
+            m_maxGapHeight = 215.0f;
+            m_obstacleSpawnInterval = 2.5f;
+            m_gravity = 380.0f;
+            m_flapForce = -300.0f;
             break;
         case 4:
-            m_obstacleSpeed = 270.0f;
-            m_minGapHeight = 100.0f;
-            m_maxGapHeight = 160.0f;
-            m_obstacleSpawnInterval = 1.8f;
-            m_gravity = 550.0f;
-            m_flapForce = -380.0f;
+            m_obstacleSpeed = 190.0f;
+            m_minGapHeight = 160.0f;
+            m_maxGapHeight = 205.0f;
+            m_obstacleSpawnInterval = 2.3f;
+            m_gravity = 410.0f;
+            m_flapForce = -315.0f;
             break;
         case 5:
-            m_obstacleSpeed = 320.0f;
-            m_minGapHeight = 90.0f;
-            m_maxGapHeight = 140.0f;
-            m_obstacleSpawnInterval = 1.5f;
-            m_gravity = 600.0f;
-            m_flapForce = -400.0f;
+            m_obstacleSpeed = 215.0f;
+            m_minGapHeight = 150.0f;
+            m_maxGapHeight = 195.0f;
+            m_obstacleSpawnInterval = 2.1f;
+            m_gravity = 440.0f;
+            m_flapForce = -330.0f;
             break;
     }
     
@@ -267,17 +267,27 @@ void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
         m_birdVelocity.setY(m_birdVelocity.y() * scaleY);
         m_birdRadius = static_cast<float>(qMax(1.0, m_birdRadius * scaleRadius));
         m_obstacleWidth = static_cast<float>(qMax(1.0, m_obstacleWidth * scaleX));
+        m_minGapHeight = static_cast<float>(m_minGapHeight * scaleY);
+        m_maxGapHeight = static_cast<float>(m_maxGapHeight * scaleY);
 
         for (Obstacle& obstacle : m_obstacles) {
             obstacle.xPosition = static_cast<float>(obstacle.xPosition * scaleX);
             obstacle.gapY = static_cast<float>(obstacle.gapY * scaleY);
             obstacle.gapHeight = static_cast<float>(obstacle.gapHeight * scaleY);
         }
+        m_minGapHeight = static_cast<float>(m_minGapHeight * scaleY);
+        m_maxGapHeight = static_cast<float>(m_maxGapHeight * scaleY);
     } else {
         // A hidden widget may not receive resizeEvent until it is shown.
-        // If no previous logical dimensions exist, restore the start layout.
-        m_birdPos = QPointF(newSize.width() / 4.0, newSize.height() / 2.0);
-        m_birdRadius = m_birdBaseRadius;
+        // Restore the same logical 640x480 layout at the actual viewport size.
+        const double scaleX = qMax(0.5, newSize.width() / 640.0);
+        const double scaleY = qMax(0.5, newSize.height() / 480.0);
+        const double scaleRadius = qMin(scaleX, scaleY);
+        m_birdPos = QPointF(newSize.width() * 0.25, newSize.height() * 0.5);
+        m_birdRadius = static_cast<float>(m_birdBaseRadius * scaleRadius);
+        m_obstacleWidth = static_cast<float>(m_obstacleBaseWidth * scaleX);
+        m_minGapHeight = static_cast<float>(m_minGapHeight * scaleY);
+        m_maxGapHeight = static_cast<float>(m_maxGapHeight * scaleY);
     }
 
     m_birdRadius = static_cast<float>(qMin(
@@ -348,10 +358,12 @@ void FlappyBirdGame::updateBird(double deltaTime) {
     // impulses. Holding a key or sensor force cannot pin the bird in the air.
     if (m_flapRequested) {
         const float strength = static_cast<float>(qMax(0.55, m_currentForce));
-        m_birdVelocity.setY(m_flapForce * strength);
+        const double scaleY = qMax(0.5, height() / 480.0);
+        m_birdVelocity.setY(m_flapForce * strength * scaleY);
         m_flapRequested = false;
     }
-    m_birdVelocity.setY(m_birdVelocity.y() + m_gravity * deltaTime);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    m_birdVelocity.setY(m_birdVelocity.y() + m_gravity * scaleY * deltaTime);
 
     // Aktualizacja pozycji
     m_birdPos.setY(m_birdPos.y() + m_birdVelocity.y() * deltaTime);
@@ -382,7 +394,8 @@ void FlappyBirdGame::updateObstacles(double deltaTime) {
     }
     
     // Aktualizacja pozycji przeszkód
-    float moveDistance = m_obstacleSpeed * m_gameSpeed * deltaTime;
+    const double scaleX = qMax(0.5, width() / 640.0);
+    float moveDistance = static_cast<float>(m_obstacleSpeed * scaleX * m_gameSpeed * deltaTime);
     
     for (auto it = m_obstacles.begin(); it != m_obstacles.end(); ) {
         it->xPosition -= moveDistance;
@@ -495,8 +508,8 @@ void FlappyBirdGame::render(QPainter &painter) {
     }
     
     // 4. Ptak
-    painter.setBrush(QBrush(Qt::yellow));
-    painter.setPen(QPen(QColorConstants::Svg::orange, 2));
+    painter.setBrush(QBrush(QColor(240, 205, 70)));
+    painter.setPen(QPen(QColor(180, 115, 35), 2));
     painter.drawEllipse(m_birdPos, m_birdRadius, m_birdRadius);
     
     // Oczy ptaka
