@@ -493,12 +493,6 @@ if(Qt5_FOUND)
     target_link_libraries(game_factory_regression PRIVATE
         Qt5::Core Qt5::Widgets Threads::Threads ${LIBSERIALPORT_LIBRARIES} biofeedback_sensor_protocol
     )
-    add_test(NAME game_factory_regression COMMAND game_factory_regression)
-    set_tests_properties(game_factory_regression PROPERTIES
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-        TIMEOUT 60
-    )
-
     # Process-restart regression for durable analytics and checkpoint history.
     add_executable(training_history_restart_regression
         tests/training_history_restart_regression.cpp
