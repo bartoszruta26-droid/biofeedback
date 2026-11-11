@@ -21,8 +21,7 @@ ScorchedEarthGame::ScorchedEarthGame(QWidget *parent)
     , m_round(1)
     , m_playerTurn(true)
 {
-    setFocusPolicy(Qt::StrongFocus);
-    setMouseTracking(true);
+    setFocusPolicy(Qt::NoFocus);
 }
 
 QString ScorchedEarthGame::gameName() const
