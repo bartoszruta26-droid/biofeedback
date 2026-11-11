@@ -1,5 +1,4 @@
 #include "games/ArcherGame.hpp"
-#include <QKeyEvent>
 #include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
@@ -46,8 +45,6 @@ void ArcherGame::initialize()
     m_shotsFired = 0;
     m_successfulHits = 0;
     m_missedShots = 0;
-    m_aimUp = false;
-    m_aimDown = false;
     repositionTarget();
 }
 
@@ -134,9 +131,6 @@ void ArcherGame::update(double deltaTime)
     } else {
         m_fireCooldown = m_autoFireInterval;
     }
-    const double aimDirection = (m_aimDown ? 1.0 : 0.0) - (m_aimUp ? 1.0 : 0.0);
-    m_aimAngle = qBound(-1.25, m_aimAngle + aimDirection * 1.35 * deltaTime, 0.85);
-
     m_target.translate(0.0, m_targetDirection * m_targetSpeed * deltaTime);
     if (m_target.top() < height() * 0.18) {
         m_target.moveTop(height() * 0.18);
