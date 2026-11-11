@@ -907,7 +907,7 @@ void OutlineTab::setupUI()
                 const ForceMetrics& previous = comparison.second;
                 report += QString("<tr><td>%1</td><td>%2 N (%3)</td>"
                                    "<td>%4 N (%5)</td><td>%6% (%7)</td>"
-                                   "<td>%8 ms (%9)</td></tr>")
+                                   "<td>%8% (%9)</td><td>%10 ms (%11)</td></tr>")
                     .arg(comparison.first.toHtmlEscaped())
                     .arg(previous.mean, 0, 'f', 2).arg(delta(current.mean, previous.mean))
                     .arg(previous.peak, 0, 'f', 2).arg(delta(current.peak, previous.peak))
