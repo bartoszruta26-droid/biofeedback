@@ -272,6 +272,12 @@ int main(int argc, char **argv)
     QApplication::sendEvent(carRaceControlsGame, &carRaceBoost);
     REQUIRE(carRaceControlsGame->boostActive());
     REQUIRE(carRaceControlsGame->boostCooldownRemaining() > 0.0);
+    const double clockBefore = carRaceControlsGame->animationClock();
+    carRaceControlsGame->update(0.1);
+    REQUIRE(carRaceControlsGame->animationClock() > clockBefore);
+    REQUIRE(carRaceControlsGame->visualLanePosition() >= 0.0);
+    REQUIRE(carRaceControlsGame->visualLanePosition() <= 2.0);
+    REQUIRE(carRaceControlsGame->passStreak() == 0);
     carRaceControlsGame->stop();
 
     std::unique_ptr<games::GameEngine> carRace(games::createGame(QStringLiteral("car_race")));

@@ -69,14 +69,17 @@
 
 ### 7. Car Race
 
-**Cel:** prowadź samochód przez trzy pasy ruchu, omijaj nadjeżdżające pojazdy, buduj wynik i używaj dopalacza w odpowiednim momencie.
+**Cel:** prowadź samochód przez trzy pasy, omijaj ruch uliczny, utrzymuj serię bezkolizyjnych minięć i rozsądnie wykorzystuj dopalacz.
 
-- **Tensometr:** steruje wyborem pasa. Niska wartość kieruje na lewy pas, środkowa utrzymuje pas środkowy, a wysoka wybiera prawy pas. Filtrowanie i histereza ograniczają przeskakiwanie między pasami przy szumie pomiarowym.
-- **Klawiatura:** `←` lub `A` — zmiana o jeden pas w lewo; `→` lub `D` — zmiana o jeden pas w prawo; `SPACJA` lub `B` — uruchomienie dopalacza.
-- **Dopalacz:** zwiększa prędkość na 1,8 s; po użyciu obowiązuje 5 s odnowienia. Wskaźnik na ekranie pokazuje stan dopalacza i czas odnowienia.
-- **Punktacja:** wynik rośnie za przejechany dystans i bezpieczne minięcie przeszkody. Tempo wzrasta wraz z dystansem.
-- **Kolizje:** zderzenie odbiera jedno życie. Ochrona przez 1,1 s zapobiega wielokrotnemu odejmowaniu żyć przy nakładających się kontaktach.
-- **Wskaźniki:** wynik, dystans, prędkość, liczba żyć, wybrany pas i stan dopalacza.
+- **Tensometr:** wybiera pas na podstawie wartości siły: niska wartość — lewy pas, środkowa — pas środkowy, wysoka — prawy pas. Sygnał jest filtrowany, a progi histerezy ograniczają przypadkowe przełączanie przy wahaniach pomiaru.
+- **Klawiatura:** `←` lub `A` — przesuń samochód o jeden pas w lewo; `→` lub `D` — przesuń o jeden pas w prawo; `SPACJA` lub `B` — aktywuj dopalacz. Ruch klawiaturą działa, gdy widok gry ma fokus.
+- **Płynność kierowania:** samochód wizualnie dojeżdża do wybranego pasa z krótką animacją. Pozycja kolizji nadal odpowiada wybranemu pasowi.
+- **Dopalacz:** przez 1,8 s zwiększa prędkość ruchu planszy. Po użyciu obowiązuje 5 s odnowienia; pasek HUD pokazuje stopień gotowości. Animowany płomień za samochodem sygnalizuje aktywne przyspieszenie.
+- **Punktacja:** punkty są przyznawane za pokonany dystans oraz za bezpieczne minięcie pojazdu. Kolejne bezkolizyjne minięcia budują serię i zwiększają premię punktową. Kolizja zeruje serię.
+- **Kolizje:** zderzenie odbiera jedno życie. Po uderzeniu działa ochrona przez 1,1 s; miganie samochodu i lekkie drżenie obrazu sygnalizują trafienie.
+- **Animacja i perspektywa:** tło ma kilka warstw przesuwających się z różną prędkością. Odległe pasma krajobrazu poruszają się wolniej niż drzewa przy drodze; znaczniki pobocza i przerywane linie pasa przesuwają się w rytmie prędkości, a ich rozmiar rośnie ku dolnej krawędzi ekranu. Koła, zawieszenie, światła pojazdów i płomień dopalacza są animowane.
+- **Wskaźniki:** wynik, dystans, prędkość, liczba żyć, seria minięć i pasek gotowości dopalacza. Po utracie wszystkich żyć pojawia się ekran końca gry.
+- **Wskazówka:** planuj zmianę pasa z wyprzedzeniem. Nie zmieniaj pasa w ostatniej chwili, gdy pojazd jest już blisko dolnej części ekranu.
 
 ### 8. Archer Force Trainer
 
