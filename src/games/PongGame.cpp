@@ -228,6 +228,7 @@ void PongGame::adaptToSize()
     const QSize newSize = size();
     if (newSize.width() < 2 || newSize.height() < 2)
         return;
+    const bool sizeChanged = newSize != m_lastSize;
 
     if (m_lastSize.width() > 1 && m_lastSize.height() > 1) {
         const double sx = static_cast<double>(newSize.width()) / m_lastSize.width();
@@ -270,9 +271,11 @@ void PongGame::adaptToSize()
                            m_rightPaddleY, m_paddleWidth, m_paddleHeight);
     m_lastSize = newSize;
     // A resize changes the coordinate space; do not interpolate across it.
-    m_previousBallPos = m_ballPos;
-    m_previousLeftPaddleY = m_leftPaddleY;
-    m_previousRightPaddleY = m_rightPaddleY;
+    if (sizeChanged) {
+        m_previousBallPos = m_ballPos;
+        m_previousLeftPaddleY = m_leftPaddleY;
+        m_previousRightPaddleY = m_rightPaddleY;
+    }
 }
 
 void PongGame::resizeEvent(QResizeEvent *event)
