@@ -181,3 +181,6 @@ Przy zmianie sterowania w kodzie należy zaktualizować ten plik oraz teksty ins
 - **Brak sygnału:** po 350 ms bez świeżej próbki aktywny gest jest anulowany, a runda wstrzymana. Po odzyskaniu sygnału wymagane jest ponowne uzbrojenie neutralną próbką.
 - **Ograniczenie interpretacji:** wynik gry nie jest klinicznym pomiarem czasu reakcji ani diagnozą.
 
+
+- **Odświeżanie i skalowanie:** symulacja korzysta ze stałego kroku 120 Hz, a precyzyjny zegar interfejsu pracuje z interwałem 8 ms (do około 125 aktualizacji na sekundę). Grafika jest rysowana w układzie proporcjonalnym, z perspektywą 2,5D i skalowaniem elementów dla małych, szerokich, wysokich, HD i 4K okien. Monitor 90 Hz lub szybszy może prezentować ponad 90 klatek/s, jeśli pozwalają na to tryb ekranu, kompozytor i wydajność urządzenia; sam monitor nie zmienia tempa symulacji ani pomiaru wejścia.
+- **Osiągnięcia i statystyki:** oprócz osiągnięć za pierwsze trafienie, perfekcyjną reakcję i serie, gra przyznaje odznaki za celność 80/90/100%, 10/15 reakcji perfekcyjnych, bezbłędną rundę, brak falstartów, poziom 5, wynik 2500 pkt i nowy rekord. Zapisuje rekord wyniku, serii, reakcji i celności oraz sumaryczne statystyki rund, trafień i pudeł.

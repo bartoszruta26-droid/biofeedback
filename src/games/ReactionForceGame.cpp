@@ -1,9 +1,13 @@
 #include "games/ReactionForceGame.hpp"
 
 #include <QFont>
+#include <QFontMetrics>
+#include <QLinearGradient>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPaintEvent>
 #include <QPen>
+#include <QRadialGradient>
 #include <QSettings>
 #include <algorithm>
 #include <cmath>
@@ -252,6 +256,8 @@ void ReactionForceGame::finishPulse()
         unlockAchievement(QStringLiteral("combo_5"), QStringLiteral("Seria pięciu trafień"));
     if (m_combo >= 10)
         unlockAchievement(QStringLiteral("combo_10"), QStringLiteral("Refleks mistrza"));
+    if (m_combo >= 15)
+        unlockAchievement(QStringLiteral("combo_15"), QStringLiteral("Seria piętnastu trafień"));
     advanceTrial();
 }
 
@@ -291,10 +297,36 @@ void ReactionForceGame::finishRound()
         unlockAchievement(QStringLiteral("clean_round"), QStringLiteral("Bezbłędna seria"));
     if (m_perfectHits >= 10)
         unlockAchievement(QStringLiteral("perfect_10"), QStringLiteral("Dziesięć reakcji perfekcyjnych"));
-    if (m_hits + m_misses > 0 &&
-        100 * m_hits >= 80 * (m_hits + m_misses))
+    const int accuracy = (100 * m_hits) / kTotalTrials;
+    QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
+    const int previousBestAccuracy =
+        settings.value(QStringLiteral("games/reaction_force/records/best_accuracy"), 0).toInt();
+    if (accuracy >= 80)
         unlockAchievement(QStringLiteral("accuracy_80"), QStringLiteral("Celność co najmniej 80%"));
-
+    if (accuracy >= 90)
+        unlockAchievement(QStringLiteral("accuracy_90"), QStringLiteral("Celność co najmniej 90%"));
+    if (accuracy == 100)
+        unlockAchievement(QStringLiteral("accuracy_100"), QStringLiteral("Perfekcyjna celność"));
+    if (m_perfectHits >= 15)
+        unlockAchievement(QStringLiteral("perfect_15"), QStringLiteral("Piętnaście perfekcyjnych reakcji"));
+    if (m_bestCombo >= 15)
+        unlockAchievement(QStringLiteral("combo_15"), QStringLiteral("Seria piętnastu trafień"));
+    if (m_falseStarts == 0)
+        unlockAchievement(QStringLiteral("no_false_starts"), QStringLiteral("Opanowanie"));
+    if (m_difficulty == 5 && accuracy >= 80)
+        unlockAchievement(QStringLiteral("difficulty_5"), QStringLiteral("Mistrz poziomu piątego"));
+    if (getScore() >= 2500)
+        unlockAchievement(QStringLiteral("score_2500"), QStringLiteral("Wynik 2500 punktów"));
+    if (getScore() > m_personalBestScore)
+        unlockAchievement(QStringLiteral("new_record"), QStringLiteral("Nowy rekord osobisty"));
+    if (previousBestAccuracy < accuracy)
+        settings.setValue(QStringLiteral("games/reaction_force/records/best_accuracy"), accuracy);
+    settings.setValue(QStringLiteral("games/reaction_force/statistics/rounds"),
+        settings.value(QStringLiteral("games/reaction_force/statistics/rounds"), 0).toInt() + 1);
+    settings.setValue(QStringLiteral("games/reaction_force/statistics/total_hits"),
+        settings.value(QStringLiteral("games/reaction_force/statistics/total_hits"), 0).toInt() + m_hits);
+    settings.setValue(QStringLiteral("games/reaction_force/statistics/total_misses"),
+        settings.value(QStringLiteral("games/reaction_force/statistics/total_misses"), 0).toInt() + m_misses);
     persistRecords();
     m_status = QStringLiteral("Runda zakończona — %1/%2 trafień").arg(m_hits).arg(kTotalTrials);
     stop();
@@ -382,136 +414,204 @@ void ReactionForceGame::paintEvent(QPaintEvent* event)
 
 void ReactionForceGame::render(QPainter& painter)
 {
-    const int w = width();
-    const int h = height();
-    painter.fillRect(rect(), QColor(7, 15, 30));
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    const qreal w = width(), h = height();
+    if (w <= 0.0 || h <= 0.0) return;
+    const qreal unit = qMin(w / 960.0, h / 540.0);
+    const qreal margin = qBound(8.0, qMin(w, h) * 0.035, 30.0);
+    const int titleSize = qBound(13, qRound(unit * 25.0), 30);
+    const int bodySize = qBound(9, qRound(unit * 16.0), 18);
+    const int cueSize = qBound(18, qRound(unit * 46.0), 54);
+    const qreal line = qMax<qreal>(1.0, unit * 1.5);
+    painter.save();
+    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::TextAntialiasing, true);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    const int margin = qBound(12, w / 28, 28);
-    const int titleSize = qBound(14, h / 20, 26);
-    const int smallSize = qBound(9, h / 42, 14);
-    painter.setPen(QColor(236, 244, 255));
-    painter.setFont(QFont(QStringLiteral("Sans Serif"), titleSize, QFont::Bold));
-    painter.drawText(QRect(margin, margin, w - 2 * margin, titleSize + 8),
-                     Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("REACTION FORCE"));
+    QLinearGradient background(0.0, 0.0, w, h);
+    background.setColorAt(0.0, QColor(5, 12, 28));
+    background.setColorAt(0.52, QColor(9, 28, 51));
+    background.setColorAt(1.0, QColor(15, 12, 38));
+    painter.fillRect(rect(), background);
+    const QPointF glowA(w * (0.18 + 0.025 * std::sin(m_visualTime * 0.31)), h * 0.18);
+    const QPointF glowB(w * 0.82, h * (0.48 + 0.025 * std::cos(m_visualTime * 0.27)));
+    QRadialGradient atmosphereA(glowA, qMax(w, h) * 0.48);
+    atmosphereA.setColorAt(0.0, QColor(20, 105, 150, 54));
+    atmosphereA.setColorAt(1.0, QColor(20, 105, 150, 0));
+    painter.fillRect(rect(), atmosphereA);
+    QRadialGradient atmosphereB(glowB, qMax(w, h) * 0.38);
+    atmosphereB.setColorAt(0.0, QColor(80, 55, 160, 34));
+    atmosphereB.setColorAt(1.0, QColor(80, 55, 160, 0));
+    painter.fillRect(rect(), atmosphereB);
 
-    painter.setFont(QFont(QStringLiteral("Sans Serif"), smallSize));
-    painter.setPen(QColor(160, 184, 210));
-    const QString stats = QStringLiteral("PRÓBA %1/%2   WYNIK %3   SERIA %4   TRAFIENIA %5   PUDŁA %6")
+    const QRectF header(margin, margin * 0.55, w - 2.0 * margin, h * 0.105);
+    painter.setPen(QColor(239, 247, 255));
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), titleSize, QFont::Black));
+    painter.drawText(header, Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("REACTION FORCE"));
+    painter.setPen(QColor(115, 194, 225));
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), bodySize, QFont::DemiBold));
+    const QString stats = QStringLiteral("PRÓBA %1/%2   •   WYNIK %3   •   SERIA %4   •   %5/%2 TRAFIEŃ")
         .arg(qMin(m_trialIndex + 1, kTotalTrials)).arg(kTotalTrials)
-        .arg(getScore()).arg(m_combo).arg(m_hits).arg(m_misses);
-    painter.drawText(QRect(margin, margin + titleSize + 8, w - 2 * margin, smallSize + 8),
-                     Qt::AlignLeft | Qt::AlignVCenter, stats);
+        .arg(getScore()).arg(m_combo).arg(m_hits);
+    const QRectF statsRect(margin, header.bottom() + h * 0.004, w - 2.0 * margin, h * 0.055);
+    painter.drawText(statsRect, Qt::AlignLeft | Qt::AlignVCenter,
+        QFontMetrics(painter.font()).elidedText(stats, Qt::ElideRight, qMax(1, qRound(statsRect.width()))));
 
-    const QRectF arena(margin, h * 0.20, w - 2.0 * margin, h * 0.43);
-    painter.fillRect(arena, QColor(12, 30, 52));
-    painter.setPen(QPen(QColor(50, 95, 130), 1));
-    for (int i = 1; i < 5; ++i) {
-        const qreal x = arena.left() + arena.width() * i / 5.0;
-        painter.drawLine(QPointF(x, arena.top()), QPointF(x, arena.bottom()));
+    // 2.5D arena with a converging horizon and perspective floor grid.
+    const QRectF arena(margin, h * 0.19, w - 2.0 * margin, h * 0.445);
+    QLinearGradient arenaFill(arena.topLeft(), arena.bottomLeft());
+    arenaFill.setColorAt(0.0, QColor(10, 35, 61, 235));
+    arenaFill.setColorAt(1.0, QColor(7, 17, 36, 248));
+    painter.setPen(QPen(QColor(53, 115, 155, 180), line));
+    painter.setBrush(arenaFill);
+    painter.drawRoundedRect(arena, qMax(6.0, unit * 12.0), qMax(6.0, unit * 12.0));
+    painter.save();
+    painter.setClipRect(arena.adjusted(line, line, -line, -line));
+    const qreal horizonY = arena.top() + arena.height() * 0.19;
+    const qreal centerX = arena.center().x();
+    QLinearGradient horizon(0.0, horizonY, 0.0, arena.bottom());
+    horizon.setColorAt(0.0, QColor(35, 115, 160, 0));
+    horizon.setColorAt(1.0, QColor(25, 105, 150, 62));
+    painter.fillRect(QRectF(arena.left(), horizonY, arena.width(), arena.bottom() - horizonY), horizon);
+    painter.setPen(QPen(QColor(58, 133, 174, 76), line * 0.8));
+    for (int i = -6; i <= 6; ++i) {
+        const qreal bottomX = centerX + arena.width() * i * 0.115;
+        painter.drawLine(QPointF(centerX + i * arena.width() * 0.012, horizonY),
+                         QPointF(bottomX, arena.bottom()));
     }
-    for (int i = 1; i < 4; ++i) {
-        const qreal y = arena.top() + arena.height() * i / 4.0;
+    for (int row = 0; row < 7; ++row) {
+        const qreal t = static_cast<qreal>(row + 1) / 7.0;
+        const qreal y = horizonY + (arena.bottom() - horizonY) * t * t;
+        painter.setPen(QPen(QColor(61, 139, 177, 35 + row * 8), line * (0.65 + t * 0.6)));
         painter.drawLine(QPointF(arena.left(), y), QPointF(arena.right(), y));
     }
 
-    const QPointF target(arena.left() + arena.width() *
-        (0.16 + 0.68 * (0.5 + 0.5 * std::sin(m_trialIndex * 1.73))),
-        arena.top() + arena.height() *
-        (0.22 + 0.56 * (0.5 + 0.5 * std::cos(m_trialIndex * 1.19))));
-    const double pulse = 0.5 + 0.5 * std::sin(m_visualTime * 5.0);
-    const double radius = qMax(10.0, qMin(arena.width(), arena.height()) * 0.075);
-    painter.setPen(QPen(m_phase == Go ? QColor(65, 245, 160) : QColor(80, 160, 210), 2));
-    painter.setBrush(QColor(20, 80, 110));
-    painter.drawEllipse(target, radius * (1.0 + pulse * 0.18), radius * (1.0 + pulse * 0.18));
+    const qreal travel = 0.5 + 0.5 * std::sin(m_visualTime * (m_phase == Go ? 1.35 : 0.72));
+    const QPointF target(
+        arena.left() + arena.width() * (0.18 + 0.64 * (0.5 + 0.5 * std::sin(m_trialIndex * 1.73 + travel * 0.48))),
+        arena.top() + arena.height() * (0.36 + 0.26 * (0.5 + 0.5 * std::cos(m_trialIndex * 1.19 + travel * 0.35))));
+    const qreal baseRadius = qBound(10.0, qMin(arena.width(), arena.height()) * 0.082, 48.0);
+    const qreal pulse = 0.5 + 0.5 * std::sin(m_visualTime * (m_phase == Go ? 8.0 : 3.2));
+    const qreal radius = baseRadius * (1.0 + pulse * (m_phase == Go ? 0.25 : 0.12));
+    const QColor accent = m_phase == Go ? QColor(76, 255, 174)
+        : (m_phase == Delay ? QColor(90, 190, 255) : QColor(242, 190, 92));
+    QRadialGradient targetGlow(target, radius * 2.9);
+    targetGlow.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), 105));
+    targetGlow.setColorAt(1.0, QColor(accent.red(), accent.green(), accent.blue(), 0));
     painter.setPen(Qt::NoPen);
-    painter.setBrush(m_phase == Go ? QColor(80, 245, 155) : QColor(65, 145, 190));
-    painter.drawEllipse(target, radius * 0.48, radius * 0.48);
-
-    QString cue;
-    QColor cueColor(205, 220, 238);
-    if (m_phase == AwaitNeutral || m_awaitingNeutral) {
-        cue = QStringLiteral("ZWOLNIJ NACISK — STREFA NEUTRALNA");
-        cueColor = QColor(245, 195, 95);
-    } else if (m_phase == Delay) {
-        cue = QStringLiteral("GOTOWY");
-        cueColor = QColor(120, 190, 245);
-    } else if (m_phase == Go) {
-        cue = QStringLiteral("TERAZ!");
-        cueColor = QColor(80, 245, 155);
-    } else {
-        cue = QStringLiteral("KONIEC RUNDY");
-    }
-    painter.setPen(cueColor);
-    painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(18, h / 12, 42), QFont::Black));
-    painter.drawText(QRectF(arena.left(), arena.center().y() - h * 0.07, arena.width(), h * 0.14),
-                     Qt::AlignCenter, cue);
-
-    const QRectF forceBar(margin, h * 0.72, w - 2.0 * margin, qMax(18.0, h * 0.055));
+    painter.setBrush(targetGlow);
+    painter.drawEllipse(target, radius * 2.9, radius * 2.9);
+    painter.setPen(QPen(accent, qMax<qreal>(1.5, line * 2.0)));
+    painter.setBrush(QColor(8, 25, 43, 210));
+    painter.drawEllipse(target, radius, radius);
+    painter.setPen(QPen(QColor(170, 230, 250, 190), line));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawEllipse(target, radius * 0.72, radius * 0.72);
+    painter.drawLine(QPointF(target.x() - radius * 1.28, target.y()), QPointF(target.x() - radius * 0.88, target.y()));
+    painter.drawLine(QPointF(target.x() + radius * 0.88, target.y()), QPointF(target.x() + radius * 1.28, target.y()));
+    painter.drawLine(QPointF(target.x(), target.y() - radius * 1.28), QPointF(target.x(), target.y() - radius * 0.88));
+    painter.drawLine(QPointF(target.x(), target.y() + radius * 0.88), QPointF(target.x(), target.y() + radius * 1.28));
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(34, 48, 66));
-    painter.drawRoundedRect(forceBar, 6, 6);
-    const double lower = targetLowerPercent() / 100.0;
-    const double upper = targetUpperPercent() / 100.0;
-    QRectF targetBand(forceBar.left() + forceBar.width() * lower, forceBar.top(),
-                      forceBar.width() * (upper - lower), forceBar.height());
-    painter.setBrush(QColor(80, 190, 245));
-    painter.drawRect(QRectF(forceBar.left(), forceBar.top(),
-        forceBar.width() * qBound(0.0, m_lastForce / 100.0, 1.0), forceBar.height()));
-    painter.setBrush(QColor(35, 150, 100, 180));
-    painter.drawRect(targetBand);
-    painter.setPen(QColor(235, 243, 252));
-    painter.setFont(QFont(QStringLiteral("Sans Serif"), smallSize));
-    painter.drawText(QRectF(forceBar.left(), forceBar.bottom() + 5, forceBar.width(), smallSize + 6),
-        Qt::AlignLeft, QStringLiteral("Siła %1%   •   Cel %2% ±%3%")
-            .arg(qRound(m_lastForce)).arg(qRound(targetForcePercent()))
-            .arg(qRound(forceTolerancePercent())));
+    painter.setBrush(accent);
+    painter.drawEllipse(target, radius * 0.19, radius * 0.19);
+    QPainterPath trail;
+    trail.moveTo(arena.left() + arena.width() * 0.08, arena.bottom() - arena.height() * 0.06);
+    trail.quadTo(centerX, horizonY + arena.height() * 0.16, target.x(), target.y());
+    painter.setPen(QPen(QColor(accent.red(), accent.green(), accent.blue(), 115),
+                        qMax<qreal>(1.0, line * 1.4), Qt::DashLine));
+    painter.drawPath(trail);
+    painter.restore();
 
-    const double windowRatio = qBound(0.0, 1.0 - m_phaseTime / qMax(0.01, reactionWindowSeconds()), 1.0);
-    const QRectF reactionTrack(margin, h * 0.86, w - 2.0 * margin, qMax(8.0, h * 0.025));
-    painter.setBrush(QColor(35, 48, 65));
+    const QRectF cuePlate(arena.left() + arena.width() * 0.06, arena.top() + arena.height() * 0.075,
+                          arena.width() * 0.88, arena.height() * 0.22);
+    painter.setPen(QPen(QColor(accent.red(), accent.green(), accent.blue(), 125), line));
+    painter.setBrush(QColor(3, 14, 29, 205));
+    painter.drawRoundedRect(cuePlate, qMax(5.0, unit * 8.0), qMax(5.0, unit * 8.0));
+    const QString cue = (m_phase == AwaitNeutral || m_awaitingNeutral)
+        ? QStringLiteral("ZWOLNIJ NACISK — STREFA NEUTRALNA")
+        : (m_phase == Delay ? QStringLiteral("GOTOWY")
+           : (m_phase == Go ? QStringLiteral("TERAZ!") : QStringLiteral("KONIEC RUNDY")));
+    painter.setPen(accent);
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(11, qRound(cueSize * 0.66), 34), QFont::Black));
+    painter.drawText(cuePlate, Qt::AlignCenter, QFontMetrics(painter.font()).elidedText(
+        cue, Qt::ElideRight, qMax(1, qRound(cuePlate.width() - 2.0 * margin))));
+
+    const QRectF forceBar(margin, h * 0.695, w - 2.0 * margin, qMax(13.0, h * 0.052));
+    painter.setPen(QPen(QColor(77, 111, 145, 180), line));
+    painter.setBrush(QColor(20, 35, 54));
+    painter.drawRoundedRect(forceBar, 5, 5);
+    const QRectF band(forceBar.left() + forceBar.width() * targetLowerPercent() / 100.0,
+                      forceBar.top(), forceBar.width() * (targetUpperPercent() - targetLowerPercent()) / 100.0,
+                      forceBar.height());
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(46, 190, 133, 175));
+    painter.drawRoundedRect(band, 3, 3);
+    painter.setBrush(QColor(77, 184, 248, 225));
+    painter.drawRoundedRect(QRectF(forceBar.left(), forceBar.top(),
+        forceBar.width() * qBound(0.0, m_lastForce / 100.0, 1.0), forceBar.height()), 4, 4);
+    painter.setPen(QColor(239, 247, 255));
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), bodySize, QFont::DemiBold));
+    painter.drawText(QRectF(margin, forceBar.bottom() + h * 0.008, w - 2.0 * margin, h * 0.045),
+        Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("SIŁA %1%     CEL %2% ±%3%")
+            .arg(qRound(m_lastForce)).arg(qRound(targetForcePercent())).arg(qRound(forceTolerancePercent())));
+
+    const qreal windowRatio = qBound(0.0, 1.0 - m_phaseTime / qMax(0.01, reactionWindowSeconds()), 1.0);
+    const QRectF reactionTrack(margin, h * 0.835, w - 2.0 * margin, qMax(6.0, h * 0.021));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(28, 43, 62));
     painter.drawRoundedRect(reactionTrack, 4, 4);
-    painter.setBrush(m_phase == Go ? QColor(75, 220, 145) : QColor(75, 130, 175));
+    painter.setBrush(m_phase == Go ? QColor(75, 235, 154) : QColor(76, 135, 184));
     painter.drawRoundedRect(QRectF(reactionTrack.left(), reactionTrack.top(),
         reactionTrack.width() * (m_phase == Go ? windowRatio : 1.0), reactionTrack.height()), 4, 4);
 
+    const QRectF footer(margin, h * 0.88, w - 2.0 * margin, h * 0.085);
     painter.setPen(m_feedbackTime > 0.0
-        ? (m_lastGrade == Miss ? QColor(255, 105, 100) : QColor(95, 240, 165))
-        : QColor(165, 185, 210));
-    painter.drawText(QRect(margin, h - margin - smallSize - 4, w - 2 * margin, smallSize + 4),
-                     Qt::AlignLeft, m_status);
-    painter.setPen(QColor(135, 160, 190));
-    painter.drawText(QRect(margin, h - margin - smallSize - 4, w - 2 * margin, smallSize + 4),
-                     Qt::AlignRight, QStringLiteral("TRUDNOŚĆ %1/5").arg(m_difficulty));
-
-    if (m_roundCompleted) {
-        const QRectF panel(w * 0.12, h * 0.28, w * 0.76, h * 0.43);
-        painter.setPen(QPen(QColor(75, 180, 145), 2));
-        painter.setBrush(QColor(5, 18, 32, 245));
-        painter.drawRoundedRect(panel, 12, 12);
-        painter.setPen(QColor(100, 245, 170));
-        painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(20, h / 13, 38), QFont::Bold));
-        painter.drawText(QRectF(panel.left() + 12, panel.top() + 12, panel.width() - 24, h * 0.08),
-                         Qt::AlignCenter, QStringLiteral("RUNDA ZAKOŃCZONA"));
-        painter.setPen(QColor(235, 244, 255));
-        painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(14, h / 23, 24), QFont::DemiBold));
-        const QString summary = QStringLiteral("Wynik: %1 pkt     Trafienia: %2/%3     Pudła: %4\n"
-                                                "Najlepsza seria: %5     Perfekcyjne reakcje: %6\n"
-                                                "Falstarty: %7     Najlepsza reakcja: %8 ms")
-            .arg(getScore()).arg(m_hits).arg(kTotalTrials).arg(m_misses)
-            .arg(m_bestCombo).arg(m_perfectHits).arg(m_falseStarts)
-            .arg(m_personalBestReactionMs > 0.0 ? qRound(m_personalBestReactionMs) : 0);
-        painter.drawText(QRectF(panel.left() + 22, panel.top() + h * 0.11,
-                                panel.width() - 44, panel.height() - h * 0.14),
-                         Qt::AlignCenter, summary);
-    }
+        ? (m_lastGrade == Miss ? QColor(255, 112, 112) : QColor(105, 248, 174))
+        : QColor(169, 193, 218));
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), bodySize, QFont::DemiBold));
+    painter.drawText(footer, Qt::AlignLeft | Qt::AlignVCenter, QFontMetrics(painter.font()).elidedText(
+        m_status, Qt::ElideRight, qMax(1, qRound(footer.width() * 0.76))));
+    painter.setPen(QColor(134, 163, 193));
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(9, bodySize - 1)));
+    painter.drawText(footer, Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("%1/5").arg(m_difficulty));
 
     if (m_toastTime > 0.0 && !m_lastAchievement.isEmpty()) {
-        painter.setPen(QColor(255, 220, 110));
-        painter.setFont(QFont(QStringLiteral("Sans Serif"), smallSize, QFont::Bold));
-        painter.drawText(QRect(margin, h * 0.65, w - 2 * margin, smallSize + 8),
-                         Qt::AlignCenter, QStringLiteral("OSIĄGNIĘCIE: %1").arg(m_lastAchievement));
+        const QRectF toast(margin, arena.bottom() - h * 0.085, w - 2.0 * margin, h * 0.06);
+        painter.setPen(QPen(QColor(255, 207, 103, 210), line));
+        painter.setBrush(QColor(42, 31, 12, 225));
+        painter.drawRoundedRect(toast, 5, 5);
+        painter.setPen(QColor(255, 222, 142));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(9, bodySize - 1), QFont::Bold));
+        painter.drawText(toast.adjusted(6, 0, -6, 0), Qt::AlignCenter,
+            QFontMetrics(painter.font()).elidedText(QStringLiteral("OSIĄGNIĘCIE: %1").arg(m_lastAchievement),
+                Qt::ElideRight, qMax(1, qRound(toast.width() - 12))));
     }
+
+    if (m_roundCompleted) {
+        const QRectF panel(w * 0.075, h * 0.235, w * 0.85, h * 0.56);
+        painter.setPen(QPen(QColor(83, 226, 169), qMax<qreal>(1.5, line * 1.4)));
+        painter.setBrush(QColor(4, 15, 30, 248));
+        painter.drawRoundedRect(panel, qMax(8.0, unit * 16.0), qMax(8.0, unit * 16.0));
+        painter.setPen(QColor(106, 255, 184));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(15, qRound(unit * 30.0), 34), QFont::Black));
+        painter.drawText(QRectF(panel.left() + margin, panel.top() + h * 0.025,
+                                panel.width() - 2.0 * margin, h * 0.09),
+                         Qt::AlignCenter, QStringLiteral("RUNDA ZAKOŃCZONA"));
+        painter.setPen(QColor(232, 243, 255));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), bodySize, QFont::DemiBold));
+        const int accuracy = (100 * m_hits) / kTotalTrials;
+        const QString summary = QStringLiteral(
+            "Wynik: %1 pkt    Celność: %2%    Trafienia: %3/%4\n"
+            "Najlepsza seria: %5    Perfekcyjne: %6    Falstarty: %7\n"
+            "Rekord wyniku: %8    Rekord serii: %9    Najlepsza reakcja: %10 ms")
+            .arg(getScore()).arg(accuracy).arg(m_hits).arg(kTotalTrials)
+            .arg(m_bestCombo).arg(m_perfectHits).arg(m_falseStarts)
+            .arg(m_personalBestScore).arg(m_personalBestCombo)
+            .arg(m_personalBestReactionMs > 0.0 ? qRound(m_personalBestReactionMs) : 0);
+        painter.drawText(QRectF(panel.left() + margin, panel.top() + h * 0.13,
+                                panel.width() - 2.0 * margin, panel.height() - h * 0.17),
+                         Qt::AlignCenter | Qt::TextWordWrap, summary);
+    }
+    painter.restore();
 }
 
 } // namespace games
