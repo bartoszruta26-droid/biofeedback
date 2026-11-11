@@ -21,7 +21,7 @@ void ArkanoidGame::initialize() {
 void ArkanoidGame::setDifficultyLevel(int level) {
  m_difficultyLevel=qBound(1,level,5);
  const double scaleX=qMax(0.5,width()/640.0), scaleY=qMax(0.5,height()/480.0);
- m_ballSpeed=(205.0+m_difficultyLevel*25.0)*scaleX;
+ m_ballSpeed=205.0+m_difficultyLevel*25.0;
  m_ballRadius=6.0*qMin(scaleX,scaleY);
  m_paddleWidth=qBound(112.0*scaleX,width()*(0.22-0.008*(m_difficultyLevel-1)),160.0*scaleX);
  m_paddleHeight=14.0*scaleY;
@@ -44,7 +44,8 @@ void ArkanoidGame::resizeEvent(QResizeEvent *event) {
   if(oldSize.width()>0&&oldSize.height()>0) {
    m_ballPosition=QPointF(m_ballPosition.x()*sx,m_ballPosition.y()*sy);
    m_ballVelocity=QPointF(m_ballVelocity.x()*sx,m_ballVelocity.y()*sy);
-   m_ballSpeed*=qMin(sx,sy);
+   for(QPointF& trailPoint:m_ballTrail)
+    trailPoint=QPointF(trailPoint.x()*sx,trailPoint.y()*sy);
    for(Brick& brick:m_bricks)
     brick.rect=QRectF(brick.rect.x()*sx,brick.rect.y()*sy,brick.rect.width()*sx,brick.rect.height()*sy);
   }
@@ -55,7 +56,7 @@ void ArkanoidGame::resizeEvent(QResizeEvent *event) {
   const double paddleX=qBound(10.0,m_paddle.center().x()*sx,newSize.width()-10.0-m_paddleWidth);
   m_paddle=QRectF(paddleX-m_paddleWidth/2.0,newSize.height()-42.0*scaleY-m_paddleHeight,m_paddleWidth,m_paddleHeight);
   if(oldSize.width()<=0||oldSize.height()<=0) buildLevel();
-  m_ballSpeed=(205.0+m_difficultyLevel*25.0)*scaleX;
+  m_ballSpeed=205.0+m_difficultyLevel*25.0;
  }
  GameEngine::resizeEvent(event);
 }
@@ -68,11 +69,14 @@ void ArkanoidGame::buildLevel(){
  for(int row=0;row<rows;++row)for(int column=0;column<columns;++column){Brick b;b.rect=QRectF(margin+column*(brickWidth+gap),58.0*scaleY+row*(brickHeight+gap),brickWidth,brickHeight);b.row=row;b.hits=(m_level>=3&&row==0)?2:1;b.active=true;m_bricks.push_back(b);}
 }
 void ArkanoidGame::resetBall(){
- m_ballPosition=QPointF(m_paddle.center().x(),m_paddle.top()-m_ballRadius-1.0);const double horizontal=m_ballSpeed*0.30;
- const double vertical=std::sqrt(qMax(0.0,m_ballSpeed*m_ballSpeed-horizontal*horizontal));m_ballVelocity=QPointF(horizontal,-vertical);m_ballTrail.clear();
+ const double scaleX=qMax(0.5,width()/640.0),scaleY=qMax(0.5,height()/480.0);
+ m_ballPosition=QPointF(m_paddle.center().x(),m_paddle.top()-m_ballRadius-1.0);
+ const double horizontal=m_ballSpeed*0.30*scaleX;
+ const double vertical=m_ballSpeed*std::sqrt(1.0-0.30*0.30)*scaleY;
+ m_ballVelocity=QPointF(horizontal,-vertical);m_ballTrail.clear();
 }
 bool ArkanoidGame::hasActiveBricks() const{return std::any_of(m_bricks.cbegin(),m_bricks.cend(),[](const Brick& b){return b.active;});}
-void ArkanoidGame::advanceLevel(){++m_level;const double scaleX=qMax(0.5,width()/640.0);m_ballSpeed=qMin(m_ballSpeed*1.025,560.0*scaleX);m_combo=0;m_comboRemaining=0.0;addScore(100);buildLevel();resetBall();}
+void ArkanoidGame::advanceLevel(){++m_level;m_ballSpeed=qMin(m_ballSpeed*1.025,560.0);m_combo=0;m_comboRemaining=0.0;addScore(100);buildLevel();resetBall();}
 void ArkanoidGame::update(double dt){
  if(!isRunning()||!std::isfinite(dt)||dt<=0.0||width()<=0||height()<=0)return;
  dt=qMin(dt,0.1);constexpr double maxStep=1.0/120.0;const int steps=qBound(1,static_cast<int>(std::ceil(dt/maxStep)),12);const double step=dt/steps;
@@ -93,9 +97,14 @@ void ArkanoidGame::updatePhysicsStep(double dt){
  QRectF bounds(m_ballPosition.x()-m_ballRadius,m_ballPosition.y()-m_ballRadius,2*m_ballRadius,2*m_ballRadius);
  if(m_ballVelocity.y()>0&&previous.y()+m_ballRadius<=m_paddle.top()+2.0&&bounds.intersects(m_paddle)){
   const double half=qMax(1.0,m_paddle.width()/2.0);const double offset=qBound(-1.0,(m_ballPosition.x()-m_paddle.center().x())/half,1.0);
-  const double speed=qMin(std::hypot(m_ballVelocity.x(),m_ballVelocity.y())*1.012,820.0);const double angle=offset*1.12;
-  m_ballVelocity.setX(std::sin(angle)*speed);m_ballVelocity.setY(-qMax(0.38,std::abs(std::cos(angle)))*speed);
-  m_ballVelocity*=speed/qMax(1.0,std::hypot(m_ballVelocity.x(),m_ballVelocity.y()));m_ballPosition.setY(m_paddle.top()-m_ballRadius-0.5);m_ballTrail.clear();
+  const double scaleX=qMax(0.5,width()/640.0),scaleY=qMax(0.5,height()/480.0);
+  const double logicalSpeed=qMin(std::hypot(m_ballVelocity.x()/scaleX,m_ballVelocity.y()/scaleY)*1.012,820.0);
+  const double angle=offset*1.12;
+  double vx=std::sin(angle),vy=-qMax(0.38,std::abs(std::cos(angle)));
+  const double directionLength=qMax(1.0,std::hypot(vx,vy));
+  m_ballVelocity=QPointF(vx/directionLength*logicalSpeed*scaleX,
+                         vy/directionLength*logicalSpeed*scaleY);
+  m_ballPosition.setY(m_paddle.top()-m_ballRadius-0.5);m_ballTrail.clear();
  }
  for(Brick& b:m_bricks){
   if(!b.active||!bounds.intersects(b.rect))continue;
