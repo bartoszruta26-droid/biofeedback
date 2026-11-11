@@ -70,6 +70,22 @@ struct RhythmForceGameTestAccess
         return game.targetForceForBeat(beat);
     }
 
+    static void beginPulse(RhythmForceGame& game, double onset, double peak)
+    {
+        game.m_songTime = onset;
+        game.m_inputAge = 0.0;
+        game.m_hasSensorSample = true;
+        game.m_awaitingNeutral = false;
+        game.m_pulseActive = false;
+        game.handleInput(peak);
+    }
+
+    static void releasePulse(RhythmForceGame& game)
+    {
+        game.m_inputAge = 0.0;
+        game.handleInput(0.0);
+    }
+
     static void emitPulse(RhythmForceGame& game, double onset, double duration, double peak)
     {
         game.m_songTime = onset;
@@ -824,21 +840,35 @@ int main(int argc, char **argv)
     REQUIRE(rhythm->lastTimingOffsetMs() > 90.0);
     REQUIRE(rhythm->lastTimingOffsetMs() < 110.0);
 
-    // Too-short pulses are rejected; the pending beat then expires once its
-    // late window passes, and the combo is reset.
+    // A pulse that starts inside the note window may finish after the visual
+    // timing window. Its pending note must not expire before release.
     const double thirdBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 3);
-    games::RhythmForceGameTestAccess::emitPulse(
-        *rhythm, thirdBeat, 0.02,
+    games::RhythmForceGameTestAccess::beginPulse(
+        *rhythm, thirdBeat,
         games::RhythmForceGameTestAccess::targetForce(*rhythm, 3));
+    games::RhythmForceGameTestAccess::advance(*rhythm, 0.10);
+    games::RhythmForceGameTestAccess::advance(*rhythm, 0.10);
+    games::RhythmForceGameTestAccess::advance(*rhythm, 0.10);
+    REQUIRE(rhythm->missCount() == 0);
+    REQUIRE(rhythm->nextBeatNumber() == 3);
+    games::RhythmForceGameTestAccess::releasePulse(*rhythm);
+    REQUIRE(rhythm->hitCount() == 3);
+    REQUIRE(rhythm->nextBeatNumber() == 4);
+
+    // Too-short pulses are rejected exactly once and consume the active note.
+    const double fourthBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 4);
+    games::RhythmForceGameTestAccess::emitPulse(
+        *rhythm, fourthBeat, 0.02,
+        games::RhythmForceGameTestAccess::targetForce(*rhythm, 4));
     REQUIRE(rhythm->missCount() == 1);
     REQUIRE(rhythm->combo() == 0);
-    REQUIRE(rhythm->nextBeatNumber() == 4);
-    const double fourthBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 4);
+    REQUIRE(rhythm->nextBeatNumber() == 5);
+    const double fifthBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 5);
     games::RhythmForceGameTestAccess::setClock(
-        *rhythm, fourthBeat + 0.24);
+        *rhythm, fifthBeat + 0.24);
     games::RhythmForceGameTestAccess::advance(*rhythm, 0.01);
     REQUIRE(rhythm->missCount() == 2);
-    REQUIRE(rhythm->nextBeatNumber() == 5);
+    REQUIRE(rhythm->nextBeatNumber() == 6);
     REQUIRE(rhythm->accuracyPercent() > 0.0);
     rhythm->setDifficultyLevel(99);
     REQUIRE(rhythm->difficultyLevel() == 5);
