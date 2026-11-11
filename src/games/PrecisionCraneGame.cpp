@@ -20,6 +20,9 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_gestureSeconds(0.0)
     , m_animationTime(0.0)
     , m_sway(0.0)
+    , m_swayVelocity(0.0)
+    , m_previousCarriageX(0.0)
+    , m_trolleyVelocity(0.0)
     , m_cargoX(0.25)
     , m_targetX(0.76)
     , m_targetWidth(0.13)
@@ -84,6 +87,9 @@ void PrecisionCraneGame::resetRound()
     m_targetX = 0.76 - (m_delivered % 3) * 0.12;
     m_gestureActive = false;
     m_gestureSeconds = 0.0;
+    m_swayVelocity = 0.0;
+    m_previousCarriageX = m_carriageX;
+    m_trolleyVelocity = 0.0;
 }
 
 void PrecisionCraneGame::initialize()
@@ -92,6 +98,9 @@ void PrecisionCraneGame::initialize()
     m_inputAge = 1.0;
     m_animationTime = 0.0;
     m_sway = 0.0;
+    m_swayVelocity = 0.0;
+    m_previousCarriageX = m_carriageX;
+    m_trolleyVelocity = 0.0;
     m_delivered = 0;
     m_mistakesRemaining = 3;
     m_lastPrecisionBonus = 0;
@@ -237,12 +246,27 @@ void PrecisionCraneGame::update(double deltaTime)
         }
     }
 
-    // Gentle pendulum motion communicates load inertia without adding another input.
-    if (m_loadAttached)
-        m_sway = std::sin(m_animationTime * (2.2 + m_difficulty * 0.12)) *
-                 (2.0 + m_force * 7.0);
-    else
-        m_sway *= 0.88;
+    // Damped-pendulum model: trolley acceleration excites the suspended load.
+    // The single force sensor remains the only player input; sway is simulation state.
+    const double trolleyVelocity = (m_carriageX - m_previousCarriageX) / dt;
+    const double trolleyAcceleration = (trolleyVelocity - m_trolleyVelocity) / dt;
+    m_previousCarriageX = m_carriageX;
+    m_trolleyVelocity = trolleyVelocity;
+    if (m_loadAttached) {
+        const double ropeLength = qBound(70.0, m_hookY - h * 0.20, qMax(71.0, floorY() - h * 0.20));
+        const double naturalFrequencySquared = 980.0 / ropeLength;
+        const double damping = 1.15;
+        const double swayAcceleration = -naturalFrequencySquared * m_sway
+                                        - damping * m_swayVelocity
+                                        - trolleyAcceleration * 0.72;
+        m_swayVelocity += swayAcceleration * dt;
+        m_sway += m_swayVelocity * dt;
+        m_sway = qBound(-ropeLength * 0.42, m_sway, ropeLength * 0.42);
+    } else {
+        m_swayVelocity *= std::exp(-5.0 * dt);
+        m_sway *= std::exp(-5.0 * dt);
+        if (std::abs(m_sway) < 0.05) m_sway = 0.0;
+    }
 }
 
 void PrecisionCraneGame::resizeEvent(QResizeEvent *event)
