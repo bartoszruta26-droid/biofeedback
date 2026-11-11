@@ -187,7 +187,7 @@ void ForceMazeGame::mousePressEvent(QMouseEvent *event)
         event->accept();
         return;
     }
-    GameEngine::mousePressEvent(event);
+    event->ignore();
 }
 
 void ForceMazeGame::unlockAchievement(const QString &id)
