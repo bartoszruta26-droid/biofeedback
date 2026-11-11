@@ -21,6 +21,9 @@ ForceMazeGame::ForceMazeGame(QWidget *parent)
     , m_lastProcessedRow(-1)
     , m_personalBestScore(0)
     , m_personalBestCrystals(0)
+    , m_personalBestLevel(1)
+    , m_cleanLevels(0)
+    , m_campaignDeaths(0)
     , m_progressRows(0.0)
     , m_playerColumn(4.0)
     , m_targetColumn(4.0)
@@ -30,10 +33,13 @@ ForceMazeGame::ForceMazeGame(QWidget *parent)
     , m_hitFlash(0.0)
     , m_checkpointFlash(0.0)
     , m_crystalPulse(0.0)
+    , m_playerTrailPhase(0.0)
+    , m_cameraShake(0.0)
     , m_hasSensorSample(false)
     , m_awaitingNeutral(true)
     , m_campaignCompleted(false)
     , m_levelClean(true)
+    , m_campaignClean(true)
     , m_status(QStringLiteral("Zwolnij tensometr do strefy neutralnej"))
 {
     setMinimumSize(320, 240);
@@ -74,6 +80,7 @@ void ForceMazeGame::initialize()
     QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
     m_personalBestScore = settings.value(QStringLiteral("games/force_maze/records/best_score"), 0).toInt();
     m_personalBestCrystals = settings.value(QStringLiteral("games/force_maze/records/best_crystals"), 0).toInt();
+    m_personalBestLevel = settings.value(QStringLiteral("games/force_maze/records/best_level"), 1).toInt();
     m_achievements = settings.value(QStringLiteral("games/force_maze/achievements")).toStringList();
 
     m_level = 1;
@@ -101,6 +108,11 @@ void ForceMazeGame::initialize()
     m_awaitingNeutral = true;
     m_campaignCompleted = false;
     m_levelClean = true;
+    m_campaignClean = true;
+    m_cleanLevels = 0;
+    m_campaignDeaths = 0;
+    m_playerTrailPhase = 0.0;
+    m_cameraShake = 0.0;
     m_status = QStringLiteral("Zwolnij tensometr do strefy neutralnej");
     m_collectedCrystals.clear();
     m_reachedCheckpoints.clear();
@@ -126,12 +138,14 @@ bool ForceMazeGame::handleInput(double value)
         return true;
     }
 
-    // The neutral band maps to the centre of the corridor. Above it, one
-    // calibrated force value controls only the horizontal coordinate.
+    // Continuous bipolar mapping around the neutral threshold: releasing
+    // below 18% steers left, increasing above 18% steers right. The neutral
+    // point is exactly the centre; there is no discontinuity at 18%.
     const double normalized = force <= kNeutralThreshold
-        ? 0.5
-        : qBound(0.0, (force - kNeutralThreshold) / (100.0 - kNeutralThreshold), 1.0);
-    m_targetColumn = 1.0 + normalized * static_cast<double>(kColumns - 3);
+        ? 0.5 * force / kNeutralThreshold
+        : 0.5 + 0.5 * (force - kNeutralThreshold) / (100.0 - kNeutralThreshold);
+    m_targetColumn = 1.0 + qBound(0.0, normalized, 1.0) *
+                              static_cast<double>(kColumns - 3);
     return true;
 }
 
@@ -152,8 +166,11 @@ void ForceMazeGame::saveRecords()
         m_personalBestScore = getScore();
     if (m_crystals > m_personalBestCrystals)
         m_personalBestCrystals = m_crystals;
+    if (m_level > m_personalBestLevel)
+        m_personalBestLevel = m_level;
     settings.setValue(QStringLiteral("games/force_maze/records/best_score"), m_personalBestScore);
     settings.setValue(QStringLiteral("games/force_maze/records/best_crystals"), m_personalBestCrystals);
+    settings.setValue(QStringLiteral("games/force_maze/records/best_level"), m_personalBestLevel);
     settings.sync();
 }
 
@@ -188,8 +205,11 @@ void ForceMazeGame::hitWall(int row)
 {
     Q_UNUSED(row);
     --m_lives;
+    ++m_campaignDeaths;
     m_levelClean = false;
+    m_campaignClean = false;
     m_hitFlash = 0.65;
+    m_cameraShake = 0.24;
     addScore(-25);
     const int checkpoint = (m_lastProcessedRow / 5) * 5;
     m_progressRows = qMax(0, checkpoint);
@@ -231,8 +251,16 @@ void ForceMazeGame::processRowCrossing(int row)
 
 void ForceMazeGame::completeLevel()
 {
-    if (m_levelClean)
+    if (m_levelClean) {
+        ++m_cleanLevels;
         unlockAchievement(QStringLiteral("clean_level"));
+        if (m_cleanLevels >= 3)
+            unlockAchievement(QStringLiteral("three_clean_levels"));
+    }
+    if (m_level >= 3)
+        unlockAchievement(QStringLiteral("level_three"));
+    if (m_level >= 5)
+        unlockAchievement(QStringLiteral("level_five"));
     addScore(250 * m_level);
     if (m_level >= kCampaignLevels) {
         finishCampaign();
@@ -255,6 +283,10 @@ void ForceMazeGame::finishCampaign()
     m_campaignCompleted = true;
     addScore(1000);
     unlockAchievement(QStringLiteral("maze_master"));
+    if (m_campaignClean)
+        unlockAchievement(QStringLiteral("untouched_campaign"));
+    if (m_crystals >= 25)
+        unlockAchievement(QStringLiteral("crystal_master"));
     saveRecords();
     m_status = QStringLiteral("Kampania ukończona");
     stop();
@@ -269,6 +301,8 @@ void ForceMazeGame::update(double deltaTime)
     m_hitFlash = qMax(0.0, m_hitFlash - deltaTime);
     m_checkpointFlash = qMax(0.0, m_checkpointFlash - deltaTime);
     m_crystalPulse = qMax(0.0, m_crystalPulse - deltaTime);
+    m_cameraShake = qMax(0.0, m_cameraShake - deltaTime);
+    m_playerTrailPhase += deltaTime * 8.0;
     if (m_inputAge <= kSignalTimeoutSeconds)
         m_inputAge += deltaTime;
 
@@ -281,7 +315,7 @@ void ForceMazeGame::update(double deltaTime)
     if (!hasFreshSignal() || m_campaignCompleted || m_lives <= 0)
         return;
 
-    const double smoothing = 1.0 - std::exp(-deltaTime * 9.0);
+    const double smoothing = 1.0 - std::exp(-deltaTime * 12.0);
     m_playerColumn += (m_targetColumn - m_playerColumn) * smoothing;
     m_progressRows += m_forwardSpeed * deltaTime;
 
@@ -320,83 +354,114 @@ void ForceMazeGame::render(QPainter &painter)
     painter.setBrush(QColor(16, 34, 48, 225));
     painter.drawRoundedRect(board, 14, 14);
 
-    // Draw a scrolling, top-down maze. The corridor shifts by one cell at a
-    // time; solid side blocks create a readable winding route and depth cues.
+    // Perspective tunnel: the far end narrows toward a vanishing point.
+    // Row depth controls tile width, horizontal spacing, vertical spacing,
+    // lighting and object scale to create an actual pseudo-3D corridor.
     const int baseRow = static_cast<int>(std::floor(m_progressRows));
     const double fractional = m_progressRows - baseRow;
-    for (int visible = 0; visible < 9; ++visible) {
+    const qreal horizonX = board.center().x();
+    const qreal horizonY = board.top() + board.height() * 0.08;
+    for (int visible = 0; visible < 10; ++visible) {
         const int row = baseRow + visible - 2;
         if (row < 0 || row >= kRowsPerLevel)
             continue;
-        const qreal y = board.top() + (static_cast<qreal>(visible) - 1.0 - fractional) * cellH;
+        const qreal depth = qBound<qreal>(0.12, (static_cast<qreal>(visible) + 0.2 - fractional) / 8.0, 1.0);
+        const qreal perspective = 0.34 + 0.66 * depth;
+        const qreal y = horizonY + (board.bottom() - horizonY) * depth;
+        const qreal rowHeight = cellH * perspective;
+        const qreal tileW = cellW * perspective;
         const int center = corridorCenter(row);
+        const qreal rowCenterX = horizonX + (center - 4.0) * cellW * perspective;
         for (int col = 0; col < kColumns; ++col) {
             const bool safe = std::abs(col - center) <= 1;
-            const QRectF cell(board.left() + col * cellW, y, cellW - 2.0, cellH - 2.0);
-            painter.setBrush(safe ? QColor(29, 82, 91) : QColor(32, 48, 62));
-            painter.setPen(QPen(safe ? QColor(72, 188, 180) : QColor(56, 78, 92), 1.0));
-            painter.drawRoundedRect(cell, 4, 4);
-            if (!safe) {
-                painter.setPen(QColor(80, 104, 117, 90));
+            const qreal x = rowCenterX + (col - center) * tileW - tileW * 0.5;
+            const QRectF cell(x, y - rowHeight * 0.5, tileW - 2.0, rowHeight - 2.0);
+            const int shade = static_cast<int>(48 + 70 * depth);
+            painter.setBrush(safe ? QColor(20, shade + 28, shade + 34) : QColor(shade - 8, shade, shade + 12));
+            painter.setPen(QPen(safe ? QColor(70, 190, 188, 90 + static_cast<int>(120 * depth))
+                                     : QColor(75, 100, 120, 80 + static_cast<int>(100 * depth)),
+                                0.7 + 1.0 * depth));
+            painter.drawRoundedRect(cell, 3.0 + 4.0 * depth, 3.0 + 4.0 * depth);
+            if (!safe && depth > 0.45) {
+                painter.setPen(QColor(105, 132, 150, static_cast<int>(40 + 60 * depth)));
                 painter.drawLine(cell.topLeft(), cell.bottomRight());
             }
         }
 
         if ((row + m_level * 2) % 3 == 1 && !m_collectedCrystals.contains(row)) {
-            const QPointF crystal(board.left() + (center + 0.5) * cellW,
-                                  y + cellH * 0.5);
-            const qreal radius = 5.0 + 2.0 * std::sin(m_visualTime * 5.0);
+            const QPointF crystal(rowCenterX + 0.5 * tileW, y);
+            const qreal radius = (3.0 + 5.0 * depth) * (1.0 + 0.12 * std::sin(m_visualTime * 5.0 + row));
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(62, 225, 244, static_cast<int>(40 + 65 * depth)));
+            painter.drawEllipse(crystal, radius * 1.8, radius * 1.8);
             QPolygonF gem;
             gem << QPointF(crystal.x(), crystal.y() - radius)
                 << QPointF(crystal.x() + radius * 0.65, crystal.y())
                 << QPointF(crystal.x(), crystal.y() + radius)
                 << QPointF(crystal.x() - radius * 0.65, crystal.y());
-            painter.setPen(QPen(QColor(156, 248, 255), 1.5));
+            painter.setPen(QPen(QColor(180, 250, 255), 1.0 + depth));
             painter.setBrush(QColor(74, 219, 235));
             painter.drawPolygon(gem);
         }
 
         if (((row + m_level) % 4) == 2) {
             const int hazardColumn = center + (((row / 4) % 2) == 0 ? -1 : 1);
-            const QPointF hazard(board.left() + (hazardColumn + 0.5) * cellW,
-                                 y + cellH * 0.5);
+            const QPointF hazard(rowCenterX + (hazardColumn - center + 0.5) * tileW, y);
             QPolygonF spike;
-            spike << QPointF(hazard.x(), hazard.y() - cellH * 0.28)
-                  << QPointF(hazard.x() + cellW * 0.22, hazard.y() + cellH * 0.20)
-                  << QPointF(hazard.x() - cellW * 0.22, hazard.y() + cellH * 0.20);
-            painter.setPen(QPen(QColor(255, 126, 112), 1.2));
-            painter.setBrush(QColor(225, 75, 72));
+            spike << QPointF(hazard.x(), hazard.y() - rowHeight * 0.28)
+                  << QPointF(hazard.x() + tileW * 0.22, hazard.y() + rowHeight * 0.20)
+                  << QPointF(hazard.x() - tileW * 0.22, hazard.y() + rowHeight * 0.20);
+            painter.setPen(QPen(QColor(255, 150, 120), 0.8 + depth));
+            painter.setBrush(QColor(215, 65, 68));
             painter.drawPolygon(spike);
         }
 
         if ((row % 6) == 4) {
-            painter.setPen(QPen(QColor(255, 192, 92), 3.0));
-            const qreal gateY = y + cellH * 0.5;
-            painter.drawLine(board.left() + (center - 1.25) * cellW, gateY,
-                             board.left() + (center - 0.62) * cellW, gateY);
-            painter.drawLine(board.left() + (center + 0.62) * cellW, gateY,
-                             board.left() + (center + 1.25) * cellW, gateY);
+            painter.setPen(QPen(QColor(255, 196, 100, static_cast<int>(100 + 150 * depth)), 1.5 + 2.0 * depth));
+            const qreal gateY = y;
+            painter.drawLine(rowCenterX - 1.25 * tileW, gateY,
+                             rowCenterX - 0.62 * tileW, gateY);
+            painter.drawLine(rowCenterX + 0.62 * tileW, gateY,
+                             rowCenterX + 1.25 * tileW, gateY);
         }
 
         if (row > 0 && row % 5 == 0) {
-            painter.setPen(QPen(QColor(255, 210, 92), 2.0, Qt::DashLine));
-            painter.drawLine(board.left() + (center - 1.35) * cellW, y + cellH * 0.5,
-                             board.left() + (center + 1.35) * cellW, y + cellH * 0.5);
+            painter.setPen(QPen(QColor(255, 210, 92, static_cast<int>(90 + 150 * depth)),
+                                1.0 + 1.3 * depth, Qt::DashLine));
+            painter.drawLine(rowCenterX - 1.35 * tileW, y,
+                             rowCenterX + 1.35 * tileW, y);
         }
     }
 
-    // Player ball and soft trail.
-    const qreal playerX = board.left() + (m_playerColumn + 0.5) * cellW;
-    const qreal playerY = board.top() + board.height() * 0.69;
+    // Player is anchored near the foreground; its perspective-scaled glow,
+    // rolling highlight and short trailing particles react to movement.
+    const qreal playerDepth = 0.92;
+    const qreal playerScale = 0.34 + 0.66 * playerDepth;
+    const qreal playerX = horizonX + (m_playerColumn - 4.0) * cellW * playerScale;
+    const qreal playerY = horizonY + (board.bottom() - horizonY) * 0.72;
+    const qreal ballRadius = qMax<qreal>(7.0, cellW * 0.19 * playerScale);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(QColor(52, 218, 205, 45));
-    painter.drawEllipse(QPointF(playerX, playerY), cellW * 0.42, cellW * 0.42);
+    painter.setBrush(QColor(52, 218, 205, 35));
+    painter.drawEllipse(QPointF(playerX, playerY), ballRadius * 2.2, ballRadius * 2.2);
+    for (int particle = 0; particle < 4; ++particle) {
+        const qreal phase = std::fmod(m_playerTrailPhase + particle * 1.7, 6.0);
+        const qreal alpha = qMax<qreal>(0.0, 150.0 * (1.0 - phase / 6.0));
+        const qreal offset = (particle + 1) * 7.0;
+        painter.setBrush(QColor(65, 225, 220, static_cast<int>(alpha)));
+        painter.drawEllipse(QPointF(playerX, playerY + offset), ballRadius * (0.16 + 0.05 * particle),
+                            ballRadius * (0.16 + 0.05 * particle));
+    }
     painter.setBrush(QColor(92, 247, 229));
-    painter.drawEllipse(QPointF(playerX, playerY), qMax<qreal>(6.0, cellW * 0.22),
-                        qMax<qreal>(6.0, cellW * 0.22));
+    painter.drawEllipse(QPointF(playerX, playerY), ballRadius, ballRadius);
+    painter.setPen(QPen(QColor(200, 255, 250, 220), 1.2));
     painter.setBrush(QColor(255, 255, 255, 210));
-    painter.drawEllipse(QPointF(playerX - cellW * 0.06, playerY - cellW * 0.07),
-                        qMax<qreal>(2.0, cellW * 0.055), qMax<qreal>(2.0, cellW * 0.055));
+    painter.drawEllipse(QPointF(playerX - ballRadius * 0.28, playerY - ballRadius * 0.32),
+                        ballRadius * 0.25, ballRadius * 0.25);
+    painter.setPen(QPen(QColor(50, 160, 170, 180), 1.0));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawArc(QRectF(playerX - ballRadius * 0.72, playerY - ballRadius * 0.72,
+                           ballRadius * 1.44, ballRadius * 1.44),
+                    static_cast<int>(m_visualTime * 800) % 5760, 2300);
 
     painter.setPen(Qt::white);
     painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(8, height() / 42), QFont::DemiBold));
