@@ -1,5 +1,4 @@
 #include "games/CarRaceGame.hpp"
-#include <QKeyEvent>
 #include <QResizeEvent>
 #include <QPainter>
 #include <QPolygonF>
@@ -18,12 +17,14 @@ constexpr double kCollisionProtection = 1.1;
 CarRaceGame::CarRaceGame(QWidget *parent)
     : GameEngine(parent)
     , m_force(0.5)
+    , m_inputAge(1.0)
     , m_spawnTimer(0.0)
     , m_spawnInterval(1.25)
     , m_roadSpeed(220.0)
     , m_distance(0.0)
     , m_boostTimer(0.0)
     , m_boostCooldown(0.0)
+    , m_boostGestureSeconds(0.0)
     , m_collisionTimer(0.0)
     , m_scoreDistanceAccumulator(0.0)
     , m_animationTime(0.0)
@@ -32,10 +33,12 @@ CarRaceGame::CarRaceGame(QWidget *parent)
     , m_passStreak(0)
     , m_collectiblesCollected(0)
     , m_lane(1)
+    , m_boostGestureLane(1)
     , m_lives(3)
     , m_spawnCount(0)
+    , m_boostGestureActive(false)
 {
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::NoFocus);
 }
 
 QString CarRaceGame::gameName() const
@@ -47,12 +50,16 @@ void CarRaceGame::initialize()
 {
     m_obstacles.clear();
     m_force = 0.5;
+    m_inputAge = 1.0;
     m_spawnTimer = 0.0;
     m_spawnInterval = 1.25;
     m_roadSpeed = 220.0;
     m_distance = 0.0;
     m_boostTimer = 0.0;
     m_boostCooldown = 0.0;
+    m_boostGestureSeconds = 0.0;
+    m_boostGestureLane = 1;
+    m_boostGestureActive = false;
     m_collisionTimer = 0.0;
     m_scoreDistanceAccumulator = 0.0;
     m_animationTime = 0.0;
@@ -117,7 +124,29 @@ bool CarRaceGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
 
-    const double target = qBound(0.0, value / 100.0, 1.0);
+    const double force = qBound(0.0, value, 100.0);
+    m_inputAge = 0.0;
+    // A short high-force hold followed by neutral release activates the boost.
+    // The car stays in its current lane throughout the gesture.
+    if (force >= 95.0) {
+        if (!m_boostGestureActive) {
+            m_boostGestureActive = true;
+            m_boostGestureSeconds = 0.0;
+            m_boostGestureLane = m_lane;
+        }
+        return true;
+    }
+    if (m_boostGestureActive) {
+        if (force <= 30.0) {
+            if (m_boostGestureSeconds >= 0.25 && m_boostGestureSeconds <= 1.2)
+                activateBoost();
+            m_boostGestureActive = false;
+            m_boostGestureSeconds = 0.0;
+            setLane(m_boostGestureLane);
+        }
+        return true;
+    }
+    const double target = force / 100.0;
     // Low-pass filtering removes sensor jitter without making steering sluggish.
     m_force += (target - m_force) * 0.65;
 
@@ -133,25 +162,6 @@ bool CarRaceGame::handleInput(double value)
         setLane(1);
     }
     return true;
-}
-
-void CarRaceGame::keyPressEvent(QKeyEvent* event)
-{
-    if (event->isAutoRepeat()) {
-        event->accept();
-        return;
-    }
-
-    switch (event->key()) {
-    case Qt::Key_Space:
-    case Qt::Key_B:
-        activateBoost();
-        break;
-    default:
-        GameEngine::keyPressEvent(event);
-        return;
-    }
-    event->accept();
 }
 
 void CarRaceGame::activateBoost()
@@ -204,6 +214,16 @@ void CarRaceGame::update(double deltaTime)
     deltaTime = qMin(deltaTime, 0.1);
 
     m_animationTime += deltaTime;
+    m_inputAge += deltaTime;
+    if (m_boostGestureActive) {
+        if (m_inputAge > 0.35) {
+            m_boostGestureActive = false;
+            m_boostGestureSeconds = 0.0;
+            setLane(m_boostGestureLane);
+        } else {
+            m_boostGestureSeconds += deltaTime;
+        }
+    }
     m_visualLane += (static_cast<double>(m_lane) - m_visualLane) * qMin(1.0, deltaTime * 11.0);
     m_cameraShakeTimer = qMax(0.0, m_cameraShakeTimer - deltaTime);
     m_boostTimer = qMax(0.0, m_boostTimer - deltaTime);
@@ -420,7 +440,8 @@ void CarRaceGame::render(QPainter& painter)
                                    (track.width() - 2.0) * ready, track.height() - 2.0), 3.0, 3.0);
     painter.setFont(QFont(QStringLiteral("Arial"), 9));
     painter.setPen(QColor(255, 255, 255, 220));
-    painter.drawText(12, height() - 12, QStringLiteral("Tensometr: wybór pasa | SPACJA lub B: dopalacz"));
+    painter.drawText(12, height() - 12,
+        QStringLiteral("Tensometr: wybór pasa | Dopalacz: przytrzymaj 95% i zwolnij"));
     if (!isRunning() && m_lives <= 0) {
         painter.fillRect(rect(), QColor(0, 0, 0, 175));
         painter.setPen(Qt::white);
