@@ -220,10 +220,12 @@ int main(int argc, char **argv)
     REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
     forceMaze->setLeftHanded(false);
     REQUIRE(!forceMaze->isLeftHanded());
-    forceMaze->handleSensorInput(20.0);
+    forceMaze->handleSensorInput(20.0); // Re-arm in the neutral band after switching.
+    REQUIRE(!forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(0.0); // Right-hand mapping: low force steers left.
     games::ForceMazeGameTestAccess::advance(*forceMaze, 0.25);
     REQUIRE(forceMaze->hasFreshSignal());
-    REQUIRE(forceMaze->playerColumn() > 4.0);
+    REQUIRE(forceMaze->playerColumn() < 4.0);
     REQUIRE(forceMaze->progressRows() > 0.0);
     games::ForceMazeGameTestAccess::advance(*forceMaze, 0.40);
     REQUIRE(!forceMaze->hasFreshSignal());
