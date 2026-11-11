@@ -37,6 +37,8 @@ public:
     bool roundCompleted() const { return m_roundCompleted; }
     int unlockedAchievementsCount() const { return m_achievements.size(); }
     QString lastAchievement() const { return m_lastAchievement; }
+    bool hasAchievement(const QString &id) const { return m_achievements.contains(id); }
+    double visualTimeSeconds() const { return m_visualTime; }
 
 protected:
     void initialize() override;
