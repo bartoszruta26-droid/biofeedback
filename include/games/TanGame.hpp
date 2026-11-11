@@ -6,7 +6,6 @@
 #include <QString>
 #include <memory>
 
-class QKeyEvent;
 class QResizeEvent;
 
 namespace games {
@@ -39,7 +38,6 @@ public:
 
 protected:
     void initialize() override;
-    void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
