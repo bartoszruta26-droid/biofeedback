@@ -2,6 +2,7 @@
 #define GAMES_SCORCHEDEARTHGAME_HPP
 
 #include "games/GameEngine.hpp"
+#include <QElapsedTimer>
 #include <QPointF>
 #include <QPolygonF>
 #include <QRectF>
@@ -58,6 +59,8 @@ private:
     double m_enemyDelay;
     double m_playerShotDelay{2.0};
     double m_playerShotInterval{2.0};
+    QElapsedTimer m_sensorClock;
+    bool m_hasSensorSample{false};
     double m_gravity;
     int m_playerHealth;
     int m_enemyHealth;
