@@ -46,6 +46,8 @@ void ArcherGame::initialize()
     m_successfulHits = 0;
     m_missedShots = 0;
     repositionTarget();
+    m_previousTarget = m_target;
+    m_previousArrowPositions.clear();
 }
 
 void ArcherGame::resizeEvent(QResizeEvent* event)
@@ -56,6 +58,8 @@ void ArcherGame::resizeEvent(QResizeEvent* event)
         m_targetSpeed = 55.0 * scaleY;
         m_gravity = 260.0 * scaleY;
         repositionTarget();
+        m_previousTarget = m_target;
+        m_previousArrowPositions.clear();
         for (Arrow& arrow : m_arrows) {
             if (arrow.position.x() > width() || arrow.position.y() > height())
                 arrow.active = false;
