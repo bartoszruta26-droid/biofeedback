@@ -62,7 +62,7 @@
 - **Tensometr:** krótki nacisk wywołuje skok ptaka. Skok jest wyzwalany przejściem z braku nacisku do nacisku, a nie samym ciągłym utrzymywaniem sygnału.
 - **Praktyka:** naciskaj krótko i rytmicznie. Długie przytrzymanie nie powinno być traktowane jako seria niezależnych skoków.
 - **Wskaźniki:** wynik, siła, poziom, prędkość gry i liczba miniętych przeszkód.
-- **Klawiatura:** w wersji bazowej nie ma osobnego skrótu skoku; sesję uruchamia się i resetuje z interfejsu.
+- **Działanie dodatkowe:** `SPACJA`, `↑`, `W`, `ENTER` lub kliknięcie lewym przyciskiem myszy może wywołać pojedynczy skok. Jest to przycisk akcji, a nie alternatywne sterowanie kierunkowe; podstawowym wejściem pozostaje tensometr.
 
 ### 6. Mario Run
 
@@ -130,7 +130,7 @@
 | Tangens | pionowe położenie kursora względem celu | brak skrótów gry |
 | Pong | pionowe położenie lewej paletki | brak skrótów gry |
 | Arkanoid | poziome położenie paletki | brak skrótów gry |
-| Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
+| Flappy Bird | impuls skoku po przekroczeniu progu | `SPACJA`/`↑`/`W`/`ENTER` lub kliknięcie — skok |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `SPACJA`/`B` — dopalacz |
 | Archer | kąt celowania 0–100% | automatyczny strzał co 2,4 s |
