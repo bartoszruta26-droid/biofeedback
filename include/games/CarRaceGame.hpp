@@ -23,6 +23,11 @@ public:
     bool boostActive() const { return m_boostTimer > 0.0; }
     double boostCooldownRemaining() const { return m_boostCooldown; }
     double collisionProtectionRemaining() const { return m_collisionTimer; }
+    double animationClock() const { return m_animationTime; }
+    double visualLanePosition() const { return m_visualLane; }
+    int passStreak() const { return m_passStreak; }
+    int collectiblesCollected() const { return m_collectiblesCollected; }
+    int difficultyLevel() const { return 1 + static_cast<int>(m_distance / 5000.0); }
 
 protected:
     void initialize() override;
@@ -37,6 +42,7 @@ private:
         QRectF rect;
         int lane;
         bool passed;
+        bool boostCell;
     };
 
     void setLane(int lane);
@@ -56,6 +62,11 @@ private:
     double m_boostCooldown;
     double m_collisionTimer;
     double m_scoreDistanceAccumulator;
+    double m_animationTime;
+    double m_visualLane;
+    double m_cameraShakeTimer;
+    int m_passStreak;
+    int m_collectiblesCollected;
     int m_lane;
     int m_lives;
     int m_spawnCount;
