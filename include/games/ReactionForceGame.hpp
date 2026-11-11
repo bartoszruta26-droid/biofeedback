@@ -96,7 +96,7 @@ private:
     double m_lastReactionMs;
     double m_lastForce;
     double m_visualTime;
-    double m_previousVisualTime;
+    double m_previousVisualTime{0.0};
     double m_feedbackTime;
     double m_toastTime;
     bool m_hasSensorSample;
