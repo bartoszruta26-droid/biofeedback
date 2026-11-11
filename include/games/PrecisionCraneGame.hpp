@@ -23,6 +23,7 @@ public:
     bool loadAttached() const { return m_loadAttached; }
     int deliveredLoads() const { return m_delivered; }
     int mistakesRemaining() const { return m_mistakesRemaining; }
+    int lastPrecisionBonus() const { return m_lastPrecisionBonus; }
     double carriagePosition() const { return m_carriageX; }
     double hookPosition() const { return m_hookY; }
     double normalizedForce() const { return m_force; }
@@ -68,6 +69,7 @@ private:
     int m_difficulty;
     int m_delivered;
     int m_mistakesRemaining;
+    int m_lastPrecisionBonus;
     int m_combo;
     ControlAxis m_axis;
     bool m_gestureActive;
