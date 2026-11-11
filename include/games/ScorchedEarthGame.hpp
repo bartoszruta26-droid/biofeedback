@@ -10,6 +10,7 @@
 class QKeyEvent;
 class QMouseEvent;
 class QResizeEvent;
+class QWheelEvent;
 
 namespace games {
 
@@ -27,6 +28,9 @@ public:
     double aimDegrees() const { return m_aimDegrees; }
     double shotPower() const { return m_power; }
     int activeProjectileCount() const { return m_projectiles.size(); }
+    int trajectoryPreviewPointCount() const;
+    double windStrength() const { return m_wind; }
+    bool isPlayerTurn() const { return m_playerTurn; }
 
 protected:
     void initialize() override;
@@ -37,6 +41,7 @@ protected:
     void resizeEvent(QResizeEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void wheelEvent(QWheelEvent* event) override;
 
 private:
     struct Projectile {
@@ -51,7 +56,9 @@ private:
     void updateTankPositions();
     void fireProjectile(bool playerOwned);
     void resolveImpact(const QPointF& point, bool playerOwned);
-    void applyCrater(double x);
+    void applyCrater(double x, double power);
+    QVector<QPointF> trajectoryPreview() const;
+    void updateWind();
 
     QPolygonF m_terrain;
     QVector<Projectile> m_projectiles;
