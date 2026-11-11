@@ -155,7 +155,7 @@ void BalanceTowerGame::placeBlock()
     const double overlapX = qMax(0.0, (top.width + m_blockWidth) * 0.5 - std::abs(x - top.x));
     const double overlapZ = qMax(0.0, (top.depth + m_blockWidth) * 0.5 - std::abs(z - top.z));
     const double overlap = qMin(overlapX, overlapZ);
-    if (overlap < 0.12) {
+    if (overlap < 0.08) {
         ++m_falls;
         m_campaignClean = false;
         m_combo = 0;
@@ -169,7 +169,7 @@ void BalanceTowerGame::placeBlock()
         return;
     }
 
-    const double precision = qBound(0.0, 1.0 - (std::abs(x - top.x) + std::abs(z - top.z)) / 0.84, 1.0);
+    const double precision = qBound(0.0, 1.0 - (std::abs(x - top.x) + std::abs(z - top.z)) / 0.96, 1.0);
     const double width = qMin(m_blockWidth, qMin(overlapX, overlapZ));
     const double depth = width;
     const double mass = 1.0 + (m_blocks.size() % 3) * 0.12;
@@ -182,7 +182,7 @@ void BalanceTowerGame::placeBlock()
     const double centerOffset = qMax(comX, comZ);
     m_stability = qBound(0.0, 1.0 - centerOffset / 0.34, 1.0);
     m_tilt = qBound(-0.35, (centerOfMassX() + centerOfMassZ()) * 0.42, 0.35);
-    if (centerOffset > 0.34) {
+    if (centerOffset > 0.42) {
         ++m_falls;
         --m_lives;
         m_campaignClean = false;
@@ -279,7 +279,7 @@ void BalanceTowerGame::update(double deltaTime)
     if (!hasFreshSignal() || m_gameOver || m_roundCompleted)
         return;
 
-    m_stability = qBound(0.0, m_stability - qAbs(m_tilt) * deltaTime * 0.018, 1.0);
+    m_stability = qBound(0.0, m_stability - qAbs(m_tilt) * deltaTime * 0.012, 1.0);
     m_tilt *= std::exp(-deltaTime * 1.8);
 }
 
