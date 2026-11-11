@@ -530,6 +530,7 @@ if(Qt5_FOUND)
         src/games/PrecisionCraneGame.cpp
         src/games/RhythmForceGame.cpp
         src/games/ForceMazeGame.cpp
+        src/games/BalanceTowerGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
@@ -549,6 +550,7 @@ if(Qt5_FOUND)
         include/games/PrecisionCraneGame.hpp
         include/games/RhythmForceGame.hpp
         include/games/ForceMazeGame.hpp
+        include/games/BalanceTowerGame.hpp
         include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
