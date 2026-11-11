@@ -27,7 +27,6 @@ public:
     double shotPower() const { return m_power; }
     int activeProjectileCount() const { return m_projectiles.size(); }
     int trajectoryPreviewPointCount() const;
-    int trajectoryPreviewPointCount() const;
 
 protected:
     void initialize() override;
