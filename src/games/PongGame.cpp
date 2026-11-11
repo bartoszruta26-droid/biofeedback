@@ -26,7 +26,10 @@ PongGame::PongGame(QWidget *parent)
     , m_rightPaddleY(0.0f)
     , m_ballPos(0.0f, 0.0f)
     , m_ballVel(0.0f, 0.0f)
+    , m_previousBallPos(0.0f, 0.0f)
     , m_ballRadius(8.0f)
+    , m_previousLeftPaddleY(0.0f)
+    , m_previousRightPaddleY(0.0f)
     , m_playerScore(0)
     , m_aiScore(0)
     , m_difficultyLevel(1)
@@ -68,6 +71,9 @@ void PongGame::initialize()
     setScore(0);
     adaptToSize();
     resetBall();
+    m_previousBallPos = m_ballPos;
+    m_previousLeftPaddleY = m_leftPaddleY;
+    m_previousRightPaddleY = m_rightPaddleY;
 }
 
 void PongGame::setDifficultyLevel(int level)
@@ -385,9 +391,17 @@ void PongGame::update(double deltaTime)
         return;
 
     adaptToSize();
-    if (!sensorInputFresh())
+    if (!sensorInputFresh()) {
+        m_previousBallPos = m_ballPos;
+        m_previousLeftPaddleY = m_leftPaddleY;
+        m_previousRightPaddleY = m_rightPaddleY;
         return; // Freeze the rally instead of scoring against a missing sensor.
+    }
 
+    // Snapshot the last committed simulation state for display interpolation.
+    m_previousBallPos = m_ballPos;
+    m_previousLeftPaddleY = m_leftPaddleY;
+    m_previousRightPaddleY = m_rightPaddleY;
     deltaTime = qMin(deltaTime, 0.1);
     const int steps = qMax(1, static_cast<int>(std::ceil(deltaTime / kPhysicsStep)));
     const double stepTime = deltaTime / steps;
@@ -421,6 +435,33 @@ QColor PongGame::getDifficultyColor() const
         case 4: return QColor(235, 145, 65);
         default: return QColor(230, 85, 85);
     }
+}
+
+void PongGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    adaptToSize();
+    alpha = qBound(0.0, alpha, 1.0);
+
+    const QPointF currentBall = m_ballPos;
+    const float currentLeft = m_leftPaddleY;
+    const float currentRight = m_rightPaddleY;
+
+    m_ballPos = m_previousBallPos +
+        (currentBall - m_previousBallPos) * alpha;
+    m_leftPaddleY = static_cast<float>(
+        m_previousLeftPaddleY + (currentLeft - m_previousLeftPaddleY) * alpha);
+    m_rightPaddleY = static_cast<float>(
+        m_previousRightPaddleY + (currentRight - m_previousRightPaddleY) * alpha);
+    m_leftPaddle.moveTop(m_leftPaddleY);
+    m_rightPaddle.moveTop(m_rightPaddleY);
+
+    render(painter);
+
+    m_ballPos = currentBall;
+    m_leftPaddleY = currentLeft;
+    m_rightPaddleY = currentRight;
+    m_leftPaddle.moveTop(m_leftPaddleY);
+    m_rightPaddle.moveTop(m_rightPaddleY);
 }
 
 void PongGame::render(QPainter &painter)
