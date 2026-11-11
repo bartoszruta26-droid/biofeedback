@@ -270,6 +270,15 @@ void BalanceTowerGame::update(double deltaTime)
 {
     if (!std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+
+    // Capture the previous simulation state before changing any visual state.
+    // Without this, renderInterpolated() always interpolates from stale values.
+    m_previousTargetPosition = m_targetPosition;
+    m_previousTargetDepth = m_targetDepth;
+    m_previousTilt = m_tilt;
+    m_previousStability = m_stability;
+    m_previousVisualTime = m_visualTime;
+
     m_visualTime += qMin(deltaTime, 0.1);
     if (m_inputAge <= kSignalTimeoutSeconds)
         m_inputAge += deltaTime;
