@@ -50,6 +50,7 @@ private:
     void fireProjectile(bool playerOwned);
     void resolveImpact(const QPointF& point, bool playerOwned);
     void applyCrater(double x);
+    QVector<QPointF> trajectoryPreview() const;
 
     QPolygonF m_terrain;
     QVector<Projectile> m_projectiles;
