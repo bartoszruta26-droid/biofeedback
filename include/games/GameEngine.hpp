@@ -207,7 +207,7 @@ protected:
     // Timer do pętli gry
     QTimer* m_gameTimer;
     
-    // Czas ostatniej klatki
+    // Monotonic timestamp of the last simulation pump, in nanoseconds.
     qint64 m_lastFrameTime;
     QElapsedTimer m_monotonicClock;
     qint64 m_accumulatedSessionMs;
