@@ -159,6 +159,12 @@ protected:
      */
     virtual void render(QPainter& painter) = 0;
 
+    // Called by the presentation layer with the fraction remaining between
+    // fixed simulation states. Games opt in by interpolating their own state.
+    virtual void renderInterpolated(QPainter& painter, double alpha);
+
+    static constexpr double kFixedSimulationStepSeconds = 1.0 / 120.0;
+
     /**
      * @brief Obsługuje wejście specyficzne dla gry
      * Do zaimplementowania w klasach pochodnych
@@ -205,6 +211,7 @@ protected:
     QElapsedTimer m_monotonicClock;
     qint64 m_accumulatedSessionMs;
     double m_simulationAccumulator;
+    double m_renderInterpolationAlpha;
     
     quint64 m_frameCount;
     quint64 m_invalidInputCount;
