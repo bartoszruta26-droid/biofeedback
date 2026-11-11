@@ -37,6 +37,8 @@
 #include <QJsonObject>
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <QPainterPath>
 
 
 namespace {
@@ -215,6 +217,46 @@ ForceMetrics calculateForceMetrics(const QVector<gui::DataPoint>& points) {
         result.meanRiseMs = riseSum / riseTimes.size();
     }
     return result;
+}
+
+QVector<QVector<gui::DataPoint>> extractForceRepetitions(
+    const QVector<gui::DataPoint>& points) {
+    QVector<QVector<gui::DataPoint>> repetitions;
+    if (points.size() < 5) return repetitions;
+    double minimum = std::numeric_limits<double>::max();
+    double maximum = std::numeric_limits<double>::lowest();
+    for (const auto& point : points) {
+        if (!std::isfinite(point.value)) continue;
+        minimum = qMin(minimum, point.value);
+        maximum = qMax(maximum, point.value);
+    }
+    const double amplitude = maximum - minimum;
+    if (!std::isfinite(amplitude) || amplitude <= 1e-9) return repetitions;
+    const double peakThreshold = minimum + amplitude * 0.35;
+    const double boundaryThreshold = minimum + amplitude * 0.10;
+    qint64 lastPeakMs = std::numeric_limits<qint64>::min();
+    int lastEnd = -1;
+    for (int i = 1; i + 1 < points.size(); ++i) {
+        if (points[i].value < peakThreshold ||
+            points[i].value < points[i - 1].value ||
+            points[i].value < points[i + 1].value) continue;
+        const qint64 peakMs = points[i].timestamp.toMSecsSinceEpoch();
+        if (lastPeakMs != std::numeric_limits<qint64>::min() && peakMs - lastPeakMs < 300)
+            continue;
+        int begin = i;
+        while (begin > lastEnd + 1 && points[begin].value > boundaryThreshold) --begin;
+        int end = i;
+        while (end + 1 < points.size() && points[end].value > boundaryThreshold) ++end;
+        if (end - begin >= 2) {
+            QVector<gui::DataPoint> segment;
+            segment.reserve(end - begin + 1);
+            for (int j = begin; j <= end; ++j) segment.push_back(points[j]);
+            repetitions.push_back(segment);
+            lastEnd = end;
+            lastPeakMs = peakMs;
+        }
+    }
+    return repetitions;
 }
 
 QString forceMetricsHtml(const QVector<gui::DataPoint>& points) {
@@ -763,8 +805,19 @@ void OutlineTab::setupUI()
         QVector<ForceSeries> selected;
         if (m_forceGraph && m_forceGraph->dataPointCount() >= 2)
             selected.push_back({tr("Bieżący przebieg"), m_forceGraph->getData()});
+        if (m_forceGraph && m_forceGraph->dataPointCount() >= 5) {
+            const auto repetitions = extractForceRepetitions(m_forceGraph->getData());
+            for (int i = 0; i < repetitions.size(); ++i)
+                selected.push_back({tr("Powtórzenie %1").arg(i + 1), repetitions[i]});
+        }
         const QJsonObject item = savedSeriesCombo->currentData().toJsonObject();
         if (!item.isEmpty()) {
+            const QString storedPatient = item.value(QStringLiteral("patient_uuid")).toString();
+            if (storedPatient != m_currentPatientUuid) {
+                QMessageBox::warning(this, tr("Porównanie serii"),
+                    tr("Wybrana seria należy do innego kontekstu pacjenta. Wybierz serię zapisaną dla bieżącego pacjenta."));
+                return;
+            }
             const QJsonArray points = item.value(QStringLiteral("points")).toArray();
             QVector<gui::DataPoint> samples;
             const QDateTime base = QDateTime::fromString(
@@ -779,10 +832,10 @@ void OutlineTab::setupUI()
                 selected.push_back({item.value(QStringLiteral("label")).toString(), samples});
         }
         overlay->setSeries(selected);
-        if (selected.size() < 2) {
-            metricsBrowser->append(tr("<p>Do porównania wybierz zapisaną serię i zapewnij bieżący przebieg lub zapisz kolejną próbę.</p>"));
+        if (selected.isEmpty()) {
+            metricsBrowser->append(tr("<p>Brak poprawnych przebiegów do porównania.</p>"));
         } else {
-            metricsBrowser->append(tr("<p>Nałożono %1 przebiegi. Oś czasu każdego przebiegu rozpoczyna się od zera; skale siły są wspólne.</p>")
+            metricsBrowser->append(tr("<p>Nałożono %1 przebiegów/powtórzeń. Każda seria jest wyrównana do początku próby; zachowano wspólną skalę siły.</p>")
                                    .arg(selected.size()));
         }
     });
