@@ -172,7 +172,7 @@ Poniższe opisy rozdzielają obecną koncepcję gry od docelowego sterowania zgo
 - **Grafika:** perspektywiczna droga z trzema pasami, kilka warstw tła, animowane pojazdy i koła, znaczniki pobocza, efekty dopalacza i kolizji.
 - **Funkcje:** trasy, poziomy prędkości, różne pojazdy, żetony, serie minięć, mistrzostwa i rekordy.
 - **Tensometr:** trzy stabilne przedziały siły wybierają lewy, środkowy lub prawy pas. Przełączenie pasa wymaga przekroczenia progu z histerezą.
-- **Dopalacz:** przytrzymanie co najmniej 95% siły przez 0,25–1,2 s i zwolnienie do środkowej strefy aktywuje dopalacz. Samochód zachowuje pas podczas gestu.
+- **Dopalacz:** przytrzymanie co najmniej 95% siły przez 0,25–1,2 s i zwolnienie do 60% lub mniej aktywuje dopalacz. Samochód zachowuje pas podczas gestu.
 - **Brak innych wejść:** ruch i dopalacz nie korzystają z klawiatury ani myszy. Po utracie świeżości sygnału samochód nie zmienia pasa, a gest dopalacza zostaje anulowany.
 
 ### 3.8. Archer Force Trainer
