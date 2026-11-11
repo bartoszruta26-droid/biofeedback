@@ -194,12 +194,14 @@ int main(int argc, char **argv)
     REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
     forceMaze->handleSensorInput(0.0);
     REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
+    // The complete 10–30% dead zone must preserve the previous target,
+    // rather than snapping the player back to the corridor centre.
     forceMaze->handleSensorInput(10.0);
-    REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
     forceMaze->handleSensorInput(20.0);
-    REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
     forceMaze->handleSensorInput(30.0);
-    REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
     forceMaze->handleSensorInput(30.1);
     REQUIRE(forceMaze->targetColumn() > 4.0);
     forceMaze->handleSensorInput(100.0);
