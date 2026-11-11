@@ -2,6 +2,7 @@
 #define GAMES_ARCHERGAME_HPP
 
 #include "games/GameEngine.hpp"
+#include <QElapsedTimer>
 #include <QPointF>
 #include <QRectF>
 #include <QVector>
@@ -50,6 +51,8 @@ private:
     double m_gravity;
     double m_fireCooldown;
     double m_autoFireInterval{2.4};
+    QElapsedTimer m_sensorClock;
+    bool m_hasSensorSample{false};
     int m_shotsFired{0};
     int m_successfulHits{0};
     int m_missedShots{0};
