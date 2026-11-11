@@ -31,6 +31,7 @@ QString ScorchedEarthGame::gameName() const
 void ScorchedEarthGame::initialize()
 {
     m_projectiles.clear();
+    m_previousProjectilePositions.clear();
     m_aimDegrees = 45.0;
     m_power = 0.82;
     m_wind = 0.0;
@@ -209,7 +210,12 @@ void ScorchedEarthGame::update(double deltaTime)
         return;
     deltaTime = qMin(deltaTime, 0.1);
 
-    const bool sensorFresh = m_hasSensorSample && m_sensorClock.isValid() &&
+    m_previousProjectilePositions.clear();
+    m_previousProjectilePositions.reserve(m_projectiles.size());
+    for (const Projectile& projectile : m_projectiles)
+        m_previousProjectilePositions.push_back(projectile.position);
+
+    const bool sensorFresh = m_hasSensorSample &&
                              m_sensorClock.elapsed() <= 350;
     if (m_projectiles.isEmpty() && m_playerTurn) {
         if (sensorFresh) {
@@ -288,6 +294,28 @@ void ScorchedEarthGame::update(double deltaTime)
 
     m_projectiles.erase(std::remove_if(m_projectiles.begin(), m_projectiles.end(),
         [](const Projectile& projectile) { return !projectile.active; }), m_projectiles.end());
+}
+
+void ScorchedEarthGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    if (m_previousProjectilePositions.size() != m_projectiles.size()) {
+        render(painter);
+        return;
+    }
+
+    QVector<QPointF> currentPositions;
+    currentPositions.reserve(m_projectiles.size());
+    for (int i = 0; i < m_projectiles.size(); ++i) {
+        currentPositions.push_back(m_projectiles[i].position);
+        m_projectiles[i].position = m_previousProjectilePositions[i] +
+            (currentPositions[i] - m_previousProjectilePositions[i]) * alpha;
+    }
+
+    render(painter);
+
+    for (int i = 0; i < m_projectiles.size(); ++i)
+        m_projectiles[i].position = currentPositions[i];
 }
 
 void ScorchedEarthGame::render(QPainter& painter)
