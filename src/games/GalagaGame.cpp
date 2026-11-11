@@ -315,6 +315,12 @@ void GalagaGame::update(double deltaTime)
 {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+    m_previousPlayer = m_player;
+    m_previousProjectiles = m_projectiles;
+    m_previousEnemies = m_enemies;
+    m_previousPowerUps = m_powerUps;
+    m_previousBackgroundOffset = m_backgroundOffset;
+    m_previousElapsed = m_elapsed;
     deltaTime = qMin(deltaTime, 0.1);
     m_elapsed += deltaTime;
     m_sensorInputAge += deltaTime;
@@ -472,6 +478,46 @@ void GalagaGame::update(double deltaTime)
         addScore(100 + m_wave * 10);
         createWave();
     }
+}
+
+void GalagaGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const QRectF player = m_player;
+    const auto projectiles = m_projectiles;
+    const auto enemies = m_enemies;
+    const auto powerUps = m_powerUps;
+    const double background = m_backgroundOffset;
+    const double elapsed = m_elapsed;
+
+    const auto interpolateRect = [alpha](QRectF& current, const QRectF& previous) {
+        current = QRectF(
+            previous.x() + (current.x() - previous.x()) * alpha,
+            previous.y() + (current.y() - previous.y()) * alpha,
+            current.width(), current.height());
+    };
+    interpolateRect(m_player, m_previousPlayer);
+    if (m_projectiles.size() == m_previousProjectiles.size())
+        for (int i = 0; i < m_projectiles.size(); ++i)
+            interpolateRect(m_projectiles[i].rect, m_previousProjectiles[i].rect);
+    if (m_enemies.size() == m_previousEnemies.size())
+        for (int i = 0; i < m_enemies.size(); ++i)
+            interpolateRect(m_enemies[i].rect, m_previousEnemies[i].rect);
+    if (m_powerUps.size() == m_previousPowerUps.size())
+        for (int i = 0; i < m_powerUps.size(); ++i)
+            interpolateRect(m_powerUps[i].rect, m_previousPowerUps[i].rect);
+    m_backgroundOffset = m_previousBackgroundOffset +
+        (background - m_previousBackgroundOffset) * alpha;
+    m_elapsed = m_previousElapsed + (elapsed - m_previousElapsed) * alpha;
+
+    render(painter);
+
+    m_player = player;
+    m_projectiles = projectiles;
+    m_enemies = enemies;
+    m_powerUps = powerUps;
+    m_backgroundOffset = background;
+    m_elapsed = elapsed;
 }
 
 void GalagaGame::render(QPainter& painter)
