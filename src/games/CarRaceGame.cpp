@@ -73,6 +73,10 @@ void CarRaceGame::initialize()
     setScore(0);
     m_player = QRectF(0.0, height() - 105.0, 38.0, 66.0);
     setLane(m_lane);
+    m_previousPlayer = m_player;
+    m_previousObstacles = m_obstacles;
+    m_previousDistance = m_distance;
+    m_previousVisualLane = m_visualLane;
 }
 
 void CarRaceGame::resizeEvent(QResizeEvent* event)
@@ -93,6 +97,10 @@ void CarRaceGame::resizeEvent(QResizeEvent* event)
     GameEngine::resizeEvent(event);
     if (width() > 0 && height() > 0)
         setLane(m_lane);
+    m_previousPlayer = m_player;
+    m_previousObstacles = m_obstacles;
+    m_previousDistance = m_distance;
+    m_previousVisualLane = m_visualLane;
 }
 
 QRectF CarRaceGame::laneRect(int lane, double top, double objectWidth, double objectHeight) const
