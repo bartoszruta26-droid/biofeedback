@@ -77,7 +77,7 @@
 **Cel:** prowadź samochód przez trzy pasy, omijaj ruch uliczny, utrzymuj serię bezkolizyjnych minięć i rozsądnie wykorzystuj dopalacz.
 
 - **Tensometr:** wybiera pas na podstawie wartości siły: niska wartość — lewy pas, środkowa — pas środkowy, wysoka — prawy pas. Sygnał jest filtrowany, a progi histerezy ograniczają przypadkowe przełączanie przy wahaniach pomiaru.
-- **Dopalacz gestem:** przytrzymaj siłę na poziomie co najmniej 95% przez 0,25–1,2 s, a następnie zwolnij do środkowej strefy tensometru. Samochód zachowuje pas podczas gestu. Dopalacz działa przez 1,8 s i ma 5 s odnowienia.
+- **Dopalacz gestem:** przytrzymaj siłę na poziomie co najmniej 95% przez 0,25–1,2 s, a następnie zwolnij do 60% lub mniej. Samochód zachowuje dotychczasowy pas w trakcie gestu; po jego zakończeniu zwykłe mapowanie siły ponownie wybiera pas. Dopalacz działa przez 1,8 s i ma 5 s odnowienia.
 - **Płynność kierowania:** samochód wizualnie dojeżdża do wybranego pasa z krótką animacją. Pozycja kolizji nadal odpowiada wybranemu pasowi.
 - **Dopalacz:** przez 1,8 s zwiększa prędkość ruchu planszy. Po użyciu obowiązuje 5 s odnowienia; pasek HUD pokazuje stopień gotowości. Animowany płomień za samochodem sygnalizuje aktywne przyspieszenie.
 - **Punktacja:** punkty są przyznawane za pokonany dystans oraz za bezpieczne minięcie pojazdu. Kolejne bezkolizyjne minięcia budują serię i zwiększają premię punktową. Kolizja zeruje serię.
