@@ -221,6 +221,17 @@ int main(int argc, char **argv)
     REQUIRE(!balance->awaitingNeutral());
     balance->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     REQUIRE(balance->hasFreshSignal());
+    // Complete the three-round campaign with centred placements.
+    for (int block = 0; block < 10; ++block)
+        games::BalanceTowerGameTestAccess::placeBlock(*balance);
+    REQUIRE(balance->placedBlocks() == 1);
+    for (int block = 0; block < 12; ++block)
+        games::BalanceTowerGameTestAccess::placeBlock(*balance);
+    REQUIRE(balance->placedBlocks() == 1);
+    for (int block = 0; block < 12; ++block)
+        games::BalanceTowerGameTestAccess::placeBlock(*balance);
+    REQUIRE(balance->roundCompleted());
+    REQUIRE(balance->hasAchievement(QStringLiteral("tower_master")));
     balance->stop();
 
     // One-axis force steering, wide dead zone, hand switching and fail-closed timeout.
