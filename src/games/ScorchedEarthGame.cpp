@@ -1,7 +1,6 @@
 #include "games/ScorchedEarthGame.hpp"
 #include <QResizeEvent>
 #include <QPainter>
-#include <QLinearGradient>
 #include <QFont>
 #include <algorithm>
 #include <cmath>
@@ -293,10 +292,9 @@ void ScorchedEarthGame::update(double deltaTime)
 
 void ScorchedEarthGame::render(QPainter& painter)
 {
-    QLinearGradient sky(0.0, 0.0, 0.0, height());
-    sky.setColorAt(0.0, QColor(20, 35, 72));
-    sky.setColorAt(1.0, QColor(220, 130, 80));
-    painter.fillRect(rect(), sky);
+    painter.fillRect(rect(), QColor(55, 88, 125));
+    painter.fillRect(QRect(0, height() / 2, width(), height() / 2),
+                     QColor(202, 133, 83));
     painter.setRenderHint(QPainter::Antialiasing, false);
 
     QPolygonF ground = m_terrain;
