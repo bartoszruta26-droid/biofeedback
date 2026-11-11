@@ -313,7 +313,7 @@ void ScorchedEarthGame::render(QPainter& painter)
         painter.drawEllipse(projectile.position, 4.0, 4.0);
 
     painter.setPen(Qt::white);
-    painter.setFont(QFont(QStringLiteral("Arial"), qMax(9, qRound(13.0 * scale)), QFont::Bold));
+    painter.setFont(QFont(QStringLiteral("Arial"), qMax(9, qRound(13.0 * scaleY)), QFont::Bold));
     painter.drawText(14, 24, QStringLiteral("Wynik: %1").arg(getScore()));
     painter.drawText(14, 46, QStringLiteral("Twoje HP: %1").arg(m_playerHealth));
     painter.drawText(width() - 150, 24, QStringLiteral("Wróg HP: %1").arg(m_enemyHealth));
