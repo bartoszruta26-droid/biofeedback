@@ -51,6 +51,7 @@ signals:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private slots:
     void onSensorDataReceived(const sensor::SensorData& data);
@@ -61,6 +62,9 @@ private:
     double m_targetY;
     double m_phase;
     double m_cursorY;
+    double m_previousPhase{0.0};
+    double m_previousCursorY{0.0};
+    double m_previousTargetY{0.0};
     bool m_isHit;
 
     int m_difficultyLevel;
