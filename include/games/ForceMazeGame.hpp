@@ -32,6 +32,8 @@ public:
     bool campaignCompleted() const { return m_campaignCompleted; }
     int personalBestScore() const { return m_personalBestScore; }
     int unlockedAchievementsCount() const { return m_achievements.size(); }
+    bool hasAchievement(const QString &id) const { return m_achievements.contains(id); }
+    double currentForcePercent() const { return m_currentForce; }
 
 protected:
     void initialize() override;
@@ -81,6 +83,7 @@ private:
     double m_checkpointFlash;
     double m_crystalPulse;
     double m_playerTrailPhase;
+    double m_currentForce;
     double m_cameraShake;
     bool m_hasSensorSample;
     bool m_awaitingNeutral;
