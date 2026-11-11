@@ -1,5 +1,4 @@
 #include "games/GalagaGame.hpp"
-#include <QKeyEvent>
 #include <QResizeEvent>
 #include <QPainter>
 #include <QFont>
@@ -20,6 +19,8 @@ GalagaGame::GalagaGame(QWidget *parent)
     : GameEngine(parent)
     , m_force(0.5)
     , m_sensorInputAge(1.0)
+    , m_forceBeforeSpecialGesture(0.5)
+    , m_specialGestureSeconds(0.0)
     , m_fireCooldown(0.0)
     , m_enemyDirection(1.0)
     , m_enemyFireCooldown(1.0)
@@ -35,7 +36,7 @@ GalagaGame::GalagaGame(QWidget *parent)
     , m_firePowerLevel(1)
     , m_enemiesDefeated(0)
     , m_combo(0)
-    , m_fireHeld(false)
+    , m_specialGestureActive(false)
     , m_sensorInputValid(false)
 {
     setFocusPolicy(Qt::StrongFocus);
@@ -84,6 +85,8 @@ void GalagaGame::initialize()
 {
     m_force = 0.5;
     m_sensorInputAge = 1.0;
+    m_forceBeforeSpecialGesture = 0.5;
+    m_specialGestureSeconds = 0.0;
     m_fireCooldown = 0.0;
     m_enemyDirection = 1.0;
     m_enemyFireCooldown = 1.0;
@@ -99,7 +102,7 @@ void GalagaGame::initialize()
     m_firePowerLevel = 1;
     m_enemiesDefeated = 0;
     m_combo = 0;
-    m_fireHeld = false;
+    m_specialGestureActive = false;
     m_sensorInputValid = false;
     m_projectiles.clear();
     m_powerUps.clear();
@@ -179,29 +182,27 @@ bool GalagaGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
     const double target = qBound(0.0, value / 100.0, 1.0);
-    m_force += (target - m_force) * 0.45;
     m_sensorInputAge = 0.0;
     m_sensorInputValid = true;
-    return true;
-}
-
-void GalagaGame::keyPressEvent(QKeyEvent* event)
-{
-    if (event->key() == Qt::Key_Space)
-        m_fireHeld = true;
-    else if (event->key() == Qt::Key_X && !event->isAutoRepeat())
-        activatePulse();
-    else
-        GameEngine::keyPressEvent(event);
-}
-
-void GalagaGame::keyReleaseEvent(QKeyEvent* event)
-{
-    if (event->key() == Qt::Key_Space) {
-        m_fireHeld = false;
-    } else {
-        GameEngine::keyReleaseEvent(event);
+    if (m_specialGestureActive) {
+        if (target <= 0.30) {
+            const double duration = m_specialGestureSeconds;
+            m_specialGestureActive = false;
+            m_specialGestureSeconds = 0.0;
+            m_force = m_forceBeforeSpecialGesture;
+            if (duration >= 0.35 && duration <= 1.2)
+                activatePulse();
+        }
+        return true;
     }
+    if (target >= 0.95) {
+        m_specialGestureActive = true;
+        m_specialGestureSeconds = 0.0;
+        m_forceBeforeSpecialGesture = m_force;
+        return true;
+    }
+    m_force += (target - m_force) * 0.45;
+    return true;
 }
 
 void GalagaGame::firePlayerShot()
@@ -317,8 +318,16 @@ void GalagaGame::update(double deltaTime)
     deltaTime = qMin(deltaTime, 0.1);
     m_elapsed += deltaTime;
     m_sensorInputAge += deltaTime;
-    if (m_sensorInputAge > 0.35)
+    if (m_sensorInputAge > 0.35) {
         m_sensorInputValid = false;
+        if (m_specialGestureActive) {
+            m_specialGestureActive = false;
+            m_specialGestureSeconds = 0.0;
+            m_force = m_forceBeforeSpecialGesture;
+        }
+    } else if (m_specialGestureActive) {
+        m_specialGestureSeconds += deltaTime;
+    }
     m_hitCooldown = qMax(0.0, m_hitCooldown - deltaTime);
     m_shieldRemaining = qMax(0.0, m_shieldRemaining - deltaTime);
     m_firePowerRemaining = qMax(0.0, m_firePowerRemaining - deltaTime);
@@ -340,9 +349,9 @@ void GalagaGame::update(double deltaTime)
     }
 
     m_fireCooldown = qMax(0.0, m_fireCooldown - deltaTime);
-    if (m_fireHeld && m_fireCooldown <= 0.0) {
+    if (m_sensorInputValid && !m_specialGestureActive && m_fireCooldown <= 0.0) {
         firePlayerShot();
-        m_fireCooldown = m_firePowerLevel == 2 ? 0.13 : (m_firePowerLevel == 3 ? 0.19 : 0.24);
+        m_fireCooldown = m_firePowerLevel == 2 ? 0.17 : (m_firePowerLevel == 3 ? 0.24 : 0.30);
     }
 
     m_enemyFireCooldown -= deltaTime;
@@ -551,8 +560,8 @@ void GalagaGame::render(QPainter& painter)
                      Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("Życia: %1").arg(m_lives));
     painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(7, hudSize - 2, 10)));
     const QString controls = width() < 300
-        ? QStringLiteral("Tensometr: ruch  •  SPACJA: ogień  •  X: impuls")
-        : QStringLiteral("Tensometr: sterowanie statkiem  •  SPACJA: ogień  •  X: impuls EMP");
+        ? QStringLiteral("Tensometr: ruch  •  ogień automatyczny  •  gest 95%: EMP")
+        : QStringLiteral("Tensometr: ruch statku  •  ogień automatyczny  •  gest 95%: EMP");
     painter.drawText(QRect(6, height() - hudSize - 7, width() - 12, hudSize + 4),
                      Qt::AlignHCenter | Qt::AlignVCenter, controls);
     painter.drawText(QRect(8, hudSize + 8, width() - 16, hudSize + 4), Qt::AlignLeft,
