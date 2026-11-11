@@ -6,6 +6,8 @@
 #include <QStringList>
 #include <QPointF>
 
+class QMouseEvent;
+
 namespace games {
 
 class ForceMazeGame final : public GameEngine
@@ -34,12 +36,15 @@ public:
     int unlockedAchievementsCount() const { return m_achievements.size(); }
     bool hasAchievement(const QString &id) const { return m_achievements.contains(id); }
     double currentForcePercent() const { return m_currentForce; }
+    bool isLeftHanded() const { return m_leftHanded; }
+    void setLeftHanded(bool leftHanded);
 
 protected:
     void initialize() override;
     void update(double deltaTime) override;
     void render(QPainter &painter) override;
     bool handleInput(double value) override;
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     friend struct ForceMazeGameTestAccess;
@@ -48,7 +53,8 @@ private:
     static constexpr int kRowsPerLevel = 18;
     static constexpr int kCampaignLevels = 5;
     static constexpr double kSignalTimeoutSeconds = 0.35;
-    static constexpr double kNeutralThreshold = 18.0;
+    static constexpr double kNeutralMin = 10.0;
+    static constexpr double kNeutralMax = 30.0;
     static constexpr double kCorridorHalfWidth = 1.28;
 
     int corridorCenter(int row) const;
@@ -90,6 +96,7 @@ private:
     bool m_campaignCompleted;
     bool m_levelClean;
     bool m_campaignClean;
+    bool m_leftHanded;
     QString m_status;
     QVector<int> m_collectedCrystals;
     QVector<int> m_reachedCheckpoints;
