@@ -39,7 +39,7 @@ GameEngine::GameEngine(QWidget *parent)
     connect(m_gameTimer, &QTimer::timeout, this, &GameEngine::gameLoop);
     
     // Ustawienie fokusa dla obsługi klawiatury
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::NoFocus);
     
     // The game paints every pixel itself; avoid an extra QWidget background pass.
     setAttribute(Qt::WA_OpaquePaintEvent, true);
