@@ -26,6 +26,7 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_difficulty(1)
     , m_delivered(0)
     , m_mistakesRemaining(3)
+    , m_lastPrecisionBonus(0)
     , m_combo(0)
     , m_axis(HorizontalAxis)
     , m_gestureActive(false)
@@ -93,6 +94,7 @@ void PrecisionCraneGame::initialize()
     m_sway = 0.0;
     m_delivered = 0;
     m_mistakesRemaining = 3;
+    m_lastPrecisionBonus = 0;
     m_combo = 0;
     m_status = QStringLiteral("Krótki impuls: chwyt/zwolnienie • długi: zmiana osi");
     setScore(0);
@@ -170,10 +172,17 @@ void PrecisionCraneGame::deliverOrDropLoad()
     const bool lowEnough = m_hookY + 18.0 + load.height() >= floorY() - 18.0;
     if (lowEnough && target.adjusted(-load.width() * 0.25, -4.0,
                                      load.width() * 0.25, 0.0).intersects(load)) {
+        const double targetCenter = target.center().x();
+        const double deliveryError = std::abs(load.center().x() - targetCenter);
+        const double precisionRadius = qMax(1.0, target.width() * 0.5);
+        const double precision = qBound(0.0, 1.0 - deliveryError / precisionRadius, 1.0);
+        m_lastPrecisionBonus = qRound(precision * 100.0);
         ++m_delivered;
         ++m_combo;
-        addScore(100 + qMin(m_combo - 1, 10) * 20 + m_difficulty * 10);
-        m_status = QStringLiteral("Dostawa precyzyjna! Seria: %1").arg(m_combo);
+        addScore(100 + m_lastPrecisionBonus +
+                 qMin(m_combo - 1, 10) * 20 + m_difficulty * 10);
+        m_status = QStringLiteral("Dostawa! Premia precyzji: +%1 • Seria: %2")
+                       .arg(m_lastPrecisionBonus).arg(m_combo);
         if (m_delivered % 4 == 0)
             setDifficultyLevel(m_difficulty + 1);
         resetRound();
@@ -330,9 +339,10 @@ void PrecisionCraneGame::render(QPainter& painter)
             .arg(getScore()).arg(m_delivered).arg(m_mistakesRemaining));
     painter.setPen(QColor(170, 218, 230));
     painter.drawText(QRectF(26.0, 48.0, w - 52.0, 20.0),
-        QStringLiteral("Oś: %1   Siła: %2%   Seria: %3")
+        QStringLiteral("Oś: %1   Siła: %2%   Seria: %3   Premia: +%4")
             .arg(m_axis == HorizontalAxis ? QStringLiteral("POZIOMA") : QStringLiteral("PIONOWA"))
-            .arg(static_cast<int>(std::round(m_force * 100.0))).arg(m_combo));
+            .arg(static_cast<int>(std::round(m_force * 100.0))).arg(m_combo)
+            .arg(m_lastPrecisionBonus));
 
     painter.setPen(QColor(255, 245, 218));
     painter.drawText(QRectF(16.0, h - 34.0, w - 32.0, 24.0), Qt::AlignCenter, m_status);
