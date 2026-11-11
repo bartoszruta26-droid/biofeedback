@@ -34,6 +34,7 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void resizeEvent(QResizeEvent* event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     struct Obstacle {
@@ -50,7 +51,11 @@ private:
     QRectF laneRect(int lane, double top, double objectWidth, double objectHeight) const;
 
     QVector<Obstacle> m_obstacles;
+    QVector<Obstacle> m_previousObstacles;
     QRectF m_player;
+    QRectF m_previousPlayer;
+    double m_previousDistance{0.0};
+    double m_previousVisualLane{0.0};
     double m_force;
     double m_inputAge;
     double m_spawnTimer;

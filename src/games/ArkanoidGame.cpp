@@ -17,6 +17,7 @@ void ArkanoidGame::initialize() {
  m_paddleWidth=qMin(m_paddleWidth,availableWidth);
  m_paddle=QRectF((width()-m_paddleWidth)/2.0,height()-42.0,m_paddleWidth,m_paddleHeight);
  buildLevel(); resetBall();
+ m_previousBallPosition=m_ballPosition; m_previousPaddle=m_paddle;
 }
 void ArkanoidGame::setDifficultyLevel(int level) {
  m_difficultyLevel=qBound(1,level,5);
@@ -43,6 +44,7 @@ void ArkanoidGame::resizeEvent(QResizeEvent *event) {
   const double sy=oldSize.height()>0?static_cast<double>(newSize.height())/oldSize.height():newSize.height()/480.0;
   if(oldSize.width()>0&&oldSize.height()>0) {
    m_ballPosition=QPointF(m_ballPosition.x()*sx,m_ballPosition.y()*sy);
+   m_previousBallPosition=m_ballPosition;
    m_ballVelocity=QPointF(m_ballVelocity.x()*sx,m_ballVelocity.y()*sy);
    for(QPointF& trailPoint:m_ballTrail)
     trailPoint=QPointF(trailPoint.x()*sx,trailPoint.y()*sy);
@@ -57,6 +59,7 @@ void ArkanoidGame::resizeEvent(QResizeEvent *event) {
   m_paddle=QRectF(paddleX-m_paddleWidth/2.0,newSize.height()-42.0*scaleY-m_paddleHeight,m_paddleWidth,m_paddleHeight);
   if(oldSize.width()<=0||oldSize.height()<=0) buildLevel();
   m_ballSpeed=205.0+m_difficultyLevel*25.0;
+  m_previousPaddle=m_paddle;
  }
  GameEngine::resizeEvent(event);
 }
@@ -71,6 +74,7 @@ void ArkanoidGame::buildLevel(){
 void ArkanoidGame::resetBall(){
  const double scaleX=qMax(0.5,width()/640.0),scaleY=qMax(0.5,height()/480.0);
  m_ballPosition=QPointF(m_paddle.center().x(),m_paddle.top()-m_ballRadius-1.0);
+ m_previousBallPosition=m_ballPosition;
  const double horizontal=m_ballSpeed*0.30*scaleX;
  const double vertical=m_ballSpeed*std::sqrt(1.0-0.30*0.30)*scaleY;
  m_ballVelocity=QPointF(horizontal,-vertical);m_ballTrail.clear();
@@ -84,6 +88,8 @@ void ArkanoidGame::update(double dt){
 }
 void ArkanoidGame::updatePhysicsStep(double dt){
  if(!isRunning()||width()<=0||height()<=0)return;
+ m_previousBallPosition=m_ballPosition;
+ m_previousPaddle=m_paddle;
  const double maxX=qMax(10.0,static_cast<double>(width())-10.0-m_paddle.width());
  const double sensorX=10.0+m_currentForce*qMax(0.0,static_cast<double>(width())-20.0-m_paddle.width());
  const double alpha=1.0-std::exp(-dt/0.025);
@@ -118,6 +124,18 @@ void ArkanoidGame::updatePhysicsStep(double dt){
 }
 QColor ArkanoidGame::brickColor(const Brick& b) const{
  if(b.hits>1)return QColor(245,90,90);switch(b.row%5){case 0:return QColor(245,110,110);case 1:return QColor(245,170,80);case 2:return QColor(235,215,90);case 3:return QColor(100,200,130);default:return QColor(90,160,230);}
+}
+void ArkanoidGame::renderInterpolated(QPainter& p,double alpha){
+ alpha=qBound(0.0,alpha,1.0);
+ const QPointF currentBall=m_ballPosition;
+ const QRectF currentPaddle=m_paddle;
+ m_ballPosition=m_previousBallPosition+(currentBall-m_previousBallPosition)*alpha;
+ m_paddle=QRectF(m_previousPaddle.x()+(currentPaddle.x()-m_previousPaddle.x())*alpha,
+                 m_previousPaddle.y()+(currentPaddle.y()-m_previousPaddle.y())*alpha,
+                 currentPaddle.width(),currentPaddle.height());
+ render(p);
+ m_ballPosition=currentBall;
+ m_paddle=currentPaddle;
 }
 void ArkanoidGame::render(QPainter& p){
  p.setRenderHint(QPainter::Antialiasing, false);p.fillRect(rect(),QColor(12,18,32));p.setPen(QPen(QColor(35,48,68),1));

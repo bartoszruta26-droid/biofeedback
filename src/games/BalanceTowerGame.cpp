@@ -46,6 +46,8 @@ void BalanceTowerGame::initialize()
     m_falls = 0;
     m_targetPosition = 0.0;
     m_targetDepth = 0.0;
+    m_targetPositionGoal = 0.0;
+    m_targetDepthGoal = 0.0;
     m_inputAge = kSignalTimeoutSeconds + 1.0;
     m_gestureDuration = 0.0;
     m_visualTime = 0.0;
@@ -61,6 +63,11 @@ void BalanceTowerGame::initialize()
     m_gameOver = false;
     m_campaignClean = true;
     m_status = QStringLiteral("Ustaw nacisk w strefie neutralnej 10–30%");
+    m_previousTargetPosition = m_targetPosition;
+    m_previousTargetDepth = m_targetDepth;
+    m_previousTilt = m_tilt;
+    m_previousStability = m_stability;
+    m_previousVisualTime = m_visualTime;
     setScore(0);
 }
 
@@ -111,9 +118,9 @@ bool BalanceTowerGame::handleInput(double value)
         : 0.5 + 0.5 * (force - kNeutralMax) / (100.0 - kNeutralMax);
     const double position = qBound(-1.0, (normalized - 0.5) * 2.0, 1.0);
     if (m_depthAxis)
-        m_targetDepth = position * 0.42;
+        m_targetDepthGoal = position * 0.42;
     else
-        m_targetPosition = position * 0.42;
+        m_targetPositionGoal = position * 0.42;
     return true;
 }
 
@@ -192,6 +199,8 @@ void BalanceTowerGame::placeBlock()
         m_blocks.append({0.0, 0.0, 1.0, 1.0, 1.0});
         m_targetPosition = 0.0;
         m_targetDepth = 0.0;
+        m_targetPositionGoal = 0.0;
+        m_targetDepthGoal = 0.0;
         m_stability = 1.0;
         m_tilt = 0.0;
         m_status = QStringLiteral("Środek ciężkości poza podstawą — wieża się przewróciła");
@@ -234,6 +243,8 @@ void BalanceTowerGame::finishRound(bool stable)
             m_blocks.append({0.0, 0.0, 1.0, 1.0, 1.0});
             m_targetPosition = 0.0;
             m_targetDepth = 0.0;
+            m_targetPositionGoal = 0.0;
+            m_targetDepthGoal = 0.0;
             m_stability = 1.0;
             m_status = QStringLiteral("Nowa plansza — poziom %1").arg(m_round);
         }
@@ -265,6 +276,15 @@ void BalanceTowerGame::update(double deltaTime)
 {
     if (!std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+
+    // Capture the previous simulation state before changing any visual state.
+    // Without this, renderInterpolated() always interpolates from stale values.
+    m_previousTargetPosition = m_targetPosition;
+    m_previousTargetDepth = m_targetDepth;
+    m_previousTilt = m_tilt;
+    m_previousStability = m_stability;
+    m_previousVisualTime = m_visualTime;
+
     m_visualTime += qMin(deltaTime, 0.1);
     if (m_inputAge <= kSignalTimeoutSeconds)
         m_inputAge += deltaTime;
@@ -279,8 +299,41 @@ void BalanceTowerGame::update(double deltaTime)
     if (!hasFreshSignal() || m_gameOver || m_roundCompleted)
         return;
 
+    // Sensor samples update a destination, not the rendered position directly.
+    // Exponential smoothing makes control continuous at any sensor/report rate.
+    const double follow = 1.0 - std::exp(-qMin(deltaTime, 0.1) * 14.0);
+    m_targetPosition += (m_targetPositionGoal - m_targetPosition) * follow;
+    m_targetDepth += (m_targetDepthGoal - m_targetDepth) * follow;
+
     m_stability = qBound(0.0, m_stability - qAbs(m_tilt) * deltaTime * 0.012, 1.0);
     m_tilt *= std::exp(-deltaTime * 1.8);
+}
+
+void BalanceTowerGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double targetPosition = m_targetPosition;
+    const double targetDepth = m_targetDepth;
+    const double tilt = m_tilt;
+    const double stability = m_stability;
+    const double visualTime = m_visualTime;
+
+    m_targetPosition = m_previousTargetPosition +
+        (targetPosition - m_previousTargetPosition) * alpha;
+    m_targetDepth = m_previousTargetDepth +
+        (targetDepth - m_previousTargetDepth) * alpha;
+    m_tilt = m_previousTilt + (tilt - m_previousTilt) * alpha;
+    m_stability = m_previousStability + (stability - m_previousStability) * alpha;
+    m_visualTime = m_previousVisualTime +
+        (visualTime - m_previousVisualTime) * alpha;
+
+    render(painter);
+
+    m_targetPosition = targetPosition;
+    m_targetDepth = targetDepth;
+    m_tilt = tilt;
+    m_stability = stability;
+    m_visualTime = visualTime;
 }
 
 void BalanceTowerGame::render(QPainter &painter)

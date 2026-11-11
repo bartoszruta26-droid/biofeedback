@@ -159,6 +159,13 @@ protected:
      */
     virtual void render(QPainter& painter) = 0;
 
+    // Called by the presentation layer with the fraction remaining between
+    // fixed simulation states. Games opt in by interpolating their own state.
+    virtual void renderInterpolated(QPainter& painter, double alpha);
+
+    static constexpr double kFixedSimulationStepSeconds = 1.0 / 120.0;
+    double renderInterpolationAlpha() const { return m_renderInterpolationAlpha; }
+
     /**
      * @brief Obsługuje wejście specyficzne dla gry
      * Do zaimplementowania w klasach pochodnych
@@ -200,11 +207,12 @@ protected:
     // Timer do pętli gry
     QTimer* m_gameTimer;
     
-    // Czas ostatniej klatki
+    // Monotonic timestamp of the last simulation pump, in nanoseconds.
     qint64 m_lastFrameTime;
     QElapsedTimer m_monotonicClock;
     qint64 m_accumulatedSessionMs;
     double m_simulationAccumulator;
+    double m_renderInterpolationAlpha;
     
     quint64 m_frameCount;
     quint64 m_invalidInputCount;

@@ -36,6 +36,8 @@ public:
     bool hasFreshSensorInput() const;
     double playerPaddleY() const;
     double aiPaddleY() const;
+    double paddleWidth() const;
+    double paddleHeight() const;
     QPointF ballPosition() const;
     int playerMatchScore() const;
     int aiMatchScore() const;
@@ -51,6 +53,7 @@ private slots:
 
 protected:
     void resizeEvent(QResizeEvent *event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     QRectF m_leftPaddle;
@@ -60,7 +63,10 @@ private:
 
     QPointF m_ballPos;
     QPointF m_ballVel;
+    QPointF m_previousBallPos;
     float m_ballRadius;
+    float m_previousLeftPaddleY;
+    float m_previousRightPaddleY;
 
     int m_playerScore;
     int m_aiScore;
@@ -88,7 +94,7 @@ private:
     void acceptForcePercent(double percent);
     QColor getDifficultyColor() const;
     void updateAIPaddle(double deltaTime);
-    void checkCollisions();
+    void checkCollisions(const QPointF& previousBallPos);
     void adaptToSize();
     bool sensorInputFresh() const;
 };

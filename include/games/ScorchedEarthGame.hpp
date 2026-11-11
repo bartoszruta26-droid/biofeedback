@@ -33,6 +33,7 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void resizeEvent(QResizeEvent* event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     struct Projectile {
@@ -51,6 +52,7 @@ private:
 
     QPolygonF m_terrain;
     QVector<Projectile> m_projectiles;
+    QVector<QPointF> m_previousProjectilePositions;
     QRectF m_playerTank;
     QRectF m_enemyTank;
     double m_aimDegrees;

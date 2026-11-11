@@ -153,6 +153,10 @@ void PrecisionCraneGame::initialize()
     setScore(0);
     setDifficultyLevel(m_difficulty);
     resetRound();
+    m_renderPreviousCarriageX = m_carriageX;
+    m_previousHookY = m_hookY;
+    m_previousSway = m_sway;
+    m_previousObstacleClock = m_obstacleClock;
 }
 
 bool PrecisionCraneGame::handleInput(double value)
@@ -271,6 +275,11 @@ void PrecisionCraneGame::update(double deltaTime)
 {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+    m_previousCarriageX = m_carriageX;
+    m_renderPreviousCarriageX = m_carriageX;
+    m_previousHookY = m_hookY;
+    m_previousSway = m_sway;
+    m_previousObstacleClock = m_obstacleClock;
     const double dt = qMin(deltaTime, 0.1);
     const double h = static_cast<double>(height());
     m_animationTime += dt;
@@ -450,6 +459,33 @@ void PrecisionCraneGame::resizeEvent(QResizeEvent *event)
     m_carriageX = clampCarriage(m_carriageX);
     m_hookY = qBound(height() * 0.24, m_hookY,
                      floorY() - 35.0 * qMax(0.5, height() / 480.0));
+
+    // A resize changes the coordinate system. Start interpolation from the
+    // transformed state, never from a position in the previous viewport.
+    m_renderPreviousCarriageX = m_carriageX;
+    m_previousHookY = m_hookY;
+    m_previousSway = m_sway;
+    m_previousObstacleClock = m_obstacleClock;
+}
+
+void PrecisionCraneGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double carriage = m_carriageX;
+    const double hook = m_hookY;
+    const double sway = m_sway;
+    const double obstacleClock = m_obstacleClock;
+    m_carriageX = m_renderPreviousCarriageX +
+        (carriage - m_renderPreviousCarriageX) * alpha;
+    m_hookY = m_previousHookY + (hook - m_previousHookY) * alpha;
+    m_sway = m_previousSway + (sway - m_previousSway) * alpha;
+    m_obstacleClock = m_previousObstacleClock +
+        (obstacleClock - m_previousObstacleClock) * alpha;
+    render(painter);
+    m_carriageX = carriage;
+    m_hookY = hook;
+    m_sway = sway;
+    m_obstacleClock = obstacleClock;
 }
 
 void PrecisionCraneGame::render(QPainter& painter)

@@ -61,6 +61,8 @@ void FlappyBirdGame::initialize() {
     
     // Czyszczenie przeszkód
     m_obstacles.clear();
+    m_previousBirdPos = m_birdPos;
+    m_previousObstacles.clear();
     m_obstacleSpawnTimer = 0.0f;
     
     // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
@@ -306,6 +308,8 @@ void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
     const QSize newSize = event->size();
     adaptToSize(m_lastKnownSize, newSize);
     m_lastKnownSize = newSize;
+    m_previousBirdPos = m_birdPos;
+    m_previousObstacles = m_obstacles;
     GameEngine::resizeEvent(event);
 }
 
@@ -422,7 +426,8 @@ void FlappyBirdGame::update(double deltaTime) {
         adaptToSize(m_lastKnownSize, currentSize);
         m_lastKnownSize = currentSize;
     }
-
+    m_previousBirdPos = m_birdPos;
+    m_previousObstacles = m_obstacles;
 
     // Ochrona wywołań bezpośrednich: nie wykonuj nieograniczonego skoku czasu.
     deltaTime = qMin(deltaTime, 0.1);
@@ -436,6 +441,27 @@ void FlappyBirdGame::update(double deltaTime) {
     
     // Sprawdzenie kolizji
     checkCollisions();
+}
+
+void FlappyBirdGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const QPointF currentBird = m_birdPos;
+    const auto currentObstacles = m_obstacles;
+    m_birdPos = m_previousBirdPos + (currentBird - m_previousBirdPos) * alpha;
+    if (m_previousObstacles.size() == m_obstacles.size()) {
+        for (std::size_t i = 0; i < m_obstacles.size(); ++i) {
+            m_obstacles[i].xPosition = static_cast<float>(
+                m_previousObstacles[i].xPosition +
+                (currentObstacles[i].xPosition - m_previousObstacles[i].xPosition) * alpha);
+            m_obstacles[i].gapY = static_cast<float>(
+                m_previousObstacles[i].gapY +
+                (currentObstacles[i].gapY - m_previousObstacles[i].gapY) * alpha);
+        }
+    }
+    render(painter);
+    m_birdPos = currentBird;
+    m_obstacles = currentObstacles;
 }
 
 void FlappyBirdGame::render(QPainter &painter) {

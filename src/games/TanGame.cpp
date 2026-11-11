@@ -79,6 +79,9 @@ void TanGame::initialize()
     m_accuracyWindowHitSeconds = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     updateSpatialFrequency();
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
 }
 
 void TanGame::updateSpatialFrequency()
@@ -144,12 +147,26 @@ double TanGame::tangentSharpness() const { return m_tangentSharpness; }
 
 void TanGame::resizeEvent(QResizeEvent* event)
 {
+    const int oldHeight = event->oldSize().height();
+    const int newHeight = event->size().height();
+    if (newHeight > 0) {
+        if (oldHeight > 0)
+            m_cursorY = newHeight * 0.5 +
+                (m_cursorY - oldHeight * 0.5) *
+                (static_cast<double>(newHeight) / oldHeight);
+        else
+            m_cursorY = newHeight * 0.5;
+    }
     QWidget::resizeEvent(event);
     updateSpatialFrequency();
     const double scaleY = qMax(0.5, height() / 480.0);
     const double ratio = 0.145 - (m_difficultyLevel - 1) * 0.010;
     m_tolerance = qBound(12.0 * scaleY,
         static_cast<double>(height()) * ratio, 64.0 * scaleY);
+    calculateTargetY(width() * 0.72);
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
     QWidget::update();
 }
 
@@ -219,6 +236,9 @@ void TanGame::update(double deltaTime)
         return;
 
     const double dt = qMin(deltaTime, 0.1);
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
     updateSpatialFrequency();
     m_phase = std::remainder(
         m_phase - m_scrollSpeed * m_frequency * dt, kPi);
@@ -281,6 +301,17 @@ void TanGame::update(double deltaTime)
             : QStringLiteral("Zmniejsz siłę");
         updateAutomaticDifficulty(dt);
     }
+}
+
+void TanGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double phase = m_phase, cursor = m_cursorY, target = m_targetY;
+    m_phase = m_previousPhase + (phase - m_previousPhase) * alpha;
+    m_cursorY = m_previousCursorY + (cursor - m_previousCursorY) * alpha;
+    m_targetY = m_previousTargetY + (target - m_previousTargetY) * alpha;
+    render(painter);
+    m_phase = phase; m_cursorY = cursor; m_targetY = target;
 }
 
 void TanGame::render(QPainter& painter)

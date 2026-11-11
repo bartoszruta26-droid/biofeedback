@@ -19,6 +19,7 @@ GameEngine::GameEngine(QWidget *parent)
     , m_lastFrameTime(0)
     , m_accumulatedSessionMs(0)
     , m_simulationAccumulator(0.0)
+    , m_renderInterpolationAlpha(0.0)
     , m_frameCount(0)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
@@ -141,6 +142,7 @@ void GameEngine::resume()
     m_monotonicClock.start();
     m_lastFrameTime = 0;
     m_simulationAccumulator = 0.0;
+    m_renderInterpolationAlpha = 0.0;
     
     // Wznowienie timera
     m_gameTimer->start();
@@ -217,6 +219,7 @@ void GameEngine::reset()
     m_monotonicClock.invalidate();
     m_lastFrameTime = 0;
     m_simulationAccumulator = 0.0;
+    m_renderInterpolationAlpha = 0.0;
     m_frameCount = 0;
     m_invalidInputCount = 0;
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
@@ -235,9 +238,10 @@ void GameEngine::gameLoop()
         return;
     }
     
-    // Obliczenie delta time (czas w sekundach od ostatniej klatki)
-    const qint64 currentTime = m_monotonicClock.elapsed();
-    double deltaTime = static_cast<double>(currentTime - m_lastFrameTime) / 1000.0;
+    // Use nanosecond monotonic time: millisecond quantization causes visible
+    // cadence jitter at 90/120 Hz, especially when 8 ms timer ticks alternate.
+    const qint64 currentTime = m_monotonicClock.nsecsElapsed();
+    double deltaTime = static_cast<double>(currentTime - m_lastFrameTime) / 1.0e9;
     m_lastFrameTime = currentTime;
 
     // Ignore negative/non-finite intervals and cap stalls to avoid tunnelling.
@@ -247,7 +251,7 @@ void GameEngine::gameLoop()
     
     // Fixed-step simulation keeps collision and movement behaviour independent
     // of GUI timer jitter. The frame delta is capped above to bound catch-up work.
-    constexpr double fixedStep = 1.0 / 120.0;
+    constexpr double fixedStep = kFixedSimulationStepSeconds;
     m_simulationAccumulator += deltaTime;
     int steps = 0;
     while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
@@ -257,8 +261,11 @@ void GameEngine::gameLoop()
     }
     m_frameCount += static_cast<quint64>(steps);
     if (steps == 12 && m_simulationAccumulator >= fixedStep)
-        m_simulationAccumulator = 0.0;
+        m_simulationAccumulator = std::fmod(m_simulationAccumulator, fixedStep);
 
+    // Interpolate only presentation. Physics and sensor sampling remain on
+    // deterministic fixed ticks; alpha never feeds back into game logic.
+    m_renderInterpolationAlpha = qBound(0.0, m_simulationAccumulator / fixedStep, 1.0);
     QWidget::update();
 }
 
@@ -354,6 +361,12 @@ void GameEngine::addScore(int points)
         std::numeric_limits<int>::min(), total, std::numeric_limits<int>::max())));
 }
 
+void GameEngine::renderInterpolated(QPainter& painter, double alpha)
+{
+    Q_UNUSED(alpha);
+    render(painter);
+}
+
 void GameEngine::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
@@ -369,7 +382,7 @@ void GameEngine::paintEvent(QPaintEvent* event)
     // Running games render an opaque background themselves. Avoid a second
     // full-window fill at 120 Hz, which is expensive on the Raspberry Pi 4.
     if (m_isRunning) {
-        render(painter);
+        renderInterpolated(painter, m_renderInterpolationAlpha);
     } else {
         painter.fillRect(rect(), Qt::black);
         // Ekran startowy/końcowy

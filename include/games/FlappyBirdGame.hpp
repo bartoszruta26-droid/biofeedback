@@ -127,6 +127,7 @@ private slots:
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     // Struktura reprezentująca przeszkodę (gałęzie drzewa)
@@ -151,6 +152,8 @@ private:
 
     // Stan gry - Ptak
     QPointF m_birdPos;            ///< Pozycja ptaka
+    QPointF m_previousBirdPos;
+    std::vector<Obstacle> m_previousObstacles;
     QPointF m_birdVelocity;       ///< Prędkość ptaka
     float m_birdRadius;           ///< Promień ptaka
     float m_gravity;              ///< Siła grawitacji

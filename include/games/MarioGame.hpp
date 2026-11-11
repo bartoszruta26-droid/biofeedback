@@ -65,6 +65,7 @@ protected:
     void paintEvent(QPaintEvent* event) override;
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
     bool handleInput(double value) override;
 
 private:
@@ -184,7 +185,12 @@ private:
     // Stan gry
     Player m_player;
     QRectF m_previousPlayerBody;
+    double m_previousWorldDistance = 0.0;
     QVector<Obstacle> m_obstacles;
+    QVector<Obstacle> m_previousObstacles;
+    QVector<Enemy> m_previousEnemies;
+    QVector<Collectible> m_previousCollectibles;
+    QVector<Cloud> m_previousClouds;
     QVector<Collectible> m_collectibles;
     QVector<Enemy> m_enemies;
     double m_enemySpawnTimer = 0.0;

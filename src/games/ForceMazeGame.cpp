@@ -119,6 +119,10 @@ void ForceMazeGame::initialize()
     m_status = QStringLiteral("Zwolnij tensometr do strefy neutralnej");
     m_collectedCrystals.clear();
     m_reachedCheckpoints.clear();
+    m_previousProgressRows = m_progressRows;
+    m_previousPlayerColumn = m_playerColumn;
+    m_previousVisualTime = m_visualTime;
+    m_previousCameraShake = m_cameraShake;
     setScore(0);
 }
 
@@ -321,6 +325,11 @@ void ForceMazeGame::update(double deltaTime)
     if (!std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
 
+    m_previousProgressRows = m_progressRows;
+    m_previousPlayerColumn = m_playerColumn;
+    m_previousVisualTime = m_visualTime;
+    m_previousCameraShake = m_cameraShake;
+
     m_visualTime += deltaTime;
     m_hitFlash = qMax(0.0, m_hitFlash - deltaTime);
     m_checkpointFlash = qMax(0.0, m_checkpointFlash - deltaTime);
@@ -357,6 +366,28 @@ void ForceMazeGame::update(double deltaTime)
 
     if (m_progressRows >= static_cast<double>(kRowsPerLevel))
         completeLevel();
+}
+
+void ForceMazeGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double progress = m_progressRows;
+    const double player = m_playerColumn;
+    const double visual = m_visualTime;
+    const double shake = m_cameraShake;
+    m_progressRows = m_previousProgressRows +
+        (progress - m_previousProgressRows) * alpha;
+    m_playerColumn = m_previousPlayerColumn +
+        (player - m_previousPlayerColumn) * alpha;
+    m_visualTime = m_previousVisualTime +
+        (visual - m_previousVisualTime) * alpha;
+    m_cameraShake = m_previousCameraShake +
+        (shake - m_previousCameraShake) * alpha;
+    render(painter);
+    m_progressRows = progress;
+    m_playerColumn = player;
+    m_visualTime = visual;
+    m_cameraShake = shake;
 }
 
 void ForceMazeGame::render(QPainter &painter)
