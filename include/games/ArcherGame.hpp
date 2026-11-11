@@ -31,6 +31,7 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void resizeEvent(QResizeEvent* event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     struct Arrow {
@@ -43,7 +44,9 @@ private:
     void repositionTarget();
 
     QVector<Arrow> m_arrows;
+    QVector<QPointF> m_previousArrowPositions;
     QRectF m_target;
+    QRectF m_previousTarget;
     double m_force;
     double m_aimAngle;
     double m_targetDirection;
