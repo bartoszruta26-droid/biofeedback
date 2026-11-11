@@ -79,6 +79,9 @@ void ScorchedEarthGame::resizeEvent(QResizeEvent* event)
         buildTerrain();
         updateTankPositions();
     }
+    m_previousProjectilePositions.clear();
+    for (const Projectile& projectile : m_projectiles)
+        m_previousProjectilePositions.push_back(projectile.position);
 }
 
 void ScorchedEarthGame::buildTerrain()
