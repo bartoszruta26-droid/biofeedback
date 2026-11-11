@@ -234,6 +234,29 @@ int main(int argc, char **argv)
     REQUIRE(archerMissGame->activeArrowCount() == 0);
     archerMissGame->stop();
 
+    // Car Race steering uses filtered, hysteretic lane selection and a timed boost.
+    std::unique_ptr<games::GameEngine> carRaceControls(games::createGame(QStringLiteral("car_race")));
+    auto* carRaceControlsGame = dynamic_cast<games::CarRaceGame*>(carRaceControls.get());
+    REQUIRE(carRaceControlsGame != nullptr);
+    carRaceControlsGame->resize(640, 480);
+    carRaceControlsGame->start();
+    REQUIRE(carRaceControlsGame->currentLane() == 1);
+    carRaceControlsGame->handleSensorInput(0.0);
+    REQUIRE(carRaceControlsGame->currentLane() == 0);
+    carRaceControlsGame->handleSensorInput(50.0);
+    REQUIRE(carRaceControlsGame->currentLane() == 1);
+    carRaceControlsGame->handleSensorInput(100.0);
+    REQUIRE(carRaceControlsGame->currentLane() == 2);
+    carRaceControlsGame->handleSensorInput(50.0);
+    REQUIRE(carRaceControlsGame->currentLane() == 1);
+    carRaceControlsGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    REQUIRE(carRaceControlsGame->currentLane() == 1);
+    QKeyEvent carRaceBoost(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(carRaceControlsGame, &carRaceBoost);
+    REQUIRE(carRaceControlsGame->boostActive());
+    REQUIRE(carRaceControlsGame->boostCooldownRemaining() > 0.0);
+    carRaceControlsGame->stop();
+
     std::unique_ptr<games::GameEngine> carRace(games::createGame(QStringLiteral("car_race")));
     auto* carRaceGame = dynamic_cast<games::CarRaceGame*>(carRace.get());
     REQUIRE(carRaceGame != nullptr);
