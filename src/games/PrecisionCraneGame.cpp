@@ -2,6 +2,7 @@
 
 #include <QPainter>
 #include <QFile>
+#include <QFileInfo>
 #include <QDir>
 #include <QSaveFile>
 #include <QStandardPaths>
@@ -18,7 +19,7 @@
 
 namespace games {
 
-PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
+PrecisionCraneGame::PrecisionCraneGame(QWidget *parent, const QString &recordsFilePath)
     : GameEngine(parent)
     , m_force(0.0)
     , m_inputAge(1.0)
@@ -56,6 +57,7 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_gestureActive(false)
     , m_loadAttached(false)
     , m_status(QStringLiteral("Oczekiwanie na sygnał tensometru"))
+    , m_recordsFilePath(recordsFilePath)
 {
     m_obstacles = {{0.40, 34.0, 28.0, 0.42, 0.0},
                    {0.58, 42.0, 32.0, 0.31, 2.1}};
@@ -297,18 +299,8 @@ void PrecisionCraneGame::update(double deltaTime)
         }
     }
 
-    if (m_loadAttached && checkObstacleCollision()) {
-        m_loadAttached = false;
-        m_cargoX = qBound(0.08, (m_carriageX + m_sway) / qMax(1, width()), 0.92);
-        ++m_collisionCount;
-        ++m_lifetimeCollisions;
-        saveRecords();
-        --m_mistakesRemaining;
-        m_combo = 0;
-        m_swayVelocity = 0.0;
-        m_status = QStringLiteral("Kolizja z przeszkodą portową — pozostało prób: %1").arg(m_mistakesRemaining);
-        if (m_mistakesRemaining <= 0) stop();
-    }
+    if (m_loadAttached)
+        processObstacleCollision();
 
     // Damped-pendulum model: trolley acceleration excites the suspended load.
     // The single force sensor remains the only player input; sway is simulation state.
@@ -353,6 +345,26 @@ bool PrecisionCraneGame::checkObstacleCollision()
     return false;
 }
 
+bool PrecisionCraneGame::processObstacleCollision()
+{
+    if (!m_loadAttached || !checkObstacleCollision())
+        return false;
+
+    m_loadAttached = false;
+    m_cargoX = qBound(0.08, (m_carriageX + m_sway) / qMax(1, width()), 0.92);
+    ++m_collisionCount;
+    ++m_lifetimeCollisions;
+    saveRecords();
+    --m_mistakesRemaining;
+    m_combo = 0;
+    m_swayVelocity = 0.0;
+    m_status = QStringLiteral("Kolizja z przeszkodą portową — pozostało prób: %1")
+                   .arg(m_mistakesRemaining);
+    if (m_mistakesRemaining <= 0)
+        stop();
+    return true;
+}
+
 void PrecisionCraneGame::configureCargo()
 {
     const int variant = m_delivered % 3;
@@ -365,8 +377,10 @@ void PrecisionCraneGame::configureCargo()
 
 void PrecisionCraneGame::loadRecords()
 {
-    const QString path = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-                         + QStringLiteral("/precision_crane_records.json");
+    const QString path = m_recordsFilePath.isEmpty()
+        ? QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+              + QStringLiteral("/precision_crane_records.json")
+        : m_recordsFilePath;
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll());
@@ -381,9 +395,12 @@ void PrecisionCraneGame::loadRecords()
 
 void PrecisionCraneGame::saveRecords()
 {
-    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    if (directory.isEmpty() || !QDir().mkpath(directory)) return;
-    const QString path = directory + QStringLiteral("/precision_crane_records.json");
+    const QString path = m_recordsFilePath.isEmpty()
+        ? QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+              + QStringLiteral("/precision_crane_records.json")
+        : m_recordsFilePath;
+    const QString directory = QFileInfo(path).absolutePath();
+    if (path.isEmpty() || directory.isEmpty() || !QDir().mkpath(directory)) return;
     m_bestScore = qMax(m_bestScore, getScore());
     QJsonObject record;
     record.insert(QStringLiteral("schemaVersion"), 1);
