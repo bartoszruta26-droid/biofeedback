@@ -153,8 +153,8 @@ void BalanceTowerGame::placeBlock()
     const Block &top = m_blocks.last();
     const double x = m_targetPosition;
     const double z = m_targetDepth;
-    const double overlapX = qMax(0.0, top.width - std::abs(x - top.x));
-    const double overlapZ = qMax(0.0, top.depth - std::abs(z - top.z));
+    const double overlapX = qMax(0.0, (top.width + m_blockWidth) * 0.5 - std::abs(x - top.x));
+    const double overlapZ = qMax(0.0, (top.depth + m_blockWidth) * 0.5 - std::abs(z - top.z));
     const double overlap = qMin(overlapX, overlapZ);
     if (overlap < 0.12) {
         ++m_falls;
@@ -171,7 +171,7 @@ void BalanceTowerGame::placeBlock()
     }
 
     const double precision = qBound(0.0, 1.0 - (std::abs(x - top.x) + std::abs(z - top.z)) / 0.84, 1.0);
-    const double width = qMax(0.38, qMin(top.width, top.depth) * (0.91 + 0.09 * precision));
+    const double width = qMax(0.38, qMin(m_blockWidth, qMin(overlapX, overlapZ)));
     const double depth = width;
     const double mass = 1.0 + (m_blocks.size() % 3) * 0.12;
     m_blocks.append({x, z, width, depth, mass});
@@ -197,7 +197,7 @@ void BalanceTowerGame::finishRound(bool stable)
 {
     if (m_roundCompleted)
         return;
-    m_roundCompleted = stable;
+    m_roundCompleted = stable && m_round >= 3;
     if (stable) {
         addScore(250 * m_round);
         unlockAchievement(QStringLiteral("round_complete"));
@@ -209,6 +209,8 @@ void BalanceTowerGame::finishRound(bool stable)
             m_status = QStringLiteral("Wieża ukończona — zwycięstwo!");
         } else {
             ++m_round;
+            m_bestRound = qMax(m_bestRound, m_round);
+            m_blockWidth = qMax(0.48, 0.78 - 0.08 * (m_round - 1));
             m_blocks.clear();
             m_blocks.append({0.0, 0.0, 1.0, 1.0, 1.0});
             m_targetPosition = 0.0;
@@ -259,8 +261,7 @@ void BalanceTowerGame::update(double deltaTime)
         return;
 
     const double smoothing = 1.0 - std::exp(-deltaTime * 10.0);
-    if (m_depthAxis)
-        m_targetPosition += (m_targetPosition - m_targetPosition) * smoothing;
+    Q_UNUSED(smoothing);
     m_stability = qBound(0.0, m_stability - qAbs(m_tilt) * deltaTime * 0.018, 1.0);
     m_tilt *= std::exp(-deltaTime * 1.8);
 }
@@ -297,11 +298,12 @@ void BalanceTowerGame::render(QPainter &painter)
         painter.drawLine(face.topLeft() + QPointF(4,2), face.topRight() + QPointF(-4,2));
     }
 
-    const qreal activeX = baseX + m_targetPosition * scale - m_blockWidth * scale * 0.5;
+    const qreal activeWidth = m_blocks.isEmpty() ? m_blockWidth : qMin(m_blockWidth, m_blocks.last().width);
+    const qreal activeX = baseX + m_targetPosition * scale - activeWidth * scale * 0.5;
     const qreal activeY = baseY - (m_blocks.size() + 1) * blockH - 18;
     painter.setPen(QPen(QColor(255, 225, 135), 2.0, Qt::DashLine));
     painter.setBrush(QColor(255, 207, 96, 65));
-    painter.drawRoundedRect(QRectF(activeX, activeY, m_blockWidth * scale,
+    painter.drawRoundedRect(QRectF(activeX, activeY, activeWidth * scale,
                                    blockH - 2), 4, 4);
 
     painter.setPen(Qt::white);
