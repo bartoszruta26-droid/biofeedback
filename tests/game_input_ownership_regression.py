@@ -33,9 +33,9 @@ for path in GAME_SOURCES + GAME_HEADERS:
 
 engine = (ROOT / "src" / "games" / "GameEngine.cpp").read_text(encoding="utf-8")
 required_engine_tokens = (
-    "m_gameTimer->setInterval(11)",
+    "m_gameTimer->setInterval(8)",
     "m_gameTimer->setTimerType(Qt::PreciseTimer)",
-    "constexpr double fixedStep = 1.0 / 90.0;",
+    "constexpr double fixedStep = 1.0 / 120.0;",
     "Qt::WA_OpaquePaintEvent",
     "Qt::WA_NoSystemBackground",
 )
