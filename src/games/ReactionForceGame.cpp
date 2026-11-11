@@ -297,7 +297,7 @@ void ReactionForceGame::finishRound()
         unlockAchievement(QStringLiteral("clean_round"), QStringLiteral("Bezbłędna seria"));
     if (m_perfectHits >= 10)
         unlockAchievement(QStringLiteral("perfect_10"), QStringLiteral("Dziesięć reakcji perfekcyjnych"));
-    const int accuracy = (100 * m_hits) / kTotalTrials;
+    const int accuracy = (100 * m_hits) / qMax(1, m_hits + m_misses);
     QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
     const int previousBestAccuracy =
         settings.value(QStringLiteral("games/reaction_force/records/best_accuracy"), 0).toInt();
@@ -598,7 +598,7 @@ void ReactionForceGame::render(QPainter& painter)
                          Qt::AlignCenter, QStringLiteral("RUNDA ZAKOŃCZONA"));
         painter.setPen(QColor(232, 243, 255));
         painter.setFont(QFont(QStringLiteral("Sans Serif"), bodySize, QFont::DemiBold));
-        const int accuracy = (100 * m_hits) / kTotalTrials;
+        const int accuracy = (100 * m_hits) / qMax(1, m_hits + m_misses);
         const QString summary = QStringLiteral(
             "Wynik: %1 pkt    Celność: %2%    Trafienia: %3/%4\n"
             "Najlepsza seria: %5    Perfekcyjne: %6    Falstarty: %7\n"
