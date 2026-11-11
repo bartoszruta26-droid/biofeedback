@@ -7,8 +7,6 @@
 #include <QRectF>
 #include <QVector>
 
-class QKeyEvent;
-class QMouseEvent;
 class QResizeEvent;
 
 namespace games {
@@ -33,10 +31,7 @@ protected:
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
-    void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
-    void mouseMoveEvent(QMouseEvent* event) override;
-    void mousePressEvent(QMouseEvent* event) override;
 
 private:
     struct Projectile {
@@ -61,6 +56,8 @@ private:
     double m_power;
     double m_wind;
     double m_enemyDelay;
+    double m_playerShotDelay{2.0};
+    double m_playerShotInterval{2.0};
     double m_gravity;
     int m_playerHealth;
     int m_enemyHealth;
