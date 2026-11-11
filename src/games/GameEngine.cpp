@@ -23,7 +23,7 @@ GameEngine::GameEngine(QWidget *parent)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Request a steady 90 Hz presentation cadence. A precise timer avoids
+    // Request a steady 120 Hz presentation cadence. A precise timer avoids
     // coarse-timer drift; the fixed-step simulation remains independent of
     // display resolution and sensor acquisition frequency.
     // Every game paints an opaque full-frame background. Let Qt skip the
@@ -32,7 +32,7 @@ GameEngine::GameEngine(QWidget *parent)
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAutoFillBackground(false);
 
-    m_gameTimer->setInterval(11);
+    m_gameTimer->setInterval(8);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
@@ -247,7 +247,7 @@ void GameEngine::gameLoop()
     
     // Fixed-step simulation keeps collision and movement behaviour independent
     // of GUI timer jitter. The frame delta is capped above to bound catch-up work.
-    constexpr double fixedStep = 1.0 / 90.0;
+    constexpr double fixedStep = 1.0 / 120.0;
     m_simulationAccumulator += deltaTime;
     int steps = 0;
     while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
@@ -367,7 +367,7 @@ void GameEngine::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::TextAntialiasing, false);
 
     // Running games render an opaque background themselves. Avoid a second
-    // full-window fill at 90 Hz, which is expensive on the Raspberry Pi 4.
+    // full-window fill at 120 Hz, which is expensive on the Raspberry Pi 4.
     if (m_isRunning) {
         render(painter);
     } else {
