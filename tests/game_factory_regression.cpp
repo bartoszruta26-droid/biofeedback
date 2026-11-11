@@ -408,6 +408,25 @@ int main(int argc, char **argv)
     REQUIRE(sinusGame->isRunning());
     sinusGame->stop();
 
+    // Scorched Earth sensor-only firing: a fresh HX711 stream starts the shot cycle.
+    std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
+    auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
+    REQUIRE(scorchedGame != nullptr);
+    scorchedGame->resize(640, 480);
+    scorchedGame->start();
+    REQUIRE(scorchedGame->playerHealth() == 100);
+    REQUIRE(scorchedGame->enemyHealth() == 100);
+    REQUIRE(scorchedGame->currentRound() == 1);
+    REQUIRE(scorchedGame->terrainPointCount() > 1);
+    scorchedGame->handleSensorInput(50.0);
+    waitForEvents(2400);
+    REQUIRE(scorchedGame->enemyHealth() < 100);
+    REQUIRE(scorchedGame->playerHealth() > 0);
+    scorchedGame->stop();
+    scorchedGame->reset();
+    REQUIRE(scorchedGame->enemyHealth() == 100);
+    REQUIRE(scorchedGame->playerHealth() == 100);
+
     std::unique_ptr<games::GameEngine> flappy(games::createGame(QStringLiteral("flappy")));
     auto* flappyGame = dynamic_cast<games::FlappyBirdGame*>(flappy.get());
     REQUIRE(flappyGame != nullptr);
