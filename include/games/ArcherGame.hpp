@@ -6,7 +6,6 @@
 #include <QRectF>
 #include <QVector>
 
-class QKeyEvent;
 class QResizeEvent;
 
 namespace games {
@@ -30,8 +29,6 @@ protected:
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void keyReleaseEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -52,6 +49,7 @@ private:
     double m_targetSpeed;
     double m_gravity;
     double m_fireCooldown;
+    double m_autoFireInterval{2.4};
     int m_shotsFired{0};
     int m_successfulHits{0};
     int m_missedShots{0};
