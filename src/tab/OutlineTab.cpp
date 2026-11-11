@@ -26,6 +26,10 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QStandardItemModel>
+#include <QCheckBox>
+#include <QDoubleSpinBox>
+#include <QTabWidget>
+#include <QSizePolicy>
 
 namespace tab {
 
@@ -139,9 +143,11 @@ void OutlineTab::setupUI()
 
     workspace->addWidget(visualScroll);
     workspace->addWidget(settingsScroll);
-    workspace->setStretchFactor(0, 72);
-    workspace->setStretchFactor(1, 28);
-    workspace->setSizes({720, 280});
+    visualScroll->setMinimumWidth(420);
+    settingsScroll->setMinimumWidth(300);
+    workspace->setStretchFactor(0, 64);
+    workspace->setStretchFactor(1, 36);
+    workspace->setSizes({900, 500});
     m_mainLayout->addWidget(workspace, 1);
 
     m_patientContextLabel = new QLabel(tr("Pacjent: nie wybrano"), visualPanel);
@@ -366,6 +372,21 @@ void OutlineTab::setupUI()
     setupControlPanel();
     setupGameArea();
 
+    // Ustawienia konspektu, gry i sterowania mają odrębne karty. Dzięki temu
+    // panel boczny nie wymaga przewijania przez wszystkie grupy jednocześnie.
+    auto* settingsTabs = new QTabWidget(settingsPanel);
+    settingsTabs->setObjectName(QStringLiteral("outlineSettingsTabs"));
+    for (const auto& page : {
+             QPair<QWidget*, QString>(m_outlineGroup, tr("Konspekt")),
+             QPair<QWidget*, QString>(m_gameSelectionGroup, tr("Gra")),
+             QPair<QWidget*, QString>(m_controlGroup, tr("Sterowanie"))}) {
+        m_rightLayout->removeWidget(page.first);
+        settingsTabs->addTab(page.first, page.second);
+    }
+    m_rightLayout->insertWidget(0, settingsTabs);
+    m_rightLayout->addWidget(m_outlineInfoGroup);
+    m_outlineInfoGroup->setMaximumHeight(220);
+
     auto* graphGroup = new QGroupBox(tr("Biofeedback — siła w czasie rzeczywistym"), visualPanel);
     auto* graphLayout = new QVBoxLayout(graphGroup);
     m_forceGraph = new gui::GraphWidget(graphGroup);
@@ -373,15 +394,157 @@ void OutlineTab::setupUI()
     m_forceGraph->setYLabel(tr("Siła"));
     m_forceGraph->setUnit(tr("N"));
     m_forceGraph->setTimeRange(30);
-    m_forceGraph->setMinimumHeight(220);
+    m_forceGraph->setMinimumHeight(260);
+    m_forceGraph->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    // Panel sterowania wykresem: zakres czasu, autoskalowanie, skala ręczna,
+    // siatka, etykiety wartości oraz eksport surowych próbek do CSV.
+    auto* graphToolbar = new QHBoxLayout();
+    auto* timeRangeCombo = new QComboBox(graphGroup);
+    timeRangeCombo->setObjectName(QStringLiteral("outlineGraphTimeRange"));
+    timeRangeCombo->addItem(tr("10 s"), 10);
+    timeRangeCombo->addItem(tr("30 s"), 30);
+    timeRangeCombo->addItem(tr("60 s"), 60);
+    timeRangeCombo->addItem(tr("120 s"), 120);
+    timeRangeCombo->addItem(tr("300 s"), 300);
+    timeRangeCombo->setCurrentIndex(1);
+    auto* autoScaleCheck = new QCheckBox(tr("Autoskalowanie Y"), graphGroup);
+    autoScaleCheck->setObjectName(QStringLiteral("outlineGraphAutoScale"));
+    autoScaleCheck->setChecked(true);
+    auto* yMinSpin = new QDoubleSpinBox(graphGroup);
+    auto* yMaxSpin = new QDoubleSpinBox(graphGroup);
+    yMinSpin->setObjectName(QStringLiteral("outlineGraphYMin"));
+    yMaxSpin->setObjectName(QStringLiteral("outlineGraphYMax"));
+    for (QDoubleSpinBox* spin : {yMinSpin, yMaxSpin}) {
+        spin->setRange(-1000000.0, 1000000.0);
+        spin->setDecimals(2);
+        spin->setSingleStep(1.0);
+        spin->setMaximumWidth(105);
+        spin->setEnabled(false);
+    }
+    yMinSpin->setValue(0.0);
+    yMaxSpin->setValue(100.0);
+    auto* gridCheck = new QCheckBox(tr("Siatka"), graphGroup);
+    gridCheck->setChecked(true);
+    auto* valuesCheck = new QCheckBox(tr("Wartości"), graphGroup);
+    valuesCheck->setChecked(false);
+    auto* exportGraphButton = new QPushButton(tr("Eksport CSV"), graphGroup);
+    auto* clearGraphButton = new QPushButton(tr("Wyczyść"), graphGroup);
+    graphToolbar->addWidget(new QLabel(tr("Okno:"), graphGroup));
+    graphToolbar->addWidget(timeRangeCombo);
+    graphToolbar->addWidget(autoScaleCheck);
+    graphToolbar->addWidget(new QLabel(tr("Y min:"), graphGroup));
+    graphToolbar->addWidget(yMinSpin);
+    graphToolbar->addWidget(new QLabel(tr("Y max:"), graphGroup));
+    graphToolbar->addWidget(yMaxSpin);
+    graphToolbar->addWidget(gridCheck);
+    graphToolbar->addWidget(valuesCheck);
+    graphToolbar->addWidget(exportGraphButton);
+    graphToolbar->addWidget(clearGraphButton);
+    graphLayout->addLayout(graphToolbar);
+
+    auto* graphStatusLabel = new QLabel(tr("Brak próbek — oczekiwanie na dane z czujnika."), graphGroup);
+    graphStatusLabel->setObjectName(QStringLiteral("outlineGraphStatus"));
+    graphLayout->addWidget(graphStatusLabel);
     graphLayout->addWidget(m_forceGraph);
+    connect(timeRangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, [this, timeRangeCombo](int index) {
+                if (m_forceGraph && index >= 0)
+                    m_forceGraph->setTimeRange(timeRangeCombo->itemData(index).toInt());
+            });
+    connect(autoScaleCheck, &QCheckBox::toggled, this,
+            [this, yMinSpin, yMaxSpin](bool enabled) {
+                yMinSpin->setEnabled(!enabled);
+                yMaxSpin->setEnabled(!enabled);
+                if (m_forceGraph) {
+                    if (enabled) m_forceGraph->setYRange(0.0, 1.0, true);
+                    else m_forceGraph->setYRange(yMinSpin->value(), yMaxSpin->value(), false);
+                }
+            });
+    auto applyManualYRange = [this, autoScaleCheck, yMinSpin, yMaxSpin]() {
+        if (autoScaleCheck->isChecked()) return;
+        if (yMinSpin->value() >= yMaxSpin->value()) {
+            yMaxSpin->setValue(yMinSpin->value() + 0.01);
+        }
+        if (m_forceGraph)
+            m_forceGraph->setYRange(yMinSpin->value(), yMaxSpin->value(), false);
+    };
+    connect(yMinSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [applyManualYRange](double) { applyManualYRange(); });
+    connect(yMaxSpin, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
+            this, [applyManualYRange](double) { applyManualYRange(); });
+    connect(gridCheck, &QCheckBox::toggled, m_forceGraph, &gui::GraphWidget::setShowGrid);
+    connect(valuesCheck, &QCheckBox::toggled, m_forceGraph, &gui::GraphWidget::setShowValues);
+    connect(clearGraphButton, &QPushButton::clicked, m_forceGraph, &gui::GraphWidget::clear);
+    connect(exportGraphButton, &QPushButton::clicked, this, [this]() {
+        if (!m_forceGraph || m_forceGraph->dataPointCount() == 0) {
+            QMessageBox::information(this, tr("Eksport wykresu"),
+                                     tr("Brak próbek do wyeksportowania."));
+            return;
+        }
+        const QString path = QFileDialog::getSaveFileName(
+            this, tr("Eksportuj próbki biofeedback"), QStringLiteral("biofeedback.csv"),
+            tr("Pliki CSV (*.csv)"));
+        if (path.isEmpty()) return;
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            QMessageBox::warning(this, tr("Eksport wykresu"),
+                                 tr("Nie można zapisać pliku: %1").arg(file.errorString()));
+            return;
+        }
+        QTextStream stream(&file);
+        stream << "timestamp_iso8601;force_n\n";
+        for (const gui::DataPoint& point : m_forceGraph->getData())
+            stream << point.timestamp.toString(Qt::ISODateWithMs) << ';'
+                   << QString::number(point.value, 'g', 15) << '\n';
+        file.close();
+        QMessageBox::information(this, tr("Eksport wykresu"),
+                                 tr("Zapisano %1 próbek do pliku:\n%2")
+                                     .arg(m_forceGraph->dataPointCount()).arg(path));
+    });
+    connect(m_forceGraph, &gui::GraphWidget::hovered, this,
+            [graphStatusLabel](const gui::DataPoint& point, const QPointF&) {
+                graphStatusLabel->setText(
+                    QObject::tr("%1 | %2 N")
+                        .arg(point.timestamp.toString(Qt::ISODateWithMs))
+                        .arg(point.value, 0, 'f', 3));
+            });
+    auto updateGraphStatus = [this, graphStatusLabel]() {
+        if (m_forceGraph)
+            graphStatusLabel->setText(
+                QObject::tr("Próbki: %1 | %2")
+                    .arg(m_forceGraph->dataPointCount())
+                    .arg(m_forceGraph->getRenderStats()));
+    };
+    auto* graphStatusTimer = new QTimer(graphGroup);
+    graphStatusTimer->setInterval(1000);
+    connect(graphStatusTimer, &QTimer::timeout, this, updateGraphStatus);
+    graphStatusTimer->start();
     m_leftLayout->insertWidget(1, graphGroup);
 
     m_clinicalProtocolBrowser = new QTextBrowser(visualPanel);
     m_clinicalProtocolBrowser->setOpenExternalLinks(true);
     m_clinicalProtocolBrowser->setMinimumHeight(150);
     m_clinicalProtocolBrowser->setPlaceholderText(tr("Wybierz konspekt, aby zobaczyć protokół kliniczny."));
-    m_leftLayout->addWidget(m_clinicalProtocolBrowser);
+
+    // Dokumentacja pacjenta jest oddzielona od widoku ćwiczenia. Każdy obszar
+    // ma własną zakładkę, dzięki czemu pola nie konkurują z wykresem i grą.
+    auto* clinicalTabs = new QTabWidget(visualPanel);
+    clinicalTabs->setObjectName(QStringLiteral("outlineClinicalWorkspaceTabs"));
+    const QList<QPair<QWidget*, QString>> clinicalPages = {
+        {episodeGroup, tr("Epizod")},
+        {assessmentGroup, tr("Ocena")},
+        {goalsGroup, tr("Cele")},
+        {sessionGroup, tr("Sesja")},
+        {observationGroup, tr("Obserwacje")},
+        {m_clinicalProtocolBrowser, tr("Protokół")}
+    };
+    for (const auto& page : clinicalPages) {
+        m_leftLayout->removeWidget(page.first);
+        clinicalTabs->addTab(page.first, page.second);
+    }
+    clinicalTabs->setMinimumHeight(260);
+    m_leftLayout->insertWidget(2, clinicalTabs);
 }
 
 void OutlineTab::setupOutlineSelector()
@@ -468,15 +631,15 @@ void OutlineTab::setupExerciseView()
     m_mediaLayout = new QHBoxLayout();
     
     m_exerciseImageLabel = new QLabel(this);
-    m_exerciseImageLabel->setMinimumSize(320, 240);
-    m_exerciseImageLabel->setMaximumSize(320, 240);
+    m_exerciseImageLabel->setMinimumSize(180, 140);
+    m_exerciseImageLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_exerciseImageLabel->setAlignment(Qt::AlignCenter);
     m_exerciseImageLabel->setText(tr("Brak obrazu"));
     m_exerciseImageLabel->setStyleSheet("QLabel { background-color: #f0f0f0; border: 1px solid #ccc; }");
     
     m_videoWidget = new QWidget(this);
-    m_videoWidget->setMinimumSize(320, 240);
-    m_videoWidget->setMaximumSize(320, 240);
+    m_videoWidget->setMinimumSize(180, 140);
+    m_videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     m_videoWidget->setStyleSheet("QWidget { background-color: #000; }");
     
     QVBoxLayout* videoLayout = new QVBoxLayout(m_videoWidget);
