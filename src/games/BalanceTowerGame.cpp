@@ -260,8 +260,6 @@ void BalanceTowerGame::update(double deltaTime)
     if (!hasFreshSignal() || m_gameOver || m_roundCompleted)
         return;
 
-    const double smoothing = 1.0 - std::exp(-deltaTime * 10.0);
-    Q_UNUSED(smoothing);
     m_stability = qBound(0.0, m_stability - qAbs(m_tilt) * deltaTime * 0.018, 1.0);
     m_tilt *= std::exp(-deltaTime * 1.8);
 }
