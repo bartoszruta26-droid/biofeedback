@@ -66,7 +66,7 @@ void ArkanoidGame::updatePhysicsStep(double dt){
  const double maxX=qMax(10.0,static_cast<double>(width())-10.0-m_paddle.width());
  const double sensorX=10.0+m_currentForce*qMax(0.0,static_cast<double>(width())-20.0-m_paddle.width());
  if(m_moveLeft||m_moveRight){const double dir=(m_moveRight?1.0:0.0)-(m_moveLeft?1.0:0.0);m_paddle.moveLeft(qBound(10.0,m_paddle.left()+dir*560.0*dt,maxX));}
- else m_paddle.moveLeft(qBound(10.0,sensorX,maxX));
+ else { const double deltaTime = dt; const double alpha = 1.0 - std::exp(-deltaTime / 0.025); m_paddle.moveLeft(qBound(10.0, m_paddle.left() + (sensorX - m_paddle.left()) * alpha, maxX)); }
  if(m_comboRemaining>0.0){m_comboRemaining=qMax(0.0,m_comboRemaining-dt);if(m_comboRemaining<=0.0)m_combo=0;}
  const QPointF previous=m_ballPosition;m_ballPosition+=m_ballVelocity*dt;m_ballTrail.push_front(m_ballPosition);while(m_ballTrail.size()>7)m_ballTrail.removeLast();
  if(m_ballPosition.x()-m_ballRadius<0){m_ballPosition.setX(m_ballRadius);m_ballVelocity.setX(std::abs(m_ballVelocity.x()));}
