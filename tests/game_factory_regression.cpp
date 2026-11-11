@@ -946,8 +946,13 @@ int main(int argc, char **argv)
     REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("flawless_round")));
     REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("perfect_16")));
     REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("accuracy_90")));
+    REQUIRE(rhythmAchievements->personalBestScore() >= rhythmAchievements->getScore());
+    REQUIRE(rhythmAchievements->personalBestAccuracy() >= 100.0);
+    REQUIRE(rhythmAchievements->personalBestCombo() >= 32);
+    const int savedPersonalBest = rhythmAchievements->personalBestScore();
     rhythmAchievements->reset();
     REQUIRE(rhythmAchievements->hasAchievement(QStringLiteral("flawless_round")));
+    REQUIRE(rhythmAchievements->personalBestScore() == savedPersonalBest);
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
