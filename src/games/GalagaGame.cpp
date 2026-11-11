@@ -365,11 +365,15 @@ void GalagaGame::update(double deltaTime)
             Projectile shot;
             shot.rect = QRectF(shooter.rect.center().x() - 2.5 * scaleX,
                                shooter.rect.bottom(), 5.0 * scaleX, 11.0 * scaleY);
-            shot.velocityX = qBound(-85.0 * scaleX,
-                (m_player.center().x() - shooter.rect.center().x()) * 0.16,
-                85.0 * scaleX);
             shot.velocityY = qMin(340.0 * scaleY,
                 (kHostileShotSpeed + m_wave * 8.0) * scaleY);
+            // Lead the stationary/current sensor-controlled player instead of
+            // using a weak fixed fraction that makes shots miss at wide layouts.
+            const double travelTime = qMax(0.12,
+                (m_player.top() - shot.rect.bottom()) / shot.velocityY);
+            shot.velocityX = qBound(-260.0 * scaleX,
+                (m_player.center().x() - shooter.rect.center().x()) / travelTime,
+                260.0 * scaleX);
             shot.fromPlayer = false;
             m_projectiles.push_back(shot);
             break;
