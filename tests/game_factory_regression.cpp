@@ -9,6 +9,7 @@
 #include "games/CarRaceGame.hpp"
 #include "games/ScorchedEarthGame.hpp"
 #include "games/PrecisionCraneGame.hpp"
+#include "games/RhythmForceGame.hpp"
 #include <QApplication>
 #include <QTemporaryDir>
 #include <QFile>
@@ -55,6 +56,43 @@ struct PrecisionCraneGameTestAccess
         game.deliverOrDropLoad();
     }
 };
+
+struct RhythmForceGameTestAccess
+{
+    static double beatTime(const RhythmForceGame& game, int beat)
+    {
+        return RhythmForceGame::kLeadInSeconds +
+            static_cast<double>(beat - 1) * game.beatIntervalSeconds();
+    }
+
+    static double targetForce(const RhythmForceGame& game, int beat)
+    {
+        return game.targetForceForBeat(beat);
+    }
+
+    static void emitPulse(RhythmForceGame& game, double onset, double duration, double peak)
+    {
+        game.m_songTime = onset;
+        game.m_inputAge = 0.0;
+        game.m_hasSensorSample = true;
+        game.m_awaitingNeutral = false;
+        game.m_pulseActive = false;
+        game.handleInput(peak);
+        game.m_pulseElapsed = duration;
+        game.m_songTime += duration;
+        game.m_inputAge = 0.0;
+        game.handleInput(0.0);
+    }
+
+    static void setClock(RhythmForceGame& game, double songTime)
+    {
+        game.m_songTime = songTime;
+        game.m_inputAge = 0.0;
+        game.m_hasSensorSample = true;
+        game.m_awaitingNeutral = false;
+        game.m_pulseActive = false;
+    }
+};
 } // namespace games
 
 #define REQUIRE(condition) do { \
@@ -86,7 +124,8 @@ int main(int argc, char **argv)
         QStringLiteral("archer"),
         QStringLiteral("car_race"),
         QStringLiteral("scorched_earth"),
-        QStringLiteral("precision_crane")
+        QStringLiteral("precision_crane"),
+        QStringLiteral("rhythm_force")
     };
 
     for (const QString& id : ids) {
@@ -745,6 +784,83 @@ int main(int argc, char **argv)
         REQUIRE(restored.missionNumber() == 1);
         restored.stop();
     }
+
+    // Rhythm Force is a one-sensor rhythm game. Timing and peak force are
+    // evaluated from short force pulses; no keyboard or second input is used.
+    std::unique_ptr<games::GameEngine> rhythmBase(
+        games::createGame(QStringLiteral("rhythm_force")));
+    auto* rhythm = dynamic_cast<games::RhythmForceGame*>(rhythmBase.get());
+    REQUIRE(rhythm != nullptr);
+    rhythm->resize(640, 480);
+    rhythm->setDifficultyLevel(1);
+    REQUIRE(rhythm->beatsPerMinute() == 72);
+    rhythm->start();
+    REQUIRE(rhythm->nextBeatNumber() == 1);
+    REQUIRE(!rhythm->hasFreshSignal());
+    games::RhythmForceGameTestAccess::emitPulse(
+        *rhythm, 1.0, 0.12,
+        games::RhythmForceGameTestAccess::targetForce(*rhythm, 1));
+    REQUIRE(rhythm->hitCount() == 1);
+    REQUIRE(rhythm->perfectCount() == 1);
+    REQUIRE(rhythm->lastHitGrade() == games::RhythmForceGame::Perfect);
+    REQUIRE(rhythm->nextBeatNumber() == 2);
+    REQUIRE(rhythm->combo() == 1);
+    REQUIRE(rhythm->getScore() >= 100);
+    REQUIRE(rhythm->accuracyPercent() == 100.0);
+
+    const double secondBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 2);
+    games::RhythmForceGameTestAccess::emitPulse(
+        *rhythm, secondBeat + 0.10, 0.12,
+        games::RhythmForceGameTestAccess::targetForce(*rhythm, 2));
+    REQUIRE(rhythm->hitCount() == 2);
+    REQUIRE(rhythm->lastHitGrade() == games::RhythmForceGame::Good);
+    REQUIRE(rhythm->combo() == 2);
+    REQUIRE(rhythm->bestCombo() == 2);
+    REQUIRE(rhythm->lastTimingOffsetMs() > 90.0);
+    REQUIRE(rhythm->lastTimingOffsetMs() < 110.0);
+
+    // Too-short pulses are rejected; the pending beat then expires once its
+    // late window passes, and the combo is reset.
+    const double thirdBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 3);
+    games::RhythmForceGameTestAccess::emitPulse(
+        *rhythm, thirdBeat, 0.02,
+        games::RhythmForceGameTestAccess::targetForce(*rhythm, 3));
+    REQUIRE(rhythm->missCount() == 1);
+    REQUIRE(rhythm->combo() == 0);
+    games::RhythmForceGameTestAccess::setClock(
+        *rhythm, thirdBeat + 0.24);
+    rhythm->update(0.01);
+    REQUIRE(rhythm->missCount() == 2);
+    REQUIRE(rhythm->nextBeatNumber() == 4);
+    REQUIRE(rhythm->accuracyPercent() > 0.0);
+    rhythm->setDifficultyLevel(99);
+    REQUIRE(rhythm->difficultyLevel() == 5);
+    REQUIRE(rhythm->beatsPerMinute() == 120);
+    rhythm->setDifficultyLevel(0);
+    REQUIRE(rhythm->difficultyLevel() == 1);
+    rhythm->stop();
+
+    // Signal loss cancels an in-progress pulse and freezes the chart. A high
+    // reconnecting sample is ignored until a neutral sample rearms the input.
+    std::unique_ptr<games::RhythmForceGame> rhythmSafety(new games::RhythmForceGame);
+    rhythmSafety->resize(640, 480);
+    rhythmSafety->start();
+    rhythmSafety->handleSensorInput(0.0);
+    rhythmSafety->handleSensorInput(68.0);
+    REQUIRE(rhythmSafety->pulseActive());
+    for (int step = 0; step < 4; ++step)
+        rhythmSafety->update(0.10);
+    REQUIRE(!rhythmSafety->hasFreshSignal());
+    REQUIRE(!rhythmSafety->pulseActive());
+    const double frozenRhythmTime = rhythmSafety->songTimeSeconds();
+    rhythmSafety->update(0.10);
+    REQUIRE(std::abs(rhythmSafety->songTimeSeconds() - frozenRhythmTime) < 0.001);
+    rhythmSafety->handleSensorInput(90.0);
+    REQUIRE(!rhythmSafety->pulseActive());
+    rhythmSafety->handleSensorInput(0.0);
+    rhythmSafety->handleSensorInput(70.0);
+    REQUIRE(rhythmSafety->pulseActive());
+    rhythmSafety->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
