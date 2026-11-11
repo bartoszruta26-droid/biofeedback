@@ -53,6 +53,9 @@ void ArcherGame::resizeEvent(QResizeEvent* event)
 {
     GameEngine::resizeEvent(event);
     if (width() > 0 && height() > 0) {
+        const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+        m_targetSpeed = 55.0 * scale;
+        m_gravity = 260.0 * scale;
         repositionTarget();
         for (Arrow& arrow : m_arrows) {
             if (arrow.position.x() > width() || arrow.position.y() > height())
@@ -82,9 +85,7 @@ bool ArcherGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
     m_force = qBound(0.0, value / 100.0, 1.0);
-    // Keyboard aiming temporarily takes priority over sensor samples.
-    if (!m_aimUp && !m_aimDown)
-        m_aimAngle = 0.55 - m_force * 1.45;
+    m_aimAngle = 0.55 - m_force * 1.45;
     return true;
 }
 
@@ -109,7 +110,7 @@ void ArcherGame::fireArrow()
     }
     m_arrows.push_back(arrow);
     ++m_shotsFired;
-    m_fireCooldown = 0.32;
+    m_fireCooldown = m_autoFireInterval;
 }
 
 void ArcherGame::update(double deltaTime)
@@ -161,7 +162,8 @@ void ArcherGame::update(double deltaTime)
             const double radial = std::sqrt(dx * dx + dy * dy);
             addScore(radial <= 0.22 ? 30 : (radial <= 0.55 ? 20 : 10));
             ++m_successfulHits;
-            m_targetSpeed = qMin(150.0, m_targetSpeed + 4.0);
+            const double targetScale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+            m_targetSpeed = qMin(150.0 * targetScale, m_targetSpeed + 4.0 * targetScale);
             repositionTarget();
             continue;
         }
