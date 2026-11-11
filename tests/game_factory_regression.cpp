@@ -476,7 +476,7 @@ int main(int argc, char **argv)
     REQUIRE(archerGame != nullptr);
     archerGame->resize(640, 480);
     archerGame->start();
-    archerGame->handleSensorInput(60.0);
+    archerGame->handleSensorInput(76.0);
     QKeyEvent archerFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(archerGame, &archerFire);
     waitForEvents(350);
