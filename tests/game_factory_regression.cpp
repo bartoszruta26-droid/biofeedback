@@ -330,6 +330,7 @@ int main(int argc, char **argv)
     std::unique_ptr<games::GameEngine> arkanoid(games::createGame(QStringLiteral("arkanoid")));
     auto* arkanoidGame = dynamic_cast<games::ArkanoidGame*>(arkanoid.get());
     REQUIRE(arkanoidGame != nullptr);
+    arkanoidGame->resize(640, 480);
     arkanoidGame->setDifficultyLevel(5);
     REQUIRE(arkanoidGame->getDifficultyLevel() == 5);
     arkanoidGame->setDifficultyLevel(0);
