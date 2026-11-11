@@ -516,7 +516,7 @@ int main(int argc, char **argv)
     craneDelivery->handleSensorInput(0.0);
     waitForEvents(40);
     REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
-    driveCrane(65.0, 1120);  // Lower the hook to the cargo.
+    driveCrane(70.0, 1120);  // Lower the hook fully to the cargo pickup height.
     driveCrane(90.0, 320);   // Short gesture grips the cargo.
     craneDelivery->handleSensorInput(0.0);
     waitForEvents(40);
@@ -530,7 +530,7 @@ int main(int argc, char **argv)
     craneDelivery->handleSensorInput(0.0);
     waitForEvents(40);
     REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
-    driveCrane(65.0, 1120);  // Lower the cargo into the bay.
+    driveCrane(70.0, 1120);  // Lower the cargo fully into the delivery bay.
     driveCrane(90.0, 320);   // Release the load.
     craneDelivery->handleSensorInput(0.0);
     waitForEvents(80);
