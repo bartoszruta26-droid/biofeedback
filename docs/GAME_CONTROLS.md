@@ -65,12 +65,17 @@
 
 ### 6. Mario Run
 
-**Cel:** pokonuj przeszkody, ładując skok i zwalniając nacisk w odpowiednim momencie.
+**Cel:** przebiegaj kolejne poziomy, omijaj przeszkody, pokonuj przeciwników, zbieraj monety i premie. Sceneria przewija się wielowarstwowo, a tempo oraz częstotliwość przeciwników rosną wraz z poziomem.
 
-- **Tensometr:** przytrzymanie powyżej progu rozpoczyna ładowanie skoku, a zwolnienie nacisku wykonuje skok. Dłuższe ładowanie zwiększa poziom naładowania i siłę skoku w granicach mechaniki gry.
-- **Wskaźnik:** pasek ładowania nad postacią pokazuje aktualną gotowość skoku.
-- **Postęp:** ekran pokazuje wynik, poziom i liczbę przeszkód pozostałych do kolejnego poziomu.
-- **Sterowanie:** ładowanie i zwolnienie skoku są obsługiwane wyłącznie przez tensometr. Utrzymanie nacisku ładuje skok, a powrót do strefy zwolnienia wykonuje skok.
+- **Tensometr/HX711:** jedyny kontroler. Nacisk co najmniej 30% rozpoczyna ładowanie skoku, spadek poniżej 20% wykonuje skok; ponowne przekroczenie progu w powietrzu wykonuje pojedynczy podwójny skok. Histereza chroni przed drganiami progu.
+- **Goombasy:** chodzą po podłożu. Lądowanie na nich od góry podczas opadania eliminuje przeciwnika i daje 200 punktów; kontakt z boku odbiera życie.
+- **Rośliny piranie:** okresowo wysuwają się z rur. Aktywna roślina odbiera życie przy kontakcie.
+- **Życia i ochrona:** trzy życia na start; trafienie odbiera jedno życie i uruchamia 1,6 s ochrony. Po utracie ostatniego życia rozgrywka kończy się.
+- **Monety:** złote monety nad trasą dają 50 punktów, a seria zbiorów zwiększa premię do 150 punktów.
+- **Gwiazda:** rzadka premia daje 5 s nietykalności i dodatkowe punkty.
+- **Otoczenie:** parallax gór, wzgórz, drzew i podłoża; animowane chmury, ptaki, słońce, monety i gwiazda.
+- **Wskaźniki:** wynik, życia, monety, poziom, postęp do kolejnego poziomu, pasek ładowania i czas ochrony.
+- **Sterowanie:** tylko tensometr/HX711; klawiatura, mysz i ekran dotykowy nie sterują rozgrywką.
 
 ### 7. Car Race
 
