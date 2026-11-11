@@ -36,6 +36,9 @@ public:
     bool pulseActive() const { return m_pulseActive; }
     bool roundCompleted() const { return m_roundCompleted; }
     int unlockedAchievementsCount() const { return m_achievements.size(); }
+    int personalBestScore() const { return m_personalBestScore; }
+    double personalBestAccuracy() const { return m_personalBestAccuracy; }
+    int personalBestCombo() const { return m_personalBestCombo; }
     QString lastAchievement() const { return m_lastAchievement; }
     bool hasAchievement(const QString &id) const { return m_achievements.contains(id); }
     double visualTimeSeconds() const { return m_visualTime; }
@@ -75,6 +78,9 @@ private:
     int m_perfectHits;
     int m_combo;
     int m_bestCombo;
+    int m_personalBestScore;
+    int m_personalBestCombo;
+    double m_personalBestAccuracy;
     double m_songTime;
     double m_inputAge;
     double m_pulseElapsed;
