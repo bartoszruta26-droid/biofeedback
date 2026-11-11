@@ -103,11 +103,12 @@
 
 **Cel:** rozgrywaj turowy pojedynek artyleryjski. Dobieraj kąt i moc, przewiduj wpływ wiatru, wykorzystuj ukształtowanie terenu oraz zadawaj obrażenia bezpośrednie i odłamkowe.
 
-- **Tensometr:** ustawia kąt działa w zakresie 15–80°; wartość 0–100% jest mapowana liniowo na ten zakres.
-- **Mysz:** przesuwaj kursor w prawo od lufy, aby ustawić kąt zgodnie z kierunkiem celowania. Linia z punktów pokazuje przewidywany tor pocisku. Kliknięcie lewym przyciskiem oddaje strzał.
-- **Klawiatura:** `W` lub `↑` — zwiększ kąt o 2°; `S` lub `↓` — zmniejsz kąt o 2°; `+` lub `=` — zwiększ moc; `-` — zmniejsz moc; `SPACJA` — oddaj strzał w swojej turze.
-- **Kółko myszy:** zwiększa lub zmniejsza moc o 4 punkty procentowe na stopień przewinięcia. Moc jest ograniczona do 35–100%.
-- **Balistyka:** tor uwzględnia grawitację i wiatr. Wiatr zmienia się po każdym trafieniu lub upadku pocisku; obserwuj jego wartość przed następnym strzałem.
+- **Tensometr:** ustawia kąt działa w zakresie 10–85°; wartość 0–100% jest mapowana liniowo na ten zakres.
+- **Mysz:** przesuwaj kursor w prawo od lufy, aby ustawić kąt zgodnie z kierunkiem celowania. Linia z punktów pokazuje przewidywany tor pocisku. Kliknięcie lewym przyciskiem oddaje strzał. Celowanie myszą jest blokowane podczas lotu pocisku i poza turą gracza.
+- **Klawiatura:** `W` lub `↑` — zwiększ kąt o 2°; `S` lub `↓` — zmniejsz kąt o 2°; `+` lub `=` — zwiększ moc o 3 punkty procentowe; `-` — zmniejsz moc o 3 punkty procentowe; `SPACJA` — oddaj strzał w swojej turze.
+- **Kółko myszy:** przewinięcie w górę zwiększa moc, a w dół ją zmniejsza — o 4 punkty procentowe na stopień przewinięcia. Moc jest ograniczona do 35–100%. Zmiana mocy jest dostępna podczas tury gracza, gdy żaden pocisk nie leci.
+- **Przeciwnik:** dobiera kąt i moc na podstawie aktualnego wiatru, grawitacji oraz ukształtowania terenu. Po kolejnych rundach jego strzały uwzględniają zmienione kratery.
+- **Balistyka:** podgląd toru uwzględnia grawitację i wiatr. Wiatr zmienia się po rozstrzygnięciu strzału; obserwuj jego wartość przed następną próbą.
 - **Eksplozje:** trafienie bezpośrednie zadaje większe obrażenia. Bliski wybuch może uszkodzić czołg także bez bezpośredniego kontaktu; siła obrażeń maleje wraz z odległością od środka wybuchu. Moc strzału wpływa na promień i głębokość krateru.
 - **Teren:** kratery pozostają na planszy i zmieniają ukształtowanie podłoża, wpływając na położenie czołgów i kolejne strzały.
 - **Postęp:** pokonanie przeciwnika rozpoczyna następną rundę, przywraca mu pełne zdrowie i odnawia część zdrowia gracza.
