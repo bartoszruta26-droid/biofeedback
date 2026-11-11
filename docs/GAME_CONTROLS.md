@@ -106,7 +106,7 @@
 - **Tensometr:** ustawia poziome położenie statku w obrębie planszy. Wartość 0–100% odpowiada położeniu od lewej do prawej krawędzi.
 - **Automatyczny ogień:** przy świeżym sygnale tensometru statek oddaje strzał co 0,30 s. Po utracie sygnału ogień zostaje zatrzymany.
 - **Impuls EMP gestem:** przytrzymaj co najmniej 95% siły przez 0,35–1,2 s, a następnie zwolnij do 30% lub mniej. Gest zużywa jeden ładunek EMP. Na początku sesji dostępne są 2 ładunki; po ukończeniu fali przywracany jest 1, maksymalnie do 4.
-- **Impuls EMP:** usuwa wszystkie aktywne pociski przeciwników i zadaje jedno uszkodzenie każdemu aktywnemu przeciwnikowi. Na początku sesji dostępne są 2 ładunki; po ukończeniu fali przywracany jest 1 ładunek, maksymalnie do 4. Naciśnij `X` ponownie dopiero wtedy, gdy chcesz zużyć kolejny ładunek.
+- **Efekt EMP:** usuwa aktywne pociski przeciwników i zadaje jedno uszkodzenie każdemu aktywnemu przeciwnikowi. Ładunki są ograniczone; ich stan jest widoczny w HUD.
 - **Ulepszenia:** co piąty pokonany przeciwnik może pozostawić premię. Niebieska premia daje potrójny strzał, zielona uruchamia osłonę, a żółta zwiększa szybkostrzelność. Premie zbiera się przez zetknięcie statku z opadającym symbolem.
 - **Punktacja i seria:** kolejne eliminacje w krótkim odstępie zwiększają premię punktową. Seria wygasa po przerwie.
 - **Trudność:** następne fale zwiększają liczebność i wytrzymałość części przeciwników oraz tempo ostrzału. Ukończenie fali daje premię punktową i dodatkowy ładunek EMP.
