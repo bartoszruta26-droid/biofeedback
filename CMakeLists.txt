@@ -342,6 +342,7 @@ if(Qt5_FOUND)
         src/games/ArcherGame.cpp
         src/games/CarRaceGame.cpp
         src/games/ScorchedEarthGame.cpp
+        src/games/PrecisionCraneGame.cpp
         src/formulas.cpp
     )
 
@@ -377,6 +378,7 @@ if(Qt5_FOUND)
         include/games/ArcherGame.hpp
         include/games/CarRaceGame.hpp
         include/games/ScorchedEarthGame.hpp
+        include/games/PrecisionCraneGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -447,6 +449,7 @@ if(Qt5_FOUND)
         src/games/ArcherGame.cpp
         src/games/CarRaceGame.cpp
         src/games/ScorchedEarthGame.cpp
+        src/games/PrecisionCraneGame.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
         include/games/GameEngine.hpp
@@ -460,6 +463,7 @@ if(Qt5_FOUND)
         include/games/ArcherGame.hpp
         include/games/CarRaceGame.hpp
         include/games/ScorchedEarthGame.hpp
+        include/games/PrecisionCraneGame.hpp
         include/sensor/SerialCommunication.hpp
         include/core/DebugManager.hpp
     )
