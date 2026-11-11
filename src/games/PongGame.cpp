@@ -192,6 +192,16 @@ double PongGame::aiPaddleY() const
     return m_rightPaddleY;
 }
 
+double PongGame::paddleWidth() const
+{
+    return m_paddleWidth;
+}
+
+double PongGame::paddleHeight() const
+{
+    return m_paddleHeight;
+}
+
 QPointF PongGame::ballPosition() const
 {
     return m_ballPos;
