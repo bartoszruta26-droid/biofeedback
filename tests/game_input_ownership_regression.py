@@ -28,7 +28,7 @@ for path in GAME_SOURCES + GAME_HEADERS:
         raise SystemExit(f"Game widget must not capture keyboard focus: {path.relative_to(ROOT)}")
     if re.search(r"Q(?:Linear|Radial)Gradient", source):
         raise SystemExit(f"Expensive gradient rendering is not allowed in the arcade profile: {path.relative_to(ROOT)}")
-    if re.search(r"setRenderHint\(QPainter::Antialiasing\s*,\s*true\)", source):
+    if re.search(r"setRenderHint\(QPainter::Antialiasing\s*(?:,\s*true)?\s*\)", source):
         raise SystemExit(f"Antialiasing must remain disabled in the arcade profile: {path.relative_to(ROOT)}")
 
 engine = (ROOT / "src" / "games" / "GameEngine.cpp").read_text(encoding="utf-8")
