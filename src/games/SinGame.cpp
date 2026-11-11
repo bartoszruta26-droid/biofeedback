@@ -280,6 +280,9 @@ void SinGame::update(double deltaTime)
         return;
 
     const double dt = qMin(deltaTime, 0.1);
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
     const double w = static_cast<double>(width());
     const double h = static_cast<double>(height());
     refreshGeometryParameters();
@@ -336,6 +339,17 @@ void SinGame::update(double deltaTime)
             : QStringLiteral("Zmniejsz siłę");
         updateAutomaticDifficulty(dt);
     }
+}
+
+void SinGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double phase = m_phase, cursor = m_cursorY, target = m_targetY;
+    m_phase = m_previousPhase + (phase - m_previousPhase) * alpha;
+    m_cursorY = m_previousCursorY + (cursor - m_previousCursorY) * alpha;
+    m_targetY = m_previousTargetY + (target - m_previousTargetY) * alpha;
+    render(painter);
+    m_phase = phase; m_cursorY = cursor; m_targetY = target;
 }
 
 void SinGame::render(QPainter& painter)
