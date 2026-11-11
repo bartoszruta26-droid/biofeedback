@@ -55,6 +55,7 @@ private:
     double terrainY(double x) const;
     void updateTankPositions();
     void fireProjectile(bool playerOwned);
+    void chooseEnemyShot();
     void resolveImpact(const QPointF& point, bool playerOwned);
     void applyCrater(double x, double power);
     QVector<QPointF> trajectoryPreview() const;
@@ -66,6 +67,8 @@ private:
     QRectF m_enemyTank;
     double m_aimDegrees;
     double m_power;
+    double m_enemyAimDegrees;
+    double m_enemyPower;
     double m_wind;
     double m_enemyDelay;
     double m_gravity;
