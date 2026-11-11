@@ -185,7 +185,7 @@ void ScorchedEarthGame::wheelEvent(QWheelEvent* event)
         const int steps = event->angleDelta().y() / 120;
         if (steps != 0) {
             m_power = qBound(0.35, m_power + steps * 0.04, 1.0);
-            update();
+            QWidget::update();
         }
         event->accept();
         return;
