@@ -16,7 +16,7 @@ ArcherGame::ArcherGame(QWidget *parent)
     , m_gravity(260.0)
     , m_fireCooldown(2.4)
 {
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::NoFocus);
 }
 
 QString ArcherGame::gameName() const
