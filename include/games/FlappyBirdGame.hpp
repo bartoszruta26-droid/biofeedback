@@ -8,7 +8,11 @@
 #include <vector>
 #include <memory>
 
+class QKeyEvent;
+class QMouseEvent;
+
 class QResizeEvent;
+class QPaintEvent;
 
 namespace games {
 
@@ -70,6 +74,10 @@ public:
      */
     float getGameSpeed() const;
 
+    // Read-only diagnostics used by deterministic gameplay regression tests.
+    double birdVerticalVelocity() const;
+    int activeObstacleCount() const;
+
     /**
      * @brief Podłącza obiekt SerialCommunication do gry
      * @param serial Współdzielony wskaźnik do obiektu SerialCommunication
@@ -120,6 +128,9 @@ private slots:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
+    void keyPressEvent(QKeyEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
 
 private:
     // Struktura reprezentująca przeszkodę (gałęzie drzewa)
@@ -170,6 +181,7 @@ private:
     // Aktualna siła z sensora (znormalizowana 0.0 - 1.0)
     double m_currentForce;
     bool m_wasFlapping;
+    bool m_flapRequested = false;
     
     // Licznik punktów za przeszkody
     int m_obstaclesPassed;
