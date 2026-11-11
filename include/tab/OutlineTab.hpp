@@ -23,6 +23,7 @@
 #include <QTextBrowser>
 #include <QLineEdit>
 #include <QSignalBlocker>
+#include <QListWidget>
 #include "data/JsonResourceRepository.hpp"
 #include <memory>
 #include "sensor/SerialCommunication.hpp"
@@ -256,12 +257,15 @@ private:
     void recordRehabilitation24HourFollowUp();
     void createRehabilitationObservation();
     void refreshRehabilitationObservations();
+    void refreshForceSeriesArchive();
 
     // Główne widgety
     QVBoxLayout* m_mainLayout;
     QVBoxLayout* m_leftLayout{nullptr};
     QVBoxLayout* m_rightLayout{nullptr};
     gui::GraphWidget* m_forceGraph{nullptr};
+    QListWidget* m_forceSeriesList{nullptr};
+    QPushButton* m_saveForceSeriesButton{nullptr};
     QLabel* m_patientContextLabel{nullptr};
     QString m_currentPatientUuid;
     QString m_currentEpisodeUuid;
