@@ -427,7 +427,7 @@ void PrecisionCraneGame::resizeEvent(QResizeEvent *event)
 void PrecisionCraneGame::render(QPainter& painter)
 {
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::Antialiasing, false);
     const double w = width(), h = height();
     const double ground = floorY();
 
