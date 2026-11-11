@@ -1,6 +1,7 @@
 #include "games/ScorchedEarthGame.hpp"
 #include <QKeyEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QResizeEvent>
 #include <QPainter>
 #include <QLinearGradient>
@@ -74,6 +75,11 @@ void ScorchedEarthGame::resizeEvent(QResizeEvent* event)
         buildTerrain();
         updateTankPositions();
     }
+}
+
+int ScorchedEarthGame::trajectoryPreviewPointCount() const
+{
+    return trajectoryPreview().size();
 }
 
 void ScorchedEarthGame::buildTerrain()
@@ -184,14 +190,14 @@ void ScorchedEarthGame::fireProjectile(bool playerOwned)
         m_playerTurn = false;
 }
 
-void ScorchedEarthGame::applyCrater(double x)
+void ScorchedEarthGame::applyCrater(double x, double power)
 {
-    constexpr double radius = 38.0;
+    const double radius = 24.0 + 30.0 * qBound(0.35, power, 1.0);
     for (QPointF& point : m_terrain) {
         const double distance = std::abs(point.x() - x);
         if (distance >= radius)
             continue;
-        const double depth = 22.0 * (1.0 - distance / radius);
+        const double depth = (12.0 + 24.0 * power) * (1.0 - distance / radius);
         point.setY(qMin(static_cast<double>(height() - 12), point.y() + depth));
     }
     updateTankPositions();
@@ -199,9 +205,18 @@ void ScorchedEarthGame::applyCrater(double x)
 
 void ScorchedEarthGame::resolveImpact(const QPointF& point, bool playerOwned)
 {
-    if (playerOwned && m_enemyTank.adjusted(-5, -5, 5, 5).contains(point)) {
-        m_enemyHealth -= 25;
-        addScore(25);
+    const double impactPower = playerOwned ? m_power : 0.78;
+    const QRectF& targetTank = playerOwned ? m_enemyTank : m_playerTank;
+    const double blastRadius = 30.0 + impactPower * 46.0;
+    const double distanceToTarget = std::hypot(targetTank.center().x() - point.x(),
+                                               targetTank.center().y() - point.y());
+    const bool directHit = targetTank.adjusted(-5, -5, 5, 5).contains(point);
+    const bool splashHit = distanceToTarget <= blastRadius;
+    if (playerOwned && (directHit || splashHit)) {
+        const double falloff = directHit ? 1.0 : qBound(0.25, 1.0 - distanceToTarget / blastRadius, 0.75);
+        const int damage = qMax(5, qRound((directHit ? 28.0 : 22.0) * impactPower * falloff));
+        m_enemyHealth -= damage;
+        addScore(damage);
         if (m_enemyHealth <= 0) {
             addScore(100);
             ++m_round;
@@ -209,19 +224,47 @@ void ScorchedEarthGame::resolveImpact(const QPointF& point, bool playerOwned)
             m_playerHealth = qMin(100, m_playerHealth + 20);
             m_wind = std::sin(m_round * 0.7) * 34.0;
         }
-    } else if (!playerOwned && m_playerTank.adjusted(-5, -5, 5, 5).contains(point)) {
-        m_playerHealth -= 25;
+    } else if (!playerOwned && (directHit || splashHit)) {
+        const double falloff = directHit ? 1.0 : qBound(0.25, 1.0 - distanceToTarget / blastRadius, 0.75);
+        m_playerHealth -= qMax(5, qRound(22.0 * impactPower * falloff));
         if (m_playerHealth <= 0) {
             stop();
             return;
         }
     }
-    applyCrater(point.x());
+    applyCrater(point.x(), impactPower);
+    updateWind();
     if (playerOwned) {
         m_enemyDelay = 0.75;
     } else {
         m_playerTurn = true;
     }
+}
+
+void ScorchedEarthGame::updateWind()
+{
+    const double phase = static_cast<double>(m_round * 7 + getScore() / 10);
+    m_wind = std::sin(phase * 0.37) * 42.0;
+}
+
+QVector<QPointF> ScorchedEarthGame::trajectoryPreview() const
+{
+    QVector<QPointF> points;
+    if (!isRunning() || !m_playerTurn || !m_projectiles.isEmpty() || m_playerTank.isEmpty())
+        return points;
+    const double angle = m_aimDegrees * 3.14159265358979323846 / 180.0;
+    const double speed = 420.0 * m_power;
+    const QPointF origin(m_playerTank.right(), m_playerTank.top() + 2.0);
+    const QPointF initialVelocity(std::cos(angle) * speed, -std::sin(angle) * speed);
+    for (int i = 1; i <= 42; ++i) {
+        const double t = i * 0.075;
+        const QPointF p(origin.x() + initialVelocity.x() * t + 0.5 * m_wind * 0.08 * t * t,
+                        origin.y() + initialVelocity.y() * t + 0.5 * m_gravity * t * t);
+        if (p.x() < 0.0 || p.x() > width() || p.y() < 0.0 || p.y() >= terrainY(p.x()))
+            break;
+        points.push_back(p);
+    }
+    return points;
 }
 
 void ScorchedEarthGame::update(double deltaTime)
@@ -314,6 +357,11 @@ void ScorchedEarthGame::render(QPainter& painter)
     painter.setBrush(QColor(205, 90, 70));
     painter.drawRoundedRect(m_enemyTank, 5.0, 5.0);
 
+    const QVector<QPointF> preview = trajectoryPreview();
+    painter.setPen(QPen(QColor(255, 235, 135, 210), 2, Qt::DotLine));
+    for (int i = 1; i < preview.size(); ++i)
+        painter.drawLine(preview[i - 1], preview[i]);
+
     painter.setPen(QPen(QColor(245, 235, 190), 4));
     painter.drawLine(m_playerTank.center(),
         m_playerTank.center() + QPointF(std::cos(m_aimDegrees * 3.14159265358979323846 / 180.0) * 28.0,
@@ -332,10 +380,12 @@ void ScorchedEarthGame::render(QPainter& painter)
     painter.drawText(width() - 150, 46, QStringLiteral("Runda: %1").arg(m_round));
     painter.drawText(width() / 2 - 65, 24, QStringLiteral("Moc: %1%").arg(qRound(m_power * 100.0)));
     painter.drawText(width() / 2 - 65, 46, m_playerTurn ? QStringLiteral("TWOJA TURA") : QStringLiteral("RUCH PRZECIWNIKA"));
+    painter.drawText(width() / 2 - 65, 68,
+        QStringLiteral("Kąt: %1° | Wiatr: %2")
+            .arg(qRound(m_aimDegrees)).arg(m_wind, 0, 'f', 1));
     painter.setFont(QFont(QStringLiteral("Arial"), 10));
     painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik / mysz: kąt | +/-: moc | Klik / SPACJA: strzał | Wiatr: %1")
-            .arg(qRound(m_wind)));
+        QStringLiteral("Czujnik / mysz: kąt | kółko myszy / +/-: moc | Klik / SPACJA: strzał"));
 }
 
 } // namespace games
