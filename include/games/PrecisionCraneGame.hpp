@@ -52,7 +52,6 @@ private:
     double m_animationTime;
     double m_sway;
     double m_cargoX;
-    double m_cargoY;
     double m_targetX;
     double m_targetWidth;
     int m_difficulty;
@@ -62,7 +61,6 @@ private:
     ControlAxis m_axis;
     bool m_gestureActive;
     bool m_loadAttached;
-    bool m_lastGestureWasLong;
     QString m_status;
 };
 
