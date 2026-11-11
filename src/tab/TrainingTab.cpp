@@ -448,6 +448,7 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Rhythm Force — Rytm siły", "rhythm_force");
     m_gameTypeCombo->addItem("Force Maze — Labirynt siły", "force_maze");
     m_gameTypeCombo->addItem("Balance Tower — Wieża równowagi", "balance_tower");
+    m_gameTypeCombo->addItem("Reaction Force — Refleks siły", "reaction_force");
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_gameTypeCombo);
