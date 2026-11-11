@@ -30,6 +30,217 @@
 #include <QDoubleSpinBox>
 #include <QTabWidget>
 #include <QSizePolicy>
+#include <QStandardPaths>
+#include <QDir>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <algorithm>
+#include <cmath>
+
+
+namespace {
+
+struct ForceSeries {
+    QString label;
+    QVector<gui::DataPoint> points;
+};
+
+class ForceOverlayWidget final : public QWidget {
+public:
+    explicit ForceOverlayWidget(QWidget* parent = nullptr) : QWidget(parent) {
+        setMinimumHeight(220);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    }
+
+    void setSeries(const QVector<ForceSeries>& series) {
+        m_series = series;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.fillRect(rect(), palette().base());
+        const QRectF area = rect().adjusted(58, 18, -18, -38);
+        p.setPen(palette().mid().color());
+        p.drawRect(area);
+        if (m_series.isEmpty()) {
+            p.setPen(palette().text().color());
+            p.drawText(area, Qt::AlignCenter, tr("Zapisz przebieg lub wybierz serie do porównania."));
+            return;
+        }
+
+        qint64 maxTime = 0;
+        double minValue = std::numeric_limits<double>::max();
+        double maxValue = std::numeric_limits<double>::lowest();
+        for (const auto& series : m_series) {
+            if (series.points.isEmpty()) continue;
+            const qint64 start = series.points.first().timestamp.toMSecsSinceEpoch();
+            for (const auto& point : series.points) {
+                maxTime = qMax(maxTime, point.timestamp.toMSecsSinceEpoch() - start);
+                minValue = qMin(minValue, point.value);
+                maxValue = qMax(maxValue, point.value);
+            }
+        }
+        if (maxTime <= 0 || !std::isfinite(minValue) || !std::isfinite(maxValue)) {
+            p.setPen(palette().text().color());
+            p.drawText(area, Qt::AlignCenter, tr("Za mało poprawnych danych do nałożenia przebiegów."));
+            return;
+        }
+        if (maxValue - minValue < 1e-9) { minValue -= 1.0; maxValue += 1.0; }
+        const double margin = (maxValue - minValue) * 0.08;
+        minValue -= margin;
+        maxValue += margin;
+
+        p.setPen(QPen(palette().mid().color(), 1, Qt::DashLine));
+        for (int i = 0; i <= 4; ++i) {
+            const qreal y = area.top() + area.height() * i / 4.0;
+            p.drawLine(QPointF(area.left(), y), QPointF(area.right(), y));
+            const double value = maxValue - (maxValue - minValue) * i / 4.0;
+            p.setPen(palette().text().color());
+            p.drawText(QRectF(2, y - 9, 50, 18), Qt::AlignRight | Qt::AlignVCenter,
+                       QString::number(value, 'f', 1) + " N");
+            p.setPen(QPen(palette().mid().color(), 1, Qt::DashLine));
+        }
+
+        const QVector<QColor> colors = {QColor("#1565c0"), QColor("#d84315"),
+                                         QColor("#2e7d32"), QColor("#8e24aa"),
+                                         QColor("#00838f"), QColor("#ad7a00")};
+        int index = 0;
+        for (const auto& series : m_series) {
+            if (series.points.size() < 2) { ++index; continue; }
+            const qint64 start = series.points.first().timestamp.toMSecsSinceEpoch();
+            QPainterPath path;
+            bool begun = false;
+            for (const auto& point : series.points) {
+                const double xRatio = qBound(0.0,
+                    static_cast<double>(point.timestamp.toMSecsSinceEpoch() - start) / maxTime, 1.0);
+                const double yRatio = qBound(0.0, (point.value - minValue) / (maxValue - minValue), 1.0);
+                const QPointF pos(area.left() + xRatio * area.width(),
+                                  area.bottom() - yRatio * area.height());
+                if (!begun) { path.moveTo(pos); begun = true; } else path.lineTo(pos);
+            }
+            p.setPen(QPen(colors[index % colors.size()], 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            p.drawPath(path);
+            const QString legend = series.label;
+            const int legendX = 64 + (index % 3) * qMax(110, (width() - 80) / 3);
+            const int legendY = height() - 18 + (index / 3) * 14;
+            p.setPen(colors[index % colors.size()]);
+            p.drawText(legendX, legendY, legend.left(22));
+            ++index;
+        }
+        p.setPen(palette().text().color());
+        p.drawText(QRectF(area.left(), area.bottom() + 8, area.width(), 18),
+                   Qt::AlignCenter, tr("Czas od początku próby (s)"));
+    }
+
+private:
+    QVector<ForceSeries> m_series;
+};
+
+struct ForceMetrics {
+    double mean{0.0};
+    double peak{0.0};
+    double peakMean{0.0};
+    double standardDeviation{0.0};
+    double coefficientOfVariation{0.0};
+    double meanRiseMs{0.0};
+    int repetitions{0};
+    double durationSeconds{0.0};
+};
+
+ForceMetrics calculateForceMetrics(const QVector<gui::DataPoint>& points) {
+    ForceMetrics result;
+    if (points.size() < 3) return result;
+    double sum = 0.0, sumSquares = 0.0;
+    double minimum = std::numeric_limits<double>::max();
+    double maximum = std::numeric_limits<double>::lowest();
+    for (const auto& point : points) {
+        if (!std::isfinite(point.value)) continue;
+        sum += point.value;
+        sumSquares += point.value * point.value;
+        minimum = qMin(minimum, point.value);
+        maximum = qMax(maximum, point.value);
+    }
+    const int count = points.size();
+    result.mean = sum / count;
+    result.peak = maximum;
+    result.standardDeviation = std::sqrt(qMax(0.0, sumSquares / count - result.mean * result.mean));
+    result.coefficientOfVariation = std::abs(result.mean) > 1e-9
+        ? 100.0 * result.standardDeviation / std::abs(result.mean) : 0.0;
+    result.durationSeconds = qMax<qint64>(0,
+        points.last().timestamp.toMSecsSinceEpoch() - points.first().timestamp.toMSecsSinceEpoch()) / 1000.0;
+
+    const double amplitude = maximum - minimum;
+    if (amplitude <= 1e-9) return result;
+    const double threshold = minimum + amplitude * 0.20;
+    const double riseThreshold = minimum + amplitude * 0.10;
+    const double peakThreshold = minimum + amplitude * 0.35;
+    QVector<double> peakValues;
+    QVector<double> riseTimes;
+    qint64 lastPeakMs = std::numeric_limits<qint64>::min();
+    for (int i = 1; i + 1 < points.size(); ++i) {
+        const auto& before = points[i - 1];
+        const auto& current = points[i];
+        const auto& after = points[i + 1];
+        if (current.value < threshold || current.value < peakThreshold ||
+            current.value < before.value || current.value < after.value) continue;
+        const qint64 peakMs = current.timestamp.toMSecsSinceEpoch();
+        if (lastPeakMs != std::numeric_limits<qint64>::min() && peakMs - lastPeakMs < 300) continue;
+        lastPeakMs = peakMs;
+        peakValues.push_back(current.value);
+
+        int startIndex = i;
+        while (startIndex > 0 && points[startIndex].value > riseThreshold) --startIndex;
+        const double ninety = minimum + (current.value - minimum) * 0.90;
+        int riseIndex = startIndex;
+        while (riseIndex < i && points[riseIndex].value < ninety) ++riseIndex;
+        if (riseIndex <= i) {
+            const double ms = points[riseIndex].timestamp.toMSecsSinceEpoch()
+                            - points[startIndex].timestamp.toMSecsSinceEpoch();
+            if (ms >= 0.0 && ms < 30000.0) riseTimes.push_back(ms);
+        }
+    }
+    result.repetitions = peakValues.size();
+    if (!peakValues.isEmpty()) {
+        double peakSum = 0.0;
+        for (double value : peakValues) peakSum += value;
+        result.peakMean = peakSum / peakValues.size();
+    }
+    if (!riseTimes.isEmpty()) {
+        double riseSum = 0.0;
+        for (double value : riseTimes) riseSum += value;
+        result.meanRiseMs = riseSum / riseTimes.size();
+    }
+    return result;
+}
+
+QString forceMetricsHtml(const QVector<gui::DataPoint>& points) {
+    const ForceMetrics m = calculateForceMetrics(points);
+    if (points.size() < 3) return QObject::tr("<p>Za mało próbek do analizy.</p>");
+    auto v = [](double x, int decimals = 2) { return QString::number(x, 'f', decimals); };
+    return QObject::tr(
+        "<table><tr><th>Parametr</th><th>Wynik</th></tr>"
+        "<tr><td>Liczba próbek</td><td>%1</td></tr>"
+        "<tr><td>Czas próby</td><td>%2 s</td></tr>"
+        "<tr><td>Średnia siła</td><td>%3 N</td></tr>"
+        "<tr><td>Maksymalna siła</td><td>%4 N</td></tr>"
+        "<tr><td>Średnia z wykrytych szczytów</td><td>%5 N</td></tr>"
+        "<tr><td>Wykryte powtórzenia</td><td>%6</td></tr>"
+        "<tr><td>Odchylenie standardowe</td><td>%7 N</td></tr>"
+        "<tr><td>Współczynnik zmienności</td><td>%8%</td></tr>"
+        "<tr><td>Średni czas narastania 10–90%</td><td>%9 ms</td></tr></table>"
+        "<p><small>Wykrywanie powtórzeń: lokalne maksima z progiem amplitudy i "
+        "minimalnym odstępem 300 ms. Parametry zależą od jakości próbkowania i "
+        "wymagają walidacji dla danego czujnika oraz protokołu.</small></p>")
+        .arg(points.size()).arg(v(m.durationSeconds)).arg(v(m.mean)).arg(v(m.peak))
+        .arg(v(m.peakMean)).arg(m.repetitions).arg(v(m.standardDeviation))
+        .arg(v(m.coefficientOfVariation)).arg(v(m.meanRiseMs, 0));
+}
+
+} // namespace
 
 namespace tab {
 
@@ -447,6 +658,137 @@ void OutlineTab::setupUI()
     graphStatusLabel->setObjectName(QStringLiteral("outlineGraphStatus"));
     graphLayout->addWidget(graphStatusLabel);
     graphLayout->addWidget(m_forceGraph);
+
+    // Analiza przebiegu: parametry próby, zapis serii i nakładanie przebiegów
+    // z kolejnych powtórzeń lub sesji. Surowe próbki pozostają niezmienione.
+    auto* analysisTabs = new QTabWidget(graphGroup);
+    analysisTabs->setObjectName(QStringLiteral("forceAnalysisTabs"));
+    auto* metricsPage = new QWidget(analysisTabs);
+    auto* metricsLayout = new QVBoxLayout(metricsPage);
+    auto* metricsBrowser = new QTextBrowser(metricsPage);
+    metricsBrowser->setObjectName(QStringLiteral("forceAnalysisMetrics"));
+    metricsBrowser->setMinimumHeight(145);
+    auto* saveSeriesButton = new QPushButton(tr("Zapisz bieżący przebieg"), metricsPage);
+    saveSeriesButton->setObjectName(QStringLiteral("saveForceSeries"));
+    auto* savedSeriesCombo = new QComboBox(metricsPage);
+    savedSeriesCombo->setObjectName(QStringLiteral("savedForceSeries"));
+    auto* compareSeriesButton = new QPushButton(tr("Porównaj zaznaczone serie"), metricsPage);
+    compareSeriesButton->setObjectName(QStringLiteral("compareForceSeries"));
+    auto* overlay = new ForceOverlayWidget(metricsPage);
+    overlay->setObjectName(QStringLiteral("forceSeriesOverlay"));
+    metricsLayout->addWidget(metricsBrowser);
+    auto* seriesControls = new QHBoxLayout();
+    seriesControls->addWidget(saveSeriesButton);
+    seriesControls->addWidget(savedSeriesCombo, 1);
+    seriesControls->addWidget(compareSeriesButton);
+    metricsLayout->addLayout(seriesControls);
+    metricsLayout->addWidget(overlay, 1);
+    analysisTabs->addTab(metricsPage, tr("Analiza i porównanie"));
+
+    auto refreshForceMetrics = [this, metricsBrowser]() {
+        if (m_forceGraph) metricsBrowser->setHtml(forceMetricsHtml(m_forceGraph->getData()));
+    };
+    refreshForceMetrics();
+    auto* metricsTimer = new QTimer(metricsPage);
+    metricsTimer->setInterval(1000);
+    connect(metricsTimer, &QTimer::timeout, this, refreshForceMetrics);
+    metricsTimer->start();
+
+    const QString seriesStorePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+                                  + QStringLiteral("/rehabilitation_force_series.json");
+    auto loadSavedSeries = [seriesStorePath, savedSeriesCombo]() {
+        savedSeriesCombo->clear();
+        QFile file(seriesStorePath);
+        if (!file.open(QIODevice::ReadOnly)) return;
+        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+        file.close();
+        const QJsonArray all = doc.array();
+        for (const QJsonValue& value : all) {
+            const QJsonObject item = value.toObject();
+            const QString label = item.value(QStringLiteral("label")).toString();
+            if (!label.isEmpty()) savedSeriesCombo->addItem(label, item);
+        }
+    };
+    loadSavedSeries();
+    connect(saveSeriesButton, &QPushButton::clicked, this,
+            [this, seriesStorePath, savedSeriesCombo, loadSavedSeries, refreshForceMetrics]() {
+        if (!m_forceGraph || m_forceGraph->dataPointCount() < 3) {
+            QMessageBox::information(this, tr("Zapis przebiegu"),
+                                     tr("Wymagane są co najmniej trzy próbki."));
+            return;
+        }
+        QDir().mkpath(QFileInfo(seriesStorePath).absolutePath());
+        QJsonArray all;
+        QFile existing(seriesStorePath);
+        if (existing.open(QIODevice::ReadOnly)) {
+            all = QJsonDocument::fromJson(existing.readAll()).array();
+            existing.close();
+        }
+        QJsonObject item;
+        const QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
+        const QString label = tr("%1 — %2 próbek")
+            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
+            .arg(m_forceGraph->dataPointCount());
+        item.insert(QStringLiteral("label"), label);
+        item.insert(QStringLiteral("patient_uuid"), m_currentPatientUuid);
+        item.insert(QStringLiteral("created_at"), timestamp);
+        QJsonArray points;
+        const auto samples = m_forceGraph->getData();
+        const qint64 origin = samples.isEmpty() ? 0 : samples.first().timestamp.toMSecsSinceEpoch();
+        for (const auto& point : samples) {
+            QJsonArray pair;
+            pair.append(point.timestamp.toMSecsSinceEpoch() - origin);
+            pair.append(point.value);
+            points.append(pair);
+        }
+        item.insert(QStringLiteral("points"), points);
+        all.append(item);
+        while (all.size() > 100) all.removeAt(0);
+        QFile file(seriesStorePath);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            QMessageBox::warning(this, tr("Zapis przebiegu"),
+                                 tr("Nie można zapisać serii: %1").arg(file.errorString()));
+            return;
+        }
+        file.write(QJsonDocument(all).toJson(QJsonDocument::Indented));
+        file.close();
+        loadSavedSeries();
+        savedSeriesCombo->setCurrentIndex(savedSeriesCombo->count() - 1);
+        refreshForceMetrics();
+        QMessageBox::information(this, tr("Zapis przebiegu"),
+                                 tr("Zapisano serię pomiarową w lokalnym archiwum aplikacji."));
+    });
+    connect(compareSeriesButton, &QPushButton::clicked, this,
+            [this, savedSeriesCombo, overlay, metricsBrowser]() {
+        QVector<ForceSeries> selected;
+        if (m_forceGraph && m_forceGraph->dataPointCount() >= 2)
+            selected.push_back({tr("Bieżący przebieg"), m_forceGraph->getData()});
+        const QJsonObject item = savedSeriesCombo->currentData().toJsonObject();
+        if (!item.isEmpty()) {
+            const QJsonArray points = item.value(QStringLiteral("points")).toArray();
+            QVector<gui::DataPoint> samples;
+            const QDateTime base = QDateTime::fromString(
+                item.value(QStringLiteral("created_at")).toString(), Qt::ISODate);
+            for (const QJsonValue& value : points) {
+                const QJsonArray pair = value.toArray();
+                if (pair.size() != 2) continue;
+                samples.push_back(gui::DataPoint(base.addMSecs(pair.at(0).toVariant().toLongLong()),
+                                                   pair.at(1).toDouble()));
+            }
+            if (samples.size() >= 2)
+                selected.push_back({item.value(QStringLiteral("label")).toString(), samples});
+        }
+        overlay->setSeries(selected);
+        if (selected.size() < 2) {
+            metricsBrowser->append(tr("<p>Do porównania wybierz zapisaną serię i zapewnij bieżący przebieg lub zapisz kolejną próbę.</p>"));
+        } else {
+            metricsBrowser->append(tr("<p>Nałożono %1 przebiegi. Oś czasu każdego przebiegu rozpoczyna się od zera; skale siły są wspólne.</p>")
+                                   .arg(selected.size()));
+        }
+    });
+    analysisTabs->addTab(new QLabel(tr("W kolejnych iteracjach można rozszerzyć archiwum o segmentację serii i automatyczne raporty trendów."), analysisTabs),
+                         tr("Informacje"));
+    graphLayout->addWidget(analysisTabs);
     connect(timeRangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this, timeRangeCombo](int index) {
                 if (m_forceGraph && index >= 0)
