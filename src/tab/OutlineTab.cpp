@@ -14,6 +14,7 @@
 #include <QFileDialog>
 #include <QPdfWriter>
 #include <QFile>
+#include <QDir>
 #include <QFileInfo>
 #include <QPageSize>
 #include <QPageLayout>
