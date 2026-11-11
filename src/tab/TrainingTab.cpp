@@ -444,6 +444,7 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Archer", "archer");
     m_gameTypeCombo->addItem("Scorched Earth", "scorched_earth");
     m_gameTypeCombo->addItem("Car Race", "car_race");
+    m_gameTypeCombo->addItem("Precision Crane", "precision_crane");
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_gameTypeCombo);
