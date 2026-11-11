@@ -7,6 +7,7 @@
 #include "games/GalagaGame.hpp"
 #include "games/ArcherGame.hpp"
 #include "games/CarRaceGame.hpp"
+#include "games/MarioGame.hpp"
 #include "games/ScorchedEarthGame.hpp"
 #include "games/PrecisionCraneGame.hpp"
 #include "games/RhythmForceGame.hpp"
@@ -18,6 +19,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QEventLoop>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QKeyEvent>
 #include <QStringList>
@@ -26,6 +28,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <functional>
 
 namespace games {
 struct PrecisionCraneGameTestAccess
@@ -148,6 +151,15 @@ static void waitForEvents(int milliseconds)
     QEventLoop loop;
     QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
     loop.exec();
+}
+
+static bool waitForCondition(const std::function<bool()>& condition, int timeoutMilliseconds)
+{
+    QElapsedTimer elapsed;
+    elapsed.start();
+    while (!condition() && elapsed.elapsed() < timeoutMilliseconds)
+        waitForEvents(20);
+    return condition();
 }
 
 int main(int argc, char **argv)
@@ -372,6 +384,29 @@ int main(int argc, char **argv)
     sinusGame->resize(640, 480);
     sinusGame->start();
     sinusGame->handleSensorInput(35.0);
+    sinusGame->setWaveformMode(0);
+    REQUIRE(sinusGame->waveformMode() == 0);
+    sinusGame->setWaveformMode(1);
+    REQUIRE(sinusGame->waveformMode() == 1);
+    sinusGame->setWaveformMode(2);
+    REQUIRE(sinusGame->waveformMode() == 2);
+    sinusGame->setWaveformMode(3);
+    REQUIRE(sinusGame->waveformMode() == 3);
+    sinusGame->setWaveformMode(4);
+    REQUIRE(sinusGame->waveformMode() == 4);
+    sinusGame->setWaveformMode(99);
+    REQUIRE(sinusGame->waveformMode() == 4);
+    sinusGame->setDifficultyLevel(5);
+    REQUIRE(sinusGame->getDifficultyLevel() == 5);
+    sinusGame->setDifficultyLevel(0);
+    REQUIRE(sinusGame->getDifficultyLevel() == 1);
+    sinusGame->setForceCalibration(10.0, 90.0);
+    REQUIRE(std::abs(sinusGame->forceCalibrationMinimum() - 10.0) < 1e-9);
+    REQUIRE(std::abs(sinusGame->forceCalibrationMaximum() - 90.0) < 1e-9);
+    sinusGame->setAutomaticDifficulty(true);
+    REQUIRE(sinusGame->automaticDifficulty());
+    sinusGame->setAutomaticDifficulty(false);
+    REQUIRE(!sinusGame->automaticDifficulty());
     sinusGame->resize(1920, 1080);
     REQUIRE(sinusGame->isRunning());
     sinusGame->resize(640, 480);
@@ -384,6 +419,30 @@ int main(int argc, char **argv)
     sinusGame->handleSensorInput(std::numeric_limits<double>::infinity());
     REQUIRE(sinusGame->isRunning());
     sinusGame->stop();
+
+    // Scorched Earth: validate the single HX711 input and safe resize lifecycle.
+    std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
+    auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
+    REQUIRE(scorchedGame != nullptr);
+    scorchedGame->resize(640, 480);
+    scorchedGame->start();
+    REQUIRE(scorchedGame->playerHealth() == 100);
+    REQUIRE(scorchedGame->enemyHealth() == 100);
+    REQUIRE(scorchedGame->currentRound() == 1);
+    REQUIRE(scorchedGame->terrainPointCount() > 1);
+    REQUIRE(scorchedGame->handleSensorInput(50.0));
+    REQUIRE(scorchedGame->aimDegrees() >= 15.0);
+    REQUIRE(scorchedGame->aimDegrees() <= 80.0);
+    scorchedGame->resize(180, 120);
+    waitForEvents(80);
+    REQUIRE(scorchedGame->isRunning());
+    scorchedGame->resize(640, 480);
+    waitForEvents(80);
+    REQUIRE(scorchedGame->isRunning());
+    scorchedGame->stop();
+    scorchedGame->reset();
+    REQUIRE(scorchedGame->enemyHealth() == 100);
+    REQUIRE(scorchedGame->playerHealth() == 100);
 
     // Mario Run: sensor-only double jump, enemies, lives and animated world.
     std::unique_ptr<games::GameEngine> marioBase(games::createGame(QStringLiteral("mario")));
@@ -671,16 +730,27 @@ int main(int argc, char **argv)
     carRaceGameOverInstance->resize(640, 480);
     carRaceGameOverInstance->start();
     carRaceGameOverInstance->handleSensorInput(50.0); // First obstacle: middle lane.
-    waitForEvents(3600);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->livesRemaining() < 3 ||
+               !carRaceGameOverInstance->isRunning();
+    }, 5000));
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 2);
     carRaceGameOverInstance->handleSensorInput(0.0); // Second obstacle: left lane.
-    waitForEvents(1500);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->livesRemaining() < 2 ||
+               !carRaceGameOverInstance->isRunning();
+    }, 5000));
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 1);
     // Allow the collision-protection window to expire before exposing the next lane.
-    waitForEvents(1200);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->collisionProtectionRemaining() <= 0.0;
+    }, 2500));
     carRaceGameOverInstance->handleSensorInput(90.0); // Third obstacle: right lane.
     carRaceGameOverInstance->handleSensorInput(90.0); // Cross the lane hysteresis from centre to right.
-    waitForEvents(1900);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->livesRemaining() == 0 ||
+               !carRaceGameOverInstance->isRunning();
+    }, 5000));
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 0);
     REQUIRE(!carRaceGameOverInstance->isRunning());
 
