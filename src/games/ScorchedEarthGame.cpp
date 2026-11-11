@@ -135,6 +135,7 @@ bool ScorchedEarthGame::handleInput(double value)
     m_sensorClock.restart();
     m_hasSensorSample = true;
     m_aimDegrees = 15.0 + normalized * 65.0;
+    m_power = 0.62 + normalized * 0.36;
     return true;
 }
 
