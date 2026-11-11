@@ -551,7 +551,7 @@ void RhythmForceGame::render(QPainter &painter)
                                 panel.width() - 24, panel.height() - 140),
                          Qt::AlignCenter, recent.isEmpty()
                             ? QStringLiteral("Pierwsze osiągnięcia wciąż przed Tobą")
-                            : QStringLiteral("ODBLOCKOWANE: %1").arg(recent.join(QStringLiteral("  •  "))));
+                            : QStringLiteral("ODBLOKOWANE: %1").arg(recent.join(QStringLiteral("  •  "))));
     }
     painter.drawText(QRect(margin, h - hudSize - margin, w - 2 * margin, hudSize + 4),
         Qt::AlignHCenter, QStringLiteral("Impuls 18–100% • zwolnienie ≤18% • dokładność %1%")
