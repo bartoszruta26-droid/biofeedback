@@ -17,6 +17,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QSlider>
 #include <QSpinBox>
 #include <QTextEdit>
@@ -301,6 +302,9 @@ private:
     QSpinBox* m_repsSpin;
     QSpinBox* m_restTimeSpin;
     QComboBox* m_gameTypeCombo;
+    QComboBox* m_sinusWaveformCombo{nullptr};
+    QSpinBox* m_sinusDifficultySpin{nullptr};
+    QCheckBox* m_sinusAutoDifficultyCheck{nullptr};
     
     // Panel sterowania
     QHBoxLayout* m_controlLayout;
