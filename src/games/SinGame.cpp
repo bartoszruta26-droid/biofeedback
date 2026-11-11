@@ -124,35 +124,6 @@ void SinGame::setAutomaticDifficulty(bool enabled)
 }
 bool SinGame::automaticDifficulty() const { return m_automaticDifficulty; }
 
-void SinGame::keyPressEvent(QKeyEvent* event)
-{
-    if (!event || event->isAutoRepeat()) {
-        if (event) event->accept();
-        return;
-    }
-    switch (event->key()) {
-        case Qt::Key_1: setWaveformMode(0); break;
-        case Qt::Key_2: setWaveformMode(1); break;
-        case Qt::Key_3: setWaveformMode(2); break;
-        case Qt::Key_Plus:
-        case Qt::Key_Equal:
-        case Qt::Key_Up: setDifficultyLevel(m_difficultyLevel + 1); break;
-        case Qt::Key_Minus:
-        case Qt::Key_Down: setDifficultyLevel(m_difficultyLevel - 1); break;
-        case Qt::Key_A: setAutomaticDifficulty(!m_automaticDifficulty); break;
-        case Qt::Key_BracketLeft:
-            if (m_lastRawForce < m_calibrationMaximum)
-                setForceCalibration(m_lastRawForce, m_calibrationMaximum);
-            break;
-        case Qt::Key_BracketRight:
-            if (m_lastRawForce > m_calibrationMinimum)
-                setForceCalibration(m_calibrationMinimum, m_lastRawForce);
-            break;
-        default: QWidget::keyPressEvent(event); return;
-    }
-    event->accept();
-}
-
 void SinGame::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
