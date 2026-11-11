@@ -542,6 +542,54 @@ int main(int argc, char **argv)
     REQUIRE(craneDelivery->lastPrecisionBonus() > 0);
     REQUIRE(craneDelivery->getScore() >= 110 + craneDelivery->lastPrecisionBonus());
     REQUIRE(craneDelivery->bestScore() >= craneDelivery->getScore());
+
+    // Repeat two complete deliveries to verify the light -> standard -> heavy
+    // cargo rotation. Compute sensor values from the documented 18–70% axis map.
+    const auto forceForHorizontalPosition = [](double normalizedX) {
+        const double left = 640.0 * 0.08;
+        const double right = 640.0 * 0.92;
+        const double control = (normalizedX * 640.0 - left) / (right - left);
+        return 100.0 * (0.18 + qBound(0.0, control, 1.0) * 0.52);
+    };
+    const auto deliverNextCargo = [&](double cargoX, double targetX) {
+        driveCrane(forceForHorizontalPosition(cargoX), 1200);
+        driveCrane(90.0, 1120);
+        craneDelivery->handleSensorInput(0.0);
+        waitForEvents(40);
+        REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
+        driveCrane(70.0, 1120);
+        driveCrane(90.0, 320);
+        craneDelivery->handleSensorInput(0.0);
+        waitForEvents(40);
+        REQUIRE(craneDelivery->loadAttached());
+        driveCrane(90.0, 1120);
+        craneDelivery->handleSensorInput(0.0);
+        waitForEvents(40);
+        REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::HorizontalAxis);
+        driveCrane(forceForHorizontalPosition(targetX), 1200);
+        driveCrane(90.0, 1120);
+        craneDelivery->handleSensorInput(0.0);
+        waitForEvents(40);
+        REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
+        driveCrane(70.0, 1120);
+        driveCrane(90.0, 320);
+        craneDelivery->handleSensorInput(0.0);
+        waitForEvents(80);
+    };
+
+    deliverNextCargo(0.33, 0.64);
+    REQUIRE(craneDelivery->deliveredLoads() == 2);
+    REQUIRE(craneDelivery->cargoType() == games::PrecisionCraneGame::HeavyCargo);
+    REQUIRE(craneDelivery->cargoMassKg() > 1.5);
+    REQUIRE(craneDelivery->missionDeliveriesRemaining() == 1);
+
+    deliverNextCargo(0.46, 0.52);
+    REQUIRE(craneDelivery->deliveredLoads() == 3);
+    REQUIRE(craneDelivery->cargoType() == games::PrecisionCraneGame::LightCargo);
+    REQUIRE(craneDelivery->cargoMassKg() < 0.7);
+    REQUIRE(craneDelivery->missionNumber() == 2);
+    REQUIRE(craneDelivery->missionDeliveriesRemaining() == 3);
+    REQUIRE(craneDelivery->precisionSamples() == 3);
     craneDelivery->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
