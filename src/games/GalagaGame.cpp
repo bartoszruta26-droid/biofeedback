@@ -10,17 +10,15 @@
 
 namespace games {
 namespace {
-constexpr double kPlayerSpeed = 360.0;
-constexpr double kPlayerShotSpeed = 520.0;
-constexpr double kHostileShotSpeed = 230.0;
+constexpr double kPlayerShotSpeed = 440.0;
+constexpr double kHostileShotSpeed = 190.0;
 constexpr double kHitProtection = 1.25;
-constexpr int kMaximumProjectiles = 100;
+constexpr int kMaximumProjectiles = 64;
 }
 
 GalagaGame::GalagaGame(QWidget *parent)
     : GameEngine(parent)
     , m_force(0.5)
-    , m_keyboardDirection(0.0)
     , m_fireCooldown(0.0)
     , m_enemyDirection(1.0)
     , m_enemyFireCooldown(1.0)
@@ -83,7 +81,6 @@ int GalagaGame::activePowerUpCount() const
 void GalagaGame::initialize()
 {
     m_force = 0.5;
-    m_keyboardDirection = 0.0;
     m_fireCooldown = 0.0;
     m_enemyDirection = 1.0;
     m_enemyFireCooldown = 1.0;
@@ -103,7 +100,12 @@ void GalagaGame::initialize()
     m_sensorInputValid = false;
     m_projectiles.clear();
     m_powerUps.clear();
-    m_player = QRectF(width() * 0.5 - 18.0, height() - 58.0, 36.0, 24.0);
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double playerWidth = 36.0 * scaleX;
+    const double playerHeight = 24.0 * scaleY;
+    m_player = QRectF(width() * 0.5 - playerWidth * 0.5,
+                      height() - 58.0 * scaleY, playerWidth, playerHeight);
     createWave();
 }
 
@@ -141,21 +143,24 @@ void GalagaGame::createWave()
 {
     m_enemies.clear();
     m_powerUps.clear();
-    const int desiredRows = qBound(3, 3 + (m_wave - 1) / 2, 6);
-    const int maxRows = qMax(1, (height() - 72) / 30);
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const int desiredRows = qBound(3, 3 + (m_wave - 1) / 3, 5);
+    const int maxRows = qMax(1, (height() - 72.0 * scaleY) / (30.0 * scaleY));
     const int rows = qMin(desiredRows, maxRows);
-    const int columns = qBound(1, width() / 40, 8);
-    const double margin = qMin(24.0, qMax(4.0, width() * 0.05));
+    const int columns = qBound(1, width() / qMax(1, qRound(40.0 * scaleX)), 8);
+    const double margin = qMin(24.0 * scaleX, qMax(4.0 * scaleX, width() * 0.05));
     const double cellWidth = qMax(1.0, (width() - 2.0 * margin) / columns);
-    const double enemyWidth = qMax(6.0, qMin(28.0, cellWidth - 6.0));
-    const double enemyHeight = qMin(22.0, qMax(8.0, (height() - 72.0) / rows - 7.0));
-    const double rowSpacing = qMax(enemyHeight + 2.0,
-                                   qMin(32.0, (height() - 72.0) / rows));
+    const double enemyWidth = qMax(6.0 * scaleX, qMin(28.0 * scaleX, cellWidth - 6.0 * scaleX));
+    const double enemyHeight = qMin(22.0 * scaleY,
+        qMax(8.0 * scaleY, (height() - 72.0 * scaleY) / rows - 7.0 * scaleY));
+    const double rowSpacing = qMax(enemyHeight + 2.0 * scaleY,
+                                   qMin(32.0 * scaleY, (height() - 72.0 * scaleY) / rows));
     for (int row = 0; row < rows; ++row) {
         for (int column = 0; column < columns; ++column) {
             Enemy enemy;
             enemy.rect = QRectF(margin + column * cellWidth + (cellWidth - enemyWidth) / 2.0,
-                                48.0 + row * rowSpacing, enemyWidth, enemyHeight);
+                                48.0 * scaleY + row * rowSpacing, enemyWidth, enemyHeight);
             enemy.hitPoints = (m_wave >= 2 && row == 0) ? 2 + (m_wave >= 6 ? 1 : 0) : 1;
             enemy.active = true;
             enemy.phase = (row * columns + column) * 0.37;
@@ -163,25 +168,22 @@ void GalagaGame::createWave()
         }
     }
     m_enemyDirection = 1.0;
-    m_enemyFireCooldown = qMax(0.45, 1.15 - m_wave * 0.035);
+    m_enemyFireCooldown = qMax(0.62, 1.45 - m_wave * 0.025);
 }
 
 bool GalagaGame::handleInput(double value)
 {
     if (!std::isfinite(value))
         return false;
-    m_force = qBound(0.0, value / 100.0, 1.0);
+    const double target = qBound(0.0, value / 100.0, 1.0);
+    m_force += (target - m_force) * 0.45;
     m_sensorInputValid = true;
     return true;
 }
 
 void GalagaGame::keyPressEvent(QKeyEvent* event)
 {
-    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_A)
-        m_keyboardDirection = -1.0;
-    else if (event->key() == Qt::Key_Right || event->key() == Qt::Key_D)
-        m_keyboardDirection = 1.0;
-    else if (event->key() == Qt::Key_Space)
+    if (event->key() == Qt::Key_Space)
         m_fireHeld = true;
     else if (event->key() == Qt::Key_X && !event->isAutoRepeat())
         activatePulse();
@@ -191,13 +193,7 @@ void GalagaGame::keyPressEvent(QKeyEvent* event)
 
 void GalagaGame::keyReleaseEvent(QKeyEvent* event)
 {
-    if (event->key() == Qt::Key_Left || event->key() == Qt::Key_A) {
-        if (m_keyboardDirection < 0.0)
-            m_keyboardDirection = 0.0;
-    } else if (event->key() == Qt::Key_Right || event->key() == Qt::Key_D) {
-        if (m_keyboardDirection > 0.0)
-            m_keyboardDirection = 0.0;
-    } else if (event->key() == Qt::Key_Space) {
+    if (event->key() == Qt::Key_Space) {
         m_fireHeld = false;
     } else {
         GameEngine::keyReleaseEvent(event);
@@ -209,13 +205,16 @@ void GalagaGame::firePlayerShot()
     if (m_projectiles.size() >= kMaximumProjectiles)
         return;
     const double centerX = m_player.center().x();
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
     const int count = m_firePowerLevel >= 3 ? 3 : 1;
     for (int i = 0; i < count && m_projectiles.size() < kMaximumProjectiles; ++i) {
-        const double spread = count == 1 ? 0.0 : (i - 1) * 105.0;
+        const double spread = count == 1 ? 0.0 : (i - 1) * 80.0 * scaleX;
         Projectile shot;
-        shot.rect = QRectF(centerX - 2.0, m_player.top() - 12.0, 4.0, 12.0);
+        shot.rect = QRectF(centerX - 2.0 * scaleX, m_player.top() - 12.0 * scaleY,
+                           4.0 * scaleX, 12.0 * scaleY);
         shot.velocityX = spread;
-        shot.velocityY = -kPlayerShotSpeed;
+        shot.velocityY = -kPlayerShotSpeed * scaleY;
         shot.fromPlayer = true;
         m_projectiles.push_back(shot);
     }
@@ -317,12 +316,15 @@ void GalagaGame::update(double deltaTime)
     m_comboTimer = qMax(0.0, m_comboTimer - deltaTime);
     if (m_comboTimer <= 0.0)
         m_combo = 0;
-    m_backgroundOffset = std::fmod(m_backgroundOffset + 24.0 * deltaTime, 40.0);
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    m_backgroundOffset = std::fmod(m_backgroundOffset + 24.0 * scaleY * deltaTime,
+                                   40.0 * scaleY);
 
-    const double sensorX = 8.0 + m_force * qMax(0.0, width() - 16.0 - m_player.width());
-    const double keyboardX = m_player.x() + m_keyboardDirection * kPlayerSpeed * deltaTime;
-    const double targetX = m_keyboardDirection == 0.0 ? sensorX : keyboardX;
-    m_player.moveLeft(qBound(6.0, targetX, qMax(6.0, width() - 6.0 - m_player.width())));
+    const double sensorX = 8.0 * scaleX +
+        m_force * qMax(0.0, width() - 16.0 * scaleX - m_player.width());
+    m_player.moveLeft(qBound(6.0 * scaleX, sensorX,
+        qMax(6.0 * scaleX, width() - 6.0 * scaleX - m_player.width())));
 
     m_fireCooldown = qMax(0.0, m_fireCooldown - deltaTime);
     if (m_fireHeld && m_fireCooldown <= 0.0) {
@@ -339,19 +341,21 @@ void GalagaGame::update(double deltaTime)
             if (!shooter.active)
                 continue;
             Projectile shot;
-            shot.rect = QRectF(shooter.rect.center().x() - 2.5,
-                               shooter.rect.bottom(), 5.0, 11.0);
-            shot.velocityX = qBound(-105.0,
-                (m_player.center().x() - shooter.rect.center().x()) * 0.2, 105.0);
-            shot.velocityY = qMin(420.0, kHostileShotSpeed + m_wave * 13.0);
+            shot.rect = QRectF(shooter.rect.center().x() - 2.5 * scaleX,
+                               shooter.rect.bottom(), 5.0 * scaleX, 11.0 * scaleY);
+            shot.velocityX = qBound(-85.0 * scaleX,
+                (m_player.center().x() - shooter.rect.center().x()) * 0.16,
+                85.0 * scaleX);
+            shot.velocityY = qMin(340.0 * scaleY,
+                (kHostileShotSpeed + m_wave * 8.0) * scaleY);
             shot.fromPlayer = false;
             m_projectiles.push_back(shot);
             break;
         }
-        m_enemyFireCooldown = qMax(0.38, 1.3 - m_wave * 0.055);
+        m_enemyFireCooldown = qMax(0.55, 1.45 - m_wave * 0.035);
     }
 
-    const double enemySpeed = qMin(145.0, 25.0 + m_wave * 5.5);
+    const double enemySpeed = qMin(95.0, 20.0 + m_wave * 3.5) * scaleX;
     bool hitEdge = false;
     for (const Enemy& enemy : m_enemies) {
         if (!enemy.active)
@@ -366,7 +370,7 @@ void GalagaGame::update(double deltaTime)
         m_enemyDirection = -m_enemyDirection;
         for (Enemy& enemy : m_enemies)
             if (enemy.active)
-                enemy.rect.translate(0.0, 9.0 + qMin(5.0, m_wave * 0.4));
+                enemy.rect.translate(0.0, (7.0 + qMin(4.0, m_wave * 0.25)) * scaleY);
     }
     for (Enemy& enemy : m_enemies) {
         if (!enemy.active)
@@ -533,8 +537,8 @@ void GalagaGame::render(QPainter& painter)
                      Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("Życia: %1").arg(m_lives));
     painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(7, hudSize - 2, 10)));
     const QString controls = width() < 300
-        ? QStringLiteral("Czujnik/ruch  •  SPACJA: ogień  •  X: impuls")
-        : QStringLiteral("Czujnik lub A/D, ←/→: ruch  •  SPACJA: ogień  •  X: impuls EMP");
+        ? QStringLiteral("Tensometr: ruch  •  SPACJA: ogień  •  X: impuls")
+        : QStringLiteral("Tensometr: sterowanie statkiem  •  SPACJA: ogień  •  X: impuls EMP");
     painter.drawText(QRect(6, height() - hudSize - 7, width() - 12, hudSize + 4),
                      Qt::AlignHCenter | Qt::AlignVCenter, controls);
     painter.drawText(QRect(8, hudSize + 8, width() - 16, hudSize + 4), Qt::AlignLeft,
