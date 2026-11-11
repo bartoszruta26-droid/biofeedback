@@ -30,8 +30,6 @@
 #include <QDoubleSpinBox>
 #include <QTabWidget>
 #include <QSizePolicy>
-#include <QStandardPaths>
-#include <QDir>
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -754,8 +752,10 @@ void OutlineTab::setupUI()
     comparisonBrowser->setObjectName(QStringLiteral("forceSessionComparison"));
     comparisonBrowser->setMaximumHeight(125);
     auto* saveSeriesButton = new QPushButton(tr("Zapisz bieżący przebieg"), metricsPage);
+    m_saveForceSeriesButton = saveSeriesButton;
     saveSeriesButton->setObjectName(QStringLiteral("saveForceSeries"));
     auto* savedSeriesList = new QListWidget(metricsPage);
+    m_forceSeriesList = savedSeriesList;
     savedSeriesList->setObjectName(QStringLiteral("savedForceSeries"));
     savedSeriesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
     savedSeriesList->setMaximumHeight(100);
@@ -782,75 +782,50 @@ void OutlineTab::setupUI()
     connect(metricsTimer, &QTimer::timeout, this, refreshForceMetrics);
     metricsTimer->start();
 
-    const QString seriesStorePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-                                  + QStringLiteral("/rehabilitation_force_series.json");
-    auto loadSavedSeries = [seriesStorePath, savedSeriesList]() {
-        savedSeriesList->clear();
-        QFile file(seriesStorePath);
-        if (!file.open(QIODevice::ReadOnly)) return;
-        const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
-        file.close();
-        const QJsonArray all = doc.array();
-        for (const QJsonValue& value : all) {
-            const QJsonObject item = value.toObject();
-            const QString label = item.value(QStringLiteral("label")).toString();
-            if (!label.isEmpty()) {
-                auto* entry = new QListWidgetItem(label, savedSeriesList);
-                entry->setData(Qt::UserRole, QString::fromUtf8(QJsonDocument(item).toJson(QJsonDocument::Compact)));
-            }
-        }
-    };
-    loadSavedSeries();
+    refreshForceSeriesArchive();
     connect(saveSeriesButton, &QPushButton::clicked, this,
-            [this, seriesStorePath, savedSeriesList, loadSavedSeries, refreshForceMetrics]() {
+            [this, savedSeriesList, refreshForceMetrics]() {
+        if (!m_resourceRepository || m_currentPatientUuid.isEmpty()) {
+            QMessageBox::information(this, tr("Zapis przebiegu"),
+                tr("Wybierz pacjenta i upewnij się, że repozytorium danych jest dostępne."));
+            return;
+        }
         if (!m_forceGraph || m_forceGraph->dataPointCount() < 3) {
             QMessageBox::information(this, tr("Zapis przebiegu"),
                                      tr("Wymagane są co najmniej trzy próbki."));
             return;
         }
-        QDir().mkpath(QFileInfo(seriesStorePath).absolutePath());
-        QJsonArray all;
-        QFile existing(seriesStorePath);
-        if (existing.open(QIODevice::ReadOnly)) {
-            all = QJsonDocument::fromJson(existing.readAll()).array();
-            existing.close();
-        }
-        QJsonObject item;
-        const QString timestamp = QDateTime::currentDateTime().toString(Qt::ISODate);
-        const QString label = tr("%1 — %2 próbek")
-            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
-            .arg(m_forceGraph->dataPointCount());
-        item.insert(QStringLiteral("label"), label);
-        item.insert(QStringLiteral("patient_uuid"), m_currentPatientUuid);
-        item.insert(QStringLiteral("created_at"), timestamp);
-        QJsonArray points;
         const auto samples = m_forceGraph->getData();
-        const qint64 origin = samples.isEmpty() ? 0 : samples.first().timestamp.toMSecsSinceEpoch();
+        QJsonArray points;
         for (const auto& point : samples) {
             QJsonArray pair;
-            pair.append(point.timestamp.toMSecsSinceEpoch() - origin);
+            pair.append(point.timestamp.toMSecsSinceEpoch() - samples.first().timestamp.toMSecsSinceEpoch());
             pair.append(point.value);
             points.append(pair);
         }
-        item.insert(QStringLiteral("points"), points);
-        all.append(item);
-        while (all.size() > 100) all.removeAt(0);
-        QFile file(seriesStorePath);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        QJsonObject payload;
+        payload.insert(QStringLiteral("patient_id"), m_currentPatientUuid);
+        payload.insert(QStringLiteral("measurement_type"), QStringLiteral("rehabilitation_force_series"));
+        payload.insert(QStringLiteral("unit"), QStringLiteral("N"));
+        payload.insert(QStringLiteral("sample_count"), samples.size());
+        payload.insert(QStringLiteral("start_at"), samples.first().timestamp.toString(Qt::ISODateWithMs));
+        payload.insert(QStringLiteral("end_at"), samples.last().timestamp.toString(Qt::ISODateWithMs));
+        payload.insert(QStringLiteral("samples"), points);
+        QJsonObject created;
+        QString error;
+        if (!m_resourceRepository->create(QStringLiteral("measurements"), payload, created, &error)) {
             QMessageBox::warning(this, tr("Zapis przebiegu"),
-                                 tr("Nie można zapisać serii: %1").arg(file.errorString()));
+                tr("Nie udało się zapisać serii w repozytorium pacjenta. Kod błędu: %1").arg(error));
             return;
         }
-        file.write(QJsonDocument(all).toJson(QJsonDocument::Indented));
-        file.close();
-        loadSavedSeries();
+        refreshForceSeriesArchive();
         if (savedSeriesList->count() > 0) {
             savedSeriesList->clearSelection();
             savedSeriesList->item(savedSeriesList->count() - 1)->setSelected(true);
         }
         refreshForceMetrics();
         QMessageBox::information(this, tr("Zapis przebiegu"),
-                                 tr("Zapisano serię pomiarową w lokalnym archiwum aplikacji."));
+            tr("Zapisano %1 próbek w repozytorium pomiarów pacjenta.").arg(samples.size()));
     });
     connect(compareSeriesButton, &QPushButton::clicked, this,
             [this, savedSeriesList, overlay, metricsBrowser, comparisonBrowser]() {
@@ -869,15 +844,15 @@ void OutlineTab::setupUI()
             const QJsonObject item = QJsonDocument::fromJson(
                 selectedItem->data(Qt::UserRole).toString().toUtf8()).object();
             if (item.isEmpty()) continue;
-            const QString storedPatient = item.value(QStringLiteral("patient_uuid")).toString();
-            if (storedPatient != m_currentPatientUuid) {
+            const QString storedPatient = item.value(QStringLiteral("patient_id")).toString();
+            if (storedPatient.compare(m_currentPatientUuid, Qt::CaseInsensitive) != 0) {
                 QMessageBox::warning(this, tr("Porównanie serii"),
                     tr("Co najmniej jedna wybrana seria należy do innego kontekstu pacjenta. Zaznacz wyłącznie serie bieżącego pacjenta."));
                 return;
             }
-            const QJsonArray points = item.value(QStringLiteral("points")).toArray();
+            const QJsonArray points = item.value(QStringLiteral("samples")).toArray();
             const QDateTime base = QDateTime::fromString(
-                item.value(QStringLiteral("created_at")).toString(), Qt::ISODate);
+                item.value(QStringLiteral("start_at")).toString(), Qt::ISODateWithMs);
             QVector<gui::DataPoint> samples;
             samples.reserve(points.size());
             for (const QJsonValue& value : points) {
@@ -1889,6 +1864,7 @@ void OutlineTab::setCurrentPatientContext(const QString& patientUuid, const QStr
     if (m_patientContextLabel)
         m_patientContextLabel->setText(tr("Pacjent: %1").arg(safeName));
     refreshRehabilitationEpisodes();
+    refreshForceSeriesArchive();
 }
 
 void OutlineTab::setResourceRepository(
@@ -1896,6 +1872,38 @@ void OutlineTab::setResourceRepository(
 {
     m_resourceRepository = std::move(repository);
     refreshRehabilitationEpisodes();
+    refreshForceSeriesArchive();
+}
+
+void OutlineTab::refreshForceSeriesArchive()
+{
+    if (!m_forceSeriesList) return;
+    m_forceSeriesList->clear();
+    const bool canUseRepository = m_resourceRepository && !m_currentPatientUuid.isEmpty();
+    if (m_saveForceSeriesButton) m_saveForceSeriesButton->setEnabled(canUseRepository);
+    if (!canUseRepository) return;
+
+    QString error;
+    const QJsonArray records = m_resourceRepository->list(QStringLiteral("measurements"), &error);
+    if (!error.isEmpty()) return;
+    for (const QJsonValue& value : records) {
+        if (!value.isObject()) continue;
+        const QJsonObject record = value.toObject();
+        if (record.value(QStringLiteral("measurement_type")).toString() !=
+            QStringLiteral("rehabilitation_force_series")) continue;
+        if (record.value(QStringLiteral("patient_id")).toString().compare(
+                m_currentPatientUuid, Qt::CaseInsensitive) != 0) continue;
+        const QString start = record.value(QStringLiteral("start_at")).toString();
+        const int count = record.value(QStringLiteral("sample_count")).toInt(
+            record.value(QStringLiteral("samples")).toArray().size());
+        const QString label = tr("%1 — %2 próbek")
+            .arg(QDateTime::fromString(start, Qt::ISODateWithMs).toLocalTime()
+                     .toString(QStringLiteral("yyyy-MM-dd hh:mm:ss")))
+            .arg(count);
+        auto* item = new QListWidgetItem(label, m_forceSeriesList);
+        item->setData(Qt::UserRole,
+            QString::fromUtf8(QJsonDocument(record).toJson(QJsonDocument::Compact)));
+    }
 }
 
 void OutlineTab::refreshRehabilitationEpisodes()
