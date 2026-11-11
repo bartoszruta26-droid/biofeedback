@@ -195,6 +195,9 @@ int main(int argc, char **argv)
     REQUIRE(balance->gameName().contains(QStringLiteral("Balance Tower")));
     balance->resize(640, 480);
     balance->start();
+    balance->resize(1920, 1080);
+    REQUIRE(balance->isRunning());
+    balance->resize(640, 480);
     REQUIRE(balance->awaitingNeutral());
     balance->handleSensorInput(20.0);
     REQUIRE(!balance->awaitingNeutral());
@@ -241,6 +244,9 @@ int main(int argc, char **argv)
     REQUIRE(forceMaze->gameName().contains(QStringLiteral("Force Maze")));
     forceMaze->resize(640, 480);
     forceMaze->start();
+    forceMaze->resize(1920, 1080);
+    REQUIRE(forceMaze->isRunning());
+    forceMaze->resize(640, 480);
     forceMaze->setLeftHanded(false); // Keep the regression independent of saved user preference.
     REQUIRE(forceMaze->awaitingNeutral());
     forceMaze->handleSensorInput(20.0);
@@ -346,6 +352,9 @@ int main(int argc, char **argv)
     tanGame->resize(640, 480);
     tanGame->start();
     tanGame->handleSensorInput(35.0);
+    tanGame->resize(1920, 1080);
+    REQUIRE(tanGame->isRunning());
+    tanGame->resize(640, 480);
     tanGame->update(std::numeric_limits<double>::max());
     REQUIRE(tanGame->isRunning());
     tanGame->update(std::numeric_limits<double>::quiet_NaN());
@@ -362,6 +371,9 @@ int main(int argc, char **argv)
     sinusGame->resize(640, 480);
     sinusGame->start();
     sinusGame->handleSensorInput(35.0);
+    sinusGame->resize(1920, 1080);
+    REQUIRE(sinusGame->isRunning());
+    sinusGame->resize(640, 480);
     sinusGame->update(std::numeric_limits<double>::max());
     REQUIRE(sinusGame->isRunning());
     sinusGame->update(std::numeric_limits<double>::quiet_NaN());
@@ -510,6 +522,9 @@ int main(int argc, char **argv)
     archerGame->resize(640, 480);
     waitForEvents(80);
     REQUIRE(archerGame->isRunning());
+    archerGame->resize(1920, 1080);
+    REQUIRE(archerGame->isRunning());
+    archerGame->resize(640, 480);
     archerGame->stop();
 
     // A deliberately low aim must miss cleanly and retire the arrow.
@@ -635,6 +650,9 @@ int main(int argc, char **argv)
     scorchedGame->resize(640, 480);
     waitForEvents(80);
     REQUIRE(scorchedGame->isRunning());
+    scorchedGame->resize(1920, 1080);
+    REQUIRE(scorchedGame->isRunning());
+    scorchedGame->resize(640, 480);
     scorchedGame->stop();
     scorchedGame->reset();
     REQUIRE(scorchedGame->playerHealth() == 100);
@@ -693,6 +711,9 @@ int main(int argc, char **argv)
     crane->resize(640, 480);
     crane->start();
     REQUIRE(crane->isRunning());
+    crane->resize(1920, 1080);
+    REQUIRE(crane->isRunning());
+    crane->resize(640, 480);
     REQUIRE(crane->controlAxis() == games::PrecisionCraneGame::HorizontalAxis);
     const double initialCarriage = crane->carriagePosition();
     for (int i = 0; i < 5; ++i) {
@@ -1008,8 +1029,11 @@ int main(int argc, char **argv)
     REQUIRE(rhythm != nullptr);
     rhythm->resize(640, 480);
     rhythm->setDifficultyLevel(1);
-    REQUIRE(rhythm->beatsPerMinute() == 72);
+    REQUIRE(rhythm->beatsPerMinute() == 60);
     rhythm->start();
+    rhythm->resize(1920, 1080);
+    REQUIRE(rhythm->isRunning());
+    rhythm->resize(640, 480);
     REQUIRE(rhythm->nextBeatNumber() == 1);
     REQUIRE(!rhythm->hasFreshSignal());
     games::RhythmForceGameTestAccess::emitPulse(
