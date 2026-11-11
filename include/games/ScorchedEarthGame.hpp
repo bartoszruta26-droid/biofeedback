@@ -26,7 +26,6 @@ public:
     double aimDegrees() const { return m_aimDegrees; }
     double shotPower() const { return m_power; }
     int activeProjectileCount() const { return m_projectiles.size(); }
-    int trajectoryPreviewPointCount() const;
 
 protected:
     void initialize() override;
@@ -49,7 +48,6 @@ private:
     void fireProjectile(bool playerOwned);
     void resolveImpact(const QPointF& point, bool playerOwned);
     void applyCrater(double x);
-    QVector<QPointF> trajectoryPreview() const;
 
     QPolygonF m_terrain;
     QVector<Projectile> m_projectiles;
