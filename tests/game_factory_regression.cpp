@@ -207,7 +207,10 @@ int main(int argc, char **argv)
     REQUIRE(balance->stability() >= 0.0 && balance->stability() <= 1.0);
     // A long high-force gesture switches the active placement axis.
     balance->handleSensorInput(90.0);
-    games::BalanceTowerGameTestAccess::advance(*balance, 0.90);
+    for (int sample = 0; sample < 9; ++sample) {
+        games::BalanceTowerGameTestAccess::advance(*balance, 0.10);
+        balance->handleSensorInput(90.0);
+    }
     balance->handleSensorInput(20.0);
     REQUIRE(balance->depthAxisActive());
     // A missing sample freezes game progression and requires neutral re-arming.
