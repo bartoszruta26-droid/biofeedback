@@ -249,10 +249,19 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 ### 4.4. Balance Tower — wieża równowagi
 
-- **Grafika:** kolorowe elementy układane na platformie, widoczny środek ciężkości, animacja przechyłu i stabilności.
-- **Funkcje:** układanie elementów, utrzymanie równowagi, serie i wyzwania na czas.
-- **Tensometr:** siła przesuwa aktualnie wybrany element w lewo/prawo lub reguluje jego położenie w osi aktywnej. Krótki impuls upuszcza element; długi gest zmienia oś lub zatwierdza ruch.
-- **Wyróżnik:** prosta do zrozumienia mechanika z dużym potencjałem kolejnych plansz.
+**Status:** pierwsza grywalna implementacja dodana do `main`, zarejestrowana w `GameFactory`, selektorze zakładki treningowej i celach kompilacji desktopowej oraz regresyjnej.
+
+- **Koncepcja:** budowanie trójwymiarowo prezentowanej wieży z kolejnych elementów. Każde ułożenie zmienia rozkład masy i położenie środka ciężkości. Gracz zdobywa punkty za precyzję, utrzymuje serię udanych ułożeń i przechodzi trzy rundy o rosnącym poziomie trudności.
+- **Grafika:** kolorowe, przestrzenne bloki, platforma bazowa, przesunięcie perspektywiczne osi głębokości, podświetlenie aktualnie kontrolowanego elementu, miernik stabilności, wizualizacja przechyłu, animowane tło i ekran zakończenia rundy.
+- **Model układania:** każdy element ma położenie w dwóch osiach, szerokość, głębokość i masę. Umieszczenie wymaga odpowiedniego nakładania się elementu na poprzedni. Zbyt małe podparcie oznacza upadek elementu, utratę życia, przerwanie serii i obniżenie wyniku. Zaliczone elementy tworzą stos, którego środek ciężkości i stabilność są przeliczane po każdym ułożeniu.
+- **Sterowanie jednym tensometrem:** jedna próbka siły reguluje położenie aktualnego elementu w aktywnej osi. Strefa neutralna 10–30% utrzymuje pozycję. Zakres poniżej 10% i powyżej 30% mapuje się na przeciwne kierunki osi. Krótki gest wysokiej siły (82% lub więcej, 0,12–0,85 s) zakończony powrotem do strefy neutralnej upuszcza element. Długi gest (powyżej 0,85 s) i zwolnienie przełącza oś poziomą/głębokości. W każdej chwili jest używany jeden kanał wejściowy; nie ma sterowania klawiaturą ani myszą.
+- **Rundy i trudność:** trzy rundy kampanii, po 12 elementów do ułożenia w każdej. Po zaliczeniu rundy konstrukcja jest resetowana do stabilnej podstawy, a trudność rośnie przez stopniowe zmniejszanie rozmiaru elementów. Trzy życia pozwalają popełnić ograniczoną liczbę błędów.
+- **Punktacja i serie:** wynik uwzględnia poprawne ułożenie, precyzję względem środka poprzedniego elementu i serię kolejnych udanych ruchów. Upadek przerywa serię i odejmuje punkty.
+- **Osiągnięcia:** pierwszy element (`first_block`), wieża z co najmniej sześciu elementów (`tower_six`), seria pięciu (`steady_hand`), ukończona runda (`round_complete`), mistrz trzech rund (`tower_master`) oraz ukończenie kampanii bez upadku (`perfect_foundation`). Osiągnięcia i rekordy są zapisywane w `QSettings`.
+- **Rekordy:** najlepszy wynik i najwyższa ukończona runda są zachowywane lokalnie pod `games/balance_tower/records`.
+- **Bezpieczeństwo sygnału:** wartości niefinitywne są odrzucane. Po 350 ms bez świeżej próbki ruch i gesty są zatrzymywane, a rozpoczęty gest anulowany. Po uruchomieniu lub utracie sygnału wymagane jest ponowne uzbrojenie przez próbkę z neutralnej strefy. Brak sygnału nie jest traktowany jako zerowa siła.
+- **Testy regresyjne:** rejestracja fabryki, cykl życia, neutralne uzbrojenie, krótki gest upuszczania, długi gest zmiany osi, stabilność stosu, timeout i ponowne uzbrojenie. Testy symulują wejście; nie zastępują testu fizycznego Nano/HX711/tensometru.
+- **Granice zastosowania:** wynik ma charakter rozrywkowy i nie jest diagnozą, oceną równowagi klinicznej ani dowodem skuteczności terapii.
 
 ### 4.5. Reaction Force — refleks siły
 
