@@ -90,6 +90,7 @@ private:
     double m_sway;
     double m_swayVelocity;
     double m_previousCarriageX;
+    double m_renderPreviousCarriageX{0.0};
     double m_previousHookY{0.0};
     double m_previousSway{0.0};
     double m_previousObstacleClock{0.0};
