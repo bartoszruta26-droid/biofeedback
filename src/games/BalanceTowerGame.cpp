@@ -296,7 +296,6 @@ void BalanceTowerGame::render(QPainter &painter)
     const qreal baseX = width() * 0.5;
     const qreal baseY = height() * 0.79;
     const qreal blockH = qMax<qreal>(13.0, height() * 0.038);
-    const qreal perspective = qBound<qreal>(0.65, 1.0 - std::abs(m_tilt) * 0.35, 1.0);
 
     painter.setPen(QPen(QColor(125, 208, 220), 2.0));
     painter.setBrush(QColor(34, 87, 105));
