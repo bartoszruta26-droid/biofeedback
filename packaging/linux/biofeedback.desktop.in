@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Biofeedback
-Comment=Pomiar, analiza i trening biofeedback
-Exec="@INSTALL_DIR@/run.sh"
-Icon=applications-science
-Terminal=false
-Categories=Education;Science;Utility;
-StartupNotify=true

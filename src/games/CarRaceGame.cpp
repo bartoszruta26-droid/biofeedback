@@ -262,8 +262,10 @@ void CarRaceGame::render(QPainter& painter)
     const double laneWidth = roadWidth / 3.0;
 
     // Distant landscape: slow parallax layers establish depth without assets.
-    painter.fillRect(rect(), QLinearGradient(0.0, 0.0, 0.0, h)
-        .createSubstituted(QColor(100, 174, 220), QColor(220, 235, 244)));
+    QLinearGradient skyGradient(0.0, 0.0, 0.0, h);
+    skyGradient.setColorAt(0.0, QColor(100, 174, 220));
+    skyGradient.setColorAt(1.0, QColor(220, 235, 244));
+    painter.fillRect(rect(), skyGradient);
     painter.fillRect(QRectF(0.0, h * 0.34, w, h * 0.66), QColor(55, 132, 72));
     const double farShift = std::fmod(m_distance * 0.035, w * 0.55);
     const double nearShift = std::fmod(m_distance * 0.11, w * 0.38);
@@ -366,13 +368,10 @@ void CarRaceGame::render(QPainter& painter)
     }
 
     // The rendered car follows the logical lane with smooth steering interpolation.
-    QRectF visualCar = laneRect(qRound(m_visualLane), m_player.top(),
-                                m_player.width(), m_player.height());
-    const double laneBlend = m_visualLane - std::floor(m_visualLane);
-    if (m_visualLane > m_lane && m_lane < 2)
-        visualCar.translate(laneBlend * laneWidth, 0.0);
-    else if (m_visualLane < m_lane && m_lane > 0)
-        visualCar.translate(-laneBlend * laneWidth, 0.0);
+    const double visualCarLeft = roadLeft + laneWidth * m_visualLane +
+                                 (laneWidth - m_player.width()) / 2.0;
+    QRectF visualCar(visualCarLeft, m_player.top(),
+                     m_player.width(), m_player.height());
     const double suspension = std::sin(m_animationTime * 13.0) * 1.4;
     visualCar.translate(0.0, suspension);
     if (m_cameraShakeTimer > 0.0) {
