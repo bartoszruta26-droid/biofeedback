@@ -23,9 +23,10 @@ GameEngine::GameEngine(QWidget *parent)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Drive the presentation at up to 120 Hz. Sensor acquisition remains
-    // independent; fixed-step physics and latest-value input coalescing bound work.
-    m_gameTimer->setInterval(8);
+    // Request a steady 90 Hz presentation cadence. A precise timer avoids
+    // coarse-timer drift; the fixed-step simulation remains independent of
+    // display resolution and sensor acquisition frequency.
+    m_gameTimer->setInterval(11);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
@@ -240,7 +241,7 @@ void GameEngine::gameLoop()
     
     // Fixed-step simulation keeps collision and movement behaviour independent
     // of GUI timer jitter. The frame delta is capped above to bound catch-up work.
-    constexpr double fixedStep = 1.0 / 120.0;
+    constexpr double fixedStep = 1.0 / 90.0;
     m_simulationAccumulator += deltaTime;
     int steps = 0;
     while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
@@ -354,8 +355,9 @@ void GameEngine::paintEvent(QPaintEvent* event)
     // Tworzenie obiektu malującego
     QPainter painter(this);
     
-    // Włączenie antyaliasingu dla lepszej jakości grafiki
-    painter.setRenderHint(QPainter::Antialiasing);
+    // Pixel-art rendering is the low-cost default. Individual games may
+    // explicitly enable smoothing only where it materially improves clarity.
+    painter.setRenderHint(QPainter::Antialiasing, false);
     
     // Tło - czarne dla gier
     painter.fillRect(rect(), Qt::black);
