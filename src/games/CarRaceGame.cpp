@@ -221,7 +221,7 @@ void CarRaceGame::update(double deltaTime)
         spawnObstacle();
     }
 
-    m_scoreDistanceAccumulator += m_roadSpeed * deltaTime;
+    m_scoreDistanceAccumulator += baseLogicalSpeed * deltaTime;
     while (m_scoreDistanceAccumulator >= 250.0) {
         m_scoreDistanceAccumulator -= 250.0;
         addScore(1);
