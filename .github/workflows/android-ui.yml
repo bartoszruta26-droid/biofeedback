@@ -1,6 +1,7 @@
 name: android-ui-build
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - integration/all-work
