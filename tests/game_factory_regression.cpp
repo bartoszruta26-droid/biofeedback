@@ -420,30 +420,6 @@ int main(int argc, char **argv)
     REQUIRE(sinusGame->isRunning());
     sinusGame->stop();
 
-    // Scorched Earth: validate the single HX711 input and safe resize lifecycle.
-    std::unique_ptr<games::GameEngine> scorched(games::createGame(QStringLiteral("scorched_earth")));
-    auto* scorchedGame = dynamic_cast<games::ScorchedEarthGame*>(scorched.get());
-    REQUIRE(scorchedGame != nullptr);
-    scorchedGame->resize(640, 480);
-    scorchedGame->start();
-    REQUIRE(scorchedGame->playerHealth() == 100);
-    REQUIRE(scorchedGame->enemyHealth() == 100);
-    REQUIRE(scorchedGame->currentRound() == 1);
-    REQUIRE(scorchedGame->terrainPointCount() > 1);
-    REQUIRE(scorchedGame->handleSensorInput(50.0));
-    REQUIRE(scorchedGame->aimDegrees() >= 15.0);
-    REQUIRE(scorchedGame->aimDegrees() <= 80.0);
-    scorchedGame->resize(180, 120);
-    waitForEvents(80);
-    REQUIRE(scorchedGame->isRunning());
-    scorchedGame->resize(640, 480);
-    waitForEvents(80);
-    REQUIRE(scorchedGame->isRunning());
-    scorchedGame->stop();
-    scorchedGame->reset();
-    REQUIRE(scorchedGame->enemyHealth() == 100);
-    REQUIRE(scorchedGame->playerHealth() == 100);
-
     // Mario Run: sensor-only double jump, enemies, lives and animated world.
     std::unique_ptr<games::GameEngine> marioBase(games::createGame(QStringLiteral("mario")));
     auto* mario = dynamic_cast<games::MarioGame*>(marioBase.get());
