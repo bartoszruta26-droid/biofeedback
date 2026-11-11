@@ -125,6 +125,9 @@ void RhythmForceGame::initialize()
     m_achievementToastSeconds = 0.0;
     QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
     m_achievements = settings.value(QStringLiteral("games/rhythm_force/achievements")).toStringList();
+    m_personalBestScore = settings.value(QStringLiteral("games/rhythm_force/records/best_score"), 0).toInt();
+    m_personalBestAccuracy = settings.value(QStringLiteral("games/rhythm_force/records/best_accuracy"), 0.0).toDouble();
+    m_personalBestCombo = settings.value(QStringLiteral("games/rhythm_force/records/best_combo"), 0).toInt();
     m_lastAchievement.clear();
     m_hasSensorSample = false;
     m_awaitingNeutral = true;
@@ -276,6 +279,13 @@ void RhythmForceGame::finishRoundIfReady()
     if (m_nextBeatIndex > kRoundBeats && !m_roundCompleted) {
         m_roundCompleted = true;
         evaluateRoundAchievements();
+        m_personalBestScore = qMax(m_personalBestScore, getScore());
+        m_personalBestAccuracy = qMax(m_personalBestAccuracy, accuracyPercent());
+        m_personalBestCombo = qMax(m_personalBestCombo, m_bestCombo);
+        QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
+        settings.setValue(QStringLiteral("games/rhythm_force/records/best_score"), m_personalBestScore);
+        settings.setValue(QStringLiteral("games/rhythm_force/records/best_accuracy"), m_personalBestAccuracy);
+        settings.setValue(QStringLiteral("games/rhythm_force/records/best_combo"), m_personalBestCombo);
         m_status = QStringLiteral("Runda zakończona");
         stop();
     }
@@ -522,8 +532,8 @@ void RhythmForceGame::render(QPainter &painter)
         painter.drawText(QRectF(panel.left() + 12, panel.top() + 80,
                                 panel.width() - 24, 22),
                          Qt::AlignCenter, summary);
-        const QString streak = QStringLiteral("Najlepsza seria: %1    Osiągnięcia: %2")
-            .arg(m_bestCombo).arg(m_achievements.size());
+        const QString streak = QStringLiteral("Seria rundy: %1    Rekord serii: %2    Rekord punktów: %3")
+            .arg(m_bestCombo).arg(m_personalBestCombo).arg(m_personalBestScore);
         painter.drawText(QRectF(panel.left() + 12, panel.top() + 106,
                                 panel.width() - 24, 22),
                          Qt::AlignCenter, streak);
@@ -551,7 +561,7 @@ void RhythmForceGame::render(QPainter &painter)
                                 panel.width() - 24, panel.height() - 140),
                          Qt::AlignCenter, recent.isEmpty()
                             ? QStringLiteral("Pierwsze osiągnięcia wciąż przed Tobą")
-                            : QStringLiteral("ODBLOKOWANE: %1").arg(recent.join(QStringLiteral("  •  "))));
+                            : QStringLiteral("ODBLOCKOWANE: %1").arg(recent.join(QStringLiteral("  •  "))));
     }
     painter.drawText(QRect(margin, h - hudSize - margin, w - 2 * margin, hudSize + 4),
         Qt::AlignHCenter, QStringLiteral("Impuls 18–100% • zwolnienie ≤18% • dokładność %1%")
