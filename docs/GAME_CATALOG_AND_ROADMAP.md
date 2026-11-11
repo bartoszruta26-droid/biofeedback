@@ -3,7 +3,7 @@
 **Repozytorium:** `bartoszruta26-droid/biofeedback`  
 **Podstawa audytu:** `main` — `d3b9afd8635f6e9fe5e8f2a015763abb19742007`  
 **Priorytet rozwoju:** rozrywka i grywalność  
-**Status dokumentu:** plan i specyfikacja; nie jest potwierdzeniem implementacji nowych mechanik
+**Status dokumentu:** plan, specyfikacja oraz opis stanu wdrożenia gier już zintegrowanych z `main`; pozycje bez statusu implementacji pozostają planem rozwoju
 
 ## 1. Bezwzględna zasada sterowania
 
