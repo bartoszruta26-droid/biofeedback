@@ -23,6 +23,9 @@ public:
     int shotsFired() const { return m_shotsFired; }
     int successfulHits() const { return m_successfulHits; }
     int missedShots() const { return m_missedShots; }
+    int comboCount() const { return m_combo; }
+    int focusCharges() const { return m_focusCharges; }
+    double windStrength() const { return m_windStrength; }
     double aimAngle() const { return m_aimAngle; }
 
 protected:
@@ -39,10 +42,12 @@ private:
         QPointF position;
         QPointF velocity;
         bool active;
+        bool focused;
     };
 
     void fireArrow();
     void repositionTarget();
+    void activateFocusShot();
 
     QVector<Arrow> m_arrows;
     QRectF m_target;
@@ -52,6 +57,12 @@ private:
     double m_targetSpeed;
     double m_gravity;
     double m_fireCooldown;
+    double m_elapsed{0.0};
+    double m_comboTimer{0.0};
+    double m_windStrength{0.0};
+    int m_combo{0};
+    int m_focusCharges{3};
+    int m_round{1};
     int m_shotsFired{0};
     int m_successfulHits{0};
     int m_missedShots{0};
