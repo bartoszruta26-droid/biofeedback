@@ -451,6 +451,38 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->setMinimumHeight(35);
     m_gameTypeCombo->setFont(QFont("Arial", 7));
     configLayout->addWidget(m_gameTypeCombo);
+
+    m_sinusWaveformCombo = new QComboBox(this);
+    m_sinusWaveformCombo->addItem(QStringLiteral("Sinusoidalny"), 0);
+    m_sinusWaveformCombo->addItem(QStringLiteral("Trójkątny"), 1);
+    m_sinusWaveformCombo->addItem(QStringLiteral("Łagodne plateau"), 2);
+    m_sinusWaveformCombo->addItem(QStringLiteral("Piłokształtny"), 3);
+    m_sinusWaveformCombo->addItem(QStringLiteral("Impulsowy"), 4);
+    m_sinusWaveformCombo->setToolTip(QStringLiteral("Kształt przebiegu celu dla Sinus Force Trainer"));
+    m_sinusWaveformCombo->setVisible(false);
+    configLayout->addWidget(m_sinusWaveformCombo);
+
+    m_sinusDifficultySpin = new QSpinBox(this);
+    m_sinusDifficultySpin->setRange(1, 5);
+    m_sinusDifficultySpin->setValue(1);
+    m_sinusDifficultySpin->setPrefix(QStringLiteral("Trudność fali: "));
+    m_sinusDifficultySpin->setVisible(false);
+    configLayout->addWidget(m_sinusDifficultySpin);
+
+    m_sinusAutoDifficultyCheck = new QCheckBox(QStringLiteral("Automatyczna trudność fali"), this);
+    m_sinusAutoDifficultyCheck->setChecked(false);
+    m_sinusAutoDifficultyCheck->setVisible(false);
+    configLayout->addWidget(m_sinusAutoDifficultyCheck);
+
+    const auto updateSinusOptionsVisibility = [this](int) {
+        const bool show = m_gameTypeCombo->currentData().toString() == QStringLiteral("sin");
+        m_sinusWaveformCombo->setVisible(show);
+        m_sinusDifficultySpin->setVisible(show);
+        m_sinusAutoDifficultyCheck->setVisible(show);
+    };
+    connect(m_gameTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, updateSinusOptionsVisibility);
+    updateSinusOptionsVisibility(m_gameTypeCombo->currentIndex());
     
     m_btnAddExercise = new QPushButton("Dodaj", this);
     m_btnAddExercise->setMaximumWidth(80);
@@ -981,6 +1013,12 @@ void TrainingTab::configureGameForExercise()
     if (!selectedGame) {
         addDebugMessage(QString("Nieznany typ gry w planie treningowym: %1").arg(type), "WARNING");
         return;
+    }
+    if (auto* sinusGame = dynamic_cast<games::SinGame*>(selectedGame)) {
+        sinusGame->setWaveformMode(m_sinusWaveformCombo ? m_sinusWaveformCombo->currentData().toInt() : 0);
+        sinusGame->setDifficultyLevel(m_sinusDifficultySpin ? m_sinusDifficultySpin->value() : 1);
+        sinusGame->setAutomaticDifficulty(m_sinusAutoDifficultyCheck &&
+                                          m_sinusAutoDifficultyCheck->isChecked());
     }
     setGameEngine(selectedGame);
 }
