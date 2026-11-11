@@ -542,7 +542,7 @@ void GalagaGame::render(QPainter& painter)
             .arg(m_specialCharges).arg(m_combo)
             .arg(m_shieldRemaining > 0.0 ? QStringLiteral("OSŁONA")
                  : (m_firePowerLevel == 3 ? QStringLiteral("POTRÓJNY STRZAŁ")
-                    : (m_firePowerLevel == 2 ? QStringLiteral("SZYBKI OGIEŃ") : QString())));
+                    : (m_firePowerLevel == 2 ? QStringLiteral("SZYBKI OGIEŃ") : QString()))));
     if (m_hitCooldown > 0.0) {
         painter.setPen(QColor(255, 225, 120));
         painter.drawText(QRect(0, height() / 2 - 18, width(), 36), Qt::AlignHCenter | Qt::AlignVCenter,
