@@ -1,0 +1,18 @@
+<RCC>
+  <qresource prefix="/heraldry">
+    <file alias="ciechomscy-wez-jablko.svg">ciechomscy-wez-jablko.svg</file>
+    <file alias="herb-rodu-klasyczny.svg">herb-rodu-klasyczny.svg</file>
+    <file alias="herb-rodu-lilia.svg">herb-rodu-lilia.svg</file>
+    <file alias="herb-biskupi.svg">herb-biskupi.svg</file>
+    <file alias="herb-arcybiskupi.svg">herb-arcybiskupi.svg</file>
+    <file alias="herb-kardynalski.svg">herb-kardynalski.svg</file>
+    <file alias="herb-opacki.svg">herb-opacki.svg</file>
+    <file alias="herb-rycerski.svg">herb-rycerski.svg</file>
+    <file alias="herb-medyczny.svg">herb-medyczny.svg</file>
+    <file alias="herb-naukowy.svg">herb-naukowy.svg</file>
+    <file alias="herb-fundacyjny.svg">herb-fundacyjny.svg</file>
+    <file alias="herb-misjonarski.svg">herb-misjonarski.svg</file>
+    <file alias="herb-samorzadowy.svg">herb-samorzadowy.svg</file>
+    <file alias="herb-zaslugi.svg">herb-zaslugi.svg</file>
+  </qresource>
+</RCC>
