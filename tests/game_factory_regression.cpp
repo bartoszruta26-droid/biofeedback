@@ -13,6 +13,7 @@
 #include "games/RhythmForceGame.hpp"
 #include "games/ForceMazeGame.hpp"
 #include "games/BalanceTowerGame.hpp"
+#include "games/ReactionForceGame.hpp"
 #include <QApplication>
 #include <QTemporaryDir>
 #include <QFile>
@@ -137,6 +138,34 @@ struct RhythmForceGameTestAccess
         game.m_pulseActive = false;
     }
 };
+
+struct ReactionForceGameTestAccess
+{
+    static void prepareGo(ReactionForceGame& game, double reactionSeconds)
+    {
+        game.m_hasSensorSample = true;
+        game.m_inputAge = 0.0;
+        game.m_awaitingNeutral = false;
+        game.m_phase = ReactionForceGame::Go;
+        game.m_phaseTime = reactionSeconds;
+        game.m_pulseActive = false;
+        game.m_pulseElapsed = 0.0;
+    }
+
+    static void completePulse(ReactionForceGame& game, double duration)
+    {
+        game.m_pulseElapsed = duration;
+        game.m_inputAge = 0.0;
+        game.handleInput(0.0);
+    }
+
+    static void advance(ReactionForceGame& game, double deltaTime)
+    {
+        game.update(deltaTime);
+    }
+};
+
+
 } // namespace games
 
 #define REQUIRE(condition) do { \
@@ -179,7 +208,8 @@ int main(int argc, char **argv)
         QStringLiteral("scorched_earth"),
         QStringLiteral("precision_crane"),
         QStringLiteral("rhythm_force"),
-        QStringLiteral("force_maze")
+        QStringLiteral("force_maze"),
+        QStringLiteral("reaction_force")
     };
 
     for (const QString& id : ids) {
@@ -198,6 +228,59 @@ int main(int argc, char **argv)
         game->stop();
         REQUIRE(!game->isRunning());
     }
+
+    // Reaction Force: one HX711 channel, neutral arming, reaction timing,
+    // target-force band, false-start handling, persistence and fail-closed timeout.
+    std::unique_ptr<games::GameEngine> reactionBase(
+        games::createGame(QStringLiteral("reaction_force")));
+    auto* reaction = dynamic_cast<games::ReactionForceGame*>(reactionBase.get());
+    REQUIRE(reaction != nullptr);
+    REQUIRE(reaction->gameName().contains(QStringLiteral("Reaction Force")));
+    reaction->resize(640, 480);
+    reaction->setDifficultyLevel(3);
+    REQUIRE(reaction->difficultyLevel() == 3);
+    reaction->start();
+    REQUIRE(reaction->phase() == games::ReactionForceGame::AwaitNeutral);
+    reaction->handleSensorInput(20.0);
+    REQUIRE(reaction->awaitingNeutral());
+    reaction->handleSensorInput(0.0);
+    REQUIRE(!reaction->awaitingNeutral());
+    REQUIRE(reaction->phase() == games::ReactionForceGame::Delay);
+
+    // A valid pulse inside the reaction window and target force band scores.
+    games::ReactionForceGameTestAccess::prepareGo(*reaction, 0.18);
+    reaction->handleSensorInput(reaction->targetForcePercent());
+    REQUIRE(reaction->pulseActive());
+    games::ReactionForceGameTestAccess::completePulse(*reaction, 0.16);
+    REQUIRE(reaction->hits() == 1);
+    REQUIRE(reaction->misses() == 0);
+    REQUIRE(reaction->perfectHits() == 1);
+    REQUIRE(reaction->combo() == 1);
+    REQUIRE(reaction->getScore() > 0);
+    REQUIRE(reaction->lastGrade() == games::ReactionForceGame::Perfect);
+
+    // An impulse before the visual GO cue is a false start and requires neutral re-arming.
+    reaction->handleSensorInput(70.0);
+    REQUIRE(reaction->falseStarts() == 1);
+    REQUIRE(reaction->misses() == 1);
+    REQUIRE(reaction->awaitingNeutral());
+    reaction->handleSensorInput(0.0);
+    REQUIRE(!reaction->awaitingNeutral());
+
+    // Reconnection timeout cancels pending actions and cannot create a hit.
+    const int reactionHitsBeforeTimeout = reaction->hits();
+    games::ReactionForceGameTestAccess::advance(*reaction, 0.40);
+    REQUIRE(!reaction->hasFreshSignal());
+    REQUIRE(reaction->awaitingNeutral());
+    REQUIRE(reaction->phase() == games::ReactionForceGame::AwaitNeutral);
+    REQUIRE(reaction->hits() == reactionHitsBeforeTimeout);
+    reaction->handleSensorInput(90.0);
+    REQUIRE(reaction->awaitingNeutral());
+    reaction->handleSensorInput(0.0);
+    REQUIRE(!reaction->awaitingNeutral());
+    reaction->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    REQUIRE(reaction->hasFreshSignal());
+    reaction->stop();
 
     // Balance Tower: one sensor, neutral arming, gesture placement, stability,
     // campaign progression and fail-closed timeout.
