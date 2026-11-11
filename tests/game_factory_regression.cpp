@@ -11,6 +11,7 @@
 #include "games/PrecisionCraneGame.hpp"
 #include "games/RhythmForceGame.hpp"
 #include "games/ForceMazeGame.hpp"
+#include "games/BalanceTowerGame.hpp"
 #include <QApplication>
 #include <QTemporaryDir>
 #include <QFile>
@@ -56,6 +57,12 @@ struct PrecisionCraneGameTestAccess
         game.m_hookY = game.floorY() - game.cargoRect().height() - 18.0;
         game.deliverOrDropLoad();
     }
+};
+
+struct BalanceTowerGameTestAccess
+{
+    static void advance(BalanceTowerGame& game, double deltaTime) { game.update(deltaTime); }
+    static void placeBlock(BalanceTowerGame& game) { game.placeBlock(); }
 };
 
 struct ForceMazeGameTestAccess
@@ -179,6 +186,39 @@ int main(int argc, char **argv)
         game->stop();
         REQUIRE(!game->isRunning());
     }
+
+    // Balance Tower: one sensor, neutral arming, gesture placement, stability,
+    // campaign progression and fail-closed timeout.
+    std::unique_ptr<games::GameEngine> balanceBase(games::createGame(QStringLiteral("balance_tower")));
+    auto* balance = dynamic_cast<games::BalanceTowerGame*>(balanceBase.get());
+    REQUIRE(balance != nullptr);
+    REQUIRE(balance->gameName().contains(QStringLiteral("Balance Tower")));
+    balance->resize(640, 480);
+    balance->start();
+    REQUIRE(balance->awaitingNeutral());
+    balance->handleSensorInput(20.0);
+    REQUIRE(!balance->awaitingNeutral());
+    balance->handleSensorInput(90.0);
+    games::BalanceTowerGameTestAccess::advance(*balance, 0.20);
+    balance->handleSensorInput(20.0);
+    REQUIRE(balance->placedBlocks() == 2);
+    REQUIRE(balance->livesRemaining() == 3);
+    REQUIRE(balance->hasAchievement(QStringLiteral("first_block")));
+    REQUIRE(balance->stability() >= 0.0 && balance->stability() <= 1.0);
+    // A long high-force gesture switches the active placement axis.
+    balance->handleSensorInput(90.0);
+    games::BalanceTowerGameTestAccess::advance(*balance, 0.90);
+    balance->handleSensorInput(20.0);
+    REQUIRE(balance->depthAxisActive());
+    // A missing sample freezes game progression and requires neutral re-arming.
+    games::BalanceTowerGameTestAccess::advance(*balance, 0.40);
+    REQUIRE(!balance->hasFreshSignal());
+    REQUIRE(balance->awaitingNeutral());
+    balance->handleSensorInput(20.0);
+    REQUIRE(!balance->awaitingNeutral());
+    balance->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    REQUIRE(balance->hasFreshSignal());
+    balance->stop();
 
     // One-axis force steering, wide dead zone, hand switching and fail-closed timeout.
     std::unique_ptr<games::GameEngine> forceMazeBase(games::createGame(QStringLiteral("force_maze")));
