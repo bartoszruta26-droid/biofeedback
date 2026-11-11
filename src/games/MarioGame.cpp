@@ -68,6 +68,7 @@ void MarioGame::paintEvent(QPaintEvent* event)
     Q_UNUSED(event);
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::TextAntialiasing, false);
     render(painter);
 
     if (!isRunning()) {
