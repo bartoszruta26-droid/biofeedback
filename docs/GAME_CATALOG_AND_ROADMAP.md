@@ -66,6 +66,8 @@ Silnik udostępnia cykl życia gry, pętlę aktualizacji, renderowanie, wynik or
 
 Wspólny potok pomiarowy przekazuje skalibrowaną siłę w niutonach. Test `tests/game_sensor_ownership_regression.py` pilnuje, aby gry nie tworzyły własnych strumieni szeregowych i korzystały z centralnego źródła pomiaru.
 
+Test `tests/game_input_ownership_regression.py` blokuje ponowne dodanie obsługi klawiatury/myszy, kosztownych gradientów i antyaliasingu oraz kontroluje profil 90 Hz silnika.
+
 ### 2.2. Istniejące gry
 
 W katalogach `src/games` i `include/games` znajduje się trzynaście gier:
@@ -171,7 +173,7 @@ Poniższe opisy rozdzielają obecną koncepcję gry od docelowego sterowania zgo
 - **Funkcje:** trasy, poziomy prędkości, różne pojazdy, żetony, serie minięć, mistrzostwa i rekordy.
 - **Tensometr:** trzy stabilne przedziały siły wybierają lewy, środkowy lub prawy pas. Przełączenie pasa wymaga przekroczenia progu z histerezą.
 - **Dopalacz:** przytrzymanie co najmniej 95% siły przez 0,25–1,2 s i zwolnienie do środkowej strefy aktywuje dopalacz. Samochód zachowuje pas podczas gestu.
-- **Brak innych wejść:** ruch lewo/prawo i dopalacz z klawiatury muszą być usunięte. Gdy sygnał jest nieaktualny, samochód nie zmienia pasa i nie aktywuje dopalacza.
+- **Brak innych wejść:** ruch i dopalacz nie korzystają z klawiatury ani myszy. Po utracie świeżości sygnału samochód nie zmienia pasa, a gest dopalacza zostaje anulowany.
 
 ### 3.8. Archer Force Trainer
 
