@@ -217,6 +217,8 @@ void ReactionForceGame::finishPulse()
         advanceTrial();
         return;
     }
+    if (m_personalBestReactionMs <= 0.0 || reactionMs < m_personalBestReactionMs)
+        m_personalBestReactionMs = reactionMs;
 
     const int timingPoints = reactionMs <= 250.0 ? 100 : (reactionMs <= 450.0 ? 75 : 45);
     const int forcePoints = qRound(50.0 * qBound(0.0, 1.0 - forceError / forceTolerancePercent(), 1.0));
@@ -301,8 +303,6 @@ void ReactionForceGame::persistRecords()
     QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
     m_personalBestScore = qMax(m_personalBestScore, getScore());
     m_personalBestCombo = qMax(m_personalBestCombo, m_bestCombo);
-    if (m_hits > 0 && (m_personalBestReactionMs <= 0.0 || m_lastReactionMs < m_personalBestReactionMs))
-        m_personalBestReactionMs = m_lastReactionMs;
     settings.setValue(QStringLiteral("games/reaction_force/records/best_score"), m_personalBestScore);
     settings.setValue(QStringLiteral("games/reaction_force/records/best_combo"), m_personalBestCombo);
     settings.setValue(QStringLiteral("games/reaction_force/records/best_reaction_ms"), m_personalBestReactionMs);
