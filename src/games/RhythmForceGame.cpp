@@ -488,6 +488,71 @@ void RhythmForceGame::render(QPainter &painter)
         painter.drawText(toast, Qt::AlignCenter,
                          QStringLiteral("OSIĄGNIĘCIE  •  %1").arg(m_lastAchievement));
     }
+
+    if (m_roundCompleted) {
+        const double panelWidth = qMin<double>(w - 2 * margin, 430.0);
+        const double panelHeight = qMin<double>(h * 0.48, 220.0);
+        const QRectF panel((w - panelWidth) * 0.5, h * 0.40,
+                           panelWidth, panelHeight);
+        painter.setPen(QPen(QColor(90, 205, 235, 220), 1.5));
+        painter.setBrush(QColor(7, 17, 34, 242));
+        painter.drawRoundedRect(panel, 14, 14);
+
+        painter.setPen(QColor(117, 232, 255));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(14, hudSize + 5), QFont::Bold));
+        painter.drawText(QRectF(panel.left() + 14, panel.top() + 12,
+                                panel.width() - 28, 30),
+                         Qt::AlignCenter, QStringLiteral("RUNDA ZAKOŃCZONA"));
+
+        const QString rank = m_misses == 0 ? QStringLiteral("RANGA S — BEZBŁĘDNIE")
+            : accuracyPercent() >= 90.0 ? QStringLiteral("RANGA A — DOSKONAŁA CELNOŚĆ")
+            : accuracyPercent() >= 75.0 ? QStringLiteral("RANGA B — DOBRY RYTM")
+            : accuracyPercent() >= 55.0 ? QStringLiteral("RANGA C — TRENUJ DALEJ")
+            : QStringLiteral("RANGA D — KOLEJNA PRÓBA");
+        painter.setPen(QColor(255, 218, 135));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(10, hudSize + 1), QFont::DemiBold));
+        painter.drawText(QRectF(panel.left() + 12, panel.top() + 46,
+                                panel.width() - 24, 24),
+                         Qt::AlignCenter, rank);
+
+        painter.setPen(QColor(231, 241, 252));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(9, hudSize)));
+        const QString summary = QStringLiteral("Wynik: %1    Celność: %2%    Perfekty: %3 / 32")
+            .arg(getScore()).arg(accuracyPercent(), 0, 'f', 1).arg(m_perfectHits);
+        painter.drawText(QRectF(panel.left() + 12, panel.top() + 80,
+                                panel.width() - 24, 22),
+                         Qt::AlignCenter, summary);
+        const QString streak = QStringLiteral("Najlepsza seria: %1    Osiągnięcia: %2")
+            .arg(m_bestCombo).arg(m_achievements.size());
+        painter.drawText(QRectF(panel.left() + 12, panel.top() + 106,
+                                panel.width() - 24, 22),
+                         Qt::AlignCenter, streak);
+
+        QStringList recent;
+        const QStringList achievementIds = {
+            QStringLiteral("flawless_round"), QStringLiteral("perfect_16"),
+            QStringLiteral("accuracy_90"), QStringLiteral("combo_8"),
+            QStringLiteral("first_perfect"), QStringLiteral("first_hit")
+        };
+        const QStringList achievementNames = {
+            QStringLiteral("Bez pomyłki"), QStringLiteral("16 perfekcyjnych"),
+            QStringLiteral("Celność 90%"), QStringLiteral("Seria 8"),
+            QStringLiteral("Perfekcyjne wyczucie"), QStringLiteral("Pierwszy takt")
+        };
+        for (int i = 0; i < achievementIds.size(); ++i) {
+            if (m_achievements.contains(achievementIds.at(i)))
+                recent.append(achievementNames.at(i));
+            if (recent.size() == 3)
+                break;
+        }
+        painter.setPen(QColor(163, 205, 225));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(8, hudSize - 1)));
+        painter.drawText(QRectF(panel.left() + 12, panel.top() + 134,
+                                panel.width() - 24, panel.height() - 140),
+                         Qt::AlignCenter, recent.isEmpty()
+                            ? QStringLiteral("Pierwsze osiągnięcia wciąż przed Tobą")
+                            : QStringLiteral("ODBLOCKOWANE: %1").arg(recent.join(QStringLiteral("  •  "))));
+    }
     painter.drawText(QRect(margin, h - hudSize - margin, w - 2 * margin, hudSize + 4),
         Qt::AlignHCenter, QStringLiteral("Impuls 18–100% • zwolnienie ≤18% • dokładność %1%")
             .arg(accuracyPercent(), 0, 'f', 1));
