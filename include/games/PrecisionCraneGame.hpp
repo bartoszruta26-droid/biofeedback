@@ -28,12 +28,15 @@ public:
     int lastPrecisionBonus() const { return m_lastPrecisionBonus; }
     CargoType cargoType() const { return m_cargoType; }
     double cargoMassKg() const { return m_cargoMassKg; }
-    int missionNumber() const { return m_missionIndex + 1; }
+    int missionNumber() const { return qMin(5, m_missionIndex + 1); }
     int missionDeliveriesRemaining() const { return qMax(0, 3 - (m_delivered % 3)); }
     bool campaignCompleted() const { return m_campaignCompleted; }
     int obstacleCount() const { return 2; }
     int collisionCount() const { return m_collisionCount; }
     int bestScore() const { return m_bestScore; }
+    int lifetimeDeliveries() const { return m_lifetimeDeliveries; }
+    int lifetimePrecisionSamples() const { return m_lifetimePrecisionSamples; }
+    int lifetimeCollisions() const { return m_lifetimeCollisions; }
     int precisionSamples() const { return m_precisionSamples; }
     double averagePrecision() const { return m_precisionSamples > 0 ? m_precisionTotal / m_precisionSamples : 0.0; }
     double carriagePosition() const { return m_carriageX; }
@@ -100,6 +103,10 @@ private:
     int m_collisionCount;
     int m_bestScore;
     int m_precisionSamples;
+    int m_lifetimeDeliveries;
+    int m_lifetimePrecisionTotal;
+    int m_lifetimePrecisionSamples;
+    int m_lifetimeCollisions;
     CargoType m_cargoType;
     bool m_campaignCompleted;
     QVector<MovingObstacle> m_obstacles;
