@@ -29,7 +29,7 @@ struct PrecisionCraneGameTestAccess
 {
     static bool collideWithFirstObstacle(PrecisionCraneGame& game)
     {
-        game.m_obstacleClock = 0.0;
+        game.m_obstacleClock = 1.25; // Non-zero phase: the container has moved along its track.
         const QRectF obstacle = game.obstacleRect(0);
         game.configureCargo();
         game.m_loadAttached = true;
@@ -37,6 +37,12 @@ struct PrecisionCraneGameTestAccess
         game.m_carriageX = obstacle.center().x();
         game.m_hookY = obstacle.top() - 18.0;
         return game.processObstacleCollision();
+    }
+
+    static double firstObstacleXAt(PrecisionCraneGame& game, double seconds)
+    {
+        game.m_obstacleClock = seconds;
+        return game.obstacleRect(0).left();
     }
 
     static void deliverAtTarget(PrecisionCraneGame& game)
@@ -652,6 +658,36 @@ int main(int argc, char **argv)
             nullptr, collisionRecords.filePath(QStringLiteral("records.json")));
         collisionGame.resize(640, 480);
         collisionGame.start();
+        const double obstacleStartX =
+            games::PrecisionCraneGameTestAccess::firstObstacleXAt(collisionGame, 0.0);
+        const double obstaclePeakX =
+            games::PrecisionCraneGameTestAccess::firstObstacleXAt(
+                collisionGame, 1.5707963267948966 / 0.42);
+        REQUIRE(obstaclePeakX > obstacleStartX + 100.0);
+        REQUIRE(games::PrecisionCraneGameTestAccess::collideWithFirstObstacle(collisionGame));
+        REQUIRE(collisionGame.collisionCount() == 1);
+        REQUIRE(collisionGame.lifetimeCollisions() == 1);
+        REQUIRE(collisionGame.mistakesRemaining() == 2);
+        REQUIRE(!collisionGame.loadAttached());
+        REQUIRE(collisionGame.deliveredLoads() == 0);
+        collisionGame.stop();
+    }
+    {
+        games::PrecisionCraneGame collisionRestored(
+            nullptr, collisionRecords.filePath(QStringLiteral("records.json")));
+        collisionRestored.resize(640, 480);
+        collisionRestored.start();
+        REQUIRE(collisionRestored.lifetimeCollisions() == 1);
+        collisionRestored.stop();
+    }
+
+    QTemporaryDir unusedCollisionRecords;
+    REQUIRE(unusedCollisionRecords.isValid());
+    {
+        games::PrecisionCraneGame collisionGame(
+            nullptr, unusedCollisionRecords.filePath(QStringLiteral("records.json")));
+        collisionGame.resize(640, 480);
+        collisionGame.start();
         REQUIRE(games::PrecisionCraneGameTestAccess::collideWithFirstObstacle(collisionGame));
         REQUIRE(collisionGame.collisionCount() == 1);
         REQUIRE(collisionGame.lifetimeCollisions() == 1);
@@ -697,6 +733,17 @@ int main(int argc, char **argv)
         REQUIRE(!campaign.isRunning());
         REQUIRE(campaign.lifetimePrecisionSamples() == 15);
         REQUIRE(campaign.bestScore() == campaign.getScore());
+    }
+    {
+        QFile persisted(campaignPath);
+        REQUIRE(persisted.open(QIODevice::ReadOnly));
+        const QJsonDocument document = QJsonDocument::fromJson(persisted.readAll());
+        REQUIRE(document.isObject());
+        const QJsonObject record = document.object();
+        REQUIRE(record.value(QStringLiteral("totalDeliveries")).toInt() == 15);
+        REQUIRE(record.value(QStringLiteral("precisionSamples")).toInt() == 15);
+        REQUIRE(record.value(QStringLiteral("bestScore")).toInt() > 0);
+        REQUIRE(record.value(QStringLiteral("averagePrecision")).toDouble() > 0.0);
     }
 
     // A new game instance simulates an application restart and must restore
