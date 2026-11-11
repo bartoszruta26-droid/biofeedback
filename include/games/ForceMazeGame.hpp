@@ -6,7 +6,6 @@
 #include <QStringList>
 #include <QPointF>
 
-class QMouseEvent;
 
 namespace games {
 
@@ -44,7 +43,6 @@ protected:
     void update(double deltaTime) override;
     void render(QPainter &painter) override;
     bool handleInput(double value) override;
-    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     friend struct ForceMazeGameTestAccess;
