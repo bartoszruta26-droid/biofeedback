@@ -142,6 +142,7 @@ void GameEngine::resume()
     m_monotonicClock.start();
     m_lastFrameTime = 0;
     m_simulationAccumulator = 0.0;
+    m_renderInterpolationAlpha = 0.0;
     
     // Wznowienie timera
     m_gameTimer->start();
@@ -218,6 +219,7 @@ void GameEngine::reset()
     m_monotonicClock.invalidate();
     m_lastFrameTime = 0;
     m_simulationAccumulator = 0.0;
+    m_renderInterpolationAlpha = 0.0;
     m_frameCount = 0;
     m_invalidInputCount = 0;
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
