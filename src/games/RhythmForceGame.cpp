@@ -360,7 +360,7 @@ void RhythmForceGame::render(QPainter &painter)
     background.setColorAt(0.52, QColor(17, 34, 61));
     background.setColorAt(1.0, QColor(5, 9, 19));
     painter.fillRect(rect(), background);
-    painter.setRenderHint(QPainter::Antialiasing, true);
+    painter.setRenderHint(QPainter::Antialiasing, false);
     const QPointF horizon(w * 0.5, h * 0.34);
     QRadialGradient atmosphere(horizon, w * 0.72);
     atmosphere.setColorAt(0.0, QColor(44, 145, 194, 82));
