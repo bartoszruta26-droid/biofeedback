@@ -209,12 +209,22 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 - **Status zakresu:** podstawowy cykl przenoszenia, przeszkody, kampania, punktacja i trwałe rekordy są zaimplementowane. Automatyczne testy regresyjne obejmują kolizje, pełną kampanię oraz odtworzenie zapisanych statystyk po restarcie obiektu gry.
 - **Wyróżnik:** zręcznościowa gra o precyzji i płynności ruchu, sterowana wyłącznie jednym tensometrem.
 
-### 4.2. Rhythm Force — rytm siły
+### 4.2. Rhythm Force — Rytm siły
 
-- **Grafika:** scena muzyczna, pulsujące znaczniki rytmu, tor nadchodzących impulsów i wizualny miernik siły.
-- **Funkcje:** poziomy rytmiczne, sekwencje o różnych tempach, mnożniki serii i ocena trafienia w okno czasowe.
-- **Tensometr:** krótkie impulsy muszą trafić w rytm. Siła impulsu odpowiada wysokości znacznika; czas rozpoczęcia i zwolnienia określa precyzję rytmiczną.
-- **Wyróżnik:** rozgrywka oparta na rytmie, czasie i stopniowaniu nacisku; bez mikrofonu i bez odtwarzania dźwięku jako wejścia.
+**Status:** zaimplementowana pierwsza pełna wersja gry na `main`. Gra jest zarejestrowana w `GameFactory`, dostępna w selektorze gier zakładki treningowej i budowana jako część aplikacji desktopowej oraz celów regresyjnych. Testy deterministyczne obejmują ocenę idealnego i dobrego trafienia, dopasowanie szczytowej siły, odrzucenie impulsu o nieprawidłowym czasie trwania, utratę sygnału, zamrożenie osi czasu, ponowne uzbrojenie po neutralnym sygnale i ograniczenia poziomu trudności.
+
+- **Koncepcja rozgrywki:** gracz wykonuje krótkie impulsy nacisku zsynchronizowane z rytmem. Każdy takt ma znacznik czasu i docelową siłę. Wynik zależy od dokładności chwili rozpoczęcia impulsu oraz od tego, jak blisko wartości docelowej znajduje się szczyt nacisku.
+- **Grafika:** ciemna scena rytmiczna, poziomy tor czasu, centralna linia odniesienia, nadchodzące znaczniki taktów, wartości siły docelowej, pasek aktualnego nacisku oraz czytelny panel wyniku, serii, trafień, pomyłek i tempa. Aktywny takt jest wyróżniony, a wynik impulsu prezentowany jest bezpośrednio po jego zwolnieniu.
+- **Przebieg rundy:** jedna runda obejmuje 32 takty po krótkim wstępie. Po rozliczeniu ostatniego taktu gra kończy rundę i zatrzymuje pętlę rozgrywki. Wszystkie czynności rozgrywki są obsługiwane tensometrem.
+- **Tempo i trudność:** pięć poziomów ustawia tempo odpowiednio na 72, 84, 96, 108 i 120 BPM. Wraz z poziomem trudności okno dopuszczalnego błędu czasu zwęża się z 220 do 140 ms, a okno oceny perfekcyjnej z 75 do 43 ms. Poziom jest ograniczany do zakresu 1–5.
+- **Sekwencja siły:** docelowy szczyt nacisku zmienia się między taktami w deterministycznym zakresie 40–84%. Wartość docelowa jest pokazywana przy znaczniku taktu, dzięki czemu użytkownik może przygotować zarówno czas, jak i amplitudę impulsu.
+- **Gest tensometru:** strefa spoczynku wynosi 0–18%. Przekroczenie 18% rozpoczyna impuls, a powrót do 18% lub niżej kończy go i uruchamia ocenę. Dopuszczalny czas impulsu wynosi 60–750 ms. Wartość maksymalna zarejestrowana w trakcie impulsu jest porównywana z siłą docelową.
+- **Ocena rytmu:** wynik czasowy ma trzy poziomy: perfekcyjny, dobry i trafienie. Impuls poza oknem trafienia albo o nieprawidłowym czasie trwania jest pomyłką. Impuls przedwczesny nie zużywa jeszcze oczekującego taktu; spóźniony takt zostaje rozliczony jako utracony.
+- **Punktacja:** część czasowa daje do 100 pkt, dopasowanie szczytowej siły do 50 pkt, a seria kolejnych trafień dodaje premię rosnącą do 50 pkt. Gra udostępnia wynik rundy, liczbę trafień, pomyłek, trafień perfekcyjnych, bieżącą i najlepszą serię oraz procent trafień.
+- **Rytm i brak sygnału:** oś czasu postępuje wyłącznie przy świeżym sygnale. Po 350 ms bez poprawnej próbki gra anuluje trwający impuls i zamraża rytm, zamiast zaliczać nieobecność użytkownika jako pudło. Po ponownym połączeniu wymagane jest zwolnienie tensometru do strefy neutralnej, zanim wejście zostanie ponownie uzbrojone.
+- **Walidacja wejścia:** wartości niefinitywne są odrzucane, a siła wejściowa ograniczana do 0–100%. Jedynym wejściem rozgrywki pozostaje centralny strumień jednego tensometru; gra nie otwiera portu szeregowego i nie tworzy własnego czytnika HX711.
+- **Integracja aplikacji:** identyfikator `rhythm_force` jest dostępny w fabryce gier i na liście gier używanych w planie treningowym. Gra korzysta ze wspólnego cyklu życia `GameEngine`, jego pętli aktualizacji i standardowego przekazywania próbek czujnika.
+- **Granice zastosowania:** wynik jest wynikiem zręcznościowej gry rytmicznej. Sam w sobie nie stanowi diagnozy, pomiaru sprawności ani dowodu skuteczności terapii.
 
 ### 4.3. Force Maze — labirynt siły
 
@@ -351,8 +361,8 @@ Kolejność:
 ### Etap 3 — nowe gry, pierwsza fala
 
 Priorytet:
-1. Precision Crane
-2. Rhythm Force
+1. Precision Crane — zaimplementowana, z testami kampanii i kolizji
+2. Rhythm Force — zaimplementowana pierwsza pełna wersja, zintegrowana z planem treningowym
 3. Force Maze
 4. Balance Tower
 5. Reaction Force
