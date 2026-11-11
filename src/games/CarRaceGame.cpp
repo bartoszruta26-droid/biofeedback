@@ -106,7 +106,7 @@ bool CarRaceGame::handleInput(double value)
 
     const double target = qBound(0.0, value / 100.0, 1.0);
     // Low-pass filtering removes sensor jitter without making steering sluggish.
-    m_force += (target - m_force) * 0.35;
+    m_force += (target - m_force) * 0.65;
 
     // Hysteresis keeps the car in its lane when the signal fluctuates near a boundary.
     if (m_lane == 0 && m_force > 0.38)
