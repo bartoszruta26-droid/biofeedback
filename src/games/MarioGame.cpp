@@ -62,6 +62,9 @@ bool MarioGame::playerOnGround() const { return m_player.isOnGround; }
 bool MarioGame::playerCharging() const { return m_player.isCharging; }
 double MarioGame::jumpCharge() const { return m_player.chargeLevel; }
 int MarioGame::activeObstacleCount() const { return m_obstacles.size(); }
+int MarioGame::activeEnemyCount() const { int n = 0; for (const Enemy& e : m_enemies) if (e.alive) ++n; return n; }
+int MarioGame::goombaCount() const { int n = 0; for (const Enemy& e : m_enemies) if (e.alive && e.type == Enemy::GOOMBA) ++n; return n; }
+int MarioGame::piranhaPlantCount() const { int n = 0; for (const Enemy& e : m_enemies) if (e.alive && e.type == Enemy::PIRANHA_PLANT) ++n; return n; }
 int MarioGame::currentLevel() const { return m_currentLevel; }
 int MarioGame::livesRemaining() const { return m_lives; }
 int MarioGame::coinsCollected() const { return m_coinsCollected; }
@@ -110,6 +113,14 @@ void MarioGame::resizeEvent(QResizeEvent* event)
                                m_player.body.height() * scaleY);
         m_player.velocityY *= scaleY;
 
+        for (Enemy& enemy : m_enemies) {
+            enemy.rect = QRectF(enemy.rect.x() * scaleX, enemy.rect.y() * scaleY,
+                                enemy.rect.width() * scaleX, enemy.rect.height() * scaleY);
+        }
+        for (Collectible& item : m_collectibles) {
+            item.rect = QRectF(item.rect.x() * scaleX, item.rect.y() * scaleY,
+                               item.rect.width() * scaleX, item.rect.height() * scaleY);
+        }
         for (Obstacle& obstacle : m_obstacles) {
             obstacle.rect = QRectF(obstacle.rect.x() * scaleX,
                                    obstacle.rect.y() * scaleY,
@@ -165,6 +176,8 @@ void MarioGame::resetLevel()
 {
     m_obstacles.clear();
     m_collectibles.clear();
+    m_enemies.clear();
+    m_enemySpawnTimer = 1.5;
     m_obstaclesPassed = 0;
     m_timeSinceLastObstacle = 0.0;
     m_obstacleSpawnInterval = 2.0;
@@ -202,7 +215,10 @@ void MarioGame::update(double deltaTime)
     
     // Generowanie i aktualizacja przeszkód
     generateObstacles(deltaTime);
+    generateEnemies(deltaTime);
     updateObstacles(deltaTime);
+    updateEnemies(deltaTime);
+    if (!isRunning()) return;
     if (!isRunning()) return;
     updateCollectibles(deltaTime);
     if (!isRunning()) return;
@@ -302,6 +318,22 @@ void MarioGame::updatePlayer(double deltaTime)
     }
 }
 
+void MarioGame::generateEnemies(double deltaTime)
+{
+    m_enemySpawnTimer += qMax(0.0, deltaTime);
+    const double groundY = height() * GROUND_Y_RATIO;
+    const double interval = qMax(1.8, 3.8 - (m_currentLevel - 1) * 0.12);
+    while (m_enemySpawnTimer >= interval) {
+        m_enemySpawnTimer -= interval;
+        Enemy enemy;
+        enemy.type = Enemy::GOOMBA;
+        enemy.rect = QRectF(width() + 12.0, groundY - 29.0, 29.0, 29.0);
+        enemy.phase = QRandomGenerator::global()->generateDouble() * 6.283185307179586;
+        enemy.alive = true;
+        m_enemies.append(enemy);
+    }
+}
+
 void MarioGame::generateObstacles(double deltaTime)
 {
     m_timeSinceLastObstacle += qMax(0.0, deltaTime);
@@ -343,6 +375,15 @@ void MarioGame::generateObstacles(double deltaTime)
         }
         
         m_obstacles.append(obstacle);
+        if (obstacle.type == Obstacle::PIPE && QRandomGenerator::global()->bounded(100) < 38) {
+            Enemy plant;
+            plant.type = Enemy::PIRANHA_PLANT;
+            plant.rect = QRectF(obstacle.rect.center().x() - 13.0, obstacle.rect.top() - 42.0,
+                                26.0, 42.0);
+            plant.phase = QRandomGenerator::global()->generateDouble() * 6.283185307179586;
+            plant.alive = true;
+            m_enemies.append(plant);
+        }
 
         // A short coin arc rewards a well-timed jump; rare stars grant temporary protection.
         if (QRandomGenerator::global()->bounded(100) < 72) {
@@ -399,6 +440,88 @@ void MarioGame::updateObstacles(double deltaTime)
             if (!isRunning()) return;
         }
     }
+}
+
+void MarioGame::updateEnemies(double deltaTime)
+{
+    const QRectF previous = m_player.body.translated(0.0, -m_player.velocityY * deltaTime);
+    for (int i = m_enemies.size() - 1; i >= 0; --i) {
+        Enemy& enemy = m_enemies[i];
+        enemy.phase += deltaTime * (enemy.type == Enemy::GOOMBA ? 5.0 : 2.8);
+        enemy.rect.translate(-PLAYER_SPEED * deltaTime, 0.0);
+        if (enemy.rect.right() < -4.0 || !enemy.alive) {
+            m_enemies.removeAt(i);
+            continue;
+        }
+        if (!m_player.body.adjusted(3.0, 2.0, -3.0, -2.0).intersects(enemy.rect))
+            continue;
+        const bool stomp = enemy.type == Enemy::GOOMBA && m_player.velocityY > 0.0 &&
+            previous.bottom() <= enemy.rect.top() + 9.0 &&
+            m_player.body.bottom() >= enemy.rect.top();
+        if (stomp) {
+            enemy.alive = false;
+            m_player.body.moveBottom(enemy.rect.top());
+            m_player.velocityY = -JUMP_FORCE * 0.48;
+            m_player.isOnGround = false;
+            m_player.isJumping = true;
+            m_player.doubleJumpAvailable = true;
+            addScore(200);
+            m_coinStreak = 0;
+        } else if (enemy.type == Enemy::PIRANHA_PLANT) {
+            // Plants briefly retract, then become dangerous again.
+            if (std::sin(enemy.phase) > -0.65) applyDamage();
+        } else {
+            applyDamage();
+        }
+        if (!isRunning()) return;
+    }
+}
+
+void MarioGame::renderEnemies(QPainter& painter)
+{
+    painter.save();
+    for (const Enemy& enemy : m_enemies) {
+        if (!enemy.alive) continue;
+        const QRectF r = enemy.rect;
+        if (enemy.type == Enemy::GOOMBA) {
+            const double squash = 1.0 + 0.08 * std::sin(enemy.phase);
+            const QRectF body(r.left(), r.top() + (1.0 - squash) * 8.0,
+                              r.width(), r.height() * squash);
+            painter.setPen(QPen(QColor(0x4B, 0x22, 0x12), 2.0));
+            painter.setBrush(QColor(0xA9, 0x58, 0x24));
+            painter.drawRoundedRect(body.adjusted(1, 4, -1, 0), 8, 8);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0xF8, 0xE8, 0xC8));
+            painter.drawEllipse(QRectF(r.left() + 6, r.top() + 10, 6, 8));
+            painter.drawEllipse(QRectF(r.left() + 17, r.top() + 10, 6, 8));
+            painter.setBrush(QColor(0x20, 0x18, 0x12));
+            painter.drawEllipse(QRectF(r.left() + 8, r.top() + 13, 3, 4));
+            painter.drawEllipse(QRectF(r.left() + 19, r.top() + 13, 3, 4));
+            painter.setPen(QPen(QColor(0x3A, 0x1B, 0x10), 3.0));
+            painter.drawLine(QPointF(r.left() + 3, r.bottom() - 2), QPointF(r.left() + 12, r.bottom() - 2));
+            painter.drawLine(QPointF(r.left() + 17, r.bottom() - 2), QPointF(r.right() - 3, r.bottom() - 2));
+        } else {
+            const double lift = (std::sin(enemy.phase) > -0.15) ? 0.0 : 17.0;
+            const QRectF stem(r.center().x() - 6, r.top() + lift + 12, 12, r.height() - 12 - lift);
+            painter.setPen(QPen(QColor(0x16, 0x79, 0x27), 2.0));
+            painter.setBrush(QColor(0x35, 0xB9, 0x43));
+            painter.drawRoundedRect(stem, 5, 5);
+            const QRectF head(r.left(), r.top() + lift, r.width(), 22);
+            painter.setPen(QPen(QColor(0x9B, 0x1F, 0x24), 2.0));
+            painter.setBrush(QColor(0xE9, 0x43, 0x45));
+            painter.drawEllipse(head);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(QColor(0xFF, 0xF4, 0xD8));
+            for (int dot = 0; dot < 5; ++dot) {
+                const double x = head.left() + 4 + dot * 4.5;
+                painter.drawEllipse(QRectF(x, head.top() + 5 + (dot % 2) * 7, 3, 3));
+            }
+            painter.setBrush(QColor(0x22, 0x18, 0x18));
+            painter.drawEllipse(QRectF(head.left() + 5, head.top() + 8, 4, 5));
+            painter.drawEllipse(QRectF(head.right() - 9, head.top() + 8, 4, 5));
+        }
+    }
+    painter.restore();
 }
 
 bool MarioGame::checkCollision(const Player& player, const Obstacle& obstacle)
@@ -560,6 +683,7 @@ void MarioGame::render(QPainter& painter)
 {
     renderBackground(painter);
     renderObstacles(painter);
+    renderEnemies(painter);
     renderCollectibles(painter);
     if (m_invulnerabilityRemaining <= 0.0 ||
         (static_cast<int>(m_invulnerabilityRemaining * 12.0) % 2 == 0))
@@ -703,6 +827,9 @@ void MarioGame::renderObstacles(QPainter& painter)
             painter.fillRect(obs.rect, Qt::black);
     }
 
+    // Bright grass lip and layered dirt bands improve ground readability.
+    painter.fillRect(QRectF(0, groundY, width(), 7), QColor(0x4C, 0xC6, 0x3A));
+    painter.fillRect(QRectF(0, groundY + 7, width(), 5), QColor(0x2E, 0x8B, 0x2E));
     // Detale ziemi (prosty wzór)
     painter.setPen(QColor(0xA0, 0x30, 0x00));
     for (double x = 0; x < width(); x += 40) {
@@ -723,31 +850,62 @@ void MarioGame::renderObstacles(QPainter& painter)
 
 void MarioGame::renderBackground(QPainter& painter)
 {
-    // Niebo (gradient w stylu 4-bitowym - jednolity kolor)
-    painter.fillRect(rect(), COLOR_SKY);
-    
-    // Chmurki (proste okręgi/owale)
-    painter.setBrush(COLOR_CLOUD);
-    painter.setPen(COLOR_CLOUD);
-    for (const auto& cloud : m_clouds) {
-        int r = cloud.size / 2;
-        painter.drawEllipse(QPoint(cloud.pos.toPoint()), r, static_cast<int>(r * 0.6));
-        painter.drawEllipse(QPoint(cloud.pos.x() - r * 0.5, cloud.pos.y() + r * 0.2), static_cast<int>(r * 0.7), static_cast<int>(r * 0.5));
-        painter.drawEllipse(QPoint(cloud.pos.x() + r * 0.5, cloud.pos.y() + r * 0.2), static_cast<int>(r * 0.7), static_cast<int>(r * 0.5));
+    QLinearGradient sky(0, 0, 0, height());
+    sky.setColorAt(0.0, QColor(0x36, 0x76, 0xD8));
+    sky.setColorAt(0.68, QColor(0x8C, 0xD8, 0xF4));
+    sky.setColorAt(1.0, QColor(0xD5, 0xF2, 0xFF));
+    painter.fillRect(rect(), sky);
+
+    // Sun glow and pixel-style sun give the scene depth without external assets.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(0xFF, 0xF0, 0xA0, 80));
+    painter.drawEllipse(QRectF(width() * 0.76, height() * 0.08, 100, 100));
+    painter.setBrush(QColor(0xFF, 0xE6, 0x75));
+    painter.drawRect(QRectF(width() * 0.80, height() * 0.12, 34, 34));
+
+    renderClouds(painter);
+    renderParallaxBackground(painter);
+}
+
+void MarioGame::renderClouds(QPainter& painter)
+{
+    painter.save();
+    for (const Cloud& cloud : m_clouds) {
+        const double scale = qMax(0.55, cloud.size / 42.0);
+        const QRectF shadow(cloud.pos.x() - 27 * scale, cloud.pos.y() - 3 * scale,
+                            58 * scale, 25 * scale);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0x65, 0xA8, 0xD4, 80));
+        painter.drawRoundedRect(shadow, 12 * scale, 12 * scale);
+        painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
+        painter.drawEllipse(QRectF(cloud.pos.x() - 23 * scale, cloud.pos.y() - 9 * scale,
+                                   28 * scale, 26 * scale));
+        painter.drawEllipse(QRectF(cloud.pos.x() - 7 * scale, cloud.pos.y() - 19 * scale,
+                                   35 * scale, 34 * scale));
+        painter.drawEllipse(QRectF(cloud.pos.x() + 10 * scale, cloud.pos.y() - 7 * scale,
+                                   27 * scale, 24 * scale));
+        painter.fillRect(QRectF(cloud.pos.x() - 20 * scale, cloud.pos.y() + 2 * scale,
+                                48 * scale, 10 * scale), QColor(0xFF, 0xFF, 0xFF));
     }
-    
-    // Wzgórza w tle (proste trójkąty)
-    painter.setBrush(QColor(0x00, 0xA8, 0x00));
-    painter.setPen(QColor(0x00, 0xA8, 0x00));
-    for (int i = 0; i < 3; ++i) {
-        const qint64 elapsedMs = m_accumulatedSessionMs + (m_monotonicClock.isValid() ? m_monotonicClock.elapsed() : 0);
-        double x = fmod(-static_cast<double>(elapsedMs) / 50.0 + i * 300, width() + 200) - 100;
-        QVector<QPoint> hill = {
-            QPoint(x, height() * GROUND_Y_RATIO),
-            QPoint(x + 100, height() * GROUND_Y_RATIO - 60),
-            QPoint(x + 200, height() * GROUND_Y_RATIO)
-        };
-        painter.drawPolygon(hill);
+    painter.restore();
+}
+
+void MarioGame::renderParallaxBackground(QPainter& painter)
+{
+    const qint64 elapsedMs = m_accumulatedSessionMs +
+        (m_monotonicClock.isValid() ? m_monotonicClock.elapsed() : 0);
+    const double groundY = height() * GROUND_Y_RATIO;
+    for (int layer = 0; layer < 2; ++layer) {
+        const double speed = layer == 0 ? 0.012 : 0.035;
+        const double spacing = layer == 0 ? 260.0 : 210.0;
+        const double offset = std::fmod(static_cast<double>(elapsedMs) * speed, spacing);
+        for (int i = -1; i < width() / spacing + 3; ++i) {
+            const double x = i * spacing - offset;
+            const double hillH = (layer == 0 ? 62.0 : 42.0) + (i % 2 == 0 ? 10.0 : 0.0);
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(layer == 0 ? QColor(0x62, 0xB8, 0x6A) : QColor(0x32, 0x91, 0x48));
+            painter.drawEllipse(QRectF(x, groundY - hillH, spacing * 0.78, hillH * 1.8));
+        }
     }
 }
 
@@ -774,7 +932,8 @@ void MarioGame::renderUI(QPainter& painter)
         painter.drawRect(QRectF(x, y, barWidth, barHeight));
     }
     
-    // Wynik i status postaci
+    // Wynik i status postaci: translucent panel keeps text readable over scenery.
+    painter.fillRect(QRectF(10, 8, 190, 116), QColor(0, 0, 0, 105));
     painter.setPen(Qt::white);
     painter.setFont(QFont("Arial", 10, QFont::Bold));
     painter.drawText(20, 30, QString("Wynik: %1").arg(m_score));

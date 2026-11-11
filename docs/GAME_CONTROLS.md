@@ -60,18 +60,19 @@
 
 ### 6. Mario Run
 
-**Cel:** pokonuj proceduralnie generowane trasy, unikaj kolców i rur, przeskakuj dziury oraz zbieraj monety i premie. Trudność rośnie wraz z kolejnymi poziomami.
+**Cel:** przebiegaj kolejne poziomy, omijaj przeszkody, pokonuj przeciwników, zbieraj monety i premie. Sceneria przewija się wielowarstwowo, a tempo oraz częstotliwość przeciwników rosną wraz z poziomem.
 
-- **Tensometr/HX711:** przekroczenie progu 30% rozpoczyna ładowanie skoku. Zwolnienie poniżej progu 20% wykonuje skok. Im dłuższe przytrzymanie, tym większa siła skoku; pełne ładowanie trwa około 1,5 s. Histereza ogranicza przypadkowe wyzwalanie przy wahaniach odczytu.
-- **Klawiatura:** przytrzymaj `SPACJĘ`, `W` lub `↑`, aby ładować skok; zwolnij klawisz, aby skoczyć. W trakcie lotu naciśnij ponownie jeden z tych klawiszy, aby wykonać podwójny skok. `R` rozpoczyna nową grę po zakończeniu rozgrywki.
-- **Podwójny skok:** po wybiciu z ziemi dostępny jest jeden dodatkowy skok w powietrzu. Odnawia się po bezpiecznym lądowaniu na podłożu lub platformie. Drugi skok ma stałą, nieco mniejszą siłę.
-- **Życia i ochrona:** rozpoczynasz z 3 życiami. Kolizja z kolcami lub rurą odbiera jedno życie, odrzuca postać i uruchamia 1,6 s ochrony przed kolejnym trafieniem. Trzecia utrata życia kończy grę.
-- **Monety:** złote monety pojawiają się w krótkich łukach nad trasą. Każda daje 50 punktów, a kolejne monety zebrane bez przerwania serii zwiększają premię do maksymalnie 150 punktów za monetę.
-- **Gwiazda ochronna:** rzadka premia daje 5 s nietykalności i 100 punktów. Podczas ochrony postać miga, a kolizje nie odbierają żyć.
-- **Przeszkody i platformy:** kolce oraz rury wymagają przeskoczenia; platformy są jednokierunkowe i można na nich wylądować od góry; dziury wymagają przelecenia nad otworem przed opadnięciem poniżej poziomu podłoża.
-- **Punktacja i poziomy:** minięcie przeszkody daje 10 punktów. Monety i gwiazdy zapewniają dodatkowe punkty. Postęp poziomu zależy od liczby miniętych przeszkód, a kolejne poziomy zwiększają tempo generowania przeszkód.
-- **Wskaźniki:** wynik, liczba żyć, zebrane monety, poziom, postęp do następnego poziomu, pasek ładowania skoku i pozostały czas ochrony.
-- **Wskazówka:** nie ładuj skoku zbyt późno. Do wysokich przeszkód i szerokich dziur wykorzystuj pełne naładowanie oraz drugi skok jako korektę toru lotu.
+- **Tensometr/HX711:** nacisk co najmniej 30% rozpoczyna ładowanie skoku, a spadek poniżej 20% zwalnia skok. Przytrzymanie do około 1,5 s zwiększa siłę wybicia. Histereza ogranicza przypadkowe przełączanie przy szumie pomiarowym.
+- **Klawiatura:** przytrzymaj `SPACJĘ`, `W` lub `↑`, aby ładować skok; zwolnij klawisz, aby skoczyć. W powietrzu naciśnij ponownie, aby wykonać podwójny skok. `R` rozpoczyna nową rozgrywkę po końcu gry.
+- **Goombasy:** chodzą po ziemi i stanowią ruchome zagrożenie. Można je pokonać, lądując na nich od góry podczas opadania; udane nadepnięcie daje 200 punktów i odbija postać w górę. Kontakt z boku odbiera życie.
+- **Rośliny piranie:** pojawiają się w części rur i okresowo wysuwają się z nich. Kontakt z wysuniętą rośliną odbiera życie; obserwuj jej cykl i przeskakuj nad rurą, gdy jest aktywna.
+- **Życia i ochrona:** startujesz z 3 życiami. Trafienie przez przeszkodę lub przeciwnika odbiera jedno życie, odrzuca postać i zapewnia 1,6 s ochrony. Po utracie trzeciego życia rozgrywka się kończy.
+- **Monety:** złote monety pojawiają się nad trasą. Każda daje 50 punktów, a nieprzerwana seria zwiększa premię do 150 punktów za monetę.
+- **Gwiazda ochronna:** rzadka premia zapewnia 5 s nietykalności i 100 punktów. W czasie ochrony postać miga, a kontakt z przeciwnikiem nie odbiera życia.
+- **Przeszkody:** kolce i rury trzeba przeskakiwać. Platformy pozwalają wylądować od góry. Dziury wymagają utrzymania się w powietrzu aż do bezpiecznego podłoża.
+- **Grafika i sceneria:** niebo z gradientem, słońce, przesuwające się chmury, dwie warstwy wzgórz, trawiasta krawędź ziemi, animowani przeciwnicy oraz czytelny panel statystyk.
+- **Wskaźniki:** wynik, życia, monety, poziom, postęp poziomu, pasek ładowania skoku i czas ochrony.
+- **Wskazówka:** pełne ładowanie przydaje się przy szerokich dziurach i wysokich rurach. Podwójny skok zachowaj na korektę toru lotu lub nadepnięcie na Goombasa.
 
 ### 7. Car Race
 
@@ -127,7 +128,7 @@
 | Pong | pionowe położenie lewej paletki | brak skrótów gry |
 | Arkanoid | poziome położenie paletki | brak skrótów gry |
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
-| Mario Run | przytrzymanie powyżej 30% ładuje skok, zwolnienie poniżej 20% wykonuje skok; ponowne naciśnięcie w locie uruchamia podwójny skok | przytrzymaj i zwolnij `SPACJĘ`/`W`/`↑`; w locie naciśnij ponownie; `R` — restart po końcu gry |
+| Mario Run | przytrzymanie tensometru ≥30% ładuje skok, zwolnienie poniżej 20% wykonuje skok; ponowne naciśnięcie w locie daje podwójny skok | przytrzymaj i zwolnij `SPACJĘ`/`W`/`↑`; w locie naciśnij ponownie; `R` — restart; nadepnij na Goombasa od góry |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
 | Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, `SPACJA` — ogień, `X` — EMP |

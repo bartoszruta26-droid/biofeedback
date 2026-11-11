@@ -49,6 +49,9 @@ public:
     bool playerCharging() const;
     double jumpCharge() const;
     int activeObstacleCount() const;
+    int activeEnemyCount() const;
+    int goombaCount() const;
+    int piranhaPlantCount() const;
     int currentLevel() const;
     int livesRemaining() const;
     int coinsCollected() const;
@@ -99,6 +102,13 @@ private:
         int size;              // Rozmiar chmurki
     };
 
+    struct Enemy {
+        QRectF rect;
+        enum Type { GOOMBA, PIRANHA_PLANT } type;
+        double phase;
+        bool alive;
+    };
+
     struct Collectible {
         QRectF rect;
         enum Type { COIN, STAR } type;
@@ -117,6 +127,11 @@ private:
     // Aktualizacja przeszkód
     void updateObstacles(double deltaTime);
     void updateCollectibles(double deltaTime);
+    void generateEnemies(double deltaTime);
+    void updateEnemies(double deltaTime);
+    void renderEnemies(QPainter& painter);
+    void renderClouds(QPainter& painter);
+    void renderParallaxBackground(QPainter& painter);
     void renderCollectibles(QPainter& painter);
     void launchJump(double force);
     void applyDamage();
@@ -171,6 +186,8 @@ private:
     Player m_player;
     QVector<Obstacle> m_obstacles;
     QVector<Collectible> m_collectibles;
+    QVector<Enemy> m_enemies;
+    double m_enemySpawnTimer = 0.0;
     QVector<Cloud> m_clouds;
     
     // Poziomy

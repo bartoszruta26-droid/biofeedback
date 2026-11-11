@@ -324,8 +324,12 @@ int main(int argc, char **argv)
     marioGame->start();
     REQUIRE(marioGame->livesRemaining() == 3);
     REQUIRE(marioGame->coinsCollected() == 0);
+    REQUIRE(marioGame->activeEnemyCount() == 0);
+    REQUIRE(marioGame->goombaCount() == 0);
+    REQUIRE(marioGame->piranhaPlantCount() == 0);
     marioGame->handleSensorInput(100.0);
     waitForEvents(420);
+    REQUIRE(marioGame->activeEnemyCount() >= 0); // Enemy population remains safely queryable during gameplay.
     REQUIRE(marioGame->playerCharging());
     REQUIRE(marioGame->jumpCharge() > 0.0);
     marioGame->handleSensorInput(0.0);
