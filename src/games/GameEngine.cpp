@@ -238,9 +238,10 @@ void GameEngine::gameLoop()
         return;
     }
     
-    // Obliczenie delta time (czas w sekundach od ostatniej klatki)
-    const qint64 currentTime = m_monotonicClock.elapsed();
-    double deltaTime = static_cast<double>(currentTime - m_lastFrameTime) / 1000.0;
+    // Use nanosecond monotonic time: millisecond quantization causes visible
+    // cadence jitter at 90/120 Hz, especially when 8 ms timer ticks alternate.
+    const qint64 currentTime = m_monotonicClock.nsecsElapsed();
+    double deltaTime = static_cast<double>(currentTime - m_lastFrameTime) / 1.0e9;
     m_lastFrameTime = currentTime;
 
     // Ignore negative/non-finite intervals and cap stalls to avoid tunnelling.
