@@ -308,7 +308,7 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
     REQUIRE(scorchedGame->isPlayerTurn());
-    scorchedGame->handleSensorInput(40.0);
+    scorchedGame->handleSensorInput(47.0); // Select a near-45-degree arc that reaches the enemy at this arena size.
     REQUIRE(scorchedGame->trajectoryPreviewPointCount() > 0);
     const double initialShotPower = scorchedGame->shotPower();
     QWheelEvent powerWheel(QPointF(320.0, 240.0), QPointF(320.0, 240.0),
