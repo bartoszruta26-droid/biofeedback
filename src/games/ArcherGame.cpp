@@ -37,9 +37,9 @@ void ArcherGame::initialize()
     m_force = 0.5;
     m_aimAngle = -0.2;
     m_targetDirection = 1.0;
-    const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
-    m_targetSpeed = 55.0 * scale;
-    m_gravity = 260.0 * scale;
+    const double scaleY = qMax(0.25, height() / 480.0);
+    m_targetSpeed = 55.0 * scaleY;
+    m_gravity = 260.0 * scaleY;
     m_fireCooldown = m_autoFireInterval;
     m_shotsFired = 0;
     m_successfulHits = 0;
@@ -53,9 +53,9 @@ void ArcherGame::resizeEvent(QResizeEvent* event)
 {
     GameEngine::resizeEvent(event);
     if (width() > 0 && height() > 0) {
-        const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
-        m_targetSpeed = 55.0 * scale;
-        m_gravity = 260.0 * scale;
+        const double scaleY = qMax(0.25, height() / 480.0);
+        m_targetSpeed = 55.0 * scaleY;
+        m_gravity = 260.0 * scaleY;
         repositionTarget();
         for (Arrow& arrow : m_arrows) {
             if (arrow.position.x() > width() || arrow.position.y() > height())
@@ -85,7 +85,7 @@ bool ArcherGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
     m_force = qBound(0.0, value / 100.0, 1.0);
-    m_aimAngle = 0.55 - m_force * 1.45;
+    m_aimAngle = 0.55 - m_force * 1.25;
     return true;
 }
 
@@ -93,13 +93,14 @@ void ArcherGame::fireArrow()
 {
     if (!isRunning() || m_fireCooldown > 0.0)
         return;
-    const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
     const QPointF origin(width() * 0.11, height() * 0.85);
-    const double speed = 780.0 * scale;
+    const double speed = 780.0;
     Arrow arrow;
     arrow.position = origin;
-    arrow.velocity = QPointF(std::cos(m_aimAngle) * speed,
-                             std::sin(m_aimAngle) * speed);
+    arrow.velocity = QPointF(std::cos(m_aimAngle) * speed * scaleX,
+                             std::sin(m_aimAngle) * speed * scaleY);
     arrow.active = true;
     if (m_arrows.size() >= 8) {
         const auto oldest = std::find_if(m_arrows.begin(), m_arrows.end(),
@@ -162,8 +163,8 @@ void ArcherGame::update(double deltaTime)
             const double radial = std::sqrt(dx * dx + dy * dy);
             addScore(radial <= 0.22 ? 30 : (radial <= 0.55 ? 20 : 10));
             ++m_successfulHits;
-            const double targetScale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
-            m_targetSpeed = qMin(150.0 * targetScale, m_targetSpeed + 4.0 * targetScale);
+            const double targetScaleY = qMax(0.25, height() / 480.0);
+            m_targetSpeed = qMin(150.0 * targetScaleY, m_targetSpeed + 4.0 * targetScaleY);
             repositionTarget();
             continue;
         }
@@ -179,12 +180,13 @@ void ArcherGame::render(QPainter& painter)
 {
     painter.fillRect(rect(), QColor(28, 42, 34));
     painter.setRenderHint(QPainter::Antialiasing, false);
-    const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
     const QPointF origin(width() * 0.11, height() * 0.85);
-    painter.setPen(QPen(QColor(130, 95, 55), 7.0 * scale));
+    painter.setPen(QPen(QColor(130, 95, 55), 7.0 * qMin(scaleX, scaleY)));
     painter.drawLine(origin,
-                     QPointF(origin.x() + std::cos(m_aimAngle) * 54.0 * scale,
-                             origin.y() + std::sin(m_aimAngle) * 54.0 * scale));
+                     QPointF(origin.x() + std::cos(m_aimAngle) * 54.0 * scaleX,
+                             origin.y() + std::sin(m_aimAngle) * 54.0 * scaleY));
 
     painter.setPen(QPen(QColor(235, 225, 190), 2));
     painter.setBrush(QColor(210, 70, 65));
@@ -210,8 +212,8 @@ void ArcherGame::render(QPainter& painter)
     painter.drawText(14, 68, QStringLiteral("Strzały: %1 | Trafienia: %2 | Pudła: %3")
         .arg(m_shotsFired).arg(m_successfulHits).arg(m_missedShots));
     painter.drawText(width() - 150, 24, QStringLiteral("W locie: %1").arg(activeArrowCount()));
-    const QPointF initialVelocity(std::cos(m_aimAngle) * 780.0 * scale,
-                                  std::sin(m_aimAngle) * 780.0 * scale);
+    const QPointF initialVelocity(std::cos(m_aimAngle) * 780.0 * scaleX,
+                                  std::sin(m_aimAngle) * 780.0 * scaleY);
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(245, 235, 190, 145));
     for (int i = 1; i <= 18; ++i) {
