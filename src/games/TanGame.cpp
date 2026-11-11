@@ -84,18 +84,21 @@ void TanGame::initialize()
 
 void TanGame::updateSpatialFrequency()
 {
-    // 1.5 tangent periods are visible at every viewport width.
-    m_frequency = width() > 0
-        ? (kPi * 1.5 / static_cast<double>(width())) : 0.0;
+    // Keep the same number of waveform periods and logical scroll speed
+    // regardless of the physical pixel dimensions.
+    const double w = qMax(1, width());
+    const double scaleX = qMax(0.5, w / 640.0);
+    m_frequency = kPi * 1.5 / w;
+    m_scrollSpeed = (55.0 + m_difficultyLevel * 18.0) * scaleX;
 }
 
 void TanGame::setDifficultyLevel(int level)
 {
     m_difficultyLevel = qBound(1, level, 5);
-    m_scrollSpeed = 75.0 + m_difficultyLevel * 30.0;
-    const double toleranceRatio = 0.115 - (m_difficultyLevel - 1) * 0.013;
-    m_tolerance = qMax(12.0,
-        qMin(48.0, qMax(240.0, static_cast<double>(height())) * toleranceRatio));
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double toleranceRatio = 0.145 - (m_difficultyLevel - 1) * 0.010;
+    m_tolerance = qBound(12.0 * scaleY,
+        static_cast<double>(height()) * toleranceRatio, 64.0 * scaleY);
     updateSpatialFrequency();
     m_isHit = false;
     m_trackingSeconds = 0.0;
@@ -172,8 +175,10 @@ void TanGame::resizeEvent(QResizeEvent* event)
 {
     QWidget::resizeEvent(event);
     updateSpatialFrequency();
-    const double ratio = 0.115 - (m_difficultyLevel - 1) * 0.013;
-    m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, static_cast<double>(height())) * ratio));
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double ratio = 0.145 - (m_difficultyLevel - 1) * 0.010;
+    m_tolerance = qBound(12.0 * scaleY,
+        static_cast<double>(height()) * ratio, 64.0 * scaleY);
     QWidget::update();
 }
 
@@ -185,9 +190,9 @@ void TanGame::updateAutomaticDifficulty(double deltaTime)
     if (m_accuracyWindowSeconds < 12.0)
         return;
     const double ratio = m_accuracyWindowHitSeconds / m_accuracyWindowSeconds;
-    if (ratio >= 0.82 && m_difficultyLevel < 5)
+    if (ratio >= 0.90 && m_difficultyLevel < 5)
         setDifficultyLevel(m_difficultyLevel + 1);
-    else if (ratio < 0.42 && m_difficultyLevel > 1)
+    else if (ratio < 0.35 && m_difficultyLevel > 1)
         setDifficultyLevel(m_difficultyLevel - 1);
     m_accuracyWindowSeconds = 0.0;
     m_accuracyWindowHitSeconds = 0.0;
