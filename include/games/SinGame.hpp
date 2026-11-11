@@ -72,8 +72,7 @@ private:
     double m_comboSeconds;
     int m_combo;
     int m_bestCombo;
-    int m_perfectStreak;
-    double m_lastAccuracy;
+    double m_perfectSeconds;
     double m_lastDistance;
     QString m_feedbackText;
     double m_calibrationMinimum;
