@@ -80,15 +80,19 @@
 
 ### 8. Archer Force Trainer
 
-**Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego i synchronizację strzału z ruchem celu.
+**Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego, kompensację wiatru i synchronizację strzału z ruchem celu.
 
-- **Tensometr/HX711:** ustawia kąt łuku w zakresie gry. Wartość siły 0–100% jest mapowana na kąt od około +31° (niższe celowanie) do około −52° (wyższe celowanie). Zmiana siły natychmiast aktualizuje kąt.
-- **Klawiatura:** przytrzymaj `W` lub `↑`, aby płynnie podnosić kąt; przytrzymaj `S` lub `↓`, aby go obniżać. Po zwolnieniu klawisza regulacja zatrzymuje się. Podczas przytrzymania klawisza sterowanie klawiaturą ma pierwszeństwo przed próbkami tensometru; po zwolnieniu wraca sterowanie czujnikiem. `SPACJA` oddaje pojedynczy strzał; kolejne strzały są ograniczone czasem odnowienia około 320 ms.
-- **Tor lotu:** kropkowana linia pokazuje przewidywany tor strzały z uwzględnieniem grawitacji i bieżącego kąta. Jest wskazówką, a poruszający się cel może zmienić położenie przed trafieniem.
-- **Strefy celu:** zewnętrzna część tarczy daje 10 punktów, środkowa 20, a środek 30. Trafienie zwiększa prędkość celu, maksymalnie do 150 jednostek na sekundę.
-- **Statystyki:** wynik, kąt celowania, łączna liczba oddanych strzałów, trafień, pudeł i strzał w locie.
+- **Tensometr/HX711:** ustawia kąt łuku. Wartość 0–100% jest mapowana na kąt od około +31° (niższe celowanie) do około −52° (wyższe celowanie). Wartość spoza zakresu jest ograniczana, a nieprawidłowe próbki (NaN lub nieskończoność) są odrzucane.
+- **Klawiatura — celowanie:** przytrzymaj `W` lub `↑`, aby płynnie podnosić kąt; przytrzymaj `S` lub `↓`, aby go obniżać. Po zwolnieniu klawisza regulacja zatrzymuje się. Podczas regulacji klawiaturą próbki czujnika nie nadpisują kąta; po zwolnieniu klawisza sterowanie czujnikiem wraca do działania.
+- **Klawiatura — strzał:** `SPACJA` oddaje zwykłą strzałę. Czas odnowienia wynosi około 320 ms. `F) lub `E` oddaje strzał skupiony, jeżeli dostępny jest ładunek skupienia i zakończył się czas odnowienia.
+- **Strzał skupiony:** na początku sesji dostępne są 3 ładunki. Strzała leci szybciej i jest mniej podatna na wiatr. Co 5 udanych trafień przywracany jest 1 ładunek, maksymalnie do 5. Strzał skupiony ma dłuższy czas odnowienia (około 480 ms) i dodatkową premię punktową.
+- **Balistyka i wiatr:** tor lotu uwzględnia grawitację oraz aktualny wiatr boczny. Wiatr zmienia siłę i kierunek w czasie; zwykła strzała podlega mu w pełni, a strzała skupiona w ograniczonym stopniu. Kropkowany podgląd toru jest prognozą dla chwili oddania strzału — ruch celu i zmiana wiatru w czasie lotu mogą zmienić wynik.
+- **Cel:** tarcza porusza się pionowo i poziomo. Jej rozmiar stopniowo maleje w kolejnych rundach, a prędkość wzrasta wraz z trafieniami. Przewiduj położenie celu w chwili przecięcia toru strzały, a nie tylko jego aktualne położenie.
+- **Punktacja:** trafienie w zewnętrzny pierścień daje 10 punktów, środkowy 20, a środek 30. Seria trafień w odstępach krótszych niż 3 sekundy zwiększa mnożnik punktów; pudło zeruje serię. Strzała skupiona daje dodatkowe 10 punktów.
+- **Postęp:** co 5 udanych trafień rozpoczyna się kolejna runda, cel staje się mniejszy, a jego prędkość wzrasta. Otrzymujesz wtedy również ładunek skupienia.
+- **Statystyki:** wynik, kąt, wiatr i jego kierunek, liczba strzałów, trafień, pudeł, aktywna seria, ładunki skupienia i numer rundy.
 - **Ograniczenia:** jednocześnie może istnieć maksymalnie 8 aktywnych strzał. Strzała, która opuści planszę, jest liczona jako pudło.
-- **Praktyka:** najpierw ustaw kąt tensometrem, następnie koryguj go krótkimi przytrzymaniami klawiszy. Obserwuj kropkowany tor oraz kierunek ruchu celu i oddaj strzał z wyprzedzeniem.
+- **Praktyka:** ustaw kąt tensometrem, obserwuj wiatr i przewidywany tor, a następnie wyprzedzaj ruch celu. Zachowuj ładunki skupienia na małe cele lub trudne warunki wiatrowe.
 
 ### 9. Galaga
 
@@ -119,7 +123,7 @@
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
-| Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
+| Archer | kąt celowania 0–100% | `W`/`↑` — wyżej, `S`/`↓` — niżej, `SPACJA` — zwykły strzał, `F`/`E` — strzał skupiony |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, przytrzymaj `SPACJĘ` |
 | Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
 
