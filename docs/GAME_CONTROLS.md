@@ -10,19 +10,20 @@
 4. **Pauza**, **wznowienie**, **zatrzymanie** i **reset** są obsługiwane przez wspólny interfejs modułu treningowego/silnika gry, a nie przez uniwersalny skrót klawiszowy.
 5. Jeżeli gra pokazuje komunikat o braku połączenia z czujnikiem, sprawdź połączenie urządzenia i strumień pomiarowy. Nie traktuj braku sygnału jako wartości zerowej ani jako polecenia wykonania ruchu.
 6. Po zmianie gry lub ponownym uruchomieniu sprawdź, czy gra rozpoczęła nową sesję i czy wynik/życia zostały zresetowane zgodnie z mechaniką gry.
-7. Silnik gier ma docelowy krok symulacji 90 Hz i żąda odświeżania w odstępach około 11 ms. Renderowanie używa lekkiej grafiki pikselowej, bez antyaliasingu i zbędnych gradientów pełnoekranowych. Rzeczywista liczba wyświetlonych klatek zależy od odświeżania monitora, kompozytora pulpitu i obciążenia Raspberry Pi 4; 90 Hz wymaga również odpowiedniego trybu wyświetlacza.
+7. Silnik gier ma docelowy krok symulacji 120 Hz i żąda odświeżania w odstępach około 8 ms. Renderowanie używa lekkiej grafiki pikselowej, bez antyaliasingu i zbędnych gradientów pełnoekranowych. Rzeczywista liczba wyświetlonych klatek zależy od odświeżania monitora, kompozytora pulpitu i obciążenia Raspberry Pi 4; 90 Hz wymaga również odpowiedniego trybu wyświetlacza.
 8. Automatyczne strzały w Archer i Scorched Earth wymagają świeżych próbek tensometru. Po utracie sygnału odliczanie jest wstrzymywane i rozpoczyna się ponownie po odzyskaniu pomiaru.
 
 ## Sterowanie poszczególnymi grami
 
 ### 1. Sinus Force Trainer
 
-**Cel:** prowadź kursor na wysokości punktu celu na sinusoidzie, w miejscu pionowej linii przerywanej.
+**Cel:** prowadź kursor położenia siły do ruchomego punktu celu, w miejscu pionowej linii przerywanej.
 
-- **Tensometr:** zmiana siły zmienia pionowe położenie kursora. Zwiększaj lub zmniejszaj nacisk, aby dopasować kursor do czerwonego punktu celu.
-- **Wskaźnik:** turkusowe kółko pokazuje położenie gracza, czerwony punkt położenie celu; zielone oznaczenie sygnalizuje trafienie.
-- **Informacje na ekranie:** bieżąca siła, tolerancja w pikselach, poziom trudności i status połączenia.
-- **Ustawienia:** poziom trudności, tryb fali, kalibrację i automatyczną trudność zmienia się w panelu ustawień gry. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
+- **Tensometr/HX711:** jedyny kontroler. Skalibrowana siła 0–100% płynnie ustawia pionowe położenie kursora; brak świeżej próbki przez ponad 350 ms zatrzymuje naliczanie wyniku i zeruje serię.
+- **Przebieg celu:** pięć ustawianych przed sesją trybów: sinusoidalny, trójkątny, łagodne plateau, piłokształtny i impulsowy. Obszar tolerancji podąża za wybranym przebiegiem.
+- **Punktacja:** wynik rośnie za utrzymanie kursora w paśmie celu; dokładność zwiększa liczbę punktów, seria rośnie wraz z czasem trafienia, a utrzymanie dokładności co najmniej 90% przez 3 i 5 sekund uruchamia premie precyzji.
+- **Rekord serii:** HUD pokazuje bieżącą oraz najlepszą serię w sesji.
+- **Panel przed sesją:** wybór przebiegu celu, poziom trudności 1–5 oraz automatyczna zmiana trudności. Kalibracja zakresu siły jest odrębną procedurą pomiarową i nie jest częścią tego panelu. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
 
 ### 2. Tan Force Trainer (Tangens)
 
@@ -124,9 +125,9 @@
 
 **Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, ustawiając kąt działa tensometrem i uwzględniając wiatr.
 
-- **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału pozostaje ustawiona na stałym, zbalansowanym poziomie.
-- **Automatyczny strzał:** po uzyskaniu świeżego sygnału w turze gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Po utracie sygnału odliczanie rozpoczyna się od nowa.
-- **Wskaźniki:** zdrowie obu czołgów, runda, wynik i siła/wiatr zgodnie z informacją na ekranie.
+- **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału jest stała i zbalansowana; żadna klawiatura, mysz ani ekran dotykowy nie sterują rozgrywką.
+- **Automatyczny strzał:** świeży sygnał tensometru uzbraja odliczanie 2 s w turze gracza; po utracie sygnału odliczanie jest zerowane. Siła i kąt pocisku zależą od ustawionej mechaniki gry i aktualnej próbki siły.
+- **Wskaźniki:** zdrowie obu czołgów, runda, wynik i aktualny wiatr.
 - **Wskazówka:** wiatr wpływa na tor pocisku. Po strzale poczekaj na zakończenie lotu i ruch przeciwnika; następna tura gracza rozpoczyna nowe dwusekundowe odliczanie.
 
 ## Skrócona tabela sterowania
