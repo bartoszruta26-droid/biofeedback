@@ -476,7 +476,7 @@ int main(int argc, char **argv)
     REQUIRE(archerGame != nullptr);
     archerGame->resize(640, 480);
     archerGame->start();
-    archerGame->handleSensorInput(80.0);
+    archerGame->handleSensorInput(60.0);
     QKeyEvent archerFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(archerGame, &archerFire);
     waitForEvents(350);
@@ -589,7 +589,9 @@ int main(int argc, char **argv)
     scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire); // Must not trigger a manual shot.
-    waitForEvents(4500); // Automatic release plus the full ballistic flight.
+    waitForEvents(350);
+    REQUIRE(scorchedGame->activeProjectileCount() == 0);
+    waitForEvents(4150); // Automatic release plus the full ballistic flight.
     REQUIRE(scorchedGame->isRunning());
     REQUIRE(scorchedGame->enemyHealth() < 100); // A real tank hit must apply damage.
     REQUIRE(scorchedGame->playerHealth() > 0);
