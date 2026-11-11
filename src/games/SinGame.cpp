@@ -78,11 +78,9 @@ void SinGame::setDifficultyLevel(int level)
 {
     m_difficultyLevel = qBound(1, level, 5);
 
-    // Speed is expressed in pixels per second; the waveform is scaled to
-    // the current viewport so it always shows the same number of cycles.
-    m_scrollSpeed = 90.0 + m_difficultyLevel * 25.0;
-    const double toleranceRatio = 0.11 - (m_difficultyLevel - 1) * 0.012;
-    m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, static_cast<double>(height())) * toleranceRatio));
+    // Keep the waveform's logical speed and hit window proportional to the
+    // reference 640x480 playfield, not to physical display pixels.
+    refreshGeometryParameters();
     refreshGeometryParameters();
     m_comboSeconds = 0.0;
     m_combo = 0;
@@ -168,9 +166,12 @@ void SinGame::refreshGeometryParameters()
 {
     const double w = qMax(1, width());
     const double h = qMax(240, height());
+    const double scaleX = qMax(0.5, w / 640.0);
+    const double scaleY = qMax(0.5, h / 480.0);
     m_frequency = 2.0 * 3.14159265358979323846 * 1.5 / w;
-    const double toleranceRatio = 0.11 - (m_difficultyLevel - 1) * 0.012;
-    m_tolerance = qBound(12.0, h * toleranceRatio, 48.0);
+    m_scrollSpeed = (65.0 + m_difficultyLevel * 18.0) * scaleX;
+    const double toleranceRatio = 0.14 - (m_difficultyLevel - 1) * 0.010;
+    m_tolerance = qBound(12.0 * scaleY, h * toleranceRatio, 64.0 * scaleY);
 }
 
 double SinGame::waveformValue(double phase) const
@@ -193,9 +194,9 @@ void SinGame::updateAutomaticDifficulty(double deltaTime)
     if (m_accuracyWindowSeconds < 12.0)
         return;
     const double ratio = m_accuracyWindowHitSeconds / m_accuracyWindowSeconds;
-    if (ratio >= 0.82 && m_difficultyLevel < 5)
+    if (ratio >= 0.90 && m_difficultyLevel < 5)
         setDifficultyLevel(m_difficultyLevel + 1);
-    else if (ratio < 0.42 && m_difficultyLevel > 1)
+    else if (ratio < 0.35 && m_difficultyLevel > 1)
         setDifficultyLevel(m_difficultyLevel - 1);
     m_accuracyWindowSeconds = 0.0;
     m_accuracyWindowHitSeconds = 0.0;
