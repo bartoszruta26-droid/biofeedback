@@ -102,10 +102,12 @@ void CarRaceGame::setLane(int lane)
     m_lane = qBound(0, lane, 2);
     const double roadWidth = qMax(0.0, width() * kRoadWidthRatio);
     const double laneWidth = roadWidth / 3.0;
-    const double playerWidth = qMin(42.0, qMax(1.0, laneWidth - 10.0));
-    const double playerHeight = qMin(68.0, qMax(1.0, height() - 8.0));
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double playerWidth = qMin(laneWidth * 0.66, 42.0 * scaleX);
+    const double playerHeight = qMin(height() * 0.18, 68.0 * scaleY);
     m_player.setSize(QSizeF(playerWidth, playerHeight));
-    m_player.moveTop(qBound(0.0, static_cast<double>(height()) - playerHeight - 24.0,
+    m_player.moveTop(qBound(0.0, static_cast<double>(height()) - playerHeight - 24.0 * scaleY,
                             qMax(0.0, static_cast<double>(height()) - playerHeight)));
     m_player.moveLeft(laneRect(m_lane, m_player.top(), playerWidth, playerHeight).left());
 }
@@ -141,14 +143,6 @@ void CarRaceGame::keyPressEvent(QKeyEvent* event)
     }
 
     switch (event->key()) {
-    case Qt::Key_Left:
-    case Qt::Key_A:
-        setLane(m_lane - 1);
-        break;
-    case Qt::Key_Right:
-    case Qt::Key_D:
-        setLane(m_lane + 1);
-        break;
     case Qt::Key_Space:
     case Qt::Key_B:
         activateBoost();
@@ -180,8 +174,10 @@ void CarRaceGame::spawnObstacle()
 
     const double roadWidth = width() * kRoadWidthRatio;
     const double laneWidth = roadWidth / 3.0;
-    const double obstacleWidth = qMin(44.0, qMax(1.0, laneWidth - 10.0));
-    const double obstacleHeight = qMin(70.0, qMax(1.0, height() * 0.21));
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double obstacleWidth = qMin(laneWidth * 0.66, 44.0 * scaleX);
+    const double obstacleHeight = qMin(height() * 0.21, 70.0 * scaleY);
     Obstacle obstacle;
     obstacle.lane = lane;
     obstacle.passed = false;
@@ -214,10 +210,11 @@ void CarRaceGame::update(double deltaTime)
     m_boostCooldown = qMax(0.0, m_boostCooldown - deltaTime);
     m_collisionTimer = qMax(0.0, m_collisionTimer - deltaTime);
 
-    const double baseSpeed = qMin(560.0, 220.0 + m_distance * 0.014);
-    m_roadSpeed = baseSpeed * (m_boostTimer > 0.0 ? 1.55 : 1.0);
-    m_distance += m_roadSpeed * deltaTime;
-    m_spawnInterval = qMax(0.58, 1.25 - m_distance / 14000.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double baseLogicalSpeed = qMin(360.0, 170.0 + m_distance * 0.009);
+    m_roadSpeed = baseLogicalSpeed * scaleY * (m_boostTimer > 0.0 ? 1.35 : 1.0);
+    m_distance += baseLogicalSpeed * deltaTime;
+    m_spawnInterval = qMax(0.95, 1.55 - m_distance / 20000.0);
     m_spawnTimer += deltaTime;
     if (m_spawnTimer >= m_spawnInterval) {
         m_spawnTimer -= m_spawnInterval;
@@ -423,7 +420,7 @@ void CarRaceGame::render(QPainter& painter)
                                    (track.width() - 2.0) * ready, track.height() - 2.0), 3.0, 3.0);
     painter.setFont(QFont(QStringLiteral("Arial"), 9));
     painter.setPen(QColor(255, 255, 255, 220));
-    painter.drawText(12, height() - 12, QStringLiteral("Czujnik / ← A → D: pas | SPACJA lub B: dopalacz"));
+    painter.drawText(12, height() - 12, QStringLiteral("Tensometr: wybór pasa | SPACJA lub B: dopalacz"));
     if (!isRunning() && m_lives <= 0) {
         painter.fillRect(rect(), QColor(0, 0, 0, 175));
         painter.setPen(Qt::white);
