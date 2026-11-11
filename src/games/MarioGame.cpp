@@ -750,7 +750,10 @@ void MarioGame::renderPlayer(QPainter& painter, const Player& player)
     const double h = player.body.height();
     const double u = qMin(w / 16.0, h / 20.0); // Pixel-art unit, scales with widget size.
     const double ox = x + (w - 16.0 * u) * 0.5;
-    const double oy = y + (h - 20.0 * u) * 0.5;
+    const double runBob = player.isOnGround && !player.isCharging
+        ? std::sin(m_animationTime * 18.0) * 0.65 * u : 0.0;
+    const double oy = y + (h - 20.0 * u) * 0.5 + runBob;
+    const int armSwing = (player.frame % 2 == 0) ? 1 : -1;
     const auto px = [&](double gx, double gy, double gw, double gh) {
         return QRectF(ox + gx * u, oy + gy * u, gw * u, gh * u);
     };
@@ -763,11 +766,17 @@ void MarioGame::renderPlayer(QPainter& painter, const Player& player)
     painter.setBrush(QColor(0, 0, 0, player.isOnGround ? 65 : 28));
     const double groundY = height() * GROUND_Y_RATIO;
     painter.drawEllipse(QRectF(x - 3 * u, groundY - 2 * u, w + 6 * u, 3 * u));
+    if (player.isOnGround && !player.isCharging && (player.frameTimer > 0.035)) {
+        const double dustPulse = 0.55 + 0.45 * std::sin(m_animationTime * 20.0);
+        painter.setBrush(QColor(0xE8, 0xD8, 0xB5, static_cast<int>(45 * dustPulse)));
+        painter.drawEllipse(QRectF(x - 7 * u, groundY - 4 * u, 5 * u, 2.5 * u));
+        painter.drawEllipse(QRectF(x - 12 * u, groundY - 2 * u, 3 * u, 2 * u));
+    }
 
     // Back arm and glove.
     painter.setPen(QPen(QColor(0x6E, 0x25, 0x1B), 0.7 * u));
     painter.setBrush(COLOR_MARIO_RED);
-    painter.drawRect(px(2, 10, 3, 4));
+    painter.drawRect(px(2, 10 + armSwing, 3, 4));
     painter.setBrush(Qt::white);
     painter.drawRect(px(1, 13, 3, 2));
 
@@ -806,7 +815,7 @@ void MarioGame::renderPlayer(QPainter& painter, const Player& player)
 
     // Front arm and glove.
     painter.setBrush(COLOR_MARIO_RED);
-    painter.drawRect(px(11, 10, 3, 3));
+    painter.drawRect(px(11, 10 - armSwing, 3, 3));
     painter.setBrush(Qt::white);
     painter.drawRect(px(13, 12, 2, 2));
 
