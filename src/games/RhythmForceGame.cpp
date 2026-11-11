@@ -3,8 +3,6 @@
 #include <QFont>
 #include <QPainter>
 #include <QPen>
-#include <QLinearGradient>
-#include <QRadialGradient>
 #include <QPolygonF>
 #include <QSettings>
 #include <algorithm>
@@ -59,7 +57,7 @@ void RhythmForceGame::setDifficultyLevel(int level)
 
 int RhythmForceGame::beatsPerMinute() const
 {
-    return 72 + (m_difficulty - 1) * 12;
+    return 60 + (m_difficulty - 1) * 8;
 }
 
 double RhythmForceGame::beatIntervalSeconds() const
@@ -74,12 +72,12 @@ double RhythmForceGame::beatTimeSeconds(int beatIndex) const
 
 double RhythmForceGame::timingWindowSeconds() const
 {
-    return 0.22 - static_cast<double>(m_difficulty - 1) * 0.02;
+    return 0.28 - static_cast<double>(m_difficulty - 1) * 0.025;
 }
 
 double RhythmForceGame::perfectWindowSeconds() const
 {
-    return qMax(0.035, 0.075 - static_cast<double>(m_difficulty - 1) * 0.008);
+    return qMax(0.05, 0.09 - static_cast<double>(m_difficulty - 1) * 0.01);
 }
 
 double RhythmForceGame::targetForceForBeat(int beatIndex) const
@@ -355,17 +353,9 @@ void RhythmForceGame::render(QPainter &painter)
 {
     const int w = width();
     const int h = height();
-    QLinearGradient background(0, 0, 0, h);
-    background.setColorAt(0.0, QColor(7, 12, 28));
-    background.setColorAt(0.52, QColor(17, 34, 61));
-    background.setColorAt(1.0, QColor(5, 9, 19));
-    painter.fillRect(rect(), background);
+    painter.fillRect(rect(), QColor(8, 19, 37));
     painter.setRenderHint(QPainter::Antialiasing, false);
     const QPointF horizon(w * 0.5, h * 0.34);
-    QRadialGradient atmosphere(horizon, w * 0.72);
-    atmosphere.setColorAt(0.0, QColor(44, 145, 194, 82));
-    atmosphere.setColorAt(1.0, QColor(12, 24, 48, 0));
-    painter.fillRect(rect(), atmosphere);
     painter.setPen(QPen(QColor(74, 154, 202, 35), 1));
     for (int i = -5; i <= 5; ++i)
         painter.drawLine(horizon, QPointF(w * 0.5 + i * w * 0.13, h));
@@ -396,11 +386,8 @@ void RhythmForceGame::render(QPainter &painter)
            << QPointF(lane.center().x() + lane.width() * 0.31, lane.top())
            << QPointF(lane.right(), lane.bottom())
            << QPointF(lane.left(), lane.bottom());
-    QLinearGradient runwayGradient(0, lane.top(), 0, lane.bottom());
-    runwayGradient.setColorAt(0.0, QColor(20, 50, 80, 245));
-    runwayGradient.setColorAt(1.0, QColor(10, 22, 43, 250));
     painter.setPen(QPen(QColor(76, 179, 222, 150), 1.4));
-    painter.setBrush(runwayGradient);
+    painter.setBrush(QColor(14, 34, 58));
     painter.drawPolygon(runway);
     const double centreX = lane.center().x();
     painter.setPen(QPen(QColor(245, 220, 110), 2));
@@ -421,11 +408,8 @@ void RhythmForceGame::render(QPainter &painter)
         const bool active = beat == m_nextBeatIndex;
         const QColor accent = active ? QColor(72, 218, 255) : QColor(95, 140, 184);
         if (active) {
-            QRadialGradient glow(QPointF(x, y), radius * 2.8);
-            glow.setColorAt(0.0, QColor(67, 208, 255, 120));
-            glow.setColorAt(1.0, QColor(67, 208, 255, 0));
-            painter.setBrush(glow);
-            painter.drawEllipse(QPointF(x, y), radius * 2.8, radius * 2.8);
+            painter.setBrush(QColor(67, 208, 255, 35));
+            painter.drawEllipse(QPointF(x, y), radius * 2.0, radius * 2.0);
         }
         painter.setPen(QPen(accent, active ? 2.2 : 1.0));
         painter.setBrush(active ? QColor(38, 160, 205) : QColor(45, 82, 122));
@@ -439,12 +423,9 @@ void RhythmForceGame::render(QPainter &painter)
 
     if (m_pulseActive) {
         const double pulseScale = 1.0 + 0.16 * std::sin(m_visualTime * 13.0);
-        QRadialGradient pulseGlow(QPointF(centreX, lane.center().y()), lane.width() * 0.11 * pulseScale);
-        pulseGlow.setColorAt(0.0, QColor(255, 166, 72, 110));
-        pulseGlow.setColorAt(1.0, QColor(255, 166, 72, 0));
-        painter.setBrush(pulseGlow);
+        painter.setBrush(QColor(255, 166, 72, 32));
         painter.drawEllipse(QPointF(centreX, lane.center().y()),
-                            lane.width() * 0.11 * pulseScale, lane.width() * 0.11 * pulseScale);
+                            lane.width() * 0.08 * pulseScale, lane.width() * 0.08 * pulseScale);
     }
     if (m_hitFlashSeconds > 0.0) {
         const double alpha = qBound(0.0, m_hitFlashSeconds / 0.42, 1.0);
