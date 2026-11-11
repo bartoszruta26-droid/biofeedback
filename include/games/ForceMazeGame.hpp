@@ -3,6 +3,7 @@
 
 #include "games/GameEngine.hpp"
 #include <QVector>
+#include <QStringList>
 #include <QPointF>
 
 namespace games {
