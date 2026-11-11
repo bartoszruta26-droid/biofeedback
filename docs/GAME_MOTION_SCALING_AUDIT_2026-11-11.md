@@ -51,3 +51,12 @@ Pozostałe gry nadal korzystają z domyślnego renderowania. Nie należy uznawa�
 ## Ograniczenia weryfikacji etapu 2
 
 Zmiany zostały zapisane w gałęzi PR. Repozytorium nie zgłosiło workflow runs ani status checks dla aktualnego commita. Kompilacja i testy uruchomieniowe nie zostały zatem potwierdzone. Przed scaleniem trzeba zbudować wszystkie cele Qt5 i wykonać game_engine_regression, game_factory_regression oraz pozostałe testy CTest.
+
+Dalsza część etapu 2:
+
+- Flappy Bird — interpolowana pozycja ptaka i ruch przeszkód; własny paintEvent w trakcie gry przekazuje renderowanie do wspólnego silnika.
+- Car Race — interpolowana pozycja pojazdu, przeszkody, przewijanie drogi i pozycja wizualna pasa.
+- Reaction Force — interpolowany zegar wizualny; własny paintEvent korzysta z tego samego współczynnika prezentacji.
+- Mario — własny paintEvent został podłączony do interpolowanego renderera; interpolacja nie jest omijana przez niestandardową ścieżkę malowania.
+
+Wszystkie wymienione migrowane gry zachowują oryginalne wejście czujnika i logikę symulacji. Przy zmianie rozmiaru lub restarcie migrowane stany poprzednie są synchronizowane z bieżącymi, aby uniknąć interpolacji przez różne układy współrzędnych.
