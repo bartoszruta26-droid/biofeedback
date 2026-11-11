@@ -103,7 +103,7 @@ void ForceMazeGame::initialize()
     m_targetColumn = 4.0;
     m_inputAge = kSignalTimeoutSeconds + 1.0;
     m_visualTime = 0.0;
-    m_forwardSpeed = 1.35;
+    m_forwardSpeed = 0.95;
     m_hitFlash = 0.0;
     m_checkpointFlash = 0.0;
     m_crystalPulse = 0.0;
@@ -312,7 +312,7 @@ void ForceMazeGame::completeLevel()
     m_collectedCrystals.clear();
     m_reachedCheckpoints.clear();
     m_levelClean = true;
-    m_forwardSpeed = 1.35 + 0.18 * static_cast<double>(m_level - 1);
+    m_forwardSpeed = 0.95 + 0.08 * static_cast<double>(m_level - 1);
     m_playerColumn = 4.0;
     m_targetColumn = 4.0;
     m_status = QStringLiteral("Poziom %1 — labirynt przyspiesza").arg(m_level);
