@@ -833,6 +833,12 @@ int main(int argc, char **argv)
     REQUIRE(rhythm->combo() == 1);
     REQUIRE(rhythm->getScore() >= 100);
     REQUIRE(rhythm->accuracyPercent() == 100.0);
+    REQUIRE(rhythm->hasAchievement(QStringLiteral("first_hit")));
+    REQUIRE(rhythm->hasAchievement(QStringLiteral("first_perfect")));
+    REQUIRE(rhythm->unlockedAchievementsCount() >= 2);
+    const double visualClockBeforeSignal = rhythm->visualTimeSeconds();
+    games::RhythmForceGameTestAccess::advance(*rhythm, 0.05);
+    REQUIRE(rhythm->visualTimeSeconds() > visualClockBeforeSignal);
 
     const double secondBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 2);
     games::RhythmForceGameTestAccess::emitPulse(
