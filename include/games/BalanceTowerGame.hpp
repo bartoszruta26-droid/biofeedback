@@ -4,6 +4,7 @@
 #include "games/GameEngine.hpp"
 #include <QVector>
 #include <QPointF>
+#include <QStringList>
 
 namespace games {
 
