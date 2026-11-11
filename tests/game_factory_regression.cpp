@@ -177,6 +177,23 @@ int main(int argc, char **argv)
     REQUIRE(galagaGame->currentWave() == 1);
     REQUIRE(galagaGame->activeEnemyCount() == 24);
 
+    // EMP is edge-triggered, consumes one charge, clears hostile fire and
+    // wipes the first-wave formation; wave progression then rebuilds enemies.
+    std::unique_ptr<games::GameEngine> galagaPulse(games::createGame(QStringLiteral("galaga")));
+    auto* galagaPulseGame = dynamic_cast<games::GalagaGame*>(galagaPulse.get());
+    REQUIRE(galagaPulseGame != nullptr);
+    galagaPulseGame->resize(640, 480);
+    galagaPulseGame->start();
+    REQUIRE(galagaPulseGame->specialCharges() == 2);
+    QKeyEvent galagaEmp(QEvent::KeyPress, Qt::Key_X, Qt::NoModifier);
+    QApplication::sendEvent(galagaPulseGame, &galagaEmp);
+    REQUIRE(galagaPulseGame->specialCharges() == 1);
+    REQUIRE(galagaPulseGame->activeEnemyCount() == 0);
+    waitForEvents(80);
+    REQUIRE(galagaPulseGame->currentWave() == 2);
+    REQUIRE(galagaPulseGame->activeEnemyCount() > 0);
+    galagaPulseGame->stop();
+
     // The first deterministic hostile shot is aligned with the far-right
     // sensor position. It must remove exactly one life and leave the session
     // active; the post-hit protection then recentres the player.
