@@ -62,7 +62,7 @@ W aktualnym `main` istnieje wspólny `GameEngine`:
 - `src/games/GameEngine.cpp`
 - `include/games/GameFactory.hpp`
 
-Silnik udostępnia cykl życia gry, pętlę aktualizacji, renderowanie, wynik oraz `handleSensorInput(double)`. Pętla gry używa timera 8 ms i symulacji o stałym kroku 1/120 s. Dane napływające z wątku odczytu są łączone do najnowszej próbki i przekazywane do wątku GUI; obsługiwane są wartości niefinitywne oraz unieważnianie opóźnionych wywołań po zatrzymaniu lub resecie.
+Silnik udostępnia cykl życia gry, pętlę aktualizacji, renderowanie, wynik oraz `handleSensorInput(double)`. Pętla gry żąda odświeżania co 11 ms (docelowo około 90 Hz) i wykonuje symulację ze stałym krokiem 1/90 s. Widgety są nieprzezroczyste, pomijają systemowe czyszczenie tła, antyaliasing i zbędne gradienty pełnoekranowe. Dane napływające z wątku odczytu są łączone do najnowszej próbki i przekazywane do wątku GUI; obsługiwane są wartości niefinitywne oraz unieważnianie opóźnionych wywołań po zatrzymaniu lub resecie.
 
 Wspólny potok pomiarowy przekazuje skalibrowaną siłę w niutonach. Test `tests/game_sensor_ownership_regression.py` pilnuje, aby gry nie tworzyły własnych strumieni szeregowych i korzystały z centralnego źródła pomiaru.
 
@@ -84,9 +84,17 @@ W katalogach `src/games` i `include/games` znajduje się trzynaście gier:
 12. Rhythm Force — `RhythmForceGame.cpp`
 13. Force Maze — `ForceMazeGame.cpp`
 
-Aktualny opis zachowania znajduje się w `docs/GAME_CONTROLS.md`. Audyt tej instrukcji wykazał rozbieżność z nową zasadą: dokument nadal opisuje skróty klawiaturowe, a w Car Race, Archer, Galaga i Scorched Earth klawiatura jest opisana jako część sterowania. Przed uznaniem całego katalogu za zgodny należy usunąć te ścieżki wejściowe i dodać testy, które wykryją ich ponowne wprowadzenie. Należy również sprawdzić zmiany w otwartych PR-ach dotyczących Mario Run, Archer i Scorched Earth — część opisów tych prac wymienia sterowanie klawiaturą.
+Aktualny opis zachowania znajduje się w `docs/GAME_CONTROLS.md`. W gałęzi `main` usunięto obsługę zdarzeń klawiatury i myszy z klas gier. Sterowanie kierunkowe i pozycjonowanie odbywa się tensometrem, a działania specjalne są realizowane gestami siły lub automatycznie przez zegar gry. Reguła jest dodatkowo sprawdzana testem statycznym, aby późniejsze zmiany nie wprowadziły ponownie drugiego kontrolera.
 
-### 2.3. Kompilacja i testy
+### 2.3. Standard wydajności i skalowania
+
+- Cel silnika: 90 Hz, timer 11 ms i stały krok symulacji 1/90 s.
+- Każda gra używa wymiarów pola gry jako układu logicznego; rozmiary obiektów, prędkości i progi kolizji muszą zachowywać proporcje przy zmianie rozdzielczości.
+- Zmiana rozdzielczości nie może zwiększać trudności przez zmniejszenie względnego rozmiaru paletki, celu, szczeliny ani strefy trafienia.
+- Renderowanie jest zoptymalizowane dla Raspberry Pi 4: nieprzezroczyste widgety, brak antyaliasingu, płaskie palety pikselowe i ograniczenie gradientów/poświat pełnoekranowych.
+- 90 Hz jest celem pętli gry, a nie gwarancją wyświetlenia 90 klatek. Rzeczywisty wynik zależy od trybu monitora, kompozytora i obciążenia urządzenia.
+
+## 2.4. Kompilacja i testy
 
 - Obecny plik główny CMake jawnie używa `find_package(Qt5 ...)` oraz celów `Qt5::...`. Aktualny przepływ CI buduje Qt 5; nie potwierdza jeszcze kompilacji Qt 6.
 - W repozytorium istnieją testy silnika i fabryki gier: `tests/game_engine_regression.cpp`, `tests/game_factory_regression.cpp`.
@@ -161,7 +169,8 @@ Poniższe opisy rozdzielają obecną koncepcję gry od docelowego sterowania zgo
 
 - **Grafika:** perspektywiczna droga z trzema pasami, kilka warstw tła, animowane pojazdy i koła, znaczniki pobocza, efekty dopalacza i kolizji.
 - **Funkcje:** trasy, poziomy prędkości, różne pojazdy, żetony, serie minięć, mistrzostwa i rekordy.
-- **Tensometr:** trzy stabilne przedziały siły wybierają lewy, środkowy lub prawy pas. Przełączenie pasa wymaga przekroczenia progu z histerezą. Dopalacz: podwójny krótki impuls albo inny jednoznaczny gest czasowy; gest nie może kolidować ze zwykłą zmianą pasa.
+- **Tensometr:** trzy stabilne przedziały siły wybierają lewy, środkowy lub prawy pas. Przełączenie pasa wymaga przekroczenia progu z histerezą.
+- **Dopalacz:** przytrzymanie co najmniej 95% siły przez 0,25–1,2 s i zwolnienie do środkowej strefy aktywuje dopalacz. Samochód zachowuje pas podczas gestu.
 - **Brak innych wejść:** ruch lewo/prawo i dopalacz z klawiatury muszą być usunięte. Gdy sygnał jest nieaktualny, samochód nie zmienia pasa i nie aktywuje dopalacza.
 
 ### 3.8. Archer Force Trainer
@@ -170,8 +179,9 @@ Poniższe opisy rozdzielają obecną koncepcję gry od docelowego sterowania zgo
 
 - **Grafika:** łucznik, łuk z animacją naciągu, czytelna tarcza, tor lotu strzały, wiatr przedstawiony graficznie i efekty trafienia.
 - **Funkcje:** tarcze statyczne i ruchome, różne odległości, serie trafień, strefy punktowe, poziomy i podsumowanie celności.
-- **Tensometr:** tryb celowania mapuje siłę na kąt. Przytrzymanie rozpoczyna naciąganie cięciwy, a zwolnienie oddaje strzał; siła w chwili zwolnienia określa moc strzału w bezpiecznym zakresie. Jeśli konieczne jest rozdzielenie kąta i mocy, długi gest przełącza aktywny parametr, a nie dodatkowy przycisk.
-- **Brak innych wejść:** klawisze korekty kąta i spacji do strzału są niedopuszczone. Tor lotu i wiatr są wyłącznie informacją wizualną, nie wymagają osobnego sterownika.
+- **Tensometr:** steruje kątem łuku w całym zakresie roboczym.
+- **Automatyczny strzał:** po uzyskaniu świeżej próbki gra odlicza 2,4 s i oddaje strzał; kolejne strzały następują co 2,4 s. Utrata świeżości sygnału zeruje odliczanie.
+- **Brak innych wejść:** klawiatura i mysz nie sterują łukiem ani strzałem.
 
 ### 3.9. Galaga
 
@@ -179,8 +189,10 @@ Poniższe opisy rozdzielają obecną koncepcję gry od docelowego sterowania zgo
 
 - **Grafika:** gwiezdne tło, statek gracza, formacje przeciwników, pociski, wybuchy, bossowie i czytelny pasek życia.
 - **Funkcje:** fale, przeciwnicy o różnych zachowaniach, premie, osłony, bossowie, serie eliminacji i rekordy.
-- **Tensometr:** siła mapuje się na poziomą pozycję statku. Ogień jest automatyczny w czasie aktywnej rozgrywki, dzięki czemu gracz nie potrzebuje drugiego przycisku. EMP lub inna umiejętność specjalna może być aktywowana podwójnym impulsem, z długim czasem odnowienia i wizualnym potwierdzeniem.
-- **Brak innych wejść:** klawisze ruchu, ognia i EMP muszą zostać usunięte. Automatyczny ogień jest funkcją gry, a nie osobnym źródłem wejścia.
+- **Tensometr:** siła mapuje się na poziomą pozycję statku.
+- **Automatyczny ogień:** przy świeżym sygnale statek oddaje strzał co 0,30 s; po utracie sygnału ogień ustaje.
+- **Impuls EMP:** przytrzymanie co najmniej 95% siły przez 0,35–1,2 s i zwolnienie do 30% lub mniej aktywuje EMP.
+- **Brak innych wejść:** ruch, ogień i EMP nie korzystają z klawiatury ani myszy.
 
 ### 3.10. Scorched Earth
 
@@ -188,8 +200,9 @@ Poniższe opisy rozdzielają obecną koncepcję gry od docelowego sterowania zgo
 
 - **Grafika:** pagórkowaty teren, działa/czołgi, czytelna trajektoria pocisku, efekty eksplozji, wiatr i pasek stanu pojazdów.
 - **Funkcje:** przeciwnik sterowany algorytmem, różne rodzaje terenu i pocisków, zmienna pogoda, kampania i poziomy trudności.
-- **Tensometr:** sekwencyjne sterowanie jednym parametrem. Krótki gest przełącza wybór między kątem i mocą; aktualna siła ustawia wybrany parametr. Długi gest zatwierdzony zwolnieniem oddaje strzał. Interfejs stale pokazuje, który parametr jest aktywny.
-- **Brak innych wejść:** klawisze W/S, +/- i spacja są niedopuszczone. Przeciwnik wykonuje swoją turę automatycznie.
+- **Tensometr:** ustawia kąt działa w zakresie 15–80 stopni; moc pocisku pozostaje stała i zbalansowana.
+- **Automatyczny strzał:** po uzyskaniu świeżego sygnału w turze gracza następuje odliczanie 2 s i wypuszczenie pocisku. Utrata sygnału zeruje odliczanie.
+- **Brak innych wejść:** klawiatura i mysz nie sterują kątem, mocą ani strzałem. Przeciwnik wykonuje swoją turę automatycznie.
 
 ## 4. Proponowane nowe gry — priorytet rozrywkowy
 
@@ -219,7 +232,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 - **Koncepcja rozgrywki:** gracz wykonuje krótkie impulsy nacisku zsynchronizowane z rytmem. Każdy takt ma znacznik czasu i docelową siłę. Wynik zależy od dokładności chwili rozpoczęcia impulsu oraz od tego, jak blisko wartości docelowej znajduje się szczyt nacisku.
 - **Grafika i perspektywa:** scena w stylistyce futurystycznego tunelu rytmicznego, z gradientowym tłem, poświatą horyzontu, perspektywiczną siatką podłoża i trapezowym torem. Znaczniki taktów zmieniają położenie, skalę i czytelność zależnie od głębi; aktywny takt ma świetlną obwódkę i poświatę. Panel HUD pokazuje tempo, poziom, numer taktu, wynik, serię, perfekcyjne trafienia i celność.
 - **Przebieg rundy:** jedna runda obejmuje 32 takty po krótkim wstępie. Po rozliczeniu ostatniego taktu gra kończy rundę i zatrzymuje pętlę rozgrywki. Wszystkie czynności rozgrywki są obsługiwane tensometrem.
-- **Tempo i trudność:** pięć poziomów ustawia tempo odpowiednio na 72, 84, 96, 108 i 120 BPM. Wraz z poziomem trudności okno dopuszczalnego błędu czasu zwęża się z 220 do 140 ms, a okno oceny perfekcyjnej z 75 do 43 ms. Poziom jest ograniczany do zakresu 1–5.
+- **Tempo i trudność:** pięć poziomów ustawia tempo odpowiednio na 60, 68, 76, 84 i 92 BPM. Wraz z poziomem trudności okno dopuszczalnego błędu czasu zwęża się z 280 do 180 ms, a okno oceny perfekcyjnej z 90 do 50 ms. Poziom jest ograniczany do zakresu 1–5.
 - **Sekwencja siły:** docelowy szczyt nacisku zmienia się między taktami w deterministycznym zakresie 40–84%. Wartość docelowa jest pokazywana przy znaczniku taktu, dzięki czemu użytkownik może przygotować zarówno czas, jak i amplitudę impulsu.
 - **Gest tensometru:** strefa spoczynku wynosi 0–18%. Przekroczenie 18% rozpoczyna impuls, a powrót do 18% lub niżej kończy go i uruchamia ocenę. Dopuszczalny czas impulsu wynosi 60–750 ms. Wartość maksymalna zarejestrowana w trakcie impulsu jest porównywana z siłą docelową.
 - **Ocena rytmu:** wynik czasowy ma trzy poziomy: perfekcyjny, dobry i trafienie. Impuls poza oknem trafienia albo o nieprawidłowym czasie trwania jest pomyłką. Impuls przedwczesny nie zużywa jeszcze oczekującego taktu; spóźniony takt zostaje rozliczony jako utracony.
@@ -347,15 +360,15 @@ Nazwy są propozycją projektową, nie istniejącymi obecnie klasami.
 
 ## 6. Plan realizacji — priorytet rozrywka
 
-### Etap 0 — uzgodnienie zasady sterowania i porządek w katalogu
+### Etap 0 — zgodność sterowania i porządek w katalogu
 
-- Przyjąć ten dokument jako nadrzędną specyfikację.
-- Przejrzeć otwarte PR-y dotyczące gier przed scaleniem; usunąć z nich sterowanie klawiaturą.
-- Zaktualizować `docs/GAME_CONTROLS.md` dopiero po rzeczywistym wdrożeniu sterowania wyłącznie tensometrem.
-- Dodać kontrolę CI zakazującą klawiaturowych i myszowych ścieżek sterowania w docelowych klasach gier.
-- Przygotować macierz: gra → parametr ciągły → gest akcji → stan awaryjny.
+- **Wdrożono:** usunięto obsługę zdarzeń klawiatury i myszy z klas gier na `main`.
+- **Wdrożono:** Car Race otrzymał gest dopalacza, Galaga automatyczny ogień i gest EMP, Flappy Bird skok wyłącznie tensometrem.
+- **Wdrożono:** Archer i Scorched Earth używają automatycznego strzału zależnego od świeżego sygnału.
+- **Wdrożono:** zaktualizowano `docs/GAME_CONTROLS.md` oraz testy regresyjne.
+- **Do utrzymania:** kontrola CI ma blokować ponowne dodanie zdarzeń klawiatury/myszy do katalogu gier.
 
-**Warunek zakończenia:** każda z dziesięciu gier ma jednoznaczny projekt sterowania jednym sygnałem siły.
+**Warunek zakończenia:** wszystkie 13 istniejących gier używają jednego strumienia tensometru do sterowania rozgrywką.
 
 ### Etap 1 — wspólne sterowanie i zgodność platform
 
@@ -368,7 +381,7 @@ Nazwy są propozycją projektową, nie istniejącymi obecnie klasami.
 
 **Warunek zakończenia:** oba warianty Qt budują aplikację i testy, a te same nagrane próbki dają identyczne zdarzenia sterujące.
 
-### Etap 2 — dostosowanie dziesięciu istniejących gier
+### Etap 2 — dostosowanie trzynastu istniejących gier
 
 Kolejność:
 1. Sinus i Tangens — dopracowanie mapowania ciągłego i wariantów przebiegów.
