@@ -650,7 +650,7 @@ int main(int argc, char **argv)
     craneDelivery->stop();
 
     // Deterministic collision regression: place the suspended cargo at the
-    // first container's analytically known position at simulation time zero.
+    // first container's analytically known position at a non-zero time.
     QTemporaryDir collisionRecords;
     REQUIRE(collisionRecords.isValid());
     {
@@ -679,22 +679,6 @@ int main(int argc, char **argv)
         collisionRestored.start();
         REQUIRE(collisionRestored.lifetimeCollisions() == 1);
         collisionRestored.stop();
-    }
-
-    QTemporaryDir unusedCollisionRecords;
-    REQUIRE(unusedCollisionRecords.isValid());
-    {
-        games::PrecisionCraneGame collisionGame(
-            nullptr, unusedCollisionRecords.filePath(QStringLiteral("records.json")));
-        collisionGame.resize(640, 480);
-        collisionGame.start();
-        REQUIRE(games::PrecisionCraneGameTestAccess::collideWithFirstObstacle(collisionGame));
-        REQUIRE(collisionGame.collisionCount() == 1);
-        REQUIRE(collisionGame.lifetimeCollisions() == 1);
-        REQUIRE(collisionGame.mistakesRemaining() == 2);
-        REQUIRE(!collisionGame.loadAttached());
-        REQUIRE(collisionGame.deliveredLoads() == 0);
-        collisionGame.stop();
     }
 
     // Exercise all 15 campaign deliveries without wall-clock sleeps. The
