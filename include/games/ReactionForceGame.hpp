@@ -49,6 +49,7 @@ public:
     bool hasAchievement(const QString& id) const { return m_achievements.contains(id); }
 
 protected:
+    void paintEvent(QPaintEvent* event) override;
     void initialize() override;
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
