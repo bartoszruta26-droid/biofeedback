@@ -176,6 +176,7 @@ struct ForceMetrics {
     double peakMean{0.0};
     double standardDeviation{0.0};
     double coefficientOfVariation{0.0};
+    double peakCoefficientOfVariation{0.0};
     double meanRiseMs{0.0};
     int repetitions{0};
     double durationSeconds{0.0};
@@ -236,8 +237,17 @@ ForceMetrics calculateForceMetrics(const QVector<gui::DataPoint>& points) {
     result.repetitions = peakValues.size();
     if (!peakValues.isEmpty()) {
         double peakSum = 0.0;
-        for (double value : peakValues) peakSum += value;
+        double peakSumSquares = 0.0;
+        for (double value : peakValues) {
+            peakSum += value;
+            peakSumSquares += value * value;
+        }
         result.peakMean = peakSum / peakValues.size();
+        const double peakVariance = qMax(0.0,
+            peakSumSquares / peakValues.size() - result.peakMean * result.peakMean);
+        const double peakStdDev = std::sqrt(peakVariance);
+        result.peakCoefficientOfVariation = std::abs(result.peakMean) > 1e-9
+            ? 100.0 * peakStdDev / std::abs(result.peakMean) : 0.0;
     }
     if (!riseTimes.isEmpty()) {
         double riseSum = 0.0;
@@ -300,14 +310,16 @@ QString forceMetricsHtml(const QVector<gui::DataPoint>& points) {
         "<tr><td>Średnia z wykrytych szczytów</td><td>%5 N</td></tr>"
         "<tr><td>Wykryte powtórzenia</td><td>%6</td></tr>"
         "<tr><td>Odchylenie standardowe</td><td>%7 N</td></tr>"
-        "<tr><td>Współczynnik zmienności</td><td>%8%</td></tr>"
-        "<tr><td>Średni czas narastania 10–90%</td><td>%9 ms</td></tr></table>"
+        "<tr><td>CV próbek całego przebiegu</td><td>%8%</td></tr>"
+        "<tr><td>CV szczytów powtórzeń</td><td>%9%</td></tr>"
+        "<tr><td>Średni czas narastania 10–90%</td><td>%10 ms</td></tr></table>"
         "<p><small>Wykrywanie powtórzeń: lokalne maksima z progiem amplitudy i "
         "minimalnym odstępem 300 ms. Parametry zależą od jakości próbkowania i "
         "wymagają walidacji dla danego czujnika oraz protokołu.</small></p>")
         .arg(points.size()).arg(v(m.durationSeconds)).arg(v(m.mean)).arg(v(m.peak))
         .arg(v(m.peakMean)).arg(m.repetitions).arg(v(m.standardDeviation))
-        .arg(v(m.coefficientOfVariation)).arg(v(m.meanRiseMs, 0));
+        .arg(v(m.coefficientOfVariation)).arg(v(m.peakCoefficientOfVariation))
+        .arg(v(m.meanRiseMs, 0));
 }
 
 } // namespace
@@ -889,7 +901,8 @@ void OutlineTab::setupUI()
             };
             QString report = tr("<h4>Zmiana względem zapisanych sesji</h4><table>"
                                 "<tr><th>Sesja odniesienia</th><th>Średnia siła</th>"
-                                "<th>Szczyt</th><th>CV</th><th>Czas narastania</th></tr>");
+                                "<th>Szczyt</th><th>CV próbek</th><th>CV szczytów</th>"
+                                "<th>Czas narastania</th></tr>");
             for (const auto& comparison : comparisons) {
                 const ForceMetrics& previous = comparison.second;
                 report += QString("<tr><td>%1</td><td>%2 N (%3)</td>"
@@ -900,6 +913,8 @@ void OutlineTab::setupUI()
                     .arg(previous.peak, 0, 'f', 2).arg(delta(current.peak, previous.peak))
                     .arg(previous.coefficientOfVariation, 0, 'f', 2)
                     .arg(delta(current.coefficientOfVariation, previous.coefficientOfVariation))
+                    .arg(previous.peakCoefficientOfVariation, 0, 'f', 2)
+                    .arg(delta(current.peakCoefficientOfVariation, previous.peakCoefficientOfVariation))
                     .arg(previous.meanRiseMs, 0, 'f', 0)
                     .arg(delta(current.meanRiseMs, previous.meanRiseMs));
             }
