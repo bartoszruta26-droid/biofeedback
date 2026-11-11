@@ -10,6 +10,8 @@
 4. **Pauza**, **wznowienie**, **zatrzymanie** i **reset** są obsługiwane przez wspólny interfejs modułu treningowego/silnika gry, a nie przez uniwersalny skrót klawiszowy.
 5. Jeżeli gra pokazuje komunikat o braku połączenia z czujnikiem, sprawdź połączenie urządzenia i strumień pomiarowy. Nie traktuj braku sygnału jako wartości zerowej ani jako polecenia wykonania ruchu.
 6. Po zmianie gry lub ponownym uruchomieniu sprawdź, czy gra rozpoczęła nową sesję i czy wynik/życia zostały zresetowane zgodnie z mechaniką gry.
+7. Silnik gier pracuje z docelowym krokiem symulacji i odświeżania około 90 Hz, z lekkim renderowaniem bez antyaliasingu. Faktyczna liczba wyświetlonych klatek zależy również od możliwości monitora, kompozytora pulpitu i obciążenia Raspberry Pi.
+8. Automatyczne strzały w Archer i Scorched Earth wymagają świeżych próbek tensometru. Po utracie sygnału odliczanie jest wstrzymywane i rozpoczyna się ponownie po odzyskaniu pomiaru.
 
 ## Sterowanie poszczególnymi grami
 
@@ -36,6 +38,7 @@
 **Cel:** odbijaj piłkę lewą paletką i zdobywaj punkty przeciwko paletce sterowanej przez komputer.
 
 - **Tensometr:** zmienia pionowe położenie lewej paletki. Reguluj nacisk, aby ustawić paletkę na torze piłki.
+- **Skalowanie:** wysokość i szerokość paletki, marginesy oraz prędkości są proporcjonalne do wymiarów pola gry. Rozdzielczość HD nie zmniejsza względnej szerokości paletki ani nie zwiększa względnej prędkości piłki.
 - **Wskaźniki:** wynik gracza i przeciwnika, siła wejściowa oraz poziom trudności.
 - **Klawiatura:** w wersji bazowej brak odrębnego sterowania paletką klawiszami.
 - **Punktacja:** punkt gracza jest naliczany po tym, gdy piłka minie stronę przeciwnika; odbicia od paletek i ścian nie są punktami.
@@ -87,7 +90,7 @@
 **Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego i synchronizację strzału z ruchem celu.
 
 - **Tensometr/HX711:** jest jedynym kontrolerem celowania. Wartość siły 0–100% ustawia kąt łuku; nie ma alternatywnego sterowania klawiaturą ani myszą.
-- **Automatyczny strzał:** po uruchomieniu gry pierwszy strzał następuje po 2,4 s, a następne co 2,4 s. Klawisz spacji nie wyzwala strzału.
+- **Automatyczny strzał:** po uzyskaniu świeżego sygnału pierwszy strzał następuje po 2,4 s, a następne co 2,4 s. Po utracie sygnału odliczanie zostaje wyzerowane; klawisz spacji nie wyzwala strzału.
 - **Tor lotu:** kropkowana linia pokazuje przewidywany tor strzały z uwzględnieniem grawitacji i bieżącego kąta. Jest wskazówką, a poruszający się cel może zmienić położenie przed trafieniem.
 - **Strefy celu:** zewnętrzna część tarczy daje 10 punktów, środkowa 20, a środek 30. Trafienie zwiększa prędkość celu, maksymalnie do 150 jednostek na sekundę.
 - **Statystyki:** wynik, kąt celowania, łączna liczba oddanych strzałów, trafień, pudeł i strzał w locie.
@@ -112,7 +115,7 @@
 **Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, dobierając kąt i siłę strzału oraz uwzględniając wiatr.
 
 - **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału pozostaje ustawiona na stałym, zbalansowanym poziomie.
-- **Automatyczny strzał:** po rozpoczęciu tury gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Klawiatura, mysz i spacja nie zmieniają kąta, mocy ani chwili strzału.
+- **Automatyczny strzał:** po uzyskaniu świeżego sygnału w turze gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Po utracie sygnału odliczanie rozpoczyna się od nowa. Klawiatura, mysz i spacja nie zmieniają kąta, mocy ani chwili strzału.
 - **Wskaźniki:** zdrowie obu czołgów, runda, wynik i siła/wiatr zgodnie z informacją na ekranie.
 - **Wskazówka:** wiatr wpływa na tor pocisku. Po strzale poczekaj na zakończenie lotu i ruch przeciwnika; następna tura gracza rozpoczyna nowe dwusekundowe odliczanie.
 
