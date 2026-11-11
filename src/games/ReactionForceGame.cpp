@@ -436,7 +436,7 @@ void ReactionForceGame::render(QPainter& painter)
     painter.drawText(QRectF(arena.left(), arena.center().y() - h * 0.07, arena.width(), h * 0.14),
                      Qt::AlignCenter, cue);
 
-    const QRectF forceBar(margin, h * 0.72, w - 2.0 * margin, qMax(18, h * 0.055));
+    const QRectF forceBar(margin, h * 0.72, w - 2.0 * margin, qMax(18.0, h * 0.055));
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(34, 48, 66));
     painter.drawRoundedRect(forceBar, 6, 6);
@@ -457,7 +457,7 @@ void ReactionForceGame::render(QPainter& painter)
             .arg(qRound(forceTolerancePercent())));
 
     const double windowRatio = qBound(0.0, 1.0 - m_phaseTime / qMax(0.01, reactionWindowSeconds()), 1.0);
-    const QRectF reactionTrack(margin, h * 0.86, w - 2.0 * margin, qMax(8, h * 0.025));
+    const QRectF reactionTrack(margin, h * 0.86, w - 2.0 * margin, qMax(8.0, h * 0.025));
     painter.setBrush(QColor(35, 48, 65));
     painter.drawRoundedRect(reactionTrack, 4, 4);
     painter.setBrush(m_phase == Go ? QColor(75, 220, 145) : QColor(75, 130, 175));
