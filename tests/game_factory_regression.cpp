@@ -391,6 +391,9 @@ int main(int argc, char **argv)
     const float defaultSpeed = flappyGame->getGameSpeed();
     flappyGame->resize(640, 480);
     flappyGame->start();
+    QKeyEvent flappySpace(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QApplication::sendEvent(flappyGame, &flappySpace);
+    REQUIRE(std::abs(flappyGame->birdVerticalVelocity()) < 1e-9);
     flappyGame->update(std::numeric_limits<double>::max());
     REQUIRE(flappyGame->isRunning());
     flappyGame->update(std::numeric_limits<double>::quiet_NaN());
@@ -473,6 +476,12 @@ int main(int argc, char **argv)
     galagaPulseGame->resize(640, 480);
     galagaPulseGame->start();
     REQUIRE(galagaPulseGame->specialCharges() == 2);
+    QKeyEvent galagaSpace(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
+    QKeyEvent galagaX(QEvent::KeyPress, Qt::Key_X, Qt::NoModifier);
+    QApplication::sendEvent(galagaPulseGame, &galagaSpace);
+    QApplication::sendEvent(galagaPulseGame, &galagaX);
+    REQUIRE(galagaPulseGame->specialCharges() == 2);
+    REQUIRE(galagaPulseGame->activeProjectileCount() == 0);
     for (int sample = 0; sample < 6; ++sample) {
         galagaPulseGame->handleSensorInput(98.0);
         waitForEvents(100);
