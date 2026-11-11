@@ -479,9 +479,12 @@ int main(int argc, char **argv)
     archerGame->handleSensorInput(80.0);
     QKeyEvent archerFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(archerGame, &archerFire);
-    waitForEvents(900);
+    waitForEvents(350);
+    REQUIRE(archerGame->shotsFired() == 0); // Keyboard input must not release an arrow.
+    waitForEvents(3200); // Automatic release follows the 2.4 s sensor-control interval.
     REQUIRE(archerGame->isRunning());
-    REQUIRE(archerGame->getScore() >= 10); // The aimed arrow must hit the target.
+    REQUIRE(archerGame->shotsFired() >= 1);
+    REQUIRE(archerGame->getScore() >= 10); // The aimed automatic arrow must hit the target.
     REQUIRE(archerGame->targetSpeed() > 55.0); // Successful hits increase target difficulty.
     archerGame->resize(180, 120);
     waitForEvents(80);
@@ -498,9 +501,7 @@ int main(int argc, char **argv)
     archerMissGame->resize(640, 480);
     archerMissGame->start();
     archerMissGame->handleSensorInput(0.0);
-    QKeyEvent archerMissFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
-    QApplication::sendEvent(archerMissGame, &archerMissFire);
-    waitForEvents(1200);
+    waitForEvents(3500); // The low sensor setting is released automatically after the timer.
     REQUIRE(archerMissGame->getScore() == 0);
     REQUIRE(archerMissGame->activeArrowCount() == 0);
     archerMissGame->stop();
@@ -587,8 +588,8 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->terrainPointCount() > 1);
     scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
-    QApplication::sendEvent(scorchedGame, &artilleryFire);
-    waitForEvents(2200); // Let the undisturbed ballistic trajectory resolve before testing resize.
+    QApplication::sendEvent(scorchedGame, &artilleryFire); // Must not trigger a manual shot.
+    waitForEvents(4500); // Automatic release plus the full ballistic flight.
     REQUIRE(scorchedGame->isRunning());
     REQUIRE(scorchedGame->enemyHealth() < 100); // A real tank hit must apply damage.
     REQUIRE(scorchedGame->playerHealth() > 0);
