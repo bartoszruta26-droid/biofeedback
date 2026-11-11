@@ -12,6 +12,7 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QKeyEvent>
+#include <QWheelEvent>
 #include <QStringList>
 #include <cstdio>
 #include <cstdlib>
@@ -310,6 +311,11 @@ int main(int argc, char **argv)
     scorchedGame->handleSensorInput(40.0);
     REQUIRE(scorchedGame->trajectoryPreviewPointCount() > 0);
     const double initialShotPower = scorchedGame->shotPower();
+    QWheelEvent powerWheel(QPointF(320.0, 240.0), QPointF(320.0, 240.0),
+                           QPoint(), QPoint(0, 120), Qt::NoButton, Qt::NoModifier,
+                           Qt::NoScrollPhase, false);
+    QApplication::sendEvent(scorchedGame, &powerWheel);
+    REQUIRE(scorchedGame->shotPower() > initialShotPower);
     QKeyEvent powerUp(QEvent::KeyPress, Qt::Key_Plus, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &powerUp);
     REQUIRE(scorchedGame->shotPower() > initialShotPower);
