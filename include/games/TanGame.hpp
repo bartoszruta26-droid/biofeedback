@@ -40,6 +40,7 @@ protected:
     void initialize() override;
     void resizeEvent(QResizeEvent* event) override;
     void render(QPainter& painter) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
     bool handleInput(double value) override;
 
 private:
@@ -56,6 +57,9 @@ private:
     double m_targetY;
     double m_phase;
     double m_cursorY;
+    double m_previousPhase{0.0};
+    double m_previousCursorY{0.0};
+    double m_previousTargetY{0.0};
     bool m_isHit;
     bool m_nearAsymptote;
 
