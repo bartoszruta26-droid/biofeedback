@@ -832,11 +832,13 @@ int main(int argc, char **argv)
         games::RhythmForceGameTestAccess::targetForce(*rhythm, 3));
     REQUIRE(rhythm->missCount() == 1);
     REQUIRE(rhythm->combo() == 0);
+    REQUIRE(rhythm->nextBeatNumber() == 4);
+    const double fourthBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 4);
     games::RhythmForceGameTestAccess::setClock(
-        *rhythm, thirdBeat + 0.24);
+        *rhythm, fourthBeat + 0.24);
     games::RhythmForceGameTestAccess::advance(*rhythm, 0.01);
     REQUIRE(rhythm->missCount() == 2);
-    REQUIRE(rhythm->nextBeatNumber() == 4);
+    REQUIRE(rhythm->nextBeatNumber() == 5);
     REQUIRE(rhythm->accuracyPercent() > 0.0);
     rhythm->setDifficultyLevel(99);
     REQUIRE(rhythm->difficultyLevel() == 5);
