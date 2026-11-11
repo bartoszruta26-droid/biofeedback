@@ -290,8 +290,7 @@ int main(int argc, char **argv)
     carRaceGameOverInstance->handleSensorInput(0.0); // Second obstacle: left lane.
     waitForEvents(1100);
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 1);
-    // Let the 1.1 s post-collision protection expire before the third obstacle
-    // reaches the player; otherwise a legitimate protected pass is ignored.
+    // Allow the collision-protection window to expire before exposing the next lane.
     waitForEvents(1200);
     carRaceGameOverInstance->handleSensorInput(99.0); // Third obstacle: right lane.
     waitForEvents(1900);
