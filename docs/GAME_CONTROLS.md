@@ -144,6 +144,8 @@
 | Archer | kąt celowania 0–100% | automatyczny strzał co 2,4 s |
 | Galaga | pozioma pozycja statku | automatyczny ogień, gest 95% i zwolnienie — EMP |
 | Scorched Earth | kąt działa | automatyczny strzał po 2 s |
+| Precision Crane | aktualna oś: pozycja wózka lub wysokość haka | gesty chwytu/zwolnienia i zmiany osi |
+| Reaction Force | impuls siły w paśmie celu | czas reakcji, automatyczny harmonogram bodźców |
 
 ## Uwaga o wersjach i rozszerzeniach
 
