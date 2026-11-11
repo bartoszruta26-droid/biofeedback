@@ -26,6 +26,8 @@ public:
     int livesRemaining() const { return m_lives; }
     int currentWave() const { return m_wave; }
     int activeEnemyCount() const;
+    int activeProjectileCount() const;
+    double playerPositionX() const { return m_player.center().x(); }
     double hitProtectionRemaining() const { return m_hitCooldown; }
 
 protected:
@@ -40,6 +42,7 @@ protected:
 private:
     struct Projectile {
         QRectF rect;
+        double velocityX;
         double velocityY;
         bool fromPlayer;
     };
@@ -65,6 +68,7 @@ private:
     int m_lives;
     int m_wave;
     bool m_fireHeld;
+    double m_backgroundOffset;
     std::shared_ptr<sensor::SerialCommunication> m_serialPort;
 };
 

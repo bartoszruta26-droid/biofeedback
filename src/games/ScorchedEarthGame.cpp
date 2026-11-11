@@ -1,5 +1,6 @@
 #include "games/ScorchedEarthGame.hpp"
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QResizeEvent>
 #include <QPainter>
 #include <QLinearGradient>
@@ -22,6 +23,7 @@ ScorchedEarthGame::ScorchedEarthGame(QWidget *parent)
     , m_playerTurn(true)
 {
     setFocusPolicy(Qt::StrongFocus);
+    setMouseTracking(true);
 }
 
 QString ScorchedEarthGame::gameName() const
@@ -115,6 +117,8 @@ void ScorchedEarthGame::updateTankPositions()
 
 bool ScorchedEarthGame::handleInput(double value)
 {
+    if (!std::isfinite(value))
+        return false;
     const double normalized = qBound(0.0, value / 100.0, 1.0);
     m_aimDegrees = 15.0 + normalized * 65.0;
     return true;
@@ -134,6 +138,30 @@ void ScorchedEarthGame::keyPressEvent(QKeyEvent* event)
         fireProjectile(true);
     else
         GameEngine::keyPressEvent(event);
+}
+
+void ScorchedEarthGame::mouseMoveEvent(QMouseEvent* event)
+{
+    const QPointF origin(m_playerTank.right(), m_playerTank.top() + 2.0);
+    const QPointF cursor = event->localPos();
+    const double dx = cursor.x() - origin.x();
+    const double dy = origin.y() - cursor.y();
+    if (dx > 1.0)
+        m_aimDegrees = qBound(10.0,
+            std::atan2(dy, dx) * 180.0 / 3.14159265358979323846, 85.0);
+    event->accept();
+}
+
+void ScorchedEarthGame::mousePressEvent(QMouseEvent* event)
+{
+    if (event->button() == Qt::LeftButton) {
+        setFocus(Qt::MouseFocusReason);
+        if (m_playerTurn)
+            fireProjectile(true);
+        event->accept();
+        return;
+    }
+    QWidget::mousePressEvent(event);
 }
 
 void ScorchedEarthGame::fireProjectile(bool playerOwned)
@@ -302,9 +330,11 @@ void ScorchedEarthGame::render(QPainter& painter)
     painter.drawText(14, 46, QStringLiteral("Twoje HP: %1").arg(m_playerHealth));
     painter.drawText(width() - 150, 24, QStringLiteral("Wróg HP: %1").arg(m_enemyHealth));
     painter.drawText(width() - 150, 46, QStringLiteral("Runda: %1").arg(m_round));
+    painter.drawText(width() / 2 - 65, 24, QStringLiteral("Moc: %1%").arg(qRound(m_power * 100.0)));
+    painter.drawText(width() / 2 - 65, 46, m_playerTurn ? QStringLiteral("TWOJA TURA") : QStringLiteral("RUCH PRZECIWNIKA"));
     painter.setFont(QFont(QStringLiteral("Arial"), 10));
     painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik/kursor: kąt | +/-: siła | SPACJA: strzał | Wiatr: %1")
+        QStringLiteral("Czujnik / mysz: kąt | +/-: moc | Klik / SPACJA: strzał | Wiatr: %1")
             .arg(qRound(m_wind)));
 }
 

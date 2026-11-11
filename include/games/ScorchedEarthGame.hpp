@@ -8,6 +8,7 @@
 #include <QVector>
 
 class QKeyEvent;
+class QMouseEvent;
 class QResizeEvent;
 
 namespace games {
@@ -23,6 +24,9 @@ public:
     int enemyHealth() const { return m_enemyHealth; }
     int currentRound() const { return m_round; }
     int terrainPointCount() const { return m_terrain.size(); }
+    double aimDegrees() const { return m_aimDegrees; }
+    double shotPower() const { return m_power; }
+    int activeProjectileCount() const { return m_projectiles.size(); }
 
 protected:
     void initialize() override;
@@ -31,6 +35,8 @@ protected:
     bool handleInput(double value) override;
     void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
+    void mouseMoveEvent(QMouseEvent* event) override;
+    void mousePressEvent(QMouseEvent* event) override;
 
 private:
     struct Projectile {
