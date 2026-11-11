@@ -84,6 +84,11 @@ struct RhythmForceGameTestAccess
         game.handleInput(0.0);
     }
 
+    static void advance(RhythmForceGame& game, double deltaTime)
+    {
+        game.update(deltaTime);
+    }
+
     static void setClock(RhythmForceGame& game, double songTime)
     {
         game.m_songTime = songTime;
@@ -829,7 +834,7 @@ int main(int argc, char **argv)
     REQUIRE(rhythm->combo() == 0);
     games::RhythmForceGameTestAccess::setClock(
         *rhythm, thirdBeat + 0.24);
-    rhythm->update(0.01);
+    games::RhythmForceGameTestAccess::advance(*rhythm, 0.01);
     REQUIRE(rhythm->missCount() == 2);
     REQUIRE(rhythm->nextBeatNumber() == 4);
     REQUIRE(rhythm->accuracyPercent() > 0.0);
@@ -849,11 +854,11 @@ int main(int argc, char **argv)
     rhythmSafety->handleSensorInput(68.0);
     REQUIRE(rhythmSafety->pulseActive());
     for (int step = 0; step < 4; ++step)
-        rhythmSafety->update(0.10);
+        games::RhythmForceGameTestAccess::advance(*rhythmSafety, 0.10);
     REQUIRE(!rhythmSafety->hasFreshSignal());
     REQUIRE(!rhythmSafety->pulseActive());
     const double frozenRhythmTime = rhythmSafety->songTimeSeconds();
-    rhythmSafety->update(0.10);
+    games::RhythmForceGameTestAccess::advance(*rhythmSafety, 0.10);
     REQUIRE(std::abs(rhythmSafety->songTimeSeconds() - frozenRhythmTime) < 0.001);
     rhythmSafety->handleSensorInput(90.0);
     REQUIRE(!rhythmSafety->pulseActive());
