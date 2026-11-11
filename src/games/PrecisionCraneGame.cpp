@@ -46,6 +46,10 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_collisionCount(0)
     , m_bestScore(0)
     , m_precisionSamples(0)
+    , m_lifetimeDeliveries(0)
+    , m_lifetimePrecisionTotal(0)
+    , m_lifetimePrecisionSamples(0)
+    , m_lifetimeCollisions(0)
     , m_cargoType(StandardCargo)
     , m_campaignCompleted(false)
     , m_axis(HorizontalAxis)
@@ -215,6 +219,9 @@ void PrecisionCraneGame::deliverOrDropLoad()
         m_lastPrecisionBonus = qRound(precision * 100.0);
         m_precisionTotal += m_lastPrecisionBonus;
         ++m_precisionSamples;
+        ++m_lifetimeDeliveries;
+        m_lifetimePrecisionTotal += m_lastPrecisionBonus;
+        ++m_lifetimePrecisionSamples;
         ++m_delivered;
         m_missionIndex = m_delivered / 3;
         saveRecords();
@@ -289,6 +296,8 @@ void PrecisionCraneGame::update(double deltaTime)
         m_loadAttached = false;
         m_cargoX = qBound(0.08, (m_carriageX + m_sway) / qMax(1, width()), 0.92);
         ++m_collisionCount;
+        ++m_lifetimeCollisions;
+        saveRecords();
         --m_mistakesRemaining;
         m_combo = 0;
         m_swayVelocity = 0.0;
@@ -359,6 +368,10 @@ void PrecisionCraneGame::loadRecords()
     if (!document.isObject()) return;
     const QJsonObject record = document.object();
     m_bestScore = qMax(0, record.value(QStringLiteral("bestScore")).toInt());
+    m_lifetimeDeliveries = qMax(0, record.value(QStringLiteral("totalDeliveries")).toInt());
+    m_lifetimePrecisionTotal = qMax(0, record.value(QStringLiteral("precisionTotal")).toInt());
+    m_lifetimePrecisionSamples = qMax(0, record.value(QStringLiteral("precisionSamples")).toInt());
+    m_lifetimeCollisions = qMax(0, record.value(QStringLiteral("totalCollisions")).toInt());
 }
 
 void PrecisionCraneGame::saveRecords()
@@ -370,9 +383,12 @@ void PrecisionCraneGame::saveRecords()
     QJsonObject record;
     record.insert(QStringLiteral("schemaVersion"), 1);
     record.insert(QStringLiteral("bestScore"), m_bestScore);
-    record.insert(QStringLiteral("totalDeliveries"), m_delivered);
-    record.insert(QStringLiteral("averagePrecision"), averagePrecision());
-    record.insert(QStringLiteral("collisionCount"), m_collisionCount);
+    record.insert(QStringLiteral("totalDeliveries"), m_lifetimeDeliveries);
+    record.insert(QStringLiteral("precisionTotal"), m_lifetimePrecisionTotal);
+    record.insert(QStringLiteral("precisionSamples"), m_lifetimePrecisionSamples);
+    record.insert(QStringLiteral("averagePrecision"), m_lifetimePrecisionSamples > 0
+        ? static_cast<double>(m_lifetimePrecisionTotal) / m_lifetimePrecisionSamples : 0.0);
+    record.insert(QStringLiteral("totalCollisions"), m_lifetimeCollisions);
     QSaveFile file(path);
     if (!file.open(QIODevice::WriteOnly)) return;
     file.write(QJsonDocument(record).toJson(QJsonDocument::Indented));
