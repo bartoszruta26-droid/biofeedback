@@ -222,7 +222,7 @@ int main(int argc, char **argv)
     balance->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     REQUIRE(balance->hasFreshSignal());
     // Complete the three-round campaign with centred placements.
-    for (int block = 0; block < 10; ++block)
+    for (int block = 0; block < 11; ++block)
         games::BalanceTowerGameTestAccess::placeBlock(*balance);
     REQUIRE(balance->placedBlocks() == 1);
     for (int block = 0; block < 12; ++block)
