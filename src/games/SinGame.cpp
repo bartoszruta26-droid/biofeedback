@@ -27,6 +27,9 @@ SinGame::SinGame(QWidget *parent)
     , m_scoreFraction(0.0)
     , m_comboSeconds(0.0)
     , m_combo(0)
+    , m_bestCombo(0)
+    , m_perfectStreak(0)
+    , m_lastAccuracy(0.0)
     , m_lastDistance(0.0)
     , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
     , m_calibrationMinimum(0.0)
@@ -64,6 +67,9 @@ void SinGame::initialize()
     m_scoreFraction = 0.0;
     m_comboSeconds = 0.0;
     m_combo = 0;
+    m_bestCombo = 0;
+    m_perfectStreak = 0;
+    m_lastAccuracy = 0.0;
     m_lastDistance = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     m_sessionSeconds = 0.0;
@@ -110,7 +116,7 @@ double SinGame::normalizedForce() const { return m_currentForce; }
 
 void SinGame::setWaveformMode(int mode)
 {
-    m_waveformMode = qBound(0, mode, 2);
+    m_waveformMode = qBound(0, mode, 4);
     m_combo = 0;
     m_comboSeconds = 0.0;
     m_feedbackText = m_waveformMode == 0 ? QStringLiteral("Tryb: fala sinusoidalna")
@@ -126,35 +132,6 @@ void SinGame::setAutomaticDifficulty(bool enabled)
     m_accuracyWindowHitSeconds = 0.0;
 }
 bool SinGame::automaticDifficulty() const { return m_automaticDifficulty; }
-
-void SinGame::keyPressEvent(QKeyEvent* event)
-{
-    if (!event || event->isAutoRepeat()) {
-        if (event) event->accept();
-        return;
-    }
-    switch (event->key()) {
-        case Qt::Key_1: setWaveformMode(0); break;
-        case Qt::Key_2: setWaveformMode(1); break;
-        case Qt::Key_3: setWaveformMode(2); break;
-        case Qt::Key_Plus:
-        case Qt::Key_Equal:
-        case Qt::Key_Up: setDifficultyLevel(m_difficultyLevel + 1); break;
-        case Qt::Key_Minus:
-        case Qt::Key_Down: setDifficultyLevel(m_difficultyLevel - 1); break;
-        case Qt::Key_A: setAutomaticDifficulty(!m_automaticDifficulty); break;
-        case Qt::Key_BracketLeft:
-            if (m_lastRawForce < m_calibrationMaximum)
-                setForceCalibration(m_lastRawForce, m_calibrationMaximum);
-            break;
-        case Qt::Key_BracketRight:
-            if (m_lastRawForce > m_calibrationMinimum)
-                setForceCalibration(m_calibrationMinimum, m_lastRawForce);
-            break;
-        default: QWidget::keyPressEvent(event); return;
-    }
-    event->accept();
-}
 
 void SinGame::resizeEvent(QResizeEvent* event)
 {
@@ -182,6 +159,12 @@ double SinGame::waveformValue(double phase) const
         const double limit = std::tanh(2.2);
         return std::tanh(2.2 * sine) / limit;
     }
+    if (m_waveformMode == 3) {
+        const double cycle = phase / (2.0 * 3.14159265358979323846);
+        return 2.0 * (cycle - std::floor(cycle + 0.5));
+    }
+    if (m_waveformMode == 4)
+        return sine >= 0.0 ? 0.72 : -0.72;
     return sine;
 }
 
@@ -315,6 +298,7 @@ void SinGame::update(double deltaTime)
         m_isHit = false;
         m_comboSeconds = 0.0;
         m_combo = 0;
+        m_perfectStreak = 0;
         m_feedbackText = QStringLiteral("Brak aktualnego sygnału — sprawdź czujnik");
         return;
     }
@@ -325,9 +309,14 @@ void SinGame::update(double deltaTime)
         m_accuracyWindowHitSeconds += dt;
         m_timeInTarget += dt;
         m_comboSeconds += dt;
-        m_combo = qMin(5, 1 + static_cast<int>(m_comboSeconds / 2.0));
+        m_combo = qMin(10, 1 + static_cast<int>(m_comboSeconds / 1.5));
+        m_bestCombo = qMax(m_bestCombo, m_combo);
         const double accuracy = qBound(0.0, 1.0 - m_lastDistance / m_tolerance, 1.0);
-        const double pointsPerSecond = 2.0 + 4.0 * accuracy + 0.5 * m_combo;
+        m_lastAccuracy = accuracy;
+        if (accuracy >= 0.90) ++m_perfectStreak;
+        else m_perfectStreak = 0;
+        const double precisionBonus = m_perfectStreak >= 5 ? 1.8 : (m_perfectStreak >= 3 ? 1.4 : 1.0);
+        const double pointsPerSecond = (2.0 + 5.0 * accuracy + 0.65 * m_combo) * precisionBonus;
         m_scoreFraction += pointsPerSecond * dt;
         const int earned = static_cast<int>(m_scoreFraction);
         if (earned > 0) {
@@ -340,6 +329,8 @@ void SinGame::update(double deltaTime)
     } else {
         m_comboSeconds = 0.0;
         m_combo = 0;
+        m_perfectStreak = 0;
+        m_lastAccuracy = 0.0;
         m_feedbackText = m_cursorY > m_targetY
             ? QStringLiteral("Zwiększ siłę")
             : QStringLiteral("Zmniejsz siłę");
@@ -394,7 +385,7 @@ void SinGame::render(QPainter& painter)
     }
     for (int x = w; x >= 0; --x) {
         const double target = centerY +
-            std::sin(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
+            waveformValue(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
         targetBand.lineTo(x, target + band);
     }
     targetBand.closeSubpath();
@@ -444,17 +435,19 @@ void SinGame::render(QPainter& painter)
     const double accuracyPercent = m_sessionSeconds > 0.0
         ? 100.0 * m_timeInTarget / m_sessionSeconds : 0.0;
     const QString modeName = m_waveformMode == 0 ? QStringLiteral("SINUS")
-        : (m_waveformMode == 1 ? QStringLiteral("TRÓJKĄT") : QStringLiteral("PLATEAU"));
+        : (m_waveformMode == 1 ? QStringLiteral("TRÓJKĄT")
+        : (m_waveformMode == 2 ? QStringLiteral("PLATEAU")
+        : (m_waveformMode == 3 ? QStringLiteral("PIŁOKSZTAŁT") : QStringLiteral("IMPULS"))));
     painter.drawText(QRect(margin, h - 78, w - 2 * margin, 22),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3    Cel: %4%")
+        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3    Rekord serii: x%4    Cel: %5%")
             .arg(static_cast<int>(std::round(m_currentForce * 100.0)))
-            .arg(getScore()).arg(m_combo)
+            .arg(getScore()).arg(m_combo).arg(m_bestCombo)
             .arg(static_cast<int>(std::round(accuracyPercent))));
 
     painter.drawText(QRect(margin, h - 52, w - 2 * margin, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("%1 | Kalibracja: %2–%3 | Auto: %4 | 1-3: tryb, +/-: trudność, A: auto, [: min, ]: max")
+        QStringLiteral("%1 | Kalibracja: %2–%3 | Auto: %4 | Tryby i trudność ustaw przed sesją")
             .arg(modeName)
             .arg(m_calibrationMinimum, 0, 'f', 1)
             .arg(m_calibrationMaximum, 0, 'f', 1)
