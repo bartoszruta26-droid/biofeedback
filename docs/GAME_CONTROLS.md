@@ -136,3 +136,27 @@
 Niektóre usprawnienia sterowania są rozwijane w osobnych gałęziach i PR-ach. Dopóki nie zostaną scalone z gałęzią integracyjną, nie należy traktować ich jako dostępnych w tej wersji aplikacji. Dotyczy to między innymi dodatkowych skrótów kalibracji, adaptacyjnej trudności, alternatywnych przebiegów ćwiczeń oraz sterowania myszą w wybranych grach.
 
 Przy zmianie sterowania w kodzie należy zaktualizować ten plik oraz teksty instruktażowe wyświetlane bezpośrednio w grze. Każdy skrót powinien mieć test regresyjny, a opis powinien odpowiadać faktycznej implementacji.
+
+
+### 11. Precision Crane — Precyzyjny dźwig
+
+**Cel:** przenieś ładunek z miejsca odbioru do oznaczonej strefy i odłóż go precyzyjnie.
+
+- **Jedyny kontroler:** jeden tensometr/HX711, skalibrowany do zakresu siły 0–100%.
+- **Ruch poziomy i pionowy:** roboczy zakres 0–70% siły steruje płynnie aktualnie wybraną osią. Oś pozioma przesuwa wózek suwnicy, a pionowa reguluje wysokość haka.
+- **Zmiana osi:** przytrzymaj siłę co najmniej 82% przez minimum 0,85 s i zwolnij do 18% lub mniej. Zmienia się aktywna oś.
+- **Chwyt i zwolnienie:** impuls siły co najmniej 82% trwający od 0,15 do 0,85 s, zakończony zwolnieniem do 18% lub mniej, przełącza chwyt/zwolnienie. Hak musi znajdować się w pobliżu ładunku, aby go podnieść.
+- **Punktacja:** poprawna dostawa daje punkty i zwiększa serię. Zwolnienie poza strefą celu zużywa jedną z trzech prób. Co cztery dostawy wzrasta trudność.
+- **Brak sygnału:** po 350 ms bez świeżej próbki sterowanie jest wstrzymywane. Klawiatura, mysz, dotyk i gamepad nie sterują rozgrywką.
+
+
+### 11. Precision Crane — Precyzyjny dźwig
+
+**Cel:** przenieś ładunek z miejsca odbioru do oznaczonej strefy i odłóż go precyzyjnie.
+
+- **Jedyny kontroler:** jeden tensometr/HX711, skalibrowany do zakresu siły 0–100%.
+- **Ruch poziomy i pionowy:** roboczy zakres 0–70% siły steruje płynnie aktualnie wybraną osią. Oś pozioma przesuwa wózek suwnicy, a pionowa reguluje wysokość haka.
+- **Zmiana osi:** przytrzymaj siłę co najmniej 82% przez minimum 0,85 s i zwolnij do 18% lub mniej. Zmienia się aktywna oś.
+- **Chwyt i zwolnienie:** impuls siły co najmniej 82% trwający od 0,15 do 0,85 s, zakończony zwolnieniem do 18% lub mniej, przełącza chwyt/zwolnienie. Hak musi znajdować się w pobliżu ładunku, aby go podnieść.
+- **Punktacja:** poprawna dostawa daje punkty i zwiększa serię. Zwolnienie poza strefą celu zużywa jedną z trzech prób. Co cztery dostawy wzrasta trudność.
+- **Brak sygnału:** po 350 ms bez świeżej próbki sterowanie jest wstrzymywane. Klawiatura, mysz, dotyk i gamepad nie sterują rozgrywką.

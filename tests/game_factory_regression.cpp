@@ -8,6 +8,7 @@
 #include "games/ArcherGame.hpp"
 #include "games/CarRaceGame.hpp"
 #include "games/ScorchedEarthGame.hpp"
+#include "games/PrecisionCraneGame.hpp"
 #include <QApplication>
 #include <QEventLoop>
 #include <QTimer>
@@ -47,7 +48,8 @@ int main(int argc, char **argv)
         QStringLiteral("galaga"),
         QStringLiteral("archer"),
         QStringLiteral("car_race"),
-        QStringLiteral("scorched_earth")
+        QStringLiteral("scorched_earth"),
+        QStringLiteral("precision_crane")
     };
 
     for (const QString& id : ids) {
@@ -376,6 +378,93 @@ int main(int argc, char **argv)
     marioReset->start();
     REQUIRE(marioReset->isRunning());
     marioReset->stop();
+
+    // Precision Crane uses one continuous force channel and time-coded gestures.
+    std::unique_ptr<games::GameEngine> craneBase(
+        games::createGame(QStringLiteral("precision_crane")));
+    auto* crane = dynamic_cast<games::PrecisionCraneGame*>(craneBase.get());
+    REQUIRE(crane != nullptr);
+    REQUIRE(crane->gameName().contains(QStringLiteral("Precision Crane")));
+    crane->setDifficultyLevel(5);
+    REQUIRE(crane->difficultyLevel() == 5);
+    crane->setDifficultyLevel(0);
+    REQUIRE(crane->difficultyLevel() == 1);
+    crane->resize(640, 480);
+    crane->start();
+    REQUIRE(crane->isRunning());
+    REQUIRE(crane->controlAxis() == games::PrecisionCraneGame::HorizontalAxis);
+    const double initialCarriage = crane->carriagePosition();
+    for (int i = 0; i < 5; ++i) {
+        crane->handleSensorInput(65.0);
+        waitForEvents(35);
+    }
+    REQUIRE(crane->normalizedForce() > 0.60);
+    REQUIRE(crane->carriagePosition() > initialCarriage);
+    // A sustained high-force hold followed by release changes the active axis.
+    for (int i = 0; i < 14; ++i) {
+        crane->handleSensorInput(90.0);
+        waitForEvents(80);
+    }
+    crane->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(crane->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
+    const double hookBefore = crane->hookPosition();
+    for (int i = 0; i < 5; ++i) {
+        crane->handleSensorInput(65.0);
+        waitForEvents(35);
+    }
+    REQUIRE(crane->hookPosition() > hookBefore);
+    crane->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    crane->handleSensorInput(std::numeric_limits<double>::infinity());
+    REQUIRE(crane->isRunning());
+    crane->resize(180, 120);
+    waitForEvents(60);
+    REQUIRE(crane->isRunning());
+    crane->resize(640, 480);
+    waitForEvents(60);
+    REQUIRE(crane->isRunning());
+    crane->stop();
+    REQUIRE(!crane->isRunning());
+
+    // End-to-end single-sensor delivery: align, lower, grip, transfer, lower and release.
+    std::unique_ptr<games::GameEngine> craneDeliveryBase(
+        games::createGame(QStringLiteral("precision_crane")));
+    auto* craneDelivery = dynamic_cast<games::PrecisionCraneGame*>(craneDeliveryBase.get());
+    REQUIRE(craneDelivery != nullptr);
+    craneDelivery->resize(640, 480);
+    craneDelivery->start();
+    const auto driveCrane = [craneDelivery](double force, int milliseconds) {
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += 80) {
+            craneDelivery->handleSensorInput(force);
+            waitForEvents(80);
+        }
+    };
+    driveCrane(25.43, 1200); // Align trolley with the first cargo.
+    driveCrane(90.0, 1120);   // Long gesture selects vertical axis.
+    craneDelivery->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
+    driveCrane(65.0, 1120);  // Lower the hook to the cargo.
+    driveCrane(90.0, 320);   // Short gesture grips the cargo.
+    craneDelivery->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(craneDelivery->loadAttached());
+    driveCrane(90.0, 1120);  // Long gesture selects horizontal axis.
+    craneDelivery->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::HorizontalAxis);
+    driveCrane(60.10, 1200); // Move above the delivery bay.
+    driveCrane(90.0, 1120);  // Return to vertical control.
+    craneDelivery->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(craneDelivery->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
+    driveCrane(65.0, 1120);  // Lower the cargo into the bay.
+    driveCrane(90.0, 320);   // Release the load.
+    craneDelivery->handleSensorInput(0.0);
+    waitForEvents(80);
+    REQUIRE(craneDelivery->deliveredLoads() == 1);
+    REQUIRE(craneDelivery->getScore() > 0);
+    craneDelivery->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
