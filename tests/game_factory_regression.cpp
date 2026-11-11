@@ -180,13 +180,14 @@ int main(int argc, char **argv)
         REQUIRE(!game->isRunning());
     }
 
-    // One-axis force steering, neutral rearming and fail-closed timeout.
+    // One-axis force steering, wide dead zone, hand switching and fail-closed timeout.
     std::unique_ptr<games::GameEngine> forceMazeBase(games::createGame(QStringLiteral("force_maze")));
     auto* forceMaze = dynamic_cast<games::ForceMazeGame*>(forceMazeBase.get());
     REQUIRE(forceMaze != nullptr);
     REQUIRE(forceMaze->gameName().contains(QStringLiteral("Force Maze")));
     forceMaze->resize(640, 480);
     forceMaze->start();
+    forceMaze->setLeftHanded(false); // Keep the regression independent of saved user preference.
     REQUIRE(forceMaze->awaitingNeutral());
     forceMaze->handleSensorInput(20.0);
     REQUIRE(!forceMaze->awaitingNeutral());
