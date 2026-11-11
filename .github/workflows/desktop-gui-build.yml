@@ -34,11 +34,18 @@ jobs:
         uses: actions/checkout@v4
       - name: Install full desktop dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential cmake pkg-config git \
-            qtbase5-dev qtbase5-dev-tools libqt5charts5-dev \
-            libserialport-dev nlohmann-json3-dev libssl-dev libncurses-dev
+          for attempt in 1 2 3 4; do
+            if sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update &&
+               sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y \\
+                 build-essential cmake pkg-config git \\
+                 qtbase5-dev qtbase5-dev-tools libqt5charts5-dev \\
+                 libserialport-dev nlohmann-json3-dev libssl-dev libncurses-dev; then
+              exit 0
+            fi
+            echo "APT attempt $attempt failed; retrying after transient repository/network failure"
+            sleep $((attempt * 10))
+          done
+          exit 1
       - name: Validate Linux packaging scripts
         run: bash -n packaging/linux/run.sh packaging/linux/install.sh packaging/linux/uninstall.sh
       - name: Configure
