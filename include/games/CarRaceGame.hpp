@@ -22,6 +22,7 @@ public:
     int currentLane() const { return m_lane; }
     bool boostActive() const { return m_boostTimer > 0.0; }
     double boostCooldownRemaining() const { return m_boostCooldown; }
+    double collisionProtectionRemaining() const { return m_collisionTimer; }
 
 protected:
     void initialize() override;
