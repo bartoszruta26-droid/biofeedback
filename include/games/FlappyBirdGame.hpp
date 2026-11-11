@@ -8,8 +8,6 @@
 #include <vector>
 #include <memory>
 
-class QKeyEvent;
-class QMouseEvent;
 
 class QResizeEvent;
 class QPaintEvent;
@@ -129,8 +127,6 @@ private slots:
 protected:
     void resizeEvent(QResizeEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
-    void keyPressEvent(QKeyEvent* event) override;
-    void mousePressEvent(QMouseEvent* event) override;
 
 private:
     // Struktura reprezentująca przeszkodę (gałęzie drzewa)
