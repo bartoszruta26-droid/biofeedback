@@ -54,6 +54,7 @@ private:
     double m_force;
     double m_aimAngle;
     double m_targetDirection;
+    double m_targetDirectionX{1.0};
     double m_targetSpeed;
     double m_gravity;
     double m_fireCooldown;
