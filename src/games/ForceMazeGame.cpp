@@ -80,6 +80,12 @@ void ForceMazeGame::initialize()
     m_lives = 3;
     m_crystals = 0;
     m_totalCrystals = 0;
+    for (int level = 1; level <= kCampaignLevels; ++level) {
+        for (int row = 0; row < kRowsPerLevel; ++row) {
+            if ((row + level * 2) % 3 == 1)
+                ++m_totalCrystals;
+        }
+    }
     m_checkpoints = 0;
     m_lastProcessedRow = -1;
     m_progressRows = 0.0;
@@ -199,6 +205,18 @@ void ForceMazeGame::hitWall(int row)
 
 void ForceMazeGame::processRowCrossing(int row)
 {
+    const int center = corridorCenter(row);
+    const bool gateRow = (row % 6) == 4;
+    if (gateRow && std::abs(m_playerColumn - static_cast<double>(center)) > 0.62) {
+        hitWall(row);
+        return;
+    }
+    const bool hazardRow = ((row + m_level) % 4) == 2;
+    const int hazardColumn = center + (((row / 4) % 2) == 0 ? -1 : 1);
+    if (hazardRow && std::abs(m_playerColumn - static_cast<double>(hazardColumn)) < 0.48) {
+        hitWall(row);
+        return;
+    }
     if (!corridorContains(m_playerColumn, row)) {
         hitWall(row);
         return;
@@ -338,6 +356,28 @@ void ForceMazeGame::render(QPainter &painter)
             painter.drawPolygon(gem);
         }
 
+        if (((row + m_level) % 4) == 2) {
+            const int hazardColumn = center + (((row / 4) % 2) == 0 ? -1 : 1);
+            const QPointF hazard(board.left() + (hazardColumn + 0.5) * cellW,
+                                 y + cellH * 0.5);
+            QPolygonF spike;
+            spike << QPointF(hazard.x(), hazard.y() - cellH * 0.28)
+                  << QPointF(hazard.x() + cellW * 0.22, hazard.y() + cellH * 0.20)
+                  << QPointF(hazard.x() - cellW * 0.22, hazard.y() + cellH * 0.20);
+            painter.setPen(QPen(QColor(255, 126, 112), 1.2));
+            painter.setBrush(QColor(225, 75, 72));
+            painter.drawPolygon(spike);
+        }
+
+        if ((row % 6) == 4) {
+            painter.setPen(QPen(QColor(255, 192, 92), 3.0));
+            const qreal gateY = y + cellH * 0.5;
+            painter.drawLine(board.left() + (center - 1.25) * cellW, gateY,
+                             board.left() + (center - 0.62) * cellW, gateY);
+            painter.drawLine(board.left() + (center + 0.62) * cellW, gateY,
+                             board.left() + (center + 1.25) * cellW, gateY);
+        }
+
         if (row > 0 && row % 5 == 0) {
             painter.setPen(QPen(QColor(255, 210, 92), 2.0, Qt::DashLine));
             painter.drawLine(board.left() + (center - 1.35) * cellW, y + cellH * 0.5,
@@ -365,8 +405,9 @@ void ForceMazeGame::render(QPainter &painter)
                      QStringLiteral("FORCE MAZE   •   POZIOM %1/%2").arg(m_level).arg(kCampaignLevels));
     painter.drawText(QRectF(margin, 30, width() - 2 * margin, 22),
                      Qt::AlignLeft | Qt::AlignVCenter,
-                     QStringLiteral("Wynik %1    Kryształy %2    Życia %3    Punkty kontrolne %4")
-                         .arg(getScore()).arg(m_crystals).arg(m_lives).arg(m_checkpoints));
+                     QStringLiteral("Wynik %1    Kryształy %2/%3    Życia %4    Punkty kontrolne %5")
+                         .arg(getScore()).arg(m_crystals).arg(m_totalCrystals)
+                         .arg(m_lives).arg(m_checkpoints));
 
     const QRectF footer(margin, height() - 38, width() - 2 * margin, 28);
     painter.setPen(QColor(180, 211, 220));
