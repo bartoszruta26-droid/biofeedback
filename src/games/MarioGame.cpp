@@ -73,15 +73,6 @@ double MarioGame::worldScrollDistance() const { return m_worldDistance; }
 double MarioGame::animationClock() const { return m_animationTime; }
 int MarioGame::currentLevel() const { return m_currentLevel; }
 
-int MarioGame::activeEnemyCount() const { int n = 0; for (const Enemy& e : m_enemies) if (e.alive) ++n; return n; }
-int MarioGame::goombaCount() const { int n = 0; for (const Enemy& e : m_enemies) if (e.alive && e.type == Enemy::GOOMBA) ++n; return n; }
-int MarioGame::piranhaPlantCount() const { int n = 0; for (const Enemy& e : m_enemies) if (e.alive && e.type == Enemy::PIRANHA_PLANT) ++n; return n; }
-int MarioGame::livesRemaining() const { return m_lives; }
-int MarioGame::coinsCollected() const { return m_coinsCollected; }
-bool MarioGame::doubleJumpAvailable() const { return m_player.doubleJumpAvailable; }
-double MarioGame::invulnerabilityRemaining() const { return m_invulnerabilityRemaining; }
-double MarioGame::worldScrollDistance() const { return m_worldDistance; }
-double MarioGame::animationClock() const { return m_animationTime; }
 
 void MarioGame::generateEnemies(double deltaTime)
 {
