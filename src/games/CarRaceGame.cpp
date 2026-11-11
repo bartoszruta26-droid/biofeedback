@@ -186,7 +186,7 @@ void CarRaceGame::spawnObstacle()
     Obstacle obstacle;
     obstacle.lane = lane;
     obstacle.passed = false;
-    obstacle.boostCell = (m_spawnCount % 5 == 4);
+    obstacle.boostCell = (m_spawnCount % 5 == 0);
     obstacle.rect = laneRect(lane, -obstacleHeight - 6.0, obstacleWidth, obstacleHeight);
     m_obstacles.push_back(obstacle);
 }
