@@ -5,7 +5,6 @@
 #include <QRectF>
 #include <QVector>
 
-class QKeyEvent;
 class QResizeEvent;
 
 namespace games {
@@ -34,7 +33,6 @@ protected:
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
-    void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -54,12 +52,14 @@ private:
     QVector<Obstacle> m_obstacles;
     QRectF m_player;
     double m_force;
+    double m_inputAge;
     double m_spawnTimer;
     double m_spawnInterval;
     double m_roadSpeed;
     double m_distance;
     double m_boostTimer;
     double m_boostCooldown;
+    double m_boostGestureSeconds;
     double m_collisionTimer;
     double m_scoreDistanceAccumulator;
     double m_animationTime;
@@ -68,8 +68,10 @@ private:
     int m_passStreak;
     int m_collectiblesCollected;
     int m_lane;
+    int m_boostGestureLane;
     int m_lives;
     int m_spawnCount;
+    bool m_boostGestureActive;
 };
 
 } // namespace games
