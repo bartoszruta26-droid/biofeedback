@@ -22,7 +22,7 @@
 - **Trudność:** pięć poziomów zmienia prędkość przebiegu i szerokość strefy tolerancji. Dostępny jest opcjonalny automatyczny dobór trudności na podstawie utrzymywanej dokładności.
 - **Grafika:** kontrastowa siatka, przebieg celu ze strefą tolerancji, pionowa bramka pomiarowa, kursor o zmiennej barwie, miernik siły i panel wyniku/serii.
 - **Utrata sygnału:** po 350 ms bez aktualnej próbki punktacja i seria zostają zatrzymane, a gra wyświetla komunikat o braku świeżego sygnału.
-- **Konfiguracja:** wybór przebiegu, poziomu, automatycznej trudności i zakresu kalibracji odbywa się przed sesją w ustawieniach aplikacji. W trakcie rozgrywki nie ma sterowania klawiaturą. Start/pauza/reset pozostają w nadrzędnym interfejsie treningowym.
+- **Konfiguracja:** wybór przebiegu, poziomu, automatycznej trudności i zakresu kalibracji jest obecnie dostępny przez metody konfiguracyjne gry przed sesją; osobny panel ustawień tych parametrów wymaga jeszcze integracji z interfejsem treningowym. W trakcie rozgrywki nie ma sterowania klawiaturą. Start/pauza/reset pozostają w nadrzędnym interfejsie treningowym.
 
 ### 2. Tan Force Trainer (Tangens)
 
