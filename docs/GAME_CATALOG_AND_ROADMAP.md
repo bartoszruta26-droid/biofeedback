@@ -297,6 +297,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 - **Bezpieczeństwo sygnału:** wartości niefinitywne są odrzucane, a siła ograniczana do 0–100%. Po 350 ms bez świeżej próbki gra anuluje aktywny impuls, zatrzymuje postęp próby i wymaga ponownego uzbrojenia próbką neutralną. Brak sygnału nie jest traktowany jako zerowa siła ani jako komenda.
 - **Testy regresyjne:** fabryka i alias identyfikatora, cykl życia, neutralne uzbrojenie, trafienie w czasie i paśmie siły, falstart, timeout sygnału, anulowanie gestu, zapis rekordów i skalowanie interfejsu. Testy symulują próbki; nie zastępują odbioru fizycznego Nano/HX711/tensometru.
 - **Granice zastosowania:** wynik jest wynikiem gry zręcznościowej i nie stanowi pomiaru czasu reakcji w warunkach klinicznych, diagnozy ani oceny sprawności.
+- **Rozszerzalność sterowania:** bieżąca wersja używa wyłącznie tensometru HX711 jako źródła sterowania. Architektura przyszłych wersji powinna dopuścić wymienne adaptery wejścia (HX711 jako domyślny, opcjonalnie klawiatura/mysz w desktopie oraz dotyk w Androidzie), bez równoczesnego mieszania źródeł i bez zmiany domyślnego zachowania wersji obecnej. Adaptery alternatywne nie są częścią tego wydania.
 
 
 ### 4.6. Space Docking — dokowanie statku
