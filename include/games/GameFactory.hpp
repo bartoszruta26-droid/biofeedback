@@ -5,6 +5,7 @@
 #include "games/CarRaceGame.hpp"
 #include "games/ScorchedEarthGame.hpp"
 #include "games/PrecisionCraneGame.hpp"
+#include "games/RhythmForceGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/GalagaGame.hpp"
@@ -53,6 +54,10 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
     if (id == QStringLiteral("precision_crane") || id == QStringLiteral("precision-crane") ||
         id == QStringLiteral("precision crane"))
         return new PrecisionCraneGame(parent);
+
+    if (id == QStringLiteral("rhythm_force") || id == QStringLiteral("rhythm-force") ||
+        id == QStringLiteral("rhythm force"))
+        return new RhythmForceGame(parent);
 
     if (id == QStringLiteral("scorched_earth") || id == QStringLiteral("scored_earth") ||
         id == QStringLiteral("scorched-earth") ||
