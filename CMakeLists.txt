@@ -514,6 +514,7 @@ if(Qt5_FOUND)
         src/games/ArcherGame.cpp
         src/games/CarRaceGame.cpp
         src/games/ScorchedEarthGame.cpp
+        src/games/PrecisionCraneGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
@@ -530,6 +531,7 @@ if(Qt5_FOUND)
         include/games/ArcherGame.hpp
         include/games/CarRaceGame.hpp
         include/games/ScorchedEarthGame.hpp
+        include/games/PrecisionCraneGame.hpp
         include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
