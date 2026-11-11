@@ -16,7 +16,7 @@ public:
     enum ControlAxis { HorizontalAxis = 0, VerticalAxis = 1 };
     enum CargoType { LightCargo = 0, StandardCargo = 1, HeavyCargo = 2 };
 
-    explicit PrecisionCraneGame(QWidget *parent = nullptr);
+    explicit PrecisionCraneGame(QWidget *parent = nullptr, const QString &recordsFilePath = QString());
     QString gameName() const override;
 
     void setDifficultyLevel(int level);
@@ -54,6 +54,8 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
+    friend struct PrecisionCraneGameTestAccess;
+
     static constexpr double kGestureForce = 0.82;
     static constexpr double kReleaseForce = 0.18;
     static constexpr double kLongGestureSeconds = 0.85;
@@ -66,6 +68,7 @@ private:
     void resetRound();
     QRectF obstacleRect(int index) const;
     bool checkObstacleCollision();
+    bool processObstacleCollision();
     void configureCargo();
     void loadRecords();
     void saveRecords();
@@ -114,6 +117,7 @@ private:
     bool m_gestureActive;
     bool m_loadAttached;
     QString m_status;
+    QString m_recordsFilePath;
 };
 
 } // namespace games
