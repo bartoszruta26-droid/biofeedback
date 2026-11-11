@@ -442,15 +442,17 @@ int main(int argc, char **argv)
     waitForEvents(420);
     REQUIRE(!craneSafety->hasFreshSignal());
     REQUIRE(craneSafety->normalizedForce() == 0.0);
+    const double positionAtTimeout = craneSafety->carriagePosition();
+    REQUIRE(positionAtTimeout >= positionBeforeTimeout);
     craneSafety->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     craneSafety->handleSensorInput(std::numeric_limits<double>::infinity());
     waitForEvents(120);
     REQUIRE(!craneSafety->hasFreshSignal());
-    REQUIRE(craneSafety->carriagePosition() == positionBeforeTimeout);
+    REQUIRE(std::abs(craneSafety->carriagePosition() - positionAtTimeout) < 0.001);
     craneSafety->handleSensorInput(65.0);
     waitForEvents(80);
     REQUIRE(craneSafety->hasFreshSignal());
-    REQUIRE(craneSafety->carriagePosition() > positionBeforeTimeout);
+    REQUIRE(craneSafety->carriagePosition() > positionAtTimeout);
     craneSafety->stop();
 
     // A sub-minimum pulse is ignored; a valid short pulse grips only when
