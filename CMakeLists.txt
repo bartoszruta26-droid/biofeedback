@@ -309,6 +309,7 @@ if(Qt5_FOUND)
     # Source files
     set(SOURCES
         src/main.cpp
+        resources/heraldry/heraldry.qrc
         src/api/HttpApiServer.cpp
         src/data/JsonResourceRepository.cpp
         src/core/Application.cpp

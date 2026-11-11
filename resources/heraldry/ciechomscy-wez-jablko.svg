@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="300" viewBox="0 0 256 300" role="img" aria-labelledby="title desc">
+<title>Herb Ciechomskich — wąż i jabłko</title><desc>Herb Ciechomskich — wąż i jabłko — autorski znak heraldyczny do zastosowań ilustracyjnych.</desc>
+<defs><clipPath id="shield"><path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z"/></clipPath></defs>
+<path d="M18 16H238V157C238 224 188 270 128 294C68 270 18 224 18 157Z" fill="#d8b45a" stroke="#392d25" stroke-width="5"/>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="#183d2b" stroke="#f4ead5" stroke-width="3"/>
+<g clip-path="url(#shield)"><g fill="none" stroke="#d7b45c" stroke-width="4" opacity=".8"><path d="M38 45H218M38 255H218"/></g><path d="M128 218C78 210 78 168 112 155C147 142 184 158 172 185C163 204 126 195 116 176C104 152 137 133 156 116C173 101 165 79 145 74" fill="none" stroke="#f4ead5" stroke-width="13" stroke-linecap="round"/><path d="M145 74Q160 59 178 70L165 88Z" fill="#f4ead5" stroke="#17251b" stroke-width="3"/><circle cx="169" cy="76" r="3" fill="#17251b"/><path d="M112 154C94 145 82 151 79 165C76 182 94 191 110 184" fill="none" stroke="#d8b45a" stroke-width="5"/><path d="M122 124C115 103 130 92 147 99C164 91 179 106 169 124C158 144 139 149 122 124Z" fill="#c83d3d" stroke="#64252b" stroke-width="4"/><path d="M147 99Q145 84 158 79" fill="none" stroke="#6c8d45" stroke-width="6" stroke-linecap="round"/><path d="M157 81Q177 70 182 88Q167 95 157 81Z" fill="#6c8d45"/></g>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="none" stroke="#392d25" stroke-width="5"/>
+<path d="M128 30V275" stroke="#f4ead5" stroke-width="1.5" opacity=".5"/>
+</svg>

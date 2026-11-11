@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="300" viewBox="0 0 256 300" role="img" aria-labelledby="title desc">
+<title>Herb rodowy — lilia</title><desc>Herb rodowy — lilia — autorski znak heraldyczny do zastosowań ilustracyjnych.</desc>
+<defs><clipPath id="shield"><path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z"/></clipPath></defs>
+<path d="M18 16H238V157C238 224 188 270 128 294C68 270 18 224 18 157Z" fill="#d8b45a" stroke="#392d25" stroke-width="5"/>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="#6b2438" stroke="#f4ead5" stroke-width="3"/>
+<g clip-path="url(#shield)"><g fill="none" stroke="#d8b45a" stroke-width="4" opacity=".8"><path d="M38 45H218M38 255H218"/></g><path d="M128 222V112M128 126C99 124 82 101 93 79C114 81 127 96 128 126ZM128 126C157 124 174 101 163 79C142 81 129 96 128 126ZM128 112C111 93 116 65 128 54C140 65 145 93 128 112Z" fill="#f4ead5" stroke="#d8b45a" stroke-width="5"/><path d="M128 165Q89 145 78 170Q102 200 128 181Q154 200 178 170Q167 145 128 165Z" fill="#6f9b58" stroke="#d8b45a" stroke-width="4"/></g>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="none" stroke="#392d25" stroke-width="5"/>
+<path d="M128 30V275" stroke="#f4ead5" stroke-width="1.5" opacity=".5"/>
+</svg>

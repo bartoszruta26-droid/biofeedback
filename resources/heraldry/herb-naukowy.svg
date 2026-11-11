@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="300" viewBox="0 0 256 300" role="img" aria-labelledby="title desc">
+<title>Znak godności naukowej — księga i gwiazda</title><desc>Znak godności naukowej — księga i gwiazda — autorski znak heraldyczny do zastosowań ilustracyjnych.</desc>
+<defs><clipPath id="shield"><path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z"/></clipPath></defs>
+<path d="M18 16H238V157C238 224 188 270 128 294C68 270 18 224 18 157Z" fill="#d8b45a" stroke="#392d25" stroke-width="5"/>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="#34335e" stroke="#f4ead5" stroke-width="3"/>
+<g clip-path="url(#shield)"><g fill="none" stroke="#d8b45a" stroke-width="4" opacity=".8"><path d="M38 45H218M38 255H218"/></g><path d="M65 108Q98 91 128 113Q158 91 191 108V211Q158 194 128 216Q98 194 65 211Z" fill="#f4ead5" stroke="#d8b45a" stroke-width="5"/><path d="M128 113V216" stroke="#9e3438" stroke-width="5"/><path d="M128 54L137 78L162 79L143 95L149 119L128 105L107 119L113 95L94 79L119 78Z" fill="#d8b45a" stroke="#f4ead5" stroke-width="2"/></g>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="none" stroke="#392d25" stroke-width="5"/>
+<path d="M128 30V275" stroke="#f4ead5" stroke-width="1.5" opacity=".5"/>
+</svg>

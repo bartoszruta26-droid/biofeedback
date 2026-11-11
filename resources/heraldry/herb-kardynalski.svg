@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="300" viewBox="0 0 256 300" role="img" aria-labelledby="title desc">
+<title>Herb kardynalski — kapelusz i chwosty</title><desc>Herb kardynalski — kapelusz i chwosty — autorski znak heraldyczny do zastosowań ilustracyjnych.</desc>
+<defs><clipPath id="shield"><path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z"/></clipPath></defs>
+<path d="M18 16H238V157C238 224 188 270 128 294C68 270 18 224 18 157Z" fill="#d8b45a" stroke="#392d25" stroke-width="5"/>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="#6e1f2a" stroke="#f4ead5" stroke-width="3"/>
+<g clip-path="url(#shield)"><g fill="none" stroke="#d8b45a" stroke-width="4" opacity=".8"><path d="M38 45H218M38 255H218"/></g><path d="M82 90Q128 43 174 90L165 107H91Z" fill="#252525" stroke="#d8b45a" stroke-width="4"/><path d="M128 105V132M128 132L74 175M128 132L94 195M128 132L128 211M128 132L162 195M128 132L182 175" stroke="#d8b45a" stroke-width="4" fill="none"/><g fill="#9e3438" stroke="#d8b45a" stroke-width="2"><circle cx="74" cy="175" r="8"/><circle cx="94" cy="195" r="8"/><circle cx="128" cy="211" r="8"/><circle cx="162" cy="195" r="8"/><circle cx="182" cy="175" r="8"/></g><path d="M105 112H151" stroke="#f4ead5" stroke-width="6"/></g>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="none" stroke="#392d25" stroke-width="5"/>
+<path d="M128 30V275" stroke="#f4ead5" stroke-width="1.5" opacity=".5"/>
+</svg>
