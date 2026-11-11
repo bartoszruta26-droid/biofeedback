@@ -8,6 +8,7 @@
 #include <QFont>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace games {
 
@@ -15,6 +16,8 @@ ScorchedEarthGame::ScorchedEarthGame(QWidget *parent)
     : GameEngine(parent)
     , m_aimDegrees(45.0)
     , m_power(0.82)
+    , m_enemyAimDegrees(42.0)
+    , m_enemyPower(0.78)
     , m_wind(0.0)
     , m_enemyDelay(0.0)
     , m_gravity(220.0)
@@ -37,6 +40,8 @@ void ScorchedEarthGame::initialize()
     m_projectiles.clear();
     m_aimDegrees = 45.0;
     m_power = 0.82;
+    m_enemyAimDegrees = 42.0;
+    m_enemyPower = 0.78;
     m_wind = 0.0;
     m_enemyDelay = 0.0;
     m_playerHealth = 100;
@@ -126,7 +131,7 @@ bool ScorchedEarthGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
     const double normalized = qBound(0.0, value / 100.0, 1.0);
-    m_aimDegrees = 15.0 + normalized * 65.0;
+    m_aimDegrees = 10.0 + normalized * 75.0;
     return true;
 }
 
@@ -148,6 +153,10 @@ void ScorchedEarthGame::keyPressEvent(QKeyEvent* event)
 
 void ScorchedEarthGame::mouseMoveEvent(QMouseEvent* event)
 {
+    if (!m_playerTurn || !m_projectiles.isEmpty()) {
+        event->accept();
+        return;
+    }
     const QPointF origin(m_playerTank.right(), m_playerTank.top() + 2.0);
     const QPointF cursor = event->localPos();
     const double dx = cursor.x() - origin.x();
@@ -170,13 +179,77 @@ void ScorchedEarthGame::mousePressEvent(QMouseEvent* event)
     QWidget::mousePressEvent(event);
 }
 
+void ScorchedEarthGame::wheelEvent(QWheelEvent* event)
+{
+    if (isRunning() && m_playerTurn && m_projectiles.isEmpty()) {
+        const int steps = event->angleDelta().y() / 120;
+        if (steps != 0) {
+            m_power = qBound(0.35, m_power + steps * 0.04, 1.0);
+            update();
+        }
+        event->accept();
+        return;
+    }
+    QWidget::wheelEvent(event);
+}
+
+void ScorchedEarthGame::chooseEnemyShot()
+{
+    const QPointF target = m_playerTank.center();
+    double bestScore = std::numeric_limits<double>::max();
+    double bestAngle = 42.0;
+    double bestPower = 0.78;
+    const QPointF origin(m_enemyTank.left(), m_enemyTank.top() + 2.0);
+
+    // Search a compact set of physically simulated trajectories. The AI uses
+    // the current crater profile and wind, rather than firing at a fixed angle.
+    for (int angleDegrees = 18; angleDegrees <= 78; angleDegrees += 3) {
+        const double angle = angleDegrees * 3.14159265358979323846 / 180.0;
+        for (int powerStep = 10; powerStep <= 20; ++powerStep) {
+            const double power = powerStep * 0.05;
+            const double speed = 420.0 * power;
+            QPointF position = origin;
+            QPointF velocity(-std::cos(angle) * speed, -std::sin(angle) * speed);
+            double closest = std::numeric_limits<double>::max();
+            for (int step = 0; step < 150; ++step) {
+                constexpr double dt = 0.04;
+                velocity.ry() += m_gravity * dt;
+                velocity.rx() += m_wind * 0.08 * dt;
+                position += velocity * dt;
+                if (position.x() < 0.0 || position.x() > width() ||
+                    position.y() < 0.0 || position.y() >= terrainY(position.x()))
+                    break;
+                const double distance = std::hypot(position.x() - target.x(),
+                                                   position.y() - target.y());
+                closest = qMin(closest, distance);
+                if (m_playerTank.adjusted(-5, -5, 5, 5).contains(position)) {
+                    closest = 0.0;
+                    break;
+                }
+            }
+            // A small power cost makes the AI prefer a lower-energy shot when
+            // two trajectories reach effectively the same point.
+            const double score = closest + power * 2.0;
+            if (score < bestScore) {
+                bestScore = score;
+                bestAngle = angleDegrees;
+                bestPower = power;
+            }
+        }
+    }
+    m_enemyAimDegrees = bestAngle;
+    m_enemyPower = bestPower;
+}
+
 void ScorchedEarthGame::fireProjectile(bool playerOwned)
 {
-    if (!isRunning() || !m_projectiles.isEmpty())
+    if (!isRunning() || !m_projectiles.isEmpty() || (playerOwned && !m_playerTurn))
         return;
+    if (!playerOwned)
+        chooseEnemyShot();
     const QRectF& tank = playerOwned ? m_playerTank : m_enemyTank;
-    const double angle = (playerOwned ? m_aimDegrees : 42.0) * 3.14159265358979323846 / 180.0;
-    const double speed = 420.0 * (playerOwned ? m_power : 0.78);
+    const double angle = (playerOwned ? m_aimDegrees : m_enemyAimDegrees) * 3.14159265358979323846 / 180.0;
+    const double speed = 420.0 * (playerOwned ? m_power : m_enemyPower);
     const double direction = playerOwned ? 1.0 : -1.0;
     Projectile projectile;
     projectile.position = QPointF(playerOwned ? tank.right() : tank.left(),
