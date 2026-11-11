@@ -29,6 +29,15 @@ SinGame::SinGame(QWidget *parent)
     , m_combo(0)
     , m_lastDistance(0.0)
     , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
+    , m_calibrationMinimum(0.0)
+    , m_calibrationMaximum(100.0)
+    , m_lastRawForce(0.0)
+    , m_waveformMode(0)
+    , m_automaticDifficulty(false)
+    , m_sessionSeconds(0.0)
+    , m_timeInTarget(0.0)
+    , m_accuracyWindowSeconds(0.0)
+    , m_accuracyWindowHitSeconds(0.0)
     , m_serialPort(nullptr)
     , m_ownSerial(false)
 {
@@ -57,8 +66,12 @@ void SinGame::initialize()
     m_combo = 0;
     m_lastDistance = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
-    m_frequency = width() > 0
-        ? (2.0 * 3.14159265358979323846 * 1.5 / static_cast<double>(width())) : 0.0;
+    m_sessionSeconds = 0.0;
+    m_timeInTarget = 0.0;
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
+    refreshGeometryParameters();
+    calculateTargetY(width() * 0.72);
 }
 
 void SinGame::setDifficultyLevel(int level)
@@ -70,14 +83,122 @@ void SinGame::setDifficultyLevel(int level)
     m_scrollSpeed = 90.0 + m_difficultyLevel * 25.0;
     const double toleranceRatio = 0.11 - (m_difficultyLevel - 1) * 0.012;
     m_tolerance = qMax(12.0, qMin(48.0, qMax(240.0, static_cast<double>(height())) * toleranceRatio));
-    m_frequency = width() > 0
-        ? (2.0 * 3.14159265358979323846 * 1.5 / static_cast<double>(width())) : 0.0;
-    setScore(0);
+    refreshGeometryParameters();
+    m_comboSeconds = 0.0;
+    m_combo = 0;
 }
 
 int SinGame::getDifficultyLevel() const
 {
     return m_difficultyLevel;
+}
+
+void SinGame::setForceCalibration(double minimum, double maximum)
+{
+    if (!std::isfinite(minimum) || !std::isfinite(maximum) || maximum <= minimum)
+        return;
+    m_calibrationMinimum = minimum;
+    m_calibrationMaximum = maximum;
+    m_currentForce = 0.0;
+    m_inputAge = 1.0;
+    m_feedbackText = QStringLiteral("Kalibracja zmieniona — oczekiwanie na nowy pomiar");
+}
+
+double SinGame::forceCalibrationMinimum() const { return m_calibrationMinimum; }
+double SinGame::forceCalibrationMaximum() const { return m_calibrationMaximum; }
+double SinGame::normalizedForce() const { return m_currentForce; }
+
+void SinGame::setWaveformMode(int mode)
+{
+    m_waveformMode = qBound(0, mode, 2);
+    m_combo = 0;
+    m_comboSeconds = 0.0;
+    m_feedbackText = m_waveformMode == 0 ? QStringLiteral("Tryb: fala sinusoidalna")
+        : (m_waveformMode == 1 ? QStringLiteral("Tryb: fala trójkątna")
+                               : QStringLiteral("Tryb: łagodny plateau"));
+}
+
+int SinGame::waveformMode() const { return m_waveformMode; }
+void SinGame::setAutomaticDifficulty(bool enabled)
+{
+    m_automaticDifficulty = enabled;
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
+}
+bool SinGame::automaticDifficulty() const { return m_automaticDifficulty; }
+
+void SinGame::keyPressEvent(QKeyEvent* event)
+{
+    if (!event || event->isAutoRepeat()) {
+        if (event) event->accept();
+        return;
+    }
+    switch (event->key()) {
+        case Qt::Key_1: setWaveformMode(0); break;
+        case Qt::Key_2: setWaveformMode(1); break;
+        case Qt::Key_3: setWaveformMode(2); break;
+        case Qt::Key_Plus:
+        case Qt::Key_Equal:
+        case Qt::Key_Up: setDifficultyLevel(m_difficultyLevel + 1); break;
+        case Qt::Key_Minus:
+        case Qt::Key_Down: setDifficultyLevel(m_difficultyLevel - 1); break;
+        case Qt::Key_A: setAutomaticDifficulty(!m_automaticDifficulty); break;
+        case Qt::Key_BracketLeft:
+            if (m_lastRawForce < m_calibrationMaximum)
+                setForceCalibration(m_lastRawForce, m_calibrationMaximum);
+            break;
+        case Qt::Key_BracketRight:
+            if (m_lastRawForce > m_calibrationMinimum)
+                setForceCalibration(m_calibrationMinimum, m_lastRawForce);
+            break;
+        default: QWidget::keyPressEvent(event); return;
+    }
+    event->accept();
+}
+
+void SinGame::resizeEvent(QResizeEvent* event)
+{
+    QWidget::resizeEvent(event);
+    refreshGeometryParameters();
+    calculateTargetY(width() * 0.72);
+    QWidget::update();
+}
+
+void SinGame::refreshGeometryParameters()
+{
+    const double w = qMax(1, width());
+    const double h = qMax(240, height());
+    m_frequency = 2.0 * 3.14159265358979323846 * 1.5 / w;
+    const double toleranceRatio = 0.11 - (m_difficultyLevel - 1) * 0.012;
+    m_tolerance = qBound(12.0, h * toleranceRatio, 48.0);
+}
+
+double SinGame::waveformValue(double phase) const
+{
+    const double sine = std::sin(phase);
+    if (m_waveformMode == 1)
+        return (2.0 / 3.14159265358979323846) * std::asin(sine);
+    if (m_waveformMode == 2) {
+        const double limit = std::tanh(2.2);
+        return std::tanh(2.2 * sine) / limit;
+    }
+    return sine;
+}
+
+void SinGame::updateAutomaticDifficulty(double deltaTime)
+{
+    if (!m_automaticDifficulty || m_inputAge > 0.35)
+        return;
+    m_accuracyWindowSeconds += deltaTime;
+    if (m_accuracyWindowSeconds < 12.0)
+        return;
+    const double ratio = m_accuracyWindowHitSeconds / m_accuracyWindowSeconds;
+    if (ratio >= 0.82 && m_difficultyLevel < 5)
+        setDifficultyLevel(m_difficultyLevel + 1);
+    else if (ratio < 0.42 && m_difficultyLevel > 1)
+        setDifficultyLevel(m_difficultyLevel - 1);
+    m_accuracyWindowSeconds = 0.0;
+    m_accuracyWindowHitSeconds = 0.0;
 }
 
 void SinGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunication> serial)
@@ -133,10 +254,14 @@ void SinGame::onConnectionStatusChanged(bool connected, const std::string& messa
 
 void SinGame::normalizeForceValue(double rawValue)
 {
-    if (!std::isfinite(rawValue) || !std::isfinite(m_maxForce) || m_maxForce <= 0.0)
+    if (!std::isfinite(rawValue))
         return;
 
-    const double normalizedForce = rawValue / m_maxForce;
+    m_lastRawForce = rawValue;
+    const double span = m_calibrationMaximum - m_calibrationMinimum;
+    if (!std::isfinite(span) || span <= 0.0)
+        return;
+    const double normalizedForce = (rawValue - m_calibrationMinimum) / span;
     if (!std::isfinite(normalizedForce))
         return;
 
@@ -160,7 +285,7 @@ void SinGame::calculateTargetY(double x)
     const double h = static_cast<double>(height());
     const double amplitude = h * 0.32;
     const double centerY = h * 0.5;
-    m_targetY = centerY + std::sin(x * m_frequency + m_phase) * amplitude;
+    m_targetY = centerY + waveformValue(x * m_frequency + m_phase) * amplitude;
 }
 
 void SinGame::update(double deltaTime)
@@ -172,11 +297,10 @@ void SinGame::update(double deltaTime)
     const double dt = qMin(deltaTime, 0.1);
     const double w = static_cast<double>(width());
     const double h = static_cast<double>(height());
-
-    // Keep 1.5 full wave cycles visible at every window size.
-    m_frequency = 2.0 * 3.14159265358979323846 * 1.5 / w;
+    refreshGeometryParameters();
     m_phase -= m_scrollSpeed * m_frequency * dt;
     m_inputAge += dt;
+    m_sessionSeconds += dt;
 
     const double checkX = w * 0.72;
     calculateTargetY(checkX);
@@ -197,8 +321,9 @@ void SinGame::update(double deltaTime)
 
     m_lastDistance = std::abs(m_cursorY - m_targetY);
     m_isHit = m_lastDistance <= m_tolerance;
-
     if (m_isHit) {
+        m_accuracyWindowHitSeconds += dt;
+        m_timeInTarget += dt;
         m_comboSeconds += dt;
         m_combo = qMin(5, 1 + static_cast<int>(m_comboSeconds / 2.0));
         const double accuracy = qBound(0.0, 1.0 - m_lastDistance / m_tolerance, 1.0);
@@ -211,12 +336,14 @@ void SinGame::update(double deltaTime)
         }
         m_feedbackText = QStringLiteral("Dobrze — utrzymaj siłę  •  dokładność %1%")
             .arg(static_cast<int>(std::round(accuracy * 100.0)));
+        updateAutomaticDifficulty(dt);
     } else {
         m_comboSeconds = 0.0;
         m_combo = 0;
         m_feedbackText = m_cursorY > m_targetY
             ? QStringLiteral("Zwiększ siłę")
             : QStringLiteral("Zmniejsz siłę");
+        updateAutomaticDifficulty(dt);
     }
 }
 
@@ -255,7 +382,7 @@ void SinGame::render(QPainter& painter)
     bool first = true;
     for (int x = 0; x <= w; ++x) {
         const double target = centerY +
-            std::sin(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
+            waveformValue(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
         if (first) {
             targetPath.moveTo(x, target);
             targetBand.moveTo(x, target - band);
@@ -314,16 +441,24 @@ void SinGame::render(QPainter& painter)
 
     painter.setPen(QColor(210, 220, 235));
     painter.setFont(QFont(QStringLiteral("Arial"), qMax(10, h / 52)));
-    painter.drawText(QRect(margin, h - 58, w - 2 * margin, 22),
+    const double accuracyPercent = m_sessionSeconds > 0.0
+        ? 100.0 * m_timeInTarget / m_sessionSeconds : 0.0;
+    const QString modeName = m_waveformMode == 0 ? QStringLiteral("SINUS")
+        : (m_waveformMode == 1 ? QStringLiteral("TRÓJKĄT") : QStringLiteral("PLATEAU"));
+    painter.drawText(QRect(margin, h - 78, w - 2 * margin, 22),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Siła: %1%    Wynik: %2    Seria trafień: x%3")
+        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3    Cel: %4%")
             .arg(static_cast<int>(std::round(m_currentForce * 100.0)))
-            .arg(getScore())
-            .arg(m_combo));
+            .arg(getScore()).arg(m_combo)
+            .arg(static_cast<int>(std::round(accuracyPercent))));
 
-    painter.drawText(QRect(margin, h - 34, w - 2 * margin, 20),
+    painter.drawText(QRect(margin, h - 52, w - 2 * margin, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Dostosuj naciąg taśmy tak, aby kursor pozostawał w zielonym pasie."));
+        QStringLiteral("%1 | Kalibracja: %2–%3 | Auto: %4 | 1-3: tryb, +/-: trudność, A: auto, [: min, ]: max")
+            .arg(modeName)
+            .arg(m_calibrationMinimum, 0, 'f', 1)
+            .arg(m_calibrationMaximum, 0, 'f', 1)
+            .arg(m_automaticDifficulty ? QStringLiteral("wł.") : QStringLiteral("wył.")));
 
     // Compact force meter with a clear 0..100% scale.
     const int meterW = qMax(12, qMin(22, w / 45));
