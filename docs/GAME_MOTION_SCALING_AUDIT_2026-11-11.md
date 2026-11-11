@@ -93,3 +93,14 @@ Wspólny interfejs interpolacji został wdrożony dla wszystkich 15 gier z katal
 Każda gra interpoluje odpowiednie dla swojej mechaniki elementy ruchome lub zegar wizualny. Dodano też test regresyjny, który przeprowadza wszystkie gry przez rozdzielczości 640×480, 1280×720, 1920×1080 i 2560×1440 oraz powrót do 640×480, sprawdzając, czy sesja pozostaje aktywna.
 
 To jest test odporności na zmianę rozmiaru, a nie jeszcze dowód identycznej prędkości fizycznej w każdym formacie. Niezależny test trajektorii, czasu przelotu, kolizji i proporcji obiektów wymaga dalszej walidacji per gra. W szczególności trzeba zweryfikować skalowanie prędkości, grawitacji, wymiarów obiektów i granic pola gry — interpolacja usuwa nierówności prezentacji, ale nie koryguje automatycznie błędów modelu fizycznego.
+
+
+## Etap 5 — precyzja czasu i płynność 90–120 Hz
+
+- Zegar pętli symulacji korzysta z `QElapsedTimer::nsecsElapsed()` i przeliczenia nanosekund na sekundy. Usuwa to kwantyzację czasu do pełnych milisekund, która powodowała nierówne odstępy aktualizacji przy odświeżaniu 90/120 Hz.
+- Symulacja nadal pracuje ze stałym krokiem 1/120 s, a precyzyjny timer Qt budzi pętlę co 8 ms. Renderowanie jest interpolowane między stanami fizyki, dzięki czemu ekran 90 Hz i 120 Hz nie musi pokazywać wyłącznie kolejnych skoków symulacji.
+- Balance Tower: naprawiono brak odświeżania poprzednich stanów interpolacji. Sterowanie czujnikiem zapisuje pozycję docelową, a widoczny cel podąża do niej z wygładzaniem zależnym od czasu.
+- Precision Crane: po zmianie rozmiaru poprzednie pozycje renderowania są synchronizowane z nowym układem współrzędnych.
+- Test statyczny wymaga teraz, aby każda z 15 gier posiadała własną implementację `renderInterpolated`, a silnik korzystał z zegara nanosekundowego.
+
+Kompilacja i testy dla tego etapu muszą zostać potwierdzone przez aktualny przebieg GitHub Actions. Nadal wymagane są testy trajektorii i kolizji przy rzeczywistym renderowaniu 90/120 Hz oraz na różnych proporcjach ekranu; testy zmiany rozmiaru same w sobie tego nie dowodzą.
