@@ -372,6 +372,21 @@ void OutlineTab::setupUI()
     setupControlPanel();
     setupGameArea();
 
+    // Ustawienia konspektu, gry i sterowania mają odrębne karty. Dzięki temu
+    // panel boczny nie wymaga przewijania przez wszystkie grupy jednocześnie.
+    auto* settingsTabs = new QTabWidget(settingsPanel);
+    settingsTabs->setObjectName(QStringLiteral("outlineSettingsTabs"));
+    for (const auto& page : {
+             QPair<QWidget*, QString>(m_outlineGroup, tr("Konspekt")),
+             QPair<QWidget*, QString>(m_gameSelectionGroup, tr("Gra")),
+             QPair<QWidget*, QString>(m_controlGroup, tr("Sterowanie"))}) {
+        m_rightLayout->removeWidget(page.first);
+        settingsTabs->addTab(page.first, page.second);
+    }
+    m_rightLayout->insertWidget(0, settingsTabs);
+    m_rightLayout->addWidget(m_outlineInfoGroup);
+    m_outlineInfoGroup->setMaximumHeight(220);
+
     auto* graphGroup = new QGroupBox(tr("Biofeedback — siła w czasie rzeczywistym"), visualPanel);
     auto* graphLayout = new QVBoxLayout(graphGroup);
     m_forceGraph = new gui::GraphWidget(graphGroup);
