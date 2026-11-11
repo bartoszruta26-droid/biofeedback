@@ -102,6 +102,21 @@ int main(int argc, char **argv)
     std::unique_ptr<games::GameEngine> sinus(games::createGame(QStringLiteral("sin_game")));
     auto* sinusGame = dynamic_cast<games::SinGame*>(sinus.get());
     REQUIRE(sinusGame != nullptr);
+    sinusGame->setWaveformMode(4);
+    REQUIRE(sinusGame->waveformMode() == 4); // Pulse waveform is available.
+    sinusGame->setWaveformMode(99);
+    REQUIRE(sinusGame->waveformMode() == 4); // Public mode selection is bounded.
+    sinusGame->setWaveformMode(-1);
+    REQUIRE(sinusGame->waveformMode() == 0);
+    sinusGame->setDifficultyLevel(5);
+    REQUIRE(sinusGame->getDifficultyLevel() == 5);
+    sinusGame->setDifficultyLevel(99);
+    REQUIRE(sinusGame->getDifficultyLevel() == 5);
+    sinusGame->setForceCalibration(10.0, 90.0);
+    REQUIRE(std::abs(sinusGame->forceCalibrationMinimum() - 10.0) < 1e-9);
+    REQUIRE(std::abs(sinusGame->forceCalibrationMaximum() - 90.0) < 1e-9);
+    sinusGame->setAutomaticDifficulty(true);
+    REQUIRE(sinusGame->automaticDifficulty());
     sinusGame->resize(640, 480);
     sinusGame->start();
     sinusGame->handleSensorInput(35.0);
