@@ -433,6 +433,12 @@ int main(int argc, char **argv)
     REQUIRE(galagaGame->currentWave() == 1);
     REQUIRE(galagaGame->activeEnemyCount() == 24);
     galagaGame->handleSensorInput(50.0);
+    waitForEvents(30);
+    const double galagaSensorPosition = galagaGame->playerPositionX();
+    QKeyEvent galagaLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+    QApplication::sendEvent(galagaGame, &galagaLeft);
+    waitForEvents(80);
+    REQUIRE(std::abs(galagaGame->playerPositionX() - galagaSensorPosition) < 0.01);
     QKeyEvent galagaFireDown(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QKeyEvent galagaFireUp(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(galagaGame, &galagaFireDown);
@@ -556,6 +562,9 @@ int main(int argc, char **argv)
     carRaceControlsGame->handleSensorInput(0.0);
     REQUIRE(carRaceControlsGame->currentLane() == 0);
     carRaceControlsGame->handleSensorInput(50.0);
+    REQUIRE(carRaceControlsGame->currentLane() == 1);
+    QKeyEvent carRaceLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
+    QApplication::sendEvent(carRaceControlsGame, &carRaceLeft);
     REQUIRE(carRaceControlsGame->currentLane() == 1);
     carRaceControlsGame->handleSensorInput(100.0);
     REQUIRE(carRaceControlsGame->currentLane() == 2);
