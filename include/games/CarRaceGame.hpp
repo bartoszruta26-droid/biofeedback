@@ -22,6 +22,9 @@ public:
     int currentLane() const { return m_lane; }
     bool boostActive() const { return m_boostTimer > 0.0; }
     double boostCooldownRemaining() const { return m_boostCooldown; }
+    double animationClock() const { return m_animationTime; }
+    double visualLanePosition() const { return m_visualLane; }
+    int passStreak() const { return m_passStreak; }
 
 protected:
     void initialize() override;
@@ -55,6 +58,10 @@ private:
     double m_boostCooldown;
     double m_collisionTimer;
     double m_scoreDistanceAccumulator;
+    double m_animationTime;
+    double m_visualLane;
+    double m_cameraShakeTimer;
+    int m_passStreak;
     int m_lane;
     int m_lives;
     int m_spawnCount;
