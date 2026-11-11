@@ -153,7 +153,7 @@ void PrecisionCraneGame::initialize()
     setScore(0);
     setDifficultyLevel(m_difficulty);
     resetRound();
-    m_previousCarriageX = m_carriageX;
+    m_renderPreviousCarriageX = m_carriageX;
     m_previousHookY = m_hookY;
     m_previousSway = m_sway;
     m_previousObstacleClock = m_obstacleClock;
@@ -467,8 +467,8 @@ void PrecisionCraneGame::renderInterpolated(QPainter& painter, double alpha)
     const double hook = m_hookY;
     const double sway = m_sway;
     const double obstacleClock = m_obstacleClock;
-    m_carriageX = m_previousCarriageX +
-        (carriage - m_previousCarriageX) * alpha;
+    m_carriageX = m_renderPreviousCarriageX +
+        (carriage - m_renderPreviousCarriageX) * alpha;
     m_hookY = m_previousHookY + (hook - m_previousHookY) * alpha;
     m_sway = m_previousSway + (sway - m_previousSway) * alpha;
     m_obstacleClock = m_previousObstacleClock +
