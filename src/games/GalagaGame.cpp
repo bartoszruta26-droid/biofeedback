@@ -113,6 +113,12 @@ void GalagaGame::initialize()
     m_player = QRectF(width() * 0.5 - playerWidth * 0.5,
                       height() - 58.0 * scaleY, playerWidth, playerHeight);
     createWave();
+    m_previousPlayer = m_player;
+    m_previousProjectiles = m_projectiles;
+    m_previousEnemies = m_enemies;
+    m_previousPowerUps = m_powerUps;
+    m_previousBackgroundOffset = m_backgroundOffset;
+    m_previousElapsed = m_elapsed;
 }
 
 void GalagaGame::resizeEvent(QResizeEvent* event)
@@ -143,6 +149,12 @@ void GalagaGame::resizeEvent(QResizeEvent* event)
             qMax(8.0, static_cast<double>(newSize.height()) - 8.0 - m_player.height())));
     }
     GameEngine::resizeEvent(event);
+    m_previousPlayer = m_player;
+    m_previousProjectiles = m_projectiles;
+    m_previousEnemies = m_enemies;
+    m_previousPowerUps = m_powerUps;
+    m_previousBackgroundOffset = m_backgroundOffset;
+    m_previousElapsed = m_elapsed;
 }
 
 void GalagaGame::createWave()
