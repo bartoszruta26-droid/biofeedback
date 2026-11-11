@@ -226,10 +226,13 @@ void GalagaGame::spawnPowerUp(const QPointF& position)
     // defeated enemy releases a rotating upgrade.
     if (m_enemiesDefeated == 0 || m_enemiesDefeated % 5 != 0 || m_powerUps.size() >= 4)
         return;
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
     PowerUp item;
-    item.rect = QRectF(position.x() - 8.0, position.y() - 8.0, 16.0, 16.0);
+    item.rect = QRectF(position.x() - 8.0 * scaleX, position.y() - 8.0 * scaleY,
+                       16.0 * scaleX, 16.0 * scaleY);
     item.type = ((m_enemiesDefeated / 5) - 1) % 3;
-    item.velocity = 95.0 + qMin(45.0, m_wave * 3.0);
+    item.velocity = (80.0 + qMin(35.0, m_wave * 2.5)) * scaleY;
     m_powerUps.push_back(item);
 }
 
@@ -295,7 +298,8 @@ bool GalagaGame::loseLife()
         return true;
     }
     m_hitCooldown = kHitProtection;
-    m_player.moveCenter(QPointF(width() * 0.5, height() - 46.0));
+    m_player.moveCenter(QPointF(width() * 0.5,
+        height() - 46.0 * qMax(0.5, height() / 480.0)));
     for (Projectile& shot : m_projectiles)
         if (!shot.fromPlayer)
             shot.rect = QRectF();
@@ -382,7 +386,8 @@ void GalagaGame::update(double deltaTime)
                 return;
             for (Enemy& remaining : m_enemies)
                 if (remaining.active)
-                    remaining.rect.moveTop(qMax(42.0, remaining.rect.top() - qMax(24.0, height() * 0.08)));
+                    remaining.rect.moveTop(qMax(42.0 * scaleY,
+                        remaining.rect.top() - qMax(24.0 * scaleY, height() * 0.08)));
             break;
         }
     }
