@@ -99,14 +99,20 @@
 - **Wskaźniki:** wynik, numer fali i pozostałe życia.
 - **Wskazówka:** obserwuj położenie pocisków przeciwników i utrzymuj statek w takim miejscu, aby móc szybko zmienić kierunek.
 
-### 10. Scorched Earth
+### 10. Scorched Earth Force Trainer
 
-**Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, dobierając kąt i siłę strzału oraz uwzględniając wiatr.
+**Cel:** rozgrywaj turowy pojedynek artyleryjski. Dobieraj kąt i moc, przewiduj wpływ wiatru, wykorzystuj ukształtowanie terenu oraz zadawaj obrażenia bezpośrednie i odłamkowe.
 
-- **Tensometr:** ustawia kąt działa w zakresie gry.
-- **Klawiatura:** `W` lub `↑` — zwiększ kąt; `S` lub `↓` — zmniejsz kąt; `+` lub `=` — zwiększ siłę; `-` — zmniejsz siłę; `SPACJA` — oddaj strzał, gdy trwa tura gracza.
-- **Wskaźniki:** zdrowie obu czołgów, runda, wynik i siła/wiatr zgodnie z informacją na ekranie.
-- **Wskazówka:** wiatr wpływa na tor pocisku. Po oddaniu strzału poczekaj na zakończenie lotu i ruch przeciwnika; nie można oddać kolejnego strzału w trakcie aktywnego pocisku.
+- **Tensometr:** ustawia kąt działa w zakresie 15–80°; wartość 0–100% jest mapowana liniowo na ten zakres.
+- **Mysz:** przesuwaj kursor w prawo od lufy, aby ustawić kąt zgodnie z kierunkiem celowania. Linia z punktów pokazuje przewidywany tor pocisku. Kliknięcie lewym przyciskiem oddaje strzał.
+- **Klawiatura:** `W` lub `↑` — zwiększ kąt o 2°; `S` lub `↓` — zmniejsz kąt o 2°; `+` lub `=` — zwiększ moc; `-` — zmniejsz moc; `SPACJA` — oddaj strzał w swojej turze.
+- **Kółko myszy:** zwiększa lub zmniejsza moc o 4 punkty procentowe na stopień przewinięcia. Moc jest ograniczona do 35–100%.
+- **Balistyka:** tor uwzględnia grawitację i wiatr. Wiatr zmienia się po każdym trafieniu lub upadku pocisku; obserwuj jego wartość przed następnym strzałem.
+- **Eksplozje:** trafienie bezpośrednie zadaje większe obrażenia. Bliski wybuch może uszkodzić czołg także bez bezpośredniego kontaktu; siła obrażeń maleje wraz z odległością od środka wybuchu. Moc strzału wpływa na promień i głębokość krateru.
+- **Teren:** kratery pozostają na planszy i zmieniają ukształtowanie podłoża, wpływając na położenie czołgów i kolejne strzały.
+- **Postęp:** pokonanie przeciwnika rozpoczyna następną rundę, przywraca mu pełne zdrowie i odnawia część zdrowia gracza.
+- **Wskaźniki:** zdrowie obu czołgów, runda, wynik, moc, kąt, wiatr i informacja o aktualnej turze.
+- **Ważne:** oddanie strzału jest możliwe wyłącznie w turze gracza i gdy poprzedni pocisk zakończył lot. Start/pauza/reset pozostają w interfejsie treningowym.
 
 ## Skrócona tabela sterowania
 
@@ -121,7 +127,7 @@
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
 | Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, przytrzymaj `SPACJĘ` |
-| Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
+| Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA`, mysz i kółko myszy |
 
 ## Uwaga o wersjach i rozszerzeniach
 
