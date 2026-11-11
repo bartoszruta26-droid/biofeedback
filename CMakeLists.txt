@@ -345,6 +345,7 @@ if(Qt5_FOUND)
         src/games/ScorchedEarthGame.cpp
         src/games/PrecisionCraneGame.cpp
         src/games/RhythmForceGame.cpp
+        src/games/ForceMazeGame.cpp
         src/formulas.cpp
     )
 
@@ -382,6 +383,7 @@ if(Qt5_FOUND)
         include/games/ScorchedEarthGame.hpp
         include/games/PrecisionCraneGame.hpp
         include/games/RhythmForceGame.hpp
+        include/games/ForceMazeGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -454,6 +456,7 @@ if(Qt5_FOUND)
         src/games/ScorchedEarthGame.cpp
         src/games/PrecisionCraneGame.cpp
         src/games/RhythmForceGame.cpp
+        src/games/ForceMazeGame.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
         include/games/GameEngine.hpp
@@ -469,6 +472,7 @@ if(Qt5_FOUND)
         include/games/ScorchedEarthGame.hpp
         include/games/PrecisionCraneGame.hpp
         include/games/RhythmForceGame.hpp
+        include/games/ForceMazeGame.hpp
         include/sensor/SerialCommunication.hpp
         include/core/DebugManager.hpp
     )
@@ -521,6 +525,7 @@ if(Qt5_FOUND)
         src/games/ScorchedEarthGame.cpp
         src/games/PrecisionCraneGame.cpp
         src/games/RhythmForceGame.cpp
+        src/games/ForceMazeGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
@@ -539,6 +544,7 @@ if(Qt5_FOUND)
         include/games/ScorchedEarthGame.hpp
         include/games/PrecisionCraneGame.hpp
         include/games/RhythmForceGame.hpp
+        include/games/ForceMazeGame.hpp
         include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)
