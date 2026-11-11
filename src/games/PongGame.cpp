@@ -241,10 +241,8 @@ void PongGame::adaptToSize()
     // Tall, narrow paddles: their width is deliberately independent of height.
     m_paddleHeight = qBound(54.0f * scale,
         static_cast<float>(newSize.height()) * 0.23f, 112.0f * scale);
-    m_paddleWidth = qBound(7.0f * scale,
-        static_cast<float>(newSize.width()) * 0.018f, 17.0f * scale);
-    m_paddleMargin = qBound(12.0f * scale,
-        static_cast<float>(newSize.width()) * 0.035f, 25.0f * scale);
+    m_paddleWidth = qBound(8.0f * scale, 11.5f * scale, 16.0f * scale);
+    m_paddleMargin = 22.0f * scale;
     m_ballRadius = qBound(5.0f * scale,
         static_cast<float>(qMin(newSize.width(), newSize.height())) * 0.016f, 11.0f * scale);
     m_aiSpeed = (80.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
