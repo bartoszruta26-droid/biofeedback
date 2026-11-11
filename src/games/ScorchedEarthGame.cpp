@@ -215,7 +215,7 @@ void ScorchedEarthGame::update(double deltaTime)
     for (const Projectile& projectile : m_projectiles)
         m_previousProjectilePositions.push_back(projectile.position);
 
-    const bool sensorFresh = m_hasSensorSample &&
+    const bool sensorFresh = m_hasSensorSample && m_sensorClock.isValid() &&
                              m_sensorClock.elapsed() <= 350;
     if (m_projectiles.isEmpty() && m_playerTurn) {
         if (sensorFresh) {
