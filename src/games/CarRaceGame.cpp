@@ -2,6 +2,8 @@
 #include <QKeyEvent>
 #include <QResizeEvent>
 #include <QPainter>
+#include <QLinearGradient>
+#include <QPolygonF>
 #include <QFont>
 #include <algorithm>
 #include <cmath>
