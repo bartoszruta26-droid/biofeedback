@@ -63,6 +63,9 @@ private:
     double m_gestureSeconds;
     double m_animationTime;
     double m_sway;
+    double m_swayVelocity;
+    double m_previousCarriageX;
+    double m_trolleyVelocity;
     double m_cargoX;
     double m_targetX;
     double m_targetWidth;
