@@ -10,6 +10,7 @@
 #include "games/ScorchedEarthGame.hpp"
 #include "games/PrecisionCraneGame.hpp"
 #include "games/RhythmForceGame.hpp"
+#include "games/ForceMazeGame.hpp"
 #include <QApplication>
 #include <QTemporaryDir>
 #include <QFile>
@@ -55,6 +56,11 @@ struct PrecisionCraneGameTestAccess
         game.m_hookY = game.floorY() - game.cargoRect().height() - 18.0;
         game.deliverOrDropLoad();
     }
+};
+
+struct ForceMazeGameTestAccess
+{
+    static void advance(ForceMazeGame& game, double deltaTime) { game.update(deltaTime); }
 };
 
 struct RhythmForceGameTestAccess
@@ -151,7 +157,8 @@ int main(int argc, char **argv)
         QStringLiteral("car_race"),
         QStringLiteral("scorched_earth"),
         QStringLiteral("precision_crane"),
-        QStringLiteral("rhythm_force")
+        QStringLiteral("rhythm_force"),
+        QStringLiteral("force_maze")
     };
 
     for (const QString& id : ids) {
@@ -170,6 +177,34 @@ int main(int argc, char **argv)
         game->stop();
         REQUIRE(!game->isRunning());
     }
+
+    // One-axis force steering, neutral rearming and fail-closed timeout.
+    std::unique_ptr<games::GameEngine> forceMazeBase(games::createGame(QStringLiteral("force_maze")));
+    auto* forceMaze = dynamic_cast<games::ForceMazeGame*>(forceMazeBase.get());
+    REQUIRE(forceMaze != nullptr);
+    REQUIRE(forceMaze->gameName().contains(QStringLiteral("Force Maze")));
+    forceMaze->resize(640, 480);
+    forceMaze->start();
+    REQUIRE(forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(0.0);
+    REQUIRE(!forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(100.0);
+    games::ForceMazeGameTestAccess::advance(*forceMaze, 0.25);
+    REQUIRE(forceMaze->hasFreshSignal());
+    REQUIRE(forceMaze->playerColumn() > 4.0);
+    REQUIRE(forceMaze->progressRows() > 0.0);
+    games::ForceMazeGameTestAccess::advance(*forceMaze, 0.40);
+    REQUIRE(!forceMaze->hasFreshSignal());
+    const double forceMazeFrozenProgress = forceMaze->progressRows();
+    games::ForceMazeGameTestAccess::advance(*forceMaze, 0.50);
+    REQUIRE(std::abs(forceMaze->progressRows() - forceMazeFrozenProgress) < 0.0001);
+    forceMaze->handleSensorInput(90.0);
+    REQUIRE(forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(0.0);
+    REQUIRE(!forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    REQUIRE(forceMaze->hasFreshSignal());
+    forceMaze->stop();
 
     std::unique_ptr<games::GameEngine> arkanoid(games::createGame(QStringLiteral("arkanoid")));
     auto* arkanoidGame = dynamic_cast<games::ArkanoidGame*>(arkanoid.get());
