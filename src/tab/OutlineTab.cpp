@@ -710,6 +710,9 @@ void OutlineTab::setupUI()
     auto* metricsBrowser = new QTextBrowser(metricsPage);
     metricsBrowser->setObjectName(QStringLiteral("forceAnalysisMetrics"));
     metricsBrowser->setMinimumHeight(145);
+    auto* comparisonBrowser = new QTextBrowser(metricsPage);
+    comparisonBrowser->setObjectName(QStringLiteral("forceSessionComparison"));
+    comparisonBrowser->setMaximumHeight(125);
     auto* saveSeriesButton = new QPushButton(tr("Zapisz bieżący przebieg"), metricsPage);
     saveSeriesButton->setObjectName(QStringLiteral("saveForceSeries"));
     auto* savedSeriesCombo = new QComboBox(metricsPage);
@@ -719,6 +722,7 @@ void OutlineTab::setupUI()
     auto* overlay = new ForceOverlayWidget(metricsPage);
     overlay->setObjectName(QStringLiteral("forceSeriesOverlay"));
     metricsLayout->addWidget(metricsBrowser);
+    metricsLayout->addWidget(comparisonBrowser);
     auto* seriesControls = new QHBoxLayout();
     seriesControls->addWidget(saveSeriesButton);
     seriesControls->addWidget(savedSeriesCombo, 1);
@@ -801,7 +805,7 @@ void OutlineTab::setupUI()
                                  tr("Zapisano serię pomiarową w lokalnym archiwum aplikacji."));
     });
     connect(compareSeriesButton, &QPushButton::clicked, this,
-            [this, savedSeriesCombo, overlay, metricsBrowser]() {
+            [this, savedSeriesCombo, overlay, metricsBrowser, comparisonBrowser]() {
         QVector<ForceSeries> selected;
         if (m_forceGraph && m_forceGraph->dataPointCount() >= 2)
             selected.push_back({tr("Bieżący przebieg"), m_forceGraph->getData()});
@@ -839,7 +843,7 @@ void OutlineTab::setupUI()
                 return before == 0.0 ? QStringLiteral("n/d")
                     : QString("%1%").arg((now - before) * 100.0 / std::abs(before), 0, 'f', 1);
             };
-            metricsBrowser->append(tr(
+            comparisonBrowser->setHtml(tr(
                 "<h4>Zmiana względem zapisanej sesji</h4><table>"
                 "<tr><th>Parametr</th><th>Poprzednio</th><th>Obecnie</th><th>Zmiana względna</th></tr>"
                 "<tr><td>Średnia siła</td><td>%1 N</td><td>%2 N</td><td>%3</td></tr>"
