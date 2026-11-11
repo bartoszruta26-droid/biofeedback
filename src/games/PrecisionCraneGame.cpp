@@ -71,37 +71,44 @@ QString PrecisionCraneGame::gameName() const
 void PrecisionCraneGame::setDifficultyLevel(int level)
 {
     m_difficulty = qBound(1, level, 5);
-    m_targetWidth = 0.18 - (m_difficulty - 1) * 0.022;
+    m_targetWidth = 0.22 - (m_difficulty - 1) * 0.015;
 }
 
 double PrecisionCraneGame::floorY() const
 {
-    return qMax(180.0, static_cast<double>(height()) * 0.82);
+    return qMax(180.0 * qMax(0.5, height() / 480.0),
+                 static_cast<double>(height()) * 0.82);
 }
 
 double PrecisionCraneGame::clampCarriage(double x) const
 {
-    const double left = qMax(42.0, width() * 0.08);
+    const double left = qMax(42.0 * qMax(0.5, width() / 640.0), width() * 0.08);
     const double right = qMax(left + 1.0, width() * 0.92);
     return qBound(left, x, right);
 }
 
 QRectF PrecisionCraneGame::cargoRect() const
 {
-    const double size = qBound(22.0, width() * 0.055 * std::sqrt(m_cargoMassKg), 56.0);
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double size = qBound(22.0 * scaleX,
+        width() * 0.055 * std::sqrt(m_cargoMassKg), 56.0 * scaleX);
     const double swingRatio = qBound(-0.42, m_sway / qMax(1.0, m_ropeLength), 0.42);
     const double verticalSwing = m_loadAttached
         ? m_ropeLength * (1.0 - std::cos(std::asin(swingRatio))) : 0.0;
     const double y = m_loadAttached
-        ? qMin(m_hookY + 18.0 + verticalSwing, floorY() - size) : floorY() - size;
+        ? qMin(m_hookY + 18.0 * scaleY + verticalSwing, floorY() - size) : floorY() - size;
     const double x = m_loadAttached ? m_carriageX + m_sway - size * 0.5 : m_cargoX * width() - size * 0.5;
     return QRectF(x, y, size, size);
 }
 
 QRectF PrecisionCraneGame::targetRect() const
 {
-    const double w = qMax(34.0, width() * m_targetWidth);
-    return QRectF(m_targetX * width() - w * 0.5, floorY() - 9.0, w, 9.0);
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double w = qMax(34.0 * scaleX, width() * m_targetWidth);
+    return QRectF(m_targetX * width() - w * 0.5, floorY() - 9.0 * scaleY,
+                  w, 9.0 * scaleY);
 }
 
 void PrecisionCraneGame::resetRound()
@@ -292,7 +299,7 @@ void PrecisionCraneGame::update(double deltaTime)
             m_carriageX += (desired - m_carriageX) * (1.0 - std::exp(-dt * 7.0));
         } else {
             const double top = height() * 0.28;
-            const double bottom = floorY() - 42.0;
+            const double bottom = floorY() - 42.0 * qMax(0.5, height() / 480.0);
             const double desired = top + control * (bottom - top);
             m_hookY += (desired - m_hookY) * (1.0 - std::exp(-dt * 7.0));
         }
@@ -309,7 +316,8 @@ void PrecisionCraneGame::update(double deltaTime)
     m_trolleyVelocity = trolleyVelocity;
     if (m_loadAttached) {
         const double ropeLength = qBound(70.0, m_ropeLength, qMax(71.0, floorY() - h * 0.20));
-        const double naturalFrequencySquared = 980.0 / (ropeLength * m_cargoMassKg);
+        const double naturalFrequencySquared =
+            (980.0 * qMax(0.5, height() / 480.0)) / (ropeLength * m_cargoMassKg);
         const double damping = 1.15 / std::sqrt(m_cargoMassKg);
         const double swayAcceleration = -naturalFrequencySquared * m_sway
                                         - damping * m_swayVelocity
@@ -329,10 +337,14 @@ QRectF PrecisionCraneGame::obstacleRect(int index) const
 {
     if (index < 0 || index >= m_obstacles.size()) return QRectF();
     const MovingObstacle& obstacle = m_obstacles.at(index);
-    const double travel = qMax(0.0, width() - obstacle.width - 2.0 * width() * 0.12);
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    const double obstacleWidth = obstacle.width * scaleX;
+    const double obstacleHeight = obstacle.height * scaleY;
+    const double travel = qMax(0.0, width() - obstacleWidth - 2.0 * width() * 0.12);
     const double phase = m_obstacleClock * obstacle.speed + obstacle.phase;
     const double x = width() * 0.12 + (travel * 0.5) * (1.0 + std::sin(phase));
-    return QRectF(x, obstacle.y * height(), obstacle.width, obstacle.height);
+    return QRectF(x, obstacle.y * height(), obstacleWidth, obstacleHeight);
 }
 
 bool PrecisionCraneGame::checkObstacleCollision()
@@ -370,8 +382,9 @@ void PrecisionCraneGame::configureCargo()
     m_cargoType = variant == 0 ? LightCargo : (variant == 1 ? StandardCargo : HeavyCargo);
     m_cargoMassKg = m_cargoType == LightCargo ? 0.65 :
                     (m_cargoType == HeavyCargo ? 1.65 : 1.0);
-    m_ropeLength = m_cargoType == LightCargo ? 118.0 :
-                   (m_cargoType == HeavyCargo ? 205.0 : 155.0);
+    m_ropeLength = (m_cargoType == LightCargo ? 118.0 :
+                    (m_cargoType == HeavyCargo ? 205.0 : 155.0)) *
+                   qMax(0.5, height() / 480.0);
 }
 
 void PrecisionCraneGame::loadRecords()
@@ -418,9 +431,24 @@ void PrecisionCraneGame::saveRecords()
 
 void PrecisionCraneGame::resizeEvent(QResizeEvent *event)
 {
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        m_carriageX *= scaleX;
+        m_previousCarriageX *= scaleX;
+        m_trolleyVelocity *= scaleX;
+        m_sway *= scaleX;
+        m_swayVelocity *= scaleX;
+        m_hookY *= scaleY;
+        m_ropeLength *= scaleY;
+    }
     GameEngine::resizeEvent(event);
     m_carriageX = clampCarriage(m_carriageX);
-    m_hookY = qBound(height() * 0.24, m_hookY, floorY() - 35.0);
+    m_hookY = qBound(height() * 0.24, m_hookY,
+                     floorY() - 35.0 * qMax(0.5, height() / 480.0));
 }
 
 void PrecisionCraneGame::render(QPainter& painter)
