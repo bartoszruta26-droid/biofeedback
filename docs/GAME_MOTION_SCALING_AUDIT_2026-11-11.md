@@ -27,3 +27,27 @@ Wstępny przegląd źródeł wskazuje, że gry używają różnych polityk skalo
 3. Brak zmiany kierunku bez rzeczywistego kontaktu z powierzchnią kolizyjną.
 4. Brak wzrostu trudności wynikającego wyłącznie z rozdzielczości lub proporcji ekranu.
 5. Testy regresyjne dla zmiany rozmiaru podczas gry, utraty sygnału i wznowienia.
+
+## Etap 2 — wspólna prezentacja i migracja wybranych gier
+
+Wspólny kontrakt renderowania został dodany do GameEngine:
+
+- fizyka pozostaje na stałym kroku 120 Hz;
+- silnik wylicza współczynnik interpolacji z reszty akumulatora czasu;
+- renderInterpolated(painter, alpha) jest domyślnie zgodny wstecz z render(painter), więc gry można migrować etapami;
+- interpolacja dotyczy wyłącznie prezentacji i nie zmienia czasu symulacji, kolizji ani danych wejściowych HX711;
+- po wznowieniu gry i resecie współczynnik interpolacji jest zerowany.
+
+Gry, które w tej iteracji przejęły interpolację stanu ruchu:
+
+- Pong — piłka i obie paletki;
+- Arkanoid — piłka i paletka;
+- Archer — strzały i ruchomy cel;
+- Mario — postać, przesuw świata, przeszkody, przeciwnicy, przedmioty i chmurki;
+- Scorched Earth — pociski.
+
+Pozostałe gry nadal korzystają z domyślnego renderowania. Nie należy uznawać migracji całego katalogu za zakończoną. Następne do migracji i testów są przede wszystkim Galaga, Flappy Bird, Car Race, Precision Crane, Balance Tower i Force Maze.
+
+## Ograniczenia weryfikacji etapu 2
+
+Zmiany zostały zapisane w gałęzi PR. Repozytorium nie zgłosiło workflow runs ani status checks dla aktualnego commita. Kompilacja i testy uruchomieniowe nie zostały zatem potwierdzone. Przed scaleniem trzeba zbudować wszystkie cele Qt5 i wykonać game_engine_regression, game_factory_regression oraz pozostałe testy CTest.
