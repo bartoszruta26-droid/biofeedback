@@ -2,12 +2,10 @@
 
 #include <QFont>
 #include <QFontMetrics>
-#include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPaintEvent>
 #include <QPen>
-#include <QRadialGradient>
 #include <QSettings>
 #include <algorithm>
 #include <cmath>
@@ -423,25 +421,20 @@ void ReactionForceGame::render(QPainter& painter)
     const int cueSize = qBound(18, qRound(unit * 46.0), 54);
     const qreal line = qMax<qreal>(1.0, unit * 1.5);
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::TextAntialiasing, true);
-    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
 
-    QLinearGradient background(0.0, 0.0, w, h);
-    background.setColorAt(0.0, QColor(5, 12, 28));
-    background.setColorAt(0.52, QColor(9, 28, 51));
-    background.setColorAt(1.0, QColor(15, 12, 38));
-    painter.fillRect(rect(), background);
+    painter.fillRect(rect(), QColor(8, 19, 38));
+    // Low-cost animated light pools use a small fixed number of translucent
+    // solid ellipses instead of per-frame gradient shader work.
     const QPointF glowA(w * (0.18 + 0.025 * std::sin(m_visualTime * 0.31)), h * 0.18);
     const QPointF glowB(w * 0.82, h * (0.48 + 0.025 * std::cos(m_visualTime * 0.27)));
-    QRadialGradient atmosphereA(glowA, qMax(w, h) * 0.48);
-    atmosphereA.setColorAt(0.0, QColor(20, 105, 150, 54));
-    atmosphereA.setColorAt(1.0, QColor(20, 105, 150, 0));
-    painter.fillRect(rect(), atmosphereA);
-    QRadialGradient atmosphereB(glowB, qMax(w, h) * 0.38);
-    atmosphereB.setColorAt(0.0, QColor(80, 55, 160, 34));
-    atmosphereB.setColorAt(1.0, QColor(80, 55, 160, 0));
-    painter.fillRect(rect(), atmosphereB);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(20, 105, 150, 18));
+    painter.drawEllipse(glowA, qMax(w, h) * 0.19, qMax(w, h) * 0.19);
+    painter.setBrush(QColor(20, 105, 150, 12));
+    painter.drawEllipse(glowA, qMax(w, h) * 0.29, qMax(w, h) * 0.29);
+    painter.setBrush(QColor(80, 55, 160, 14));
+    painter.drawEllipse(glowB, qMax(w, h) * 0.17, qMax(w, h) * 0.17);
 
     const QRectF header(margin, margin * 0.55, w - 2.0 * margin, h * 0.105);
     painter.setPen(QColor(239, 247, 255));
@@ -458,20 +451,15 @@ void ReactionForceGame::render(QPainter& painter)
 
     // 2.5D arena with a converging horizon and perspective floor grid.
     const QRectF arena(margin, h * 0.19, w - 2.0 * margin, h * 0.445);
-    QLinearGradient arenaFill(arena.topLeft(), arena.bottomLeft());
-    arenaFill.setColorAt(0.0, QColor(10, 35, 61, 235));
-    arenaFill.setColorAt(1.0, QColor(7, 17, 36, 248));
     painter.setPen(QPen(QColor(53, 115, 155, 180), line));
-    painter.setBrush(arenaFill);
+    painter.setBrush(QColor(8, 24, 45));
     painter.drawRoundedRect(arena, qMax(6.0, unit * 12.0), qMax(6.0, unit * 12.0));
     painter.save();
     painter.setClipRect(arena.adjusted(line, line, -line, -line));
     const qreal horizonY = arena.top() + arena.height() * 0.19;
     const qreal centerX = arena.center().x();
-    QLinearGradient horizon(0.0, horizonY, 0.0, arena.bottom());
-    horizon.setColorAt(0.0, QColor(35, 115, 160, 0));
-    horizon.setColorAt(1.0, QColor(25, 105, 150, 62));
-    painter.fillRect(QRectF(arena.left(), horizonY, arena.width(), arena.bottom() - horizonY), horizon);
+    painter.fillRect(QRectF(arena.left(), horizonY, arena.width(), arena.bottom() - horizonY),
+                     QColor(25, 105, 150, 24));
     painter.setPen(QPen(QColor(58, 133, 174, 76), line * 0.8));
     for (int i = -6; i <= 6; ++i) {
         const qreal bottomX = centerX + arena.width() * i * 0.115;
@@ -494,12 +482,13 @@ void ReactionForceGame::render(QPainter& painter)
     const qreal radius = baseRadius * (1.0 + pulse * (m_phase == Go ? 0.25 : 0.12));
     const QColor accent = m_phase == Go ? QColor(76, 255, 174)
         : (m_phase == Delay ? QColor(90, 190, 255) : QColor(242, 190, 92));
-    QRadialGradient targetGlow(target, radius * 2.9);
-    targetGlow.setColorAt(0.0, QColor(accent.red(), accent.green(), accent.blue(), 105));
-    targetGlow.setColorAt(1.0, QColor(accent.red(), accent.green(), accent.blue(), 0));
     painter.setPen(Qt::NoPen);
-    painter.setBrush(targetGlow);
-    painter.drawEllipse(target, radius * 2.9, radius * 2.9);
+    painter.setBrush(QColor(accent.red(), accent.green(), accent.blue(), 16));
+    painter.drawEllipse(target, radius * 2.8, radius * 2.8);
+    painter.setBrush(QColor(accent.red(), accent.green(), accent.blue(), 28));
+    painter.drawEllipse(target, radius * 2.0, radius * 2.0);
+    painter.setBrush(QColor(accent.red(), accent.green(), accent.blue(), 45));
+    painter.drawEllipse(target, radius * 1.35, radius * 1.35);
     painter.setPen(QPen(accent, qMax<qreal>(1.5, line * 2.0)));
     painter.setBrush(QColor(8, 25, 43, 210));
     painter.drawEllipse(target, radius, radius);
