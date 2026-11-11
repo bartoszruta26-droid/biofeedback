@@ -41,6 +41,8 @@ void ArcherGame::initialize()
     m_targetSpeed = 55.0 * scaleY;
     m_gravity = 260.0 * scaleY;
     m_fireCooldown = m_autoFireInterval;
+    m_sensorClock.invalidate();
+    m_hasSensorSample = false;
     m_shotsFired = 0;
     m_successfulHits = 0;
     m_missedShots = 0;
@@ -85,6 +87,8 @@ bool ArcherGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
     m_force = qBound(0.0, value / 100.0, 1.0);
+    m_sensorClock.restart();
+    m_hasSensorSample = true;
     m_aimAngle = 0.55 - m_force * 1.25;
     return true;
 }
@@ -119,9 +123,15 @@ void ArcherGame::update(double deltaTime)
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
     deltaTime = qMin(deltaTime, 0.1);
-    m_fireCooldown -= deltaTime;
-    if (m_fireCooldown <= 0.0) {
-        fireArrow();
+    const bool sensorFresh = m_hasSensorSample && m_sensorClock.isValid() &&
+                              m_sensorClock.elapsed() <= 350;
+    if (sensorFresh) {
+        m_fireCooldown -= deltaTime;
+        if (m_fireCooldown <= 0.0) {
+            fireArrow();
+            m_fireCooldown = m_autoFireInterval;
+        }
+    } else {
         m_fireCooldown = m_autoFireInterval;
     }
     const double aimDirection = (m_aimDown ? 1.0 : 0.0) - (m_aimUp ? 1.0 : 0.0);
