@@ -194,7 +194,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 ### 4.1. Precision Crane — dźwig precyzyjny
 
-**Status:** pierwsza grywalna wersja zaimplementowana i scalona do `main` (PR #270). Uzupełniono zabezpieczenie fail-closed po utracie świeżości sygnału: po 350 ms ruch zostaje zatrzymany, gest anulowany, a wskazanie siły zerowane do prezentacji neutralnej; próbki NaN/Inf nie odświeżają watchdogu. Dodano regresje utraty/przywrócenia sygnału i rozróżniania krótkiego impulsu od gestu poniżej minimalnego czasu.
+**Status:** pierwsza grywalna wersja zaimplementowana i scalona do `main` (PR #270). Uzupełniono zabezpieczenie fail-closed po utracie świeżości sygnału: po 350 ms ruch zostaje zatrzymany, gest anulowany, a wskazanie siły zerowane do prezentacji neutralnej; próbki NaN/Inf nie odświeżają watchdogu. Dodano regresje utraty/przywrócenia sygnału i rozróżniania krótkiego impulsu od gestu poniżej minimalnego czasu. Ostatni potwierdzony zestaw CI dla commita `9622d1fd` zakończył się sukcesem na Linux Qt5, Raspberry Pi ARM64 Debian Trixie, regresji bezpieczeństwa i prywatności. Test integracyjny obejmuje pełną dostawę oraz kolejność aktualizacji najlepszego wyniku. Dalsze rozszerzenie testów na `main` sprawdza rotację trzech typów ładunków po trzech pełnych dostawach (commit `c0daf848`); jego CI jest uruchomione.
 
 - **Grafika:** port w widoku bocznym, suwnica z prowadnicą, wózek jezdny, lina, hak, ładunek, strefa odbioru, woda i tło portowe. Kołysanie podwieszonego ładunku sygnalizuje bezwładność.
 - **Funkcje:** podnoszenie i opuszczanie ładunku, transport poziomy, precyzyjne dostawy, serie udanych dostaw, premie punktowe, trzy pomyłki na sesję i pięć poziomów trudności ze zwężającą się strefą celu.
