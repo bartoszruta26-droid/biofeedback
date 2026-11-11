@@ -79,6 +79,9 @@ void TanGame::initialize()
     m_accuracyWindowHitSeconds = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     updateSpatialFrequency();
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
 }
 
 void TanGame::updateSpatialFrequency()
