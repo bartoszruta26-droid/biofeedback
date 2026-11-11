@@ -532,8 +532,8 @@ void RhythmForceGame::render(QPainter &painter)
         painter.drawText(QRectF(panel.left() + 12, panel.top() + 80,
                                 panel.width() - 24, 22),
                          Qt::AlignCenter, summary);
-        const QString streak = QStringLiteral("Seria rundy: %1    Rekord serii: %2    Rekord punktów: %3")
-            .arg(m_bestCombo).arg(m_personalBestCombo).arg(m_personalBestScore);
+        const QString streak = QStringLiteral("Rekord punktów: %1    Celność: %2%    Seria: %3")
+            .arg(m_personalBestScore).arg(m_personalBestAccuracy, 0, 'f', 1).arg(m_personalBestCombo);
         painter.drawText(QRectF(panel.left() + 12, panel.top() + 106,
                                 panel.width() - 24, 22),
                          Qt::AlignCenter, streak);
@@ -561,7 +561,7 @@ void RhythmForceGame::render(QPainter &painter)
                                 panel.width() - 24, panel.height() - 140),
                          Qt::AlignCenter, recent.isEmpty()
                             ? QStringLiteral("Pierwsze osiągnięcia wciąż przed Tobą")
-                            : QStringLiteral("ODBLOCKOWANE: %1").arg(recent.join(QStringLiteral("  •  "))));
+                            : QStringLiteral("ODBLOKOWANE: %1").arg(recent.join(QStringLiteral("  •  "))));
     }
     painter.drawText(QRect(margin, h - hudSize - margin, w - 2 * margin, hudSize + 4),
         Qt::AlignHCenter, QStringLiteral("Impuls 18–100% • zwolnienie ≤18% • dokładność %1%")
