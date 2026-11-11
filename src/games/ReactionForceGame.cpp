@@ -2,6 +2,7 @@
 
 #include <QFont>
 #include <QPainter>
+#include <QPaintEvent>
 #include <QPen>
 #include <QSettings>
 #include <algorithm>
@@ -372,6 +373,13 @@ void ReactionForceGame::update(double deltaTime)
     }
 }
 
+void ReactionForceGame::paintEvent(QPaintEvent* event)
+{
+    Q_UNUSED(event);
+    QPainter painter(this);
+    render(painter);
+}
+
 void ReactionForceGame::render(QPainter& painter)
 {
     const int w = width();
@@ -475,6 +483,28 @@ void ReactionForceGame::render(QPainter& painter)
     painter.setPen(QColor(135, 160, 190));
     painter.drawText(QRect(margin, h - margin - smallSize - 4, w - 2 * margin, smallSize + 4),
                      Qt::AlignRight, QStringLiteral("TRUDNOŚĆ %1/5").arg(m_difficulty));
+
+    if (m_roundCompleted) {
+        const QRectF panel(w * 0.12, h * 0.28, w * 0.76, h * 0.43);
+        painter.setPen(QPen(QColor(75, 180, 145), 2));
+        painter.setBrush(QColor(5, 18, 32, 245));
+        painter.drawRoundedRect(panel, 12, 12);
+        painter.setPen(QColor(100, 245, 170));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(20, h / 13, 38), QFont::Bold));
+        painter.drawText(QRectF(panel.left() + 12, panel.top() + 12, panel.width() - 24, h * 0.08),
+                         Qt::AlignCenter, QStringLiteral("RUNDA ZAKOŃCZONA"));
+        painter.setPen(QColor(235, 244, 255));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qBound(14, h / 23, 24), QFont::DemiBold));
+        const QString summary = QStringLiteral("Wynik: %1 pkt     Trafienia: %2/%3     Pudła: %4\n"
+                                                "Najlepsza seria: %5     Perfekcyjne reakcje: %6\n"
+                                                "Falstarty: %7     Najlepsza reakcja: %8 ms")
+            .arg(getScore()).arg(m_hits).arg(kTotalTrials).arg(m_misses)
+            .arg(m_bestCombo).arg(m_perfectHits).arg(m_falseStarts)
+            .arg(m_personalBestReactionMs > 0.0 ? qRound(m_personalBestReactionMs) : 0);
+        painter.drawText(QRectF(panel.left() + 22, panel.top() + h * 0.11,
+                                panel.width() - 44, panel.height() - h * 0.14),
+                         Qt::AlignCenter, summary);
+    }
 
     if (m_toastTime > 0.0 && !m_lastAchievement.isEmpty()) {
         painter.setPen(QColor(255, 220, 110));
