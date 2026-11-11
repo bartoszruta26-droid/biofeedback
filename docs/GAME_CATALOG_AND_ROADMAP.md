@@ -68,7 +68,7 @@ Wspólny potok pomiarowy przekazuje skalibrowaną siłę w niutonach. Test `test
 
 ### 2.2. Istniejące gry
 
-W katalogach `src/games` i `include/games` znajduje się dziesięć gier:
+W katalogach `src/games` i `include/games` znajduje się dwanaście gier:
 
 1. Sinus Force Trainer — `SinGame.cpp`
 2. Tan Force Trainer — `TanGame.cpp`
@@ -80,6 +80,8 @@ W katalogach `src/games` i `include/games` znajduje się dziesięć gier:
 8. Archer Force Trainer — `ArcherGame.cpp`
 9. Galaga — `GalagaGame.cpp`
 10. Scorched Earth — `ScorchedEarthGame.cpp`
+11. Precision Crane — `PrecisionCraneGame.cpp`
+12. Rhythm Force — `RhythmForceGame.cpp`
 
 Aktualny opis zachowania znajduje się w `docs/GAME_CONTROLS.md`. Audyt tej instrukcji wykazał rozbieżność z nową zasadą: dokument nadal opisuje skróty klawiaturowe, a w Car Race, Archer, Galaga i Scorched Earth klawiatura jest opisana jako część sterowania. Przed uznaniem całego katalogu za zgodny należy usunąć te ścieżki wejściowe i dodać testy, które wykryją ich ponowne wprowadzenie. Należy również sprawdzić zmiany w otwartych PR-ach dotyczących Mario Run, Archer i Scorched Earth — część opisów tych prac wymienia sterowanie klawiaturą.
 
