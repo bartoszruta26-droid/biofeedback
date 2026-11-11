@@ -355,6 +355,7 @@ void ReactionForceGame::update(double deltaTime)
 {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+    m_previousVisualTime = m_visualTime;
 
     const double dt = qMin(deltaTime, 0.1);
     m_visualTime += dt;
@@ -403,11 +404,23 @@ void ReactionForceGame::update(double deltaTime)
     }
 }
 
+void ReactionForceGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    const double currentVisualTime = m_visualTime;
+    m_visualTime = m_previousVisualTime +
+        (currentVisualTime - m_previousVisualTime) * qBound(0.0, alpha, 1.0);
+    render(painter);
+    m_visualTime = currentVisualTime;
+}
+
 void ReactionForceGame::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     QPainter painter(this);
-    render(painter);
+    if (isRunning())
+        renderInterpolated(painter, renderInterpolationAlpha());
+    else
+        render(painter);
 }
 
 void ReactionForceGame::render(QPainter& painter)
