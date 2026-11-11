@@ -47,6 +47,7 @@ protected:
     void initialize() override;
     void update(double deltaTime) override;
     void render(QPainter &painter) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
     bool handleInput(double value) override;
 
 private:
@@ -82,6 +83,8 @@ private:
     int m_personalBestCombo;
     double m_personalBestAccuracy;
     double m_songTime;
+    double m_previousSongTime{0.0};
+    double m_previousVisualTime{0.0};
     double m_inputAge;
     double m_pulseElapsed;
     double m_pulseStartedAt;
