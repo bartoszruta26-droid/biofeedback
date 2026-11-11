@@ -74,6 +74,7 @@ private:
     QVector<Enemy> m_enemies;
     QVector<PowerUp> m_powerUps;
     double m_force;
+    double m_sensorInputAge;
     double m_fireCooldown;
     double m_enemyDirection;
     double m_enemyFireCooldown;
