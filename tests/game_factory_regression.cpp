@@ -479,9 +479,15 @@ int main(int argc, char **argv)
     archerGame->handleSensorInput(76.0);
     QKeyEvent archerFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(archerGame, &archerFire);
-    waitForEvents(350);
+    const auto refreshArcherSensor = [archerGame](int milliseconds, double force) {
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += 100) {
+            archerGame->handleSensorInput(force);
+            waitForEvents(100);
+        }
+    };
+    refreshArcherSensor(350, 76.0);
     REQUIRE(archerGame->shotsFired() == 0); // Keyboard input must not release an arrow.
-    waitForEvents(3200); // Automatic release follows the 2.4 s sensor-control interval.
+    refreshArcherSensor(3200, 76.0); // Keep the sensor fresh through the 2.4 s timer and flight.
     REQUIRE(archerGame->isRunning());
     REQUIRE(archerGame->shotsFired() >= 1);
     REQUIRE(archerGame->getScore() >= 10); // The aimed automatic arrow must hit the target.
@@ -500,8 +506,14 @@ int main(int argc, char **argv)
     REQUIRE(archerMissGame != nullptr);
     archerMissGame->resize(640, 480);
     archerMissGame->start();
+    const auto refreshMissSensor = [archerMissGame](int milliseconds) {
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += 100) {
+            archerMissGame->handleSensorInput(0.0);
+            waitForEvents(100);
+        }
+    };
     archerMissGame->handleSensorInput(0.0);
-    waitForEvents(3500); // The low sensor setting is released automatically after the timer.
+    refreshMissSensor(3500); // Fresh low-force samples keep the timed release armed.
     REQUIRE(archerMissGame->getScore() == 0);
     REQUIRE(archerMissGame->activeArrowCount() == 0);
     archerMissGame->stop();
@@ -589,9 +601,15 @@ int main(int argc, char **argv)
     scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire); // Must not trigger a manual shot.
-    waitForEvents(350);
+    const auto refreshArtillerySensor = [scorchedGame](int milliseconds) {
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += 100) {
+            scorchedGame->handleSensorInput(40.0);
+            waitForEvents(100);
+        }
+    };
+    refreshArtillerySensor(350);
     REQUIRE(scorchedGame->activeProjectileCount() == 0);
-    waitForEvents(4150); // Automatic release plus the full ballistic flight.
+    refreshArtillerySensor(4150); // Fresh signal, 2 s countdown and complete ballistic flight.
     REQUIRE(scorchedGame->isRunning());
     REQUIRE(scorchedGame->enemyHealth() < 100); // A real tank hit must apply damage.
     REQUIRE(scorchedGame->playerHealth() > 0);
