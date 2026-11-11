@@ -283,6 +283,33 @@ void BalanceTowerGame::update(double deltaTime)
     m_tilt *= std::exp(-deltaTime * 1.8);
 }
 
+void BalanceTowerGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double targetPosition = m_targetPosition;
+    const double targetDepth = m_targetDepth;
+    const double tilt = m_tilt;
+    const double stability = m_stability;
+    const double visualTime = m_visualTime;
+
+    m_targetPosition = m_previousTargetPosition +
+        (targetPosition - m_previousTargetPosition) * alpha;
+    m_targetDepth = m_previousTargetDepth +
+        (targetDepth - m_previousTargetDepth) * alpha;
+    m_tilt = m_previousTilt + (tilt - m_previousTilt) * alpha;
+    m_stability = m_previousStability + (stability - m_previousStability) * alpha;
+    m_visualTime = m_previousVisualTime +
+        (visualTime - m_previousVisualTime) * alpha;
+
+    render(painter);
+
+    m_targetPosition = targetPosition;
+    m_targetDepth = targetDepth;
+    m_tilt = tilt;
+    m_stability = stability;
+    m_visualTime = visualTime;
+}
+
 void BalanceTowerGame::render(QPainter &painter)
 {
     const QRectF bounds = rect();
