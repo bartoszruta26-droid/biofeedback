@@ -470,6 +470,14 @@ void TrainingTab::setupUI()
     m_sinusDifficultySpin->setVisible(false);
     configLayout->addWidget(m_sinusDifficultySpin);
 
+    m_reactionForceDifficultySpin = new QSpinBox(this);
+    m_reactionForceDifficultySpin->setRange(1, 5);
+    m_reactionForceDifficultySpin->setValue(1);
+    m_reactionForceDifficultySpin->setPrefix(QStringLiteral("Trudność Reaction Force: "));
+    m_reactionForceDifficultySpin->setToolTip(QStringLiteral("Wyższy poziom skraca czas reakcji i zawęża pasmo siły."));
+    m_reactionForceDifficultySpin->setVisible(false);
+    configLayout->addWidget(m_reactionForceDifficultySpin);
+
     m_sinusAutoDifficultyCheck = new QCheckBox(QStringLiteral("Automatyczna trudność fali"), this);
     m_sinusAutoDifficultyCheck->setChecked(false);
     m_sinusAutoDifficultyCheck->setVisible(false);
@@ -481,6 +489,14 @@ void TrainingTab::setupUI()
         m_sinusDifficultySpin->setVisible(show);
         m_sinusAutoDifficultyCheck->setVisible(show);
     };
+    const auto updateReactionForceOptionsVisibility = [this](int) {
+        const bool show = m_gameTypeCombo->currentData().toString() == QStringLiteral("reaction_force");
+        if (m_reactionForceDifficultySpin)
+            m_reactionForceDifficultySpin->setVisible(show);
+    };
+    connect(m_gameTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this, updateReactionForceOptionsVisibility);
+    updateReactionForceOptionsVisibility(m_gameTypeCombo->currentIndex());
     connect(m_gameTypeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, updateSinusOptionsVisibility);
     updateSinusOptionsVisibility(m_gameTypeCombo->currentIndex());
@@ -1020,6 +1036,10 @@ void TrainingTab::configureGameForExercise()
         sinusGame->setDifficultyLevel(m_sinusDifficultySpin ? m_sinusDifficultySpin->value() : 1);
         sinusGame->setAutomaticDifficulty(m_sinusAutoDifficultyCheck &&
                                           m_sinusAutoDifficultyCheck->isChecked());
+    }
+    if (auto* reactionGame = dynamic_cast<games::ReactionForceGame*>(selectedGame)) {
+        reactionGame->setDifficultyLevel(
+            m_reactionForceDifficultySpin ? m_reactionForceDifficultySpin->value() : 1);
     }
     setGameEngine(selectedGame);
 }
