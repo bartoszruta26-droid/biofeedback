@@ -71,21 +71,24 @@
 
 **Cel:** prowadź samochód przez trzy pasy ruchu, omijaj nadjeżdżające pojazdy, buduj wynik i używaj dopalacza w odpowiednim momencie.
 
-- **Tensometr:** steruje wyborem pasa. Niska wartość kieruje na lewy pas, środkowa utrzymuje pas środkowy, a wysoka wybiera prawy pas. Sterowanie jest filtrowane i ma strefę histerezy, więc niewielkie wahania pomiaru nie powodują ciągłego przeskakiwania między pasami.
+- **Tensometr:** steruje wyborem pasa. Niska wartość kieruje na lewy pas, środkowa utrzymuje pas środkowy, a wysoka wybiera prawy pas. Filtrowanie i histereza ograniczają przeskakiwanie między pasami przy szumie pomiarowym.
 - **Klawiatura:** `←` lub `A` — zmiana o jeden pas w lewo; `→` lub `D` — zmiana o jeden pas w prawo; `SPACJA` lub `B` — uruchomienie dopalacza.
-- **Dopalacz:** zapewnia krótkotrwały wzrost prędkości. Po użyciu ładuje się przez kilka sekund; pasek pod górnymi wskaźnikami pokazuje gotowość. Ponowne naciśnięcie podczas ładowania nie uruchamia kolejnego dopalacza.
-- **Punktacja:** wynik rośnie za przejechany dystans oraz za każdą bezpiecznie miniętą przeszkodę. Prędkość i częstotliwość ruchu rosną wraz z dystansem.
-- **Kolizje:** zderzenie odbiera jedno życie. Krótka ochrona po uderzeniu zapobiega wielokrotnemu odejmowaniu żyć w tej samej serii kontaktów; miganie samochodu sygnalizuje ochronę.
-- **Wskaźniki:** wynik, dystans, prędkość, liczba żyć i pasek dopalacza. Po utracie wszystkich żyć wyświetlany jest ekran końca gry.
+- **Dopalacz:** zwiększa prędkość na 1,8 s; po użyciu obowiązuje 5 s odnowienia. Wskaźnik na ekranie pokazuje stan dopalacza i czas odnowienia.
+- **Punktacja:** wynik rośnie za przejechany dystans i bezpieczne minięcie przeszkody. Tempo wzrasta wraz z dystansem.
+- **Kolizje:** zderzenie odbiera jedno życie. Ochrona przez 1,1 s zapobiega wielokrotnemu odejmowaniu żyć przy nakładających się kontaktach.
+- **Wskaźniki:** wynik, dystans, prędkość, liczba żyć, wybrany pas i stan dopalacza.
 
-### 8. Archer
+### 8. Archer Force Trainer
 
-**Cel:** ustaw kąt łuku i trafiaj w poruszający się cel.
+**Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego i synchronizację strzału z ruchem celu.
 
-- **Tensometr:** ustawia kąt celowania w całym dostępnym zakresie; większa wartość wejściowa unosi kąt łuku.
-- **Klawiatura:** `W` lub `↑` — podnieś celowanie; `S` lub `↓` — obniż celowanie; `SPACJA` — oddaj strzał.
-- **Wskaźniki:** wynik i aktualny kąt celowania.
-- **Wskazówka:** uwzględnij tor balistyczny strzały i ruch celu. Nie oceniaj kierunku wyłącznie na podstawie chwilowego położenia celu.
+- **Tensometr/HX711:** ustawia kąt łuku w zakresie gry. Wartość siły 0–100% jest mapowana na kąt od około +31° (niższe celowanie) do około −52° (wyższe celowanie). Zmiana siły natychmiast aktualizuje kąt.
+- **Klawiatura:** przytrzymaj `W` lub `↑`, aby płynnie podnosić kąt; przytrzymaj `S` lub `↓`, aby go obniżać. Po zwolnieniu klawisza regulacja zatrzymuje się. Podczas przytrzymania klawisza sterowanie klawiaturą ma pierwszeństwo przed próbkami tensometru; po zwolnieniu wraca sterowanie czujnikiem. `SPACJA` oddaje pojedynczy strzał; kolejne strzały są ograniczone czasem odnowienia około 320 ms.
+- **Tor lotu:** kropkowana linia pokazuje przewidywany tor strzały z uwzględnieniem grawitacji i bieżącego kąta. Jest wskazówką, a poruszający się cel może zmienić położenie przed trafieniem.
+- **Strefy celu:** zewnętrzna część tarczy daje 10 punktów, środkowa 20, a środek 30. Trafienie zwiększa prędkość celu, maksymalnie do 150 jednostek na sekundę.
+- **Statystyki:** wynik, kąt celowania, łączna liczba oddanych strzałów, trafień, pudeł i strzał w locie.
+- **Ograniczenia:** jednocześnie może istnieć maksymalnie 8 aktywnych strzał. Strzała, która opuści planszę, jest liczona jako pudło.
+- **Praktyka:** najpierw ustaw kąt tensometrem, następnie koryguj go krótkimi przytrzymaniami klawiszy. Obserwuj kropkowany tor oraz kierunek ruchu celu i oddaj strzał z wyprzedzeniem.
 
 ### 9. Galaga
 
@@ -115,13 +118,13 @@
 | Arkanoid | poziome położenie paletki | brak skrótów gry |
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
-| Car Race | wybór jednego z trzech pasów z filtrowaniem i histerezą | `←`/`A`, `→`/`D`, `SPACJA`/`B` — dopalacz |
-| Archer | kąt celowania | `W`/`↑`, `S`/`↓`, `SPACJA` |
+| Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
+| Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, przytrzymaj `SPACJĘ` |
 | Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
 
 ## Uwaga o wersjach i rozszerzeniach
 
-Niektóre usprawnienia sterowania są rozwijane w osobnych gałęziach i PR-ach. Dopóki nie zostaną scalone z gałęzią integracyjną, nie należy traktować ich jako dostępnych w tej wersji aplikacji. Dotyczy to między innymi dodatkowych skrótów kalibracji, alternatywnych przebiegów ćwiczeń oraz sterowania myszą w wybranych grach. Opis dopalacza Car Race odpowiada implementacji w gałęzi, do której odnosi się ta aktualizacja.
+Niektóre usprawnienia sterowania są rozwijane w osobnych gałęziach i PR-ach. Dopóki nie zostaną scalone z gałęzią integracyjną, nie należy traktować ich jako dostępnych w tej wersji aplikacji. Dotyczy to między innymi dodatkowych skrótów kalibracji, adaptacyjnej trudności, alternatywnych przebiegów ćwiczeń oraz sterowania myszą w wybranych grach.
 
 Przy zmianie sterowania w kodzie należy zaktualizować ten plik oraz teksty instruktażowe wyświetlane bezpośrednio w grze. Każdy skrót powinien mieć test regresyjny, a opis powinien odpowiadać faktycznej implementacji.
