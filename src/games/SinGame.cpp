@@ -28,8 +28,7 @@ SinGame::SinGame(QWidget *parent)
     , m_comboSeconds(0.0)
     , m_combo(0)
     , m_bestCombo(0)
-    , m_perfectStreak(0)
-    , m_lastAccuracy(0.0)
+    , m_perfectSeconds(0.0)
     , m_lastDistance(0.0)
     , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
     , m_calibrationMinimum(0.0)
@@ -68,8 +67,7 @@ void SinGame::initialize()
     m_comboSeconds = 0.0;
     m_combo = 0;
     m_bestCombo = 0;
-    m_perfectStreak = 0;
-    m_lastAccuracy = 0.0;
+    m_perfectSeconds = 0.0;
     m_lastDistance = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     m_sessionSeconds = 0.0;
@@ -300,7 +298,7 @@ void SinGame::update(double deltaTime)
         m_isHit = false;
         m_comboSeconds = 0.0;
         m_combo = 0;
-        m_perfectStreak = 0;
+        m_perfectSeconds = 0.0;
         m_feedbackText = QStringLiteral("Brak aktualnego sygnału — sprawdź czujnik");
         return;
     }
@@ -314,10 +312,9 @@ void SinGame::update(double deltaTime)
         m_combo = qMin(10, 1 + static_cast<int>(m_comboSeconds / 1.5));
         m_bestCombo = qMax(m_bestCombo, m_combo);
         const double accuracy = qBound(0.0, 1.0 - m_lastDistance / m_tolerance, 1.0);
-        m_lastAccuracy = accuracy;
-        if (accuracy >= 0.90) ++m_perfectStreak;
-        else m_perfectStreak = 0;
-        const double precisionBonus = m_perfectStreak >= 5 ? 1.8 : (m_perfectStreak >= 3 ? 1.4 : 1.0);
+        if (accuracy >= 0.90) m_perfectSeconds += dt;
+        else m_perfectSeconds = 0.0;
+        const double precisionBonus = m_perfectSeconds >= 5.0 ? 1.8 : (m_perfectSeconds >= 3.0 ? 1.4 : 1.0);
         const double pointsPerSecond = (2.0 + 5.0 * accuracy + 0.65 * m_combo) * precisionBonus;
         m_scoreFraction += pointsPerSecond * dt;
         const int earned = static_cast<int>(m_scoreFraction);
@@ -332,7 +329,6 @@ void SinGame::update(double deltaTime)
         m_comboSeconds = 0.0;
         m_combo = 0;
         m_perfectStreak = 0;
-        m_lastAccuracy = 0.0;
         m_feedbackText = m_cursorY > m_targetY
             ? QStringLiteral("Zwiększ siłę")
             : QStringLiteral("Zmniejsz siłę");
