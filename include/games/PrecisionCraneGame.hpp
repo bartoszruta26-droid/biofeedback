@@ -52,6 +52,7 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void resizeEvent(QResizeEvent *event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     friend struct PrecisionCraneGameTestAccess;
@@ -89,6 +90,9 @@ private:
     double m_sway;
     double m_swayVelocity;
     double m_previousCarriageX;
+    double m_previousHookY{0.0};
+    double m_previousSway{0.0};
+    double m_previousObstacleClock{0.0};
     double m_trolleyVelocity;
     double m_cargoMassKg;
     double m_ropeLength;
