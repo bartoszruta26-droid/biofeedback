@@ -44,6 +44,12 @@ void MarioGame::initialize()
 {
     initPlayer();
     resetLevel();
+    m_previousPlayerBody = m_player.body;
+    m_previousWorldDistance = m_worldDistance;
+    m_previousObstacles = m_obstacles;
+    m_previousEnemies = m_enemies;
+    m_previousCollectibles = m_collectibles;
+    m_previousClouds = m_clouds;
     
     // Reset chmurek
     m_clouds.clear();
