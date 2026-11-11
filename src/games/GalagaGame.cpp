@@ -19,6 +19,7 @@ constexpr int kMaximumProjectiles = 64;
 GalagaGame::GalagaGame(QWidget *parent)
     : GameEngine(parent)
     , m_force(0.5)
+    , m_sensorInputAge(1.0)
     , m_fireCooldown(0.0)
     , m_enemyDirection(1.0)
     , m_enemyFireCooldown(1.0)
@@ -54,6 +55,7 @@ void GalagaGame::disconnectSerial()
 {
     m_serialPort.reset();
     m_sensorInputValid = false;
+    m_sensorInputAge = 1.0;
 }
 
 bool GalagaGame::isSerialConnected() const
@@ -81,6 +83,7 @@ int GalagaGame::activePowerUpCount() const
 void GalagaGame::initialize()
 {
     m_force = 0.5;
+    m_sensorInputAge = 1.0;
     m_fireCooldown = 0.0;
     m_enemyDirection = 1.0;
     m_enemyFireCooldown = 1.0;
@@ -177,6 +180,7 @@ bool GalagaGame::handleInput(double value)
         return false;
     const double target = qBound(0.0, value / 100.0, 1.0);
     m_force += (target - m_force) * 0.45;
+    m_sensorInputAge = 0.0;
     m_sensorInputValid = true;
     return true;
 }
@@ -312,6 +316,9 @@ void GalagaGame::update(double deltaTime)
         return;
     deltaTime = qMin(deltaTime, 0.1);
     m_elapsed += deltaTime;
+    m_sensorInputAge += deltaTime;
+    if (m_sensorInputAge > 0.35)
+        m_sensorInputValid = false;
     m_hitCooldown = qMax(0.0, m_hitCooldown - deltaTime);
     m_shieldRemaining = qMax(0.0, m_shieldRemaining - deltaTime);
     m_firePowerRemaining = qMax(0.0, m_firePowerRemaining - deltaTime);
@@ -325,10 +332,12 @@ void GalagaGame::update(double deltaTime)
     m_backgroundOffset = std::fmod(m_backgroundOffset + 24.0 * scaleY * deltaTime,
                                    40.0 * scaleY);
 
-    const double sensorX = 8.0 * scaleX +
-        m_force * qMax(0.0, width() - 16.0 * scaleX - m_player.width());
-    m_player.moveLeft(qBound(6.0 * scaleX, sensorX,
-        qMax(6.0 * scaleX, width() - 6.0 * scaleX - m_player.width())));
+    if (m_sensorInputValid) {
+        const double sensorX = 8.0 * scaleX +
+            m_force * qMax(0.0, width() - 16.0 * scaleX - m_player.width());
+        m_player.moveLeft(qBound(6.0 * scaleX, sensorX,
+            qMax(6.0 * scaleX, width() - 6.0 * scaleX - m_player.width())));
+    }
 
     m_fireCooldown = qMax(0.0, m_fireCooldown - deltaTime);
     if (m_fireHeld && m_fireCooldown <= 0.0) {
