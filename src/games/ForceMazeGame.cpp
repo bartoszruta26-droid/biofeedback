@@ -2,6 +2,7 @@
 
 #include <QLinearGradient>
 #include <QPainter>
+#include <QMouseEvent>
 #include <QPainterPath>
 #include <QPolygonF>
 #include <QSettings>
@@ -41,6 +42,7 @@ ForceMazeGame::ForceMazeGame(QWidget *parent)
     , m_campaignCompleted(false)
     , m_levelClean(true)
     , m_campaignClean(true)
+    , m_leftHanded(false)
     , m_status(QStringLiteral("Zwolnij tensometr do strefy neutralnej"))
 {
     setMinimumSize(320, 240);
@@ -83,6 +85,7 @@ void ForceMazeGame::initialize()
     m_personalBestCrystals = settings.value(QStringLiteral("games/force_maze/records/best_crystals"), 0).toInt();
     m_personalBestLevel = settings.value(QStringLiteral("games/force_maze/records/best_level"), 1).toInt();
     m_achievements = settings.value(QStringLiteral("games/force_maze/achievements")).toStringList();
+    m_leftHanded = settings.value(QStringLiteral("games/force_maze/left_handed"), false).toBool();
 
     m_level = 1;
     m_lives = 3;
@@ -131,25 +134,60 @@ bool ForceMazeGame::handleInput(double value)
     m_hasSensorSample = true;
     m_inputAge = 0.0;
 
+    const bool inNeutralBand = force >= kNeutralMin && force <= kNeutralMax;
     if (m_awaitingNeutral) {
-        if (force <= kNeutralThreshold) {
+        if (inNeutralBand) {
             m_awaitingNeutral = false;
-            m_status = QStringLiteral("Gotowy — steruj położeniem kulki siłą nacisku");
+            m_targetColumn = 4.0;
+            m_status = QStringLiteral("Gotowy — strefa neutralna 10–30%, sterowanie aktywne");
         } else {
-            m_status = QStringLiteral("Zwolnij nacisk, aby ponownie uzbroić sterowanie");
+            m_status = QStringLiteral("Ustaw nacisk w szerokiej strefie neutralnej 10–30%");
         }
         return true;
     }
 
-    // Continuous bipolar mapping around the neutral threshold: releasing
-    // below 18% steers left, increasing above 18% steers right. The neutral
-    // point is exactly the centre; there is no discontinuity at 18%.
-    const double normalized = force <= kNeutralThreshold
-        ? 0.5 * force / kNeutralThreshold
-        : 0.5 + 0.5 * (force - kNeutralThreshold) / (100.0 - kNeutralThreshold);
-    m_targetColumn = 1.0 + qBound(0.0, normalized, 1.0) *
-                              static_cast<double>(kColumns - 3);
+    // Wide dead zone: values from 10% to 30% hold the current target and
+    // cannot cause drift. Outside it, force is mapped continuously to the
+    // two sides. The handedness setting reverses the horizontal direction.
+    if (inNeutralBand)
+        return true;
+
+    double normalized = force < kNeutralMin
+        ? 0.5 * force / kNeutralMin
+        : 0.5 + 0.5 * (force - kNeutralMax) / (100.0 - kNeutralMax);
+    normalized = qBound(0.0, normalized, 1.0);
+    if (m_leftHanded)
+        normalized = 1.0 - normalized;
+    m_targetColumn = 1.0 + normalized * static_cast<double>(kColumns - 3);
     return true;
+}
+
+void ForceMazeGame::setLeftHanded(bool leftHanded)
+{
+    if (m_leftHanded == leftHanded)
+        return;
+    m_leftHanded = leftHanded;
+    m_targetColumn = 4.0;
+    m_awaitingNeutral = true;
+    m_status = QStringLiteral("Zmieniono rękę — ustaw nacisk w strefie neutralnej 10–30%");
+    QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
+    settings.setValue(QStringLiteral("games/force_maze/left_handed"), m_leftHanded);
+    settings.sync();
+}
+
+void ForceMazeGame::mousePressEvent(QMouseEvent *event)
+{
+    if (!event)
+        return;
+    const qreal margin = qMax<qreal>(14.0, width() * 0.045);
+    const QRectF handButton(width() - margin - 132.0, 5.0, 132.0, 24.0);
+    if (handButton.contains(event->pos())) {
+        setLeftHanded(!m_leftHanded);
+        update();
+        event->accept();
+        return;
+    }
+    GameEngine::mousePressEvent(event);
 }
 
 void ForceMazeGame::unlockAchievement(const QString &id)
@@ -491,16 +529,36 @@ void ForceMazeGame::render(QPainter &painter)
                            forceTrack.width() * m_currentForce / 100.0, forceTrack.height());
     painter.setBrush(QColor(77, 224, 211));
     painter.drawRoundedRect(forceFill, 2.5, 2.5);
-    const qreal neutralX = forceTrack.left() + forceTrack.width() * kNeutralThreshold / 100.0;
-    painter.setPen(QPen(QColor(255, 220, 130), 1.5));
-    painter.drawLine(QPointF(neutralX, forceTrack.top() - 2),
-                     QPointF(neutralX, forceTrack.bottom() + 2));
+    const qreal neutralLeft = forceTrack.left() + forceTrack.width() * kNeutralMin / 100.0;
+    const qreal neutralRight = forceTrack.left() + forceTrack.width() * kNeutralMax / 100.0;
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(255, 220, 130, 95));
+    painter.drawRect(QRectF(neutralLeft, forceTrack.top() - 2,
+                            neutralRight - neutralLeft, forceTrack.height() + 4));
+    painter.setPen(QPen(QColor(255, 220, 130), 1.2));
+    painter.drawLine(QPointF(neutralLeft, forceTrack.top() - 3),
+                     QPointF(neutralLeft, forceTrack.bottom() + 3));
+    painter.drawLine(QPointF(neutralRight, forceTrack.top() - 3),
+                     QPointF(neutralRight, forceTrack.bottom() + 3));
+    const qreal forceX = forceTrack.left() + forceTrack.width() * m_currentForce / 100.0;
+    painter.setPen(QPen(QColor(255, 255, 255), 1.5));
+    painter.drawLine(QPointF(forceX, forceTrack.top() - 4),
+                     QPointF(forceX, forceTrack.bottom() + 4));
+
+    const QRectF handButton(width() - margin - 132.0, 5.0, 132.0, 24.0);
+    painter.setPen(QPen(QColor(112, 206, 213), 1.0));
+    painter.setBrush(QColor(20, 57, 70, 230));
+    painter.drawRoundedRect(handButton, 7.0, 7.0);
+    painter.setPen(Qt::white);
+    painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(8, height() / 48), QFont::DemiBold));
+    painter.drawText(handButton, Qt::AlignCenter,
+                     m_leftHanded ? QStringLiteral("Ręka: lewa") : QStringLiteral("Ręka: prawa"));
 
     const QRectF footer(margin, height() - 38, width() - 2 * margin, 28);
     painter.setPen(QColor(180, 211, 220));
     const QString state = hasFreshSignal()
-        ? QStringLiteral("Sterowanie aktywne — siła reguluje położenie poziome")
-        : QStringLiteral("PAUZA BEZPIECZEŃSTWA — oczekiwanie na świeży sygnał i neutralny nacisk");
+        ? QStringLiteral("Strefa neutralna 10–30% — poza nią siła reguluje położenie; kliknij u góry, aby zmienić rękę")
+        : QStringLiteral("PAUZA — oczekiwanie na świeży sygnał i nacisk w strefie neutralnej 10–30%");
     painter.drawText(footer, Qt::AlignCenter, m_status.isEmpty() ? state : m_status);
 
     if (m_hitFlash > 0.0) {
