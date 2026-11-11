@@ -181,9 +181,9 @@ void BalanceTowerGame::placeBlock()
     const double comX = std::abs(centerOfMassX());
     const double comZ = std::abs(centerOfMassZ());
     const double centerOffset = qMax(comX, comZ);
-    m_stability = qBound(0.0, 1.0 - centerOffset / 0.42, 1.0);
+    m_stability = qBound(0.0, 1.0 - centerOffset / 0.34, 1.0);
     m_tilt = qBound(-0.35, (centerOfMassX() + centerOfMassZ()) * 0.42, 0.35);
-    if (centerOffset > 0.42) {
+    if (centerOffset > 0.34) {
         ++m_falls;
         --m_lives;
         m_campaignClean = false;
