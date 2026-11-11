@@ -317,7 +317,9 @@ void BalanceTowerGame::render(QPainter &painter)
     }
 
     const qreal activeWidth = m_blocks.isEmpty() ? m_blockWidth : qMin(m_blockWidth, m_blocks.last().width);
-    const qreal activeX = baseX + m_targetPosition * scale - activeWidth * scale * 0.5;
+    const qreal activeDepthShift = m_targetDepth * scale * 0.22;
+    const qreal activeX = baseX + m_targetPosition * scale + activeDepthShift -
+                          activeWidth * scale * 0.5;
     const qreal activeY = baseY - (m_blocks.size() + 1) * blockH - 18;
     painter.setPen(QPen(QColor(255, 225, 135), 2.0, Qt::DashLine));
     painter.setBrush(QColor(255, 207, 96, 65));
