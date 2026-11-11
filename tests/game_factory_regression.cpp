@@ -566,7 +566,7 @@ int main(int argc, char **argv)
     QKeyEvent carRaceLeft(QEvent::KeyPress, Qt::Key_Left, Qt::NoModifier);
     QApplication::sendEvent(carRaceControlsGame, &carRaceLeft);
     REQUIRE(carRaceControlsGame->currentLane() == 1);
-    carRaceControlsGame->handleSensorInput(100.0);
+    carRaceControlsGame->handleSensorInput(90.0);
     REQUIRE(carRaceControlsGame->currentLane() == 2);
     carRaceControlsGame->handleSensorInput(50.0);
     REQUIRE(carRaceControlsGame->currentLane() == 1);
@@ -574,6 +574,12 @@ int main(int argc, char **argv)
     REQUIRE(carRaceControlsGame->currentLane() == 1);
     QKeyEvent carRaceBoost(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(carRaceControlsGame, &carRaceBoost);
+    REQUIRE(!carRaceControlsGame->boostActive()); // Keyboard is not a game input.
+    for (int sample = 0; sample < 6; ++sample) {
+        carRaceControlsGame->handleSensorInput(98.0);
+        waitForEvents(100);
+    }
+    carRaceControlsGame->handleSensorInput(50.0); // Neutral release completes the timed boost gesture.
     REQUIRE(carRaceControlsGame->boostActive());
     REQUIRE(carRaceControlsGame->boostCooldownRemaining() > 0.0);
     const double clockBefore = carRaceControlsGame->animationClock();
@@ -624,7 +630,7 @@ int main(int argc, char **argv)
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 1);
     // Allow the collision-protection window to expire before exposing the next lane.
     waitForEvents(1200);
-    carRaceGameOverInstance->handleSensorInput(99.0); // Third obstacle: right lane.
+    carRaceGameOverInstance->handleSensorInput(90.0); // Third obstacle: right lane.
     waitForEvents(1900);
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 0);
     REQUIRE(!carRaceGameOverInstance->isRunning());
