@@ -161,6 +161,35 @@ void ScorchedEarthGame::fireProjectile(bool playerOwned)
         m_playerTurn = false;
 }
 
+int ScorchedEarthGame::trajectoryPreviewPointCount() const
+{
+    return trajectoryPreview().size();
+}
+
+QVector<QPointF> ScorchedEarthGame::trajectoryPreview() const
+{
+    QVector<QPointF> points;
+    if (m_playerTank.isNull() || width() <= 0 || height() <= 0)
+        return points;
+    const double angle = m_aimDegrees * 3.14159265358979323846 / 180.0;
+    const double scaleX = qMax(0.25, width() / 640.0);
+    const double scaleY = qMax(0.25, height() / 480.0);
+    const double speed = 420.0 * m_power;
+    const QPointF origin(m_playerTank.right(), m_playerTank.top() + 2.0);
+    const QPointF initialVelocity(std::cos(angle) * speed * scaleX,
+                                  -std::sin(angle) * speed * scaleY);
+    for (int step = 1; step <= 80; ++step) {
+        const double t = step * 0.05;
+        const QPointF point(origin.x() + initialVelocity.x() * t,
+            origin.y() + initialVelocity.y() * t + 0.5 * m_gravity * t * t);
+        if (point.x() < 0.0 || point.x() > width() ||
+            point.y() < 0.0 || point.y() >= terrainY(point.x()))
+            break;
+        points.push_back(point);
+    }
+    return points;
+}
+
 void ScorchedEarthGame::applyCrater(double x)
 {
     const double scaleX = qMax(0.25, width() / 640.0);
