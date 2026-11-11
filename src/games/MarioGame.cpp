@@ -70,6 +70,8 @@ int MarioGame::livesRemaining() const { return m_lives; }
 int MarioGame::coinsCollected() const { return m_coinsCollected; }
 bool MarioGame::doubleJumpAvailable() const { return m_player.doubleJumpAvailable; }
 double MarioGame::invulnerabilityRemaining() const { return m_invulnerabilityRemaining; }
+double MarioGame::worldScrollDistance() const { return m_worldDistance; }
+double MarioGame::animationClock() const { return m_animationTime; }
 
 void MarioGame::paintEvent(QPaintEvent* event)
 {
@@ -209,6 +211,10 @@ void MarioGame::update(double deltaTime)
     // Ogranicz bezpośrednie wywołania, tak jak w GameEngine.
     deltaTime = qMin(deltaTime, 0.1);
 
+    // A single scene clock drives all animation and parallax from real gameplay travel.
+    m_animationTime += deltaTime;
+    m_worldDistance += PLAYER_SPEED * deltaTime;
+
     // Aktualizacja gracza
     updatePlayer(deltaTime);
     if (!isRunning()) return;
@@ -218,7 +224,6 @@ void MarioGame::update(double deltaTime)
     generateEnemies(deltaTime);
     updateObstacles(deltaTime);
     updateEnemies(deltaTime);
-    if (!isRunning()) return;
     if (!isRunning()) return;
     updateCollectibles(deltaTime);
     if (!isRunning()) return;
@@ -703,16 +708,21 @@ void MarioGame::renderCollectibles(QPainter& painter)
     painter.save();
     for (const Collectible& item : m_collectibles) {
         const double bob = std::sin(item.phase) * 3.0;
+        const double spin = 0.78 + 0.22 * std::abs(std::sin(item.phase * 1.7));
         const QRectF r = item.rect.translated(0.0, bob);
         if (item.type == Collectible::COIN) {
             painter.setPen(QPen(QColor(0x8C, 0x55, 0x00), 2.0));
             painter.setBrush(QColor(0xFF, 0xD8, 0x32));
-            painter.drawEllipse(r);
+            painter.drawEllipse(QRectF(r.center().x() - r.width() * spin * 0.5, r.top(),
+                                       r.width() * spin, r.height()));
             painter.setPen(QPen(QColor(0xFF, 0xF3, 0xA0), 2.0));
             painter.drawLine(QPointF(r.center().x(), r.top() + 4.0),
                              QPointF(r.center().x(), r.bottom() - 4.0));
         } else {
             const QPointF c = r.center();
+            painter.translate(c);
+            painter.rotate(std::sin(item.phase) * 8.0);
+            painter.translate(-c);
             QPolygonF star;
             for (int point = 0; point < 10; ++point) {
                 const double angle = -1.5707963267948966 + point * 3.14159265358979323846 / 5.0;
@@ -896,11 +906,15 @@ void MarioGame::renderObstacles(QPainter& painter)
     // Bright grass lip and layered dirt bands improve ground readability.
     painter.fillRect(QRectF(0, groundY, width(), 7), QColor(0x4C, 0xC6, 0x3A));
     painter.fillRect(QRectF(0, groundY + 7, width(), 5), QColor(0x2E, 0x8B, 0x2E));
-    // Detale ziemi (prosty wzór)
+    // Ground texture scrolls at full camera speed; tile scale increases toward the foreground.
+    const double tileWidth = 40.0;
+    const double groundOffset = std::fmod(m_worldDistance, tileWidth);
     painter.setPen(QColor(0xA0, 0x30, 0x00));
-    for (double x = 0; x < width(); x += 40) {
+    for (double x = -tileWidth - groundOffset; x < width() + tileWidth; x += tileWidth) {
         for (double y = groundY + 10; y < height(); y += 30) {
-            const QRectF tile(x, y, 30, 20);
+            const double depth = qBound(0.0, (y - groundY) / qMax(1.0, height() - groundY), 1.0);
+            const double tileScale = 0.68 + depth * 0.32;
+            const QRectF tile(x, y, 30.0 * tileScale, 20.0 * tileScale);
             bool intersectsGap = false;
             for (const auto& obs : m_obstacles) {
                 if (obs.type == Obstacle::GAP && tile.intersects(obs.rect)) {
@@ -909,7 +923,7 @@ void MarioGame::renderObstacles(QPainter& painter)
                 }
             }
             if (!intersectsGap)
-                painter.fillRect(tile, QColor(0xA0, 0x30, 0x00));
+                painter.fillRect(tile, depth > 0.55 ? QColor(0x8A, 0x37, 0x12) : QColor(0xA0, 0x30, 0x00));
         }
     }
 }
@@ -926,8 +940,12 @@ void MarioGame::renderBackground(QPainter& painter)
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(0xFF, 0xF0, 0xA0, 80));
     painter.drawEllipse(QRectF(width() * 0.76, height() * 0.08, 100, 100));
+    const double sunPulse = 1.0 + 0.045 * std::sin(m_animationTime * 1.4);
+    const QRectF sunRect(width() * 0.80 - 17.0 * (sunPulse - 1.0),
+                         height() * 0.12 - 17.0 * (sunPulse - 1.0),
+                         34.0 * sunPulse, 34.0 * sunPulse);
     painter.setBrush(QColor(0xFF, 0xE6, 0x75));
-    painter.drawRect(QRectF(width() * 0.80, height() * 0.12, 34, 34));
+    painter.drawRect(sunRect);
 
     renderClouds(painter);
     renderParallaxBackground(painter);
@@ -936,43 +954,97 @@ void MarioGame::renderBackground(QPainter& painter)
 void MarioGame::renderClouds(QPainter& painter)
 {
     painter.save();
-    for (const Cloud& cloud : m_clouds) {
+    for (int i = 0; i < m_clouds.size(); ++i) {
+        const Cloud& cloud = m_clouds[i];
         const double scale = qMax(0.55, cloud.size / 42.0);
-        const QRectF shadow(cloud.pos.x() - 27 * scale, cloud.pos.y() - 3 * scale,
-                            58 * scale, 25 * scale);
+        const double bob = std::sin(m_animationTime * (0.7 + scale * 0.18) + i * 1.7) * 2.8 * scale;
+        const double x = cloud.pos.x();
+        const double y = cloud.pos.y() + bob;
+        const QRectF shadow(x - 27 * scale, y - 3 * scale, 58 * scale, 25 * scale);
         painter.setPen(Qt::NoPen);
         painter.setBrush(QColor(0x65, 0xA8, 0xD4, 80));
         painter.drawRoundedRect(shadow, 12 * scale, 12 * scale);
         painter.setBrush(QColor(0xFF, 0xFF, 0xFF));
-        painter.drawEllipse(QRectF(cloud.pos.x() - 23 * scale, cloud.pos.y() - 9 * scale,
-                                   28 * scale, 26 * scale));
-        painter.drawEllipse(QRectF(cloud.pos.x() - 7 * scale, cloud.pos.y() - 19 * scale,
-                                   35 * scale, 34 * scale));
-        painter.drawEllipse(QRectF(cloud.pos.x() + 10 * scale, cloud.pos.y() - 7 * scale,
-                                   27 * scale, 24 * scale));
-        painter.fillRect(QRectF(cloud.pos.x() - 20 * scale, cloud.pos.y() + 2 * scale,
-                                48 * scale, 10 * scale), QColor(0xFF, 0xFF, 0xFF));
+        painter.drawEllipse(QRectF(x - 23 * scale, y - 9 * scale, 28 * scale, 26 * scale));
+        painter.drawEllipse(QRectF(x - 7 * scale, y - 19 * scale, 35 * scale, 34 * scale));
+        painter.drawEllipse(QRectF(x + 10 * scale, y - 7 * scale, 27 * scale, 24 * scale));
+        painter.fillRect(QRectF(x - 20 * scale, y + 2 * scale, 48 * scale, 10 * scale), Qt::white);
     }
     painter.restore();
 }
 
 void MarioGame::renderParallaxBackground(QPainter& painter)
 {
-    const qint64 elapsedMs = m_accumulatedSessionMs +
-        (m_monotonicClock.isValid() ? m_monotonicClock.elapsed() : 0);
     const double groundY = height() * GROUND_Y_RATIO;
-    for (int layer = 0; layer < 2; ++layer) {
-        const double speed = layer == 0 ? 0.012 : 0.035;
-        const double spacing = layer == 0 ? 260.0 : 210.0;
-        const double offset = std::fmod(static_cast<double>(elapsedMs) * speed, spacing);
-        for (int i = -1; i < width() / spacing + 3; ++i) {
-            const double x = i * spacing - offset;
-            const double hillH = (layer == 0 ? 62.0 : 42.0) + (i % 2 == 0 ? 10.0 : 0.0);
-            painter.setPen(Qt::NoPen);
-            painter.setBrush(layer == 0 ? QColor(0x62, 0xB8, 0x6A) : QColor(0x32, 0x91, 0x48));
-            painter.drawEllipse(QRectF(x, groundY - hillH, spacing * 0.78, hillH * 1.8));
-        }
+    const double world = m_worldDistance;
+    painter.save();
+    painter.setPen(Qt::NoPen);
+
+    // Distant mountains: 9% of camera speed, muted and close to the horizon.
+    const double farSpacing = 330.0;
+    const double farOffset = std::fmod(world * 0.09, farSpacing);
+    for (int i = -1; i < width() / farSpacing + 3; ++i) {
+        const double x = i * farSpacing - farOffset;
+        const double peak = groundY - height() * 0.25;
+        QPolygonF mountain;
+        mountain << QPointF(x, groundY)
+                 << QPointF(x + farSpacing * 0.26, peak + 28.0)
+                 << QPointF(x + farSpacing * 0.48, peak - 14.0)
+                 << QPointF(x + farSpacing * 0.72, peak + 34.0)
+                 << QPointF(x + farSpacing, groundY);
+        painter.setBrush(QColor(0x83, 0xB9, 0xB0));
+        painter.drawPolygon(mountain);
+        QPolygonF snow;
+        snow << QPointF(x + farSpacing * 0.38, peak + 8.0)
+             << QPointF(x + farSpacing * 0.48, peak - 14.0)
+             << QPointF(x + farSpacing * 0.58, peak + 10.0)
+             << QPointF(x + farSpacing * 0.50, peak + 3.0);
+        painter.setBrush(QColor(0xD8, 0xEF, 0xE4, 180));
+        painter.drawPolygon(snow);
     }
+
+    // Midground hills: 26% speed and larger apparent shapes.
+    const double midSpacing = 250.0;
+    const double midOffset = std::fmod(world * 0.26, midSpacing);
+    for (int i = -1; i < width() / midSpacing + 3; ++i) {
+        const double x = i * midSpacing - midOffset;
+        const double hillHeight = height() * (0.105 + ((i & 1) ? 0.018 : 0.0));
+        painter.setBrush(QColor(0x69, 0xC2, 0x75));
+        painter.drawEllipse(QRectF(x, groundY - hillHeight * 0.72,
+                                   midSpacing * 0.92, hillHeight * 1.45));
+        painter.setBrush(QColor(0xA4, 0xDF, 0x8B, 170));
+        painter.drawEllipse(QRectF(x + midSpacing * 0.18, groundY - hillHeight * 0.54,
+                                   midSpacing * 0.22, hillHeight * 0.16));
+    }
+
+    // Foreground shrubs: 58% speed, larger and higher contrast.
+    const double nearSpacing = 190.0;
+    const double nearOffset = std::fmod(world * 0.58, nearSpacing);
+    for (int i = -1; i < width() / nearSpacing + 3; ++i) {
+        const double x = i * nearSpacing - nearOffset;
+        const double base = groundY + 1.0;
+        const double scale = 0.72 + ((i & 1) ? 0.16 : 0.0);
+        painter.setBrush(QColor(0x2B, 0x91, 0x48));
+        painter.drawEllipse(QRectF(x + 16, base - 48 * scale, 42 * scale, 58 * scale));
+        painter.drawEllipse(QRectF(x + 39, base - 62 * scale, 48 * scale, 72 * scale));
+        painter.drawEllipse(QRectF(x + 66, base - 42 * scale, 38 * scale, 52 * scale));
+        painter.setBrush(QColor(0x1C, 0x6F, 0x3A));
+        painter.drawRect(QRectF(x + 51, base - 12 * scale, 9 * scale, 14 * scale));
+    }
+
+    // Three flocks of small birds cross the sky with animated wing beats.
+    painter.setPen(QPen(QColor(0x3D, 0x72, 0x8D, 170), 1.8));
+    for (int bird = 0; bird < 3; ++bird) {
+        const double cycle = std::fmod(m_animationTime * (18.0 + bird * 3.0) +
+                                       bird * width() * 0.42, width() + 70.0);
+        const double bx = cycle - 35.0;
+        const double by = height() * (0.20 + bird * 0.055) +
+                          std::sin(m_animationTime * 2.1 + bird) * 4.0;
+        const double wing = 3.0 + 2.0 * std::sin(m_animationTime * 8.0 + bird);
+        painter.drawArc(QRectF(bx - 8, by - wing, 9, wing * 2), 0, 150 * 16);
+        painter.drawArc(QRectF(bx, by - wing, 9, wing * 2), 30 * 16, 150 * 16);
+    }
+    painter.restore();
 }
 
 void MarioGame::renderUI(QPainter& painter)

@@ -57,6 +57,8 @@ public:
     int coinsCollected() const;
     bool doubleJumpAvailable() const;
     double invulnerabilityRemaining() const;
+    double worldScrollDistance() const;
+    double animationClock() const;
 
 protected:
     void initialize() override;
@@ -190,6 +192,8 @@ private:
     QVector<Enemy> m_enemies;
     double m_enemySpawnTimer = 0.0;
     QVector<Cloud> m_clouds;
+    double m_worldDistance = 0.0;
+    double m_animationTime = 0.0;
     
     // Poziomy
     int m_currentLevel;

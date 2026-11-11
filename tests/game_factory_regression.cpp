@@ -324,6 +324,11 @@ int main(int argc, char **argv)
     marioGame->start();
     REQUIRE(marioGame->livesRemaining() == 3);
     REQUIRE(marioGame->coinsCollected() == 0);
+    const double initialWorldDistance = marioGame->worldScrollDistance();
+    const double initialAnimationClock = marioGame->animationClock();
+    marioGame->update(0.1);
+    REQUIRE(marioGame->worldScrollDistance() > initialWorldDistance);
+    REQUIRE(marioGame->animationClock() > initialAnimationClock);
     REQUIRE(marioGame->activeEnemyCount() == 0);
     REQUIRE(marioGame->goombaCount() == 0);
     REQUIRE(marioGame->piranhaPlantCount() == 0);

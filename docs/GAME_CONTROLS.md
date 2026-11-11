@@ -70,7 +70,9 @@
 - **Monety:** złote monety pojawiają się nad trasą. Każda daje 50 punktów, a nieprzerwana seria zwiększa premię do 150 punktów za monetę.
 - **Gwiazda ochronna:** rzadka premia zapewnia 5 s nietykalności i 100 punktów. W czasie ochrony postać miga, a kontakt z przeciwnikiem nie odbiera życia.
 - **Przeszkody:** kolce i rury trzeba przeskakiwać. Platformy pozwalają wylądować od góry. Dziury wymagają utrzymania się w powietrzu aż do bezpiecznego podłoża.
-- **Grafika i sceneria:** niebo z gradientem, słońce, przesuwające się chmury, dwie warstwy wzgórz, trawiasta krawędź ziemi, animowani przeciwnicy oraz czytelny panel statystyk.
+- **Perspektywa i przewijanie planszy:** dalekie góry przesuwają się z prędkością 9% ruchu podłoża, środkowe wzgórza z 26%, pierwszoplanowe drzewa i krzewy z 58%, a tekstura ziemi z pełną prędkością trasy. Różne rozmiary i kontrast warstw budują głębię.
+- **Animacje otoczenia:** chmury kołyszą się na wysokości, słońce pulsuje, ptaki przelatują z animacją skrzydeł, monety obracają się i unoszą, a gwiazda lekko obraca się podczas unoszenia. Przeciwnicy zachowują własne animacje ruchu i wysuwania.
+- **Grafika i sceneria:** gradientowe niebo, dalekie pasma górskie, wzgórza, pierwszoplanowa roślinność, przesuwająca się tekstura ziemi, trawiasta krawędź i czytelny panel statystyk.
 - **Wskaźniki:** wynik, życia, monety, poziom, postęp poziomu, pasek ładowania skoku i czas ochrony.
 - **Wskazówka:** pełne ładowanie przydaje się przy szerokich dziurach i wysokich rurach. Podwójny skok zachowaj na korektę toru lotu lub nadepnięcie na Goombasa.
 
