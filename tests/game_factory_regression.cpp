@@ -220,6 +220,23 @@ int main(int argc, char **argv)
     REQUIRE(archerGame->isRunning());
     archerGame->stop();
 
+    // Precision shots consume a bounded focus charge and are tracked separately.
+    std::unique_ptr<games::GameEngine> archerFocus(games::createGame(QStringLiteral("archer")));
+    auto* archerFocusGame = dynamic_cast<games::ArcherGame*>(archerFocus.get());
+    REQUIRE(archerFocusGame != nullptr);
+    archerFocusGame->resize(640, 480);
+    archerFocusGame->start();
+    REQUIRE(archerFocusGame->focusCharges() == 3);
+    QKeyEvent archerFocusFire(QEvent::KeyPress, Qt::Key_F, Qt::NoModifier);
+    QApplication::sendEvent(archerFocusGame, &archerFocusFire);
+    REQUIRE(archerFocusGame->focusCharges() == 2);
+    REQUIRE(archerFocusGame->shotsFired() == 1);
+    REQUIRE(archerFocusGame->activeArrowCount() == 1);
+    const double stableAim = archerFocusGame->aimAngle();
+    archerFocusGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    REQUIRE(archerFocusGame->aimAngle() == stableAim);
+    archerFocusGame->stop();
+
     // A deliberately low aim must miss cleanly and retire the arrow.
     std::unique_ptr<games::GameEngine> archerMiss(games::createGame(QStringLiteral("archer")));
     auto* archerMissGame = dynamic_cast<games::ArcherGame*>(archerMiss.get());
