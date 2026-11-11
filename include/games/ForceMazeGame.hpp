@@ -42,6 +42,7 @@ protected:
     void initialize() override;
     void update(double deltaTime) override;
     void render(QPainter &painter) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
     bool handleInput(double value) override;
 
 private:
@@ -87,6 +88,10 @@ private:
     double m_checkpointFlash;
     double m_crystalPulse;
     double m_playerTrailPhase;
+    double m_previousProgressRows{0.0};
+    double m_previousPlayerColumn{0.0};
+    double m_previousVisualTime{0.0};
+    double m_previousCameraShake{0.0};
     double m_currentForce;
     double m_cameraShake;
     bool m_hasSensorSample;
