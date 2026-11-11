@@ -347,6 +347,7 @@ if(Qt5_FOUND)
         src/games/RhythmForceGame.cpp
         src/games/ForceMazeGame.cpp
         src/games/BalanceTowerGame.cpp
+        src/games/ReactionForceGame.cpp
         src/formulas.cpp
     )
 
@@ -386,6 +387,7 @@ if(Qt5_FOUND)
         include/games/RhythmForceGame.hpp
         include/games/ForceMazeGame.hpp
         include/games/BalanceTowerGame.hpp
+        include/games/ReactionForceGame.hpp
         include/games/GameFactory.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -460,6 +462,7 @@ if(Qt5_FOUND)
         src/games/RhythmForceGame.cpp
         src/games/ForceMazeGame.cpp
         src/games/BalanceTowerGame.cpp
+        src/games/ReactionForceGame.cpp
         src/sensor/SerialCommunication.cpp
         src/core/DebugManager.cpp
         include/games/GameEngine.hpp
@@ -477,6 +480,7 @@ if(Qt5_FOUND)
         include/games/RhythmForceGame.hpp
         include/games/ForceMazeGame.hpp
         include/games/BalanceTowerGame.hpp
+        include/games/ReactionForceGame.hpp
         include/sensor/SerialCommunication.hpp
         include/core/DebugManager.hpp
     )
@@ -489,7 +493,6 @@ if(Qt5_FOUND)
     target_link_libraries(game_factory_regression PRIVATE
         Qt5::Core Qt5::Widgets Threads::Threads ${LIBSERIALPORT_LIBRARIES} biofeedback_sensor_protocol
     )
-
     # Process-restart regression for durable analytics and checkpoint history.
     add_executable(training_history_restart_regression
         tests/training_history_restart_regression.cpp
@@ -531,6 +534,7 @@ if(Qt5_FOUND)
         src/games/RhythmForceGame.cpp
         src/games/ForceMazeGame.cpp
         src/games/BalanceTowerGame.cpp
+        src/games/ReactionForceGame.cpp
         include/tab/TrainingTab.hpp
         include/tab/TrainingAnalyticsWidget.hpp
         include/core/DebugManager.hpp
@@ -551,6 +555,7 @@ if(Qt5_FOUND)
         include/games/RhythmForceGame.hpp
         include/games/ForceMazeGame.hpp
         include/games/BalanceTowerGame.hpp
+        include/games/ReactionForceGame.hpp
         include/games/GameFactory.hpp
     )
     set_target_properties(training_tab_process_restart_regression PROPERTIES AUTOMOC ON)

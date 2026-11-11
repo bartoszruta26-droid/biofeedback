@@ -778,6 +778,7 @@ void OutlineTab::populateGameCombo()
     m_gameCombo->addItem(tr("Scorched Earth"), "scorched_earth");
     m_gameCombo->addItem(tr("Car Race"), "car_race");
     m_gameCombo->addItem(tr("Precision Crane"), "precision_crane");
+    m_gameCombo->addItem(tr("Reaction Force — Refleks siły"), "reaction_force");
 
     // Nie pokazuj jako dostępnych gier, których implementacje nie są jeszcze
     // dołączone do aplikacji. Identyfikatory pozostają rozpoznawalne przy

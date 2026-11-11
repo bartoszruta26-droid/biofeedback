@@ -144,6 +144,8 @@
 | Archer | kąt celowania 0–100% | automatyczny strzał co 2,4 s |
 | Galaga | pozioma pozycja statku | automatyczny ogień, gest 95% i zwolnienie — EMP |
 | Scorched Earth | kąt działa | automatyczny strzał po 2 s |
+| Precision Crane | aktualna oś: pozycja wózka lub wysokość haka | gesty chwytu/zwolnienia i zmiany osi |
+| Reaction Force | impuls siły w paśmie celu | czas reakcji, automatyczny harmonogram bodźców |
 
 ## Uwaga o wersjach i rozszerzeniach
 
@@ -162,3 +164,23 @@ Przy zmianie sterowania w kodzie należy zaktualizować ten plik oraz teksty ins
 - **Chwyt i zwolnienie:** impuls siły co najmniej 82% trwający od 0,15 do 0,85 s, zakończony zwolnieniem do 18% lub mniej, przełącza chwyt/zwolnienie. Hak musi znajdować się w pobliżu ładunku, aby go podnieść.
 - **Punktacja:** poprawna dostawa daje punkty i zwiększa serię. Zwolnienie poza strefą celu zużywa jedną z trzech prób. Co cztery dostawy wzrasta trudność.
 - **Brak sygnału:** po 350 ms bez świeżej próbki sterowanie jest wstrzymywane. Klawiatura, mysz, dotyk i gamepad nie sterują rozgrywką.
+
+### 12. Reaction Force — Refleks siły
+
+**Cel:** reaguj na sygnał wizualny, rozpoczynając krótki impuls i osiągając wyświetlony zakres siły.
+
+- **Jedyny kontroler:** jeden tensometr/HX711, przekazujący skalibrowaną siłę 0–100% przez wspólny potok pomiarowy. Gra nie otwiera portu szeregowego.
+- **Uzbrojenie:** po rozpoczęciu gry zwolnij nacisk do 18% lub mniej. Po pierwszej próbce neutralnej pojawia się faza przygotowania.
+- **Reakcja:** rozpocznij impuls po wyświetleniu komunikatu „TERAZ!”. Przekroczenie 22% rozpoczyna impuls; powrót do 18% lub mniej kończy go.
+- **Siła docelowa:** przed próbą widoczna jest wartość celu i dopuszczalne pasmo. Szczyt impulsu musi znaleźć się w tym zakresie.
+- **Czas impulsu:** prawidłowy impuls trwa od 70 do 600 ms. Zbyt krótki lub zbyt długi nacisk jest pudłem.
+- **Czas reakcji:** do 250 ms — „Perfekt”; do 450 ms — „Dobrze”; późniejsza reakcja w oknie próby — „Trafienie”. Po upływie okna próba jest zaliczana jako pudło.
+- **Falstart:** impuls przed sygnałem „TERAZ!” przerywa serię i wymaga ponownego zwolnienia tensometru do strefy neutralnej.
+- **Runda:** 20 prób. Pięć poziomów trudności zawęża pasmo siły i skraca okno reakcji.
+- **Wskaźniki:** wynik, numer próby, bieżąca seria, trafienia, pudła, aktualna siła, siła docelowa i czas reakcji.
+- **Brak sygnału:** po 350 ms bez świeżej próbki aktywny gest jest anulowany, a runda wstrzymana. Po odzyskaniu sygnału wymagane jest ponowne uzbrojenie neutralną próbką.
+- **Ograniczenie interpretacji:** wynik gry nie jest klinicznym pomiarem czasu reakcji ani diagnozą.
+
+
+- **Odświeżanie i skalowanie:** symulacja korzysta ze stałego kroku 120 Hz, a precyzyjny zegar interfejsu pracuje z interwałem 8 ms (do około 125 aktualizacji na sekundę). Grafika jest rysowana w układzie proporcjonalnym, z perspektywą 2,5D i skalowaniem elementów dla małych, szerokich, wysokich, HD i 4K okien. Monitor 90 Hz lub szybszy może prezentować ponad 90 klatek/s, jeśli pozwalają na to tryb ekranu, kompozytor i wydajność urządzenia; sam monitor nie zmienia tempa symulacji ani pomiaru wejścia.
+- **Osiągnięcia i statystyki:** oprócz osiągnięć za pierwsze trafienie, perfekcyjną reakcję i serie, gra przyznaje odznaki za celność 80/90/100%, 10/15 reakcji perfekcyjnych, bezbłędną rundę, brak falstartów, poziom 5, wynik 2500 pkt i nowy rekord. Zapisuje rekord wyniku, serii, reakcji i celności oraz sumaryczne statystyki rund, trafień i pudeł.

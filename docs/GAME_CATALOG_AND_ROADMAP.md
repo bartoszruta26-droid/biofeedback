@@ -70,7 +70,7 @@ Test `tests/game_input_ownership_regression.py` blokuje ponowne dodanie obsługi
 
 ### 2.2. Istniejące gry
 
-W katalogach `src/games` i `include/games` znajduje się trzynaście gier:
+W katalogach `src/games` i `include/games` znajduje się czternaście gier:
 
 1. Sinus Force Trainer — `SinGame.cpp`
 2. Tan Force Trainer — `TanGame.cpp`
@@ -85,6 +85,7 @@ W katalogach `src/games` i `include/games` znajduje się trzynaście gier:
 11. Precision Crane — `PrecisionCraneGame.cpp`
 12. Rhythm Force — `RhythmForceGame.cpp`
 13. Force Maze — `ForceMazeGame.cpp`
+14. Reaction Force — `ReactionForceGame.cpp`
 
 Aktualny opis zachowania znajduje się w `docs/GAME_CONTROLS.md`. W gałęzi `main` usunięto obsługę zdarzeń klawiatury i myszy z klas gier. Sterowanie kierunkowe i pozycjonowanie odbywa się tensometrem, a działania specjalne są realizowane gestami siły lub automatycznie przez zegar gry. Reguła jest dodatkowo sprawdzana testem statycznym, aby późniejsze zmiany nie wprowadziły ponownie drugiego kontrolera.
 
@@ -280,10 +281,25 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 ### 4.5. Reaction Force — refleks siły
 
-- **Grafika:** cele pojawiające się w różnych miejscach ekranu, odliczanie, pasek siły i wyraźny sygnał trafienia.
-- **Funkcje:** zadania na reakcję, trafienie w zakres siły, serie celnych odpowiedzi i stopniowanie tempa.
-- **Tensometr:** pojedynczy impuls musi rozpocząć się w określonym oknie czasowym i osiągnąć wyświetlony zakres siły. Nieprawidłowy lub spóźniony impuls kończy próbę.
-- **Wyróżnik:** krótkie, dynamiczne rundy i porównywanie własnych rekordów.
+**Status:** pierwsza pełna implementacja gry została dodana do gałęzi feature/reaction-force-game. Po scaleniu będzie dostępna w GameFactory, selektorze treningu i selektorze gier w konspektach. Gra korzysta ze wspólnego GameEngine i centralnego strumienia jednego tensometru; nie otwiera portu szeregowego i nie implementuje alternatywnego sterowania.
+
+- **Koncepcja rozgrywki:** 20 krótkich prób reakcyjnych w jednej rundzie. Po uzbrojeniu wejścia neutralną próbką gra pokazuje fazę przygotowania, a następnie wyraźny sygnał „TERAZ!”. Gracz musi rozpocząć pojedynczy impuls nacisku, osiągnąć wyświetlony przedział siły i zwolnić nacisk.
+- **Scena i grafika:** responsywna arena 2,5D z perspektywiczną siatką zbiegającą się na horyzoncie, warstwowym oświetleniem, animowanym celem, świetlną poświatą, pierścieniami namierzania i śladem energii. Komunikaty „GOTOWY”/„TERAZ!” są umieszczone na osobnej planszy. Układ, marginesy, grubości linii i wielkości czcionek są skalowane względem wymiarów okna; tekst jest skracany bez wychodzenia poza obszar. Pasek siły pokazuje bieżącą wartość, cel i tolerancję, a pasek reakcji maleje w czasie próby.
+- **Przebieg próby:** harmonogram bodźca jest deterministyczny i oparty na numerze próby oraz poziomie trudności, co umożliwia powtarzalne testy. Opóźnienie bodźca wynosi około 0,93–1,95 s i skraca się wraz z trudnością. Okno reakcji wynosi 1,45 s na poziomie 1 i maleje o 0,12 s na każdy kolejny poziom.
+- **Gest tensometru:** strefa neutralna wynosi 0–18%; przekroczenie 22% rozpoczyna impuls. Powrót do 18% lub mniej kończy impuls i uruchamia ocenę. Dopuszczalny czas impulsu wynosi 70–600 ms. Szczyt nacisku jest porównywany z wartością celu. Każda akcja pochodzi z tego samego strumienia HX711.
+- **Cel siły:** wartość docelowa zmienia się deterministycznie w zakresie 38–80%. Tolerancja maleje z 15 punktów procentowych na poziomie 1 do 9 na poziomie 5 (z ograniczeniem minimalnym 8). Gra zawsze wyświetla docelową wartość i dopuszczalny zakres przed bodźcem.
+- **Ocena reakcji:** reakcja do 250 ms otrzymuje ocenę „Perfekt”, do 450 ms — „Dobrze”, a późniejsza, lecz mieszcząca się w oknie próby — „Trafienie”. Trafienie wymaga jednocześnie poprawnego czasu, prawidłowej długości impulsu i szczytowej siły w wyświetlonym paśmie. Wynik składa się z części za czas (do 100 pkt), dopasowanie siły (do 50 pkt) i serię (do 40 pkt).
+- **Przedwczesny impuls:** nacisk przed sygnałem „TERAZ!” jest falstartem. Powoduje pudło, przerwanie serii i wymaga ponownego uzbrojenia przez neutralną próbkę; nie może zostać zaliczony jako trafienie.
+- **Trudność:** pięć poziomów. Wyższy poziom skraca czas oczekiwania i okno reakcji oraz zawęża dopuszczalny przedział siły. Trudność nie zwiększa wymaganej maksymalnej siły ponad indywidualnie skalibrowany zakres.
+- **Runda i postęp:** runda kończy się po rozliczeniu 20 prób. Wynik, liczba trafień, pudła, falstarty, najlepsza seria i liczba perfekcyjnych reakcji są prezentowane w podsumowaniu.
+- **Osiągnięcia:** pierwsze trafienie, pierwsza reakcja perfekcyjna, serie 5/10/15, 10/15 perfekcyjnych reakcji, celność 80/90/100%, bezbłędna runda, zero falstartów, mistrz poziomu 5, wynik 2500 pkt i nowy rekord osobisty. Każde osiągnięcie ma trwały identyfikator i jest zapisywane w QSettings. Dodatkowo utrwalane są łączne liczby rund, trafień i pudeł oraz najlepsza celność.
+- **Rekordy i statystyki:** najlepszy wynik, najlepsza seria, najkrótszy zarejestrowany czas reakcji, najlepsza celność oraz łączne liczby ukończonych rund, trafień i pudeł są zapisywane lokalnie pod games/reaction_force/records i games/reaction_force/statistics.
+- **Bezpieczeństwo sygnału:** wartości niefinitywne są odrzucane, a siła ograniczana do 0–100%. Po 350 ms bez świeżej próbki gra anuluje aktywny impuls, zatrzymuje postęp próby i wymaga ponownego uzbrojenia próbką neutralną. Brak sygnału nie jest traktowany jako zerowa siła ani jako komenda.
+- **Płynność:** silnik używa stałego kroku symulacji 120 Hz i precyzyjnego zegara Qt z interwałem 8 ms (teoretycznie do 125 wywołań/s). Animacje korzystają z czasu symulacji, a nie liczby klatek, więc monitor 90/120/144 Hz nie zmienia trudności ani punktacji. Rzeczywista częstotliwość prezentacji zależy od monitora, kompozytora i wydajności urządzenia.
+- **Testy regresyjne:** fabryka i alias identyfikatora, cykl życia, neutralne uzbrojenie, trafienie w czasie i paśmie siły, falstart, timeout sygnału, anulowanie gestu, zapis rekordów, skalowanie interfejsu i zmiana rozmiaru w trakcie rundy. Testy symulują próbki; nie zastępują odbioru fizycznego Nano/HX711/tensometru.
+- **Granice zastosowania:** wynik jest wynikiem gry zręcznościowej i nie stanowi pomiaru czasu reakcji w warunkach klinicznych, diagnozy ani oceny sprawności.
+- **Rozszerzalność sterowania:** bieżąca wersja używa wyłącznie tensometru HX711 jako źródła sterowania. Architektura przyszłych wersji powinna dopuścić wymienne adaptery wejścia (HX711 jako domyślny, opcjonalnie klawiatura/mysz w desktopie oraz dotyk w Androidzie), bez równoczesnego mieszania źródeł i bez zmiany domyślnego zachowania wersji obecnej. Adaptery alternatywne nie są częścią tego wydania.
+
 
 ### 4.6. Space Docking — dokowanie statku
 
