@@ -1,12 +1,12 @@
 # Instrukcja sterowania grami Biofeedback
 
-> Dokument opisuje sterowanie zaimplementowane w gałęzi main. Tensometr jest jedynym kontrolerem kierunkowym i pozycjonującym w grach, które go obsługują. Klawiatura może wyzwalać wyłącznie jawnie opisane działania lub ustawienia, a strzały w Archer i Scorched Earth są automatyczne.
+> Dokument opisuje sterowanie zaimplementowane w gałęzi main. Jedynym urządzeniem wejściowym podczas rozgrywki jest tensometr/HX711. Klawiatura, mysz, ekran dotykowy i gamepad nie sterują grą. Działania specjalne są wywoływane gestami siły albo automatycznie przez zegar gry.
 
 ## Zasady wspólne
 
 1. Wybierz grę w module treningowym i uruchom ją przyciskiem **Start**.
 2. Jeżeli gra korzysta z tensometru/HX711, podłącz urządzenie i sprawdź, czy aplikacja odbiera aktualne próbki. Wartość siły jest interpretowana zgodnie z mechaniką konkretnej gry — nie każda gra używa jej w ten sam sposób.
-3. Tensometr pozostaje jedynym wejściem kierunkowym. Klawisze wymienione w opisie gry uruchamiają wyłącznie działania dodatkowe (np. ogień, impuls EMP lub dopalacz), a nie zastępują sterowania tensometrem.
+3. Wszystkie ruchy, gesty i akcje rozgrywki muszą wynikać z jednego strumienia tensometru. W grach z automatycznym działaniem (np. ogień) świeży sygnał uzbraja automatykę; utrata sygnału ją zatrzymuje.
 4. **Pauza**, **wznowienie**, **zatrzymanie** i **reset** są obsługiwane przez wspólny interfejs modułu treningowego/silnika gry, a nie przez uniwersalny skrót klawiszowy.
 5. Jeżeli gra pokazuje komunikat o braku połączenia z czujnikiem, sprawdź połączenie urządzenia i strumień pomiarowy. Nie traktuj braku sygnału jako wartości zerowej ani jako polecenia wykonania ruchu.
 6. Po zmianie gry lub ponownym uruchomieniu sprawdź, czy gra rozpoczęła nową sesję i czy wynik/życia zostały zresetowane zgodnie z mechaniką gry.
@@ -22,7 +22,7 @@
 - **Tensometr:** zmiana siły zmienia pionowe położenie kursora. Zwiększaj lub zmniejszaj nacisk, aby dopasować kursor do czerwonego punktu celu.
 - **Wskaźnik:** turkusowe kółko pokazuje położenie gracza, czerwony punkt położenie celu; zielone oznaczenie sygnalizuje trafienie.
 - **Informacje na ekranie:** bieżąca siła, tolerancja w pikselach, poziom trudności i status połączenia.
-- **Klawiatura:** w tej wersji nie ma odrębnych skrótów gry do regulacji siły ani fazy. Start/pauza/reset są dostępne w interfejsie treningowym.
+- **Ustawienia:** poziom trudności, tryb fali, kalibrację i automatyczną trudność zmienia się w panelu ustawień gry. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
 
 ### 2. Tan Force Trainer (Tangens)
 
@@ -31,17 +31,16 @@
 - **Tensometr:** reguluje położenie kursora w pionie. Koryguj nacisk, aby turkusowy kursor pokrywał się z punktem celu.
 - **Asymptoty:** wykres tangensa zawiera nieciągłości. Przerwy na wykresie są zamierzone — nie oznaczają błędu renderowania. Nie próbuj „przeskakiwać” przez asymptotę gwałtownym ruchem siły.
 - **Wskaźniki:** siła, poziom, tolerancja, wynik i oznaczenie trafienia.
-- **Klawiatura:** w wersji bazowej nie ma osobnych skrótów do regulacji siły lub przebiegu. Sterowanie sesją odbywa się w interfejsie treningowym.
+- **Ustawienia:** poziom trudności, ostrość przebiegu, kalibrację i automatyczną trudność zmienia się w panelu ustawień. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
 
 ### 3. Pong Force Trainer
 
 **Cel:** odbijaj piłkę lewą paletką i zdobywaj punkty przeciwko paletce sterowanej przez komputer.
 
 - **Tensometr:** zmienia pionowe położenie lewej paletki. Reguluj nacisk, aby ustawić paletkę na torze piłki.
-- **Skalowanie:** wysokość i szerokość paletki, marginesy oraz prędkości są proporcjonalne do wymiarów pola gry. Rozdzielczość HD nie zmniejsza względnej szerokości paletki ani nie zwiększa względnej prędkości piłki.
+- **Skalowanie:** wymiary paletek i piłki oraz prędkości są odniesione do logicznego pola gry 640×480. Rozdzielczość HD nie zmniejsza względnej szerokości paletki ani nie zwiększa względnej prędkości piłki.
 - **Wskaźniki:** wynik gracza i przeciwnika, siła wejściowa oraz poziom trudności.
-- **Skalowanie:** szerokość i wysokość paletki, rozmiar piłki oraz prędkości są odniesione do logicznego pola gry 640×480. Większa rozdzielczość nie zmniejsza względnej szerokości paletki ani nie zwiększa względnej prędkości piłki.
-- **Sterowanie:** położenie paletki wyznacza wyłącznie tensometr.
+- **Sterowanie:** położenie lewej paletki wyznacza wyłącznie tensometr.
 - **Punktacja:** punkt gracza jest naliczany po tym, gdy piłka minie stronę przeciwnika; odbicia od paletek i ścian nie są punktami.
 
 ### 4. Arkanoid
@@ -62,7 +61,7 @@
 - **Tensometr:** krótki nacisk wywołuje skok ptaka. Skok jest wyzwalany przejściem z braku nacisku do nacisku, a nie samym ciągłym utrzymywaniem sygnału.
 - **Praktyka:** naciskaj krótko i rytmicznie. Długie przytrzymanie nie powinno być traktowane jako seria niezależnych skoków.
 - **Wskaźniki:** wynik, siła, poziom, prędkość gry i liczba miniętych przeszkód.
-- **Działanie dodatkowe:** `SPACJA`, `↑`, `W`, `ENTER` lub kliknięcie lewym przyciskiem myszy może wywołać pojedynczy skok. Jest to przycisk akcji, a nie alternatywne sterowanie kierunkowe; podstawowym wejściem pozostaje tensometr.
+- **Sterowanie:** skok jest wywoływany wyłącznie impulsem tensometru. Każdy nowy skok wymaga zwolnienia nacisku i ponownego przekroczenia progu aktywacji. Klawiatura i mysz nie wywołują skoku.
 
 ### 6. Mario Run
 
@@ -71,14 +70,14 @@
 - **Tensometr:** przytrzymanie powyżej progu rozpoczyna ładowanie skoku, a zwolnienie nacisku wykonuje skok. Dłuższe ładowanie zwiększa poziom naładowania i siłę skoku w granicach mechaniki gry.
 - **Wskaźnik:** pasek ładowania nad postacią pokazuje aktualną gotowość skoku.
 - **Postęp:** ekran pokazuje wynik, poziom i liczbę przeszkód pozostałych do kolejnego poziomu.
-- **Klawiatura:** w wersji bazowej skok jest sterowany tensometrem; nie ma osobnego skrótu klawiaturowego do ładowania i zwalniania skoku.
+- **Sterowanie:** ładowanie i zwolnienie skoku są obsługiwane wyłącznie przez tensometr. Utrzymanie nacisku ładuje skok, a powrót do strefy zwolnienia wykonuje skok.
 
 ### 7. Car Race
 
 **Cel:** prowadź samochód przez trzy pasy, omijaj ruch uliczny, utrzymuj serię bezkolizyjnych minięć i rozsądnie wykorzystuj dopalacz.
 
 - **Tensometr:** wybiera pas na podstawie wartości siły: niska wartość — lewy pas, środkowa — pas środkowy, wysoka — prawy pas. Sygnał jest filtrowany, a progi histerezy ograniczają przypadkowe przełączanie przy wahaniach pomiaru.
-- **Działanie dodatkowe:** `SPACJA` lub `B` — aktywuj dopalacz. Klawisze kierunkowe nie sterują samochodem; wybór pasa odbywa się wyłącznie tensometrem.
+- **Dopalacz gestem:** przytrzymaj siłę na poziomie co najmniej 95% przez 0,25–1,2 s, a następnie zwolnij do środkowej strefy tensometru. Samochód zachowuje pas podczas gestu. Dopalacz działa przez 1,8 s i ma 5 s odnowienia.
 - **Płynność kierowania:** samochód wizualnie dojeżdża do wybranego pasa z krótką animacją. Pozycja kolizji nadal odpowiada wybranemu pasowi.
 - **Dopalacz:** przez 1,8 s zwiększa prędkość ruchu planszy. Po użyciu obowiązuje 5 s odnowienia; pasek HUD pokazuje stopień gotowości. Animowany płomień za samochodem sygnalizuje aktywne przyspieszenie.
 - **Punktacja:** punkty są przyznawane za pokonany dystans oraz za bezpieczne minięcie pojazdu. Kolejne bezkolizyjne minięcia budują serię i zwiększają premię punktową. Kolizja zeruje serię.
@@ -105,7 +104,8 @@
 **Cel:** steruj statkiem, niszcz kolejne formacje przeciwników, zbieraj ulepszenia i unikaj wrogiego ostrzału.
 
 - **Tensometr:** ustawia poziome położenie statku w obrębie planszy. Wartość 0–100% odpowiada położeniu od lewej do prawej krawędzi.
-- **Działania dodatkowe:** przytrzymanie `SPACJI` — ciągły ogień; `X` — jednorazowy impuls EMP. Ruch statku jest sterowany wyłącznie tensometrem.
+- **Automatyczny ogień:** przy świeżym sygnale tensometru statek oddaje strzał co 0,30 s. Po utracie sygnału ogień zostaje zatrzymany.
+- **Impuls EMP gestem:** przytrzymaj co najmniej 95% siły przez 0,35–1,2 s, a następnie zwolnij do 30% lub mniej. Gest zużywa jeden ładunek EMP. Na początku sesji dostępne są 2 ładunki; po ukończeniu fali przywracany jest 1, maksymalnie do 4.
 - **Impuls EMP:** usuwa wszystkie aktywne pociski przeciwników i zadaje jedno uszkodzenie każdemu aktywnemu przeciwnikowi. Na początku sesji dostępne są 2 ładunki; po ukończeniu fali przywracany jest 1 ładunek, maksymalnie do 4. Naciśnij `X` ponownie dopiero wtedy, gdy chcesz zużyć kolejny ładunek.
 - **Ulepszenia:** co piąty pokonany przeciwnik może pozostawić premię. Niebieska premia daje potrójny strzał, zielona uruchamia osłonę, a żółta zwiększa szybkostrzelność. Premie zbiera się przez zetknięcie statku z opadającym symbolem.
 - **Punktacja i seria:** kolejne eliminacje w krótkim odstępie zwiększają premię punktową. Seria wygasa po przerwie.
@@ -118,7 +118,7 @@
 **Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, ustawiając kąt działa tensometrem i uwzględniając wiatr.
 
 - **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału pozostaje ustawiona na stałym, zbalansowanym poziomie.
-- **Automatyczny strzał:** po uzyskaniu świeżego sygnału w turze gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Po utracie sygnału odliczanie rozpoczyna się od nowa. Klawiatura, mysz i spacja nie zmieniają kąta, mocy ani chwili strzału.
+- **Automatyczny strzał:** po uzyskaniu świeżego sygnału w turze gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Po utracie sygnału odliczanie rozpoczyna się od nowa.
 - **Wskaźniki:** zdrowie obu czołgów, runda, wynik i siła/wiatr zgodnie z informacją na ekranie.
 - **Wskazówka:** wiatr wpływa na tor pocisku. Po strzale poczekaj na zakończenie lotu i ruch przeciwnika; następna tura gracza rozpoczyna nowe dwusekundowe odliczanie.
 
@@ -130,16 +130,16 @@
 | Tangens | pionowe położenie kursora względem celu | brak skrótów gry |
 | Pong | pionowe położenie lewej paletki | brak skrótów gry |
 | Arkanoid | poziome położenie paletki | brak skrótów gry |
-| Flappy Bird | impuls skoku po przekroczeniu progu | `SPACJA`/`↑`/`W`/`ENTER` lub kliknięcie — skok |
+| Flappy Bird | impuls skoku po przekroczeniu progu | brak dodatkowego wejścia |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
-| Car Race | wybór jednego z trzech pasów | `SPACJA`/`B` — dopalacz |
+| Car Race | wybór jednego z trzech pasów | gest 95% i zwolnienie — dopalacz |
 | Archer | kąt celowania 0–100% | automatyczny strzał co 2,4 s |
-| Galaga | pozioma pozycja statku | `SPACJA` — ogień, `X` — EMP |
+| Galaga | pozioma pozycja statku | automatyczny ogień, gest 95% i zwolnienie — EMP |
 | Scorched Earth | kąt działa | automatyczny strzał po 2 s |
 
 ## Uwaga o wersjach i rozszerzeniach
 
-Niektóre usprawnienia sterowania są rozwijane w osobnych gałęziach i PR-ach. Dopóki nie zostaną scalone z gałęzią integracyjną, nie należy traktować ich jako dostępnych w tej wersji aplikacji. Dotyczy to między innymi dodatkowych skrótów kalibracji, adaptacyjnej trudności, alternatywnych przebiegów ćwiczeń oraz sterowania myszą w wybranych grach.
+Wszystkie parametry konfiguracyjne (np. trudność, kalibracja, tryb fali i preferowana ręka) należy zmieniać w interfejsie ustawień poza samą rozgrywką. Żadna gra nie może wymagać klawiatury ani myszy do wykonania ruchu lub akcji.
 
 Przy zmianie sterowania w kodzie należy zaktualizować ten plik oraz teksty instruktażowe wyświetlane bezpośrednio w grze. Każdy skrót powinien mieć test regresyjny, a opis powinien odpowiadać faktycznej implementacji.
 
