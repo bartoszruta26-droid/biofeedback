@@ -230,14 +230,15 @@ void PongGame::adaptToSize()
 
     const float scaleX = qMax(0.25f, newSize.width() / 640.0f);
     const float scaleY = qMax(0.25f, newSize.height() / 480.0f);
-    m_paddleHeight = qBound(52.0f * scale, static_cast<float>(newSize.height()) * 0.22f,
-                            150.0f * scale);
-    m_paddleWidth = qBound(12.0f * scale, static_cast<float>(newSize.width()) * 0.032f,
-                           30.0f * scale);
-    m_paddleMargin = qBound(12.0f * scale, static_cast<float>(newSize.width()) * 0.035f,
-                            28.0f * scale);
-    m_ballRadius = qBound(5.0f * scale,
-        static_cast<float>(qMin(newSize.width(), newSize.height())) * 0.018f, 12.0f * scale);
+    const float minScale = qMin(scaleX, scaleY);
+    m_paddleHeight = qBound(52.0f * scaleY, static_cast<float>(newSize.height()) * 0.22f,
+                            150.0f * scaleY);
+    m_paddleWidth = qBound(12.0f * scaleX, static_cast<float>(newSize.width()) * 0.032f,
+                           30.0f * scaleX);
+    m_paddleMargin = qBound(12.0f * scaleX, static_cast<float>(newSize.width()) * 0.035f,
+                            28.0f * scaleX);
+    m_ballRadius = qBound(5.0f * minScale,
+        static_cast<float>(qMin(newSize.width(), newSize.height())) * 0.018f, 12.0f * minScale);
     m_aiSpeed = (110.0f + static_cast<float>(m_difficultyLevel) * 55.0f) * scaleY;
     m_ballSpeed = (260.0f + static_cast<float>(m_difficultyLevel) * 55.0f) * scaleX;
 
