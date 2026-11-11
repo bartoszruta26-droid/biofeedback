@@ -213,6 +213,11 @@ void CarRaceGame::update(double deltaTime)
         return;
     deltaTime = qMin(deltaTime, 0.1);
 
+    m_previousPlayer = m_player;
+    m_previousObstacles = m_obstacles;
+    m_previousDistance = m_distance;
+    m_previousVisualLane = m_visualLane;
+
     m_animationTime += deltaTime;
     m_inputAge += deltaTime;
     if (m_boostGestureActive) {
@@ -278,6 +283,40 @@ void CarRaceGame::update(double deltaTime)
         [this](const Obstacle& obstacle) {
             return obstacle.rect.isEmpty() || obstacle.rect.top() > height() + 80.0;
         }), m_obstacles.end());
+}
+
+void CarRaceGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const QRectF currentPlayer = m_player;
+    const auto currentObstacles = m_obstacles;
+    const double currentDistance = m_distance;
+    const double currentVisualLane = m_visualLane;
+
+    m_player = QRectF(
+        m_previousPlayer.x() + (currentPlayer.x() - m_previousPlayer.x()) * alpha,
+        m_previousPlayer.y() + (currentPlayer.y() - m_previousPlayer.y()) * alpha,
+        currentPlayer.width(), currentPlayer.height());
+    if (m_previousObstacles.size() == m_obstacles.size()) {
+        for (int i = 0; i < m_obstacles.size(); ++i) {
+            const QRectF before = m_previousObstacles[i].rect;
+            const QRectF now = currentObstacles[i].rect;
+            m_obstacles[i].rect = QRectF(
+                before.x() + (now.x() - before.x()) * alpha,
+                before.y() + (now.y() - before.y()) * alpha,
+                now.width(), now.height());
+        }
+    }
+    m_distance = m_previousDistance + (currentDistance - m_previousDistance) * alpha;
+    m_visualLane = m_previousVisualLane +
+        (currentVisualLane - m_previousVisualLane) * alpha;
+
+    render(painter);
+
+    m_player = currentPlayer;
+    m_obstacles = currentObstacles;
+    m_distance = currentDistance;
+    m_visualLane = currentVisualLane;
 }
 
 void CarRaceGame::render(QPainter& painter)
