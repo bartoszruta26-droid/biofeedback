@@ -1,12 +1,12 @@
 # Instrukcja sterowania grami Biofeedback
 
-> Dokument opisuje sterowanie zaimplementowane w aktualnej gałęzi integracyjnej Biofeedback. Skróty klawiaturowe odnoszą się do aktywnego widoku gry. Funkcje, które są dopiero w osobnych gałęziach lub Pull Requestach, nie są przedstawiane jako dostępne w tej wersji.
+> Dokument opisuje sterowanie zaimplementowane w aktualnej gałęzi integracyjnej Biofeedback. W docelowym modelu rozgrywki jedynym kontrolerem jest pojedynczy tensometr/HX711; klawiatura nie jest wejściem sterującym grą. Funkcje planowane, które nie są jeszcze dostępne w tej wersji, są oznaczone jako docelowe.
 
 ## Zasady wspólne
 
 1. Wybierz grę w module treningowym i uruchom ją przyciskiem **Start**.
 2. Jeżeli gra korzysta z tensometru/HX711, podłącz urządzenie i sprawdź, czy aplikacja odbiera aktualne próbki. Wartość siły jest interpretowana zgodnie z mechaniką konkretnej gry — nie każda gra używa jej w ten sam sposób.
-3. Sterowanie klawiaturą działa, gdy widok gry ma fokus. Kliknij obszar gry, jeżeli klawisze nie reagują.
+3. Rozgrywka nie wymaga klawiatury, myszy, ekranu dotykowego ani gamepada. Parametry konfiguracyjne należy ustawić przed sesją w interfejsie aplikacji, a akcje w trakcie gry realizować sygnałem tensometru.
 4. **Pauza**, **wznowienie**, **zatrzymanie** i **reset** są obsługiwane przez wspólny interfejs modułu treningowego/silnika gry, a nie przez uniwersalny skrót klawiszowy.
 5. Jeżeli gra pokazuje komunikat o braku połączenia z czujnikiem, sprawdź połączenie urządzenia i strumień pomiarowy. Nie traktuj braku sygnału jako wartości zerowej ani jako polecenia wykonania ruchu.
 6. Po zmianie gry lub ponownym uruchomieniu sprawdź, czy gra rozpoczęła nową sesję i czy wynik/życia zostały zresetowane zgodnie z mechaniką gry.
@@ -15,12 +15,14 @@
 
 ### 1. Sinus Force Trainer
 
-**Cel:** prowadź kursor na wysokości punktu celu na sinusoidzie, w miejscu pionowej linii przerywanej.
+**Cel:** utrzymuj kursor na ruchomym celu i buduj serię precyzyjnych trafień. Gra obejmuje pięć przebiegów: sinusoidalny, trójkątny, łagodny plateau, piłokształtny i impulsowy.
 
-- **Tensometr:** zmiana siły zmienia pionowe położenie kursora. Zwiększaj lub zmniejszaj nacisk, aby dopasować kursor do czerwonego punktu celu.
-- **Wskaźnik:** turkusowe kółko pokazuje położenie gracza, czerwony punkt położenie celu; zielone oznaczenie sygnalizuje trafienie.
-- **Informacje na ekranie:** bieżąca siła, tolerancja w pikselach, poziom trudności i status połączenia.
-- **Klawiatura:** w tej wersji nie ma odrębnych skrótów gry do regulacji siły ani fazy. Start/pauza/reset są dostępne w interfejsie treningowym.
+- **Tensometr:** ciągła, indywidualnie skalibrowana siła 0–100% steruje pionowym położeniem kursora. Im większa siła, tym wyższe położenie. Wygładzanie ogranicza drżenie sygnału bez zmiany źródła sterowania.
+- **Punktacja:** punkty rosną proporcjonalnie do dokładności i czasu utrzymania kursora w strefie celu. Dłuższe serie zwiększają mnożnik; precyzja co najmniej 90% przez kolejne okna daje premię za serię doskonałą. Rekord serii pozostaje widoczny w HUD.
+- **Trudność:** pięć poziomów zmienia prędkość przebiegu i szerokość strefy tolerancji. Dostępny jest opcjonalny automatyczny dobór trudności na podstawie utrzymywanej dokładności.
+- **Grafika:** kontrastowa siatka, przebieg celu ze strefą tolerancji, pionowa bramka pomiarowa, kursor o zmiennej barwie, miernik siły i panel wyniku/serii.
+- **Utrata sygnału:** po 350 ms bez aktualnej próbki punktacja i seria zostają zatrzymane, a gra wyświetla komunikat o braku świeżego sygnału.
+- **Konfiguracja:** wybór przebiegu, poziomu, automatycznej trudności i zakresu kalibracji odbywa się przed sesją w ustawieniach aplikacji. W trakcie rozgrywki nie ma sterowania klawiaturą. Start/pauza/reset pozostają w nadrzędnym interfejsie treningowym.
 
 ### 2. Tan Force Trainer (Tangens)
 
