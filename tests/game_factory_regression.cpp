@@ -385,6 +385,39 @@ int main(int argc, char **argv)
     REQUIRE(sinusGame->isRunning());
     sinusGame->stop();
 
+    // Mario Run: sensor-only double jump, enemies, lives and animated world.
+    std::unique_ptr<games::GameEngine> marioBase(games::createGame(QStringLiteral("mario")));
+    auto* mario = dynamic_cast<games::MarioGame*>(marioBase.get());
+    REQUIRE(mario != nullptr);
+    mario->resize(640, 480);
+    mario->start();
+    REQUIRE(mario->livesRemaining() == 3);
+    REQUIRE(mario->coinsCollected() == 0);
+    const double initialScroll = mario->worldScrollDistance();
+    const double initialAnimation = mario->animationClock();
+    waitForEvents(120);
+    REQUIRE(mario->worldScrollDistance() > initialScroll);
+    REQUIRE(mario->animationClock() > initialAnimation);
+    mario->handleSensorInput(100.0);
+    waitForEvents(300);
+    REQUIRE(mario->playerCharging());
+    REQUIRE(mario->jumpCharge() > 0.0);
+    mario->handleSensorInput(0.0);
+    REQUIRE(mario->playerVerticalVelocity() < 0.0);
+    REQUIRE(mario->doubleJumpAvailable());
+    mario->handleSensorInput(100.0);
+    REQUIRE(!mario->doubleJumpAvailable());
+    REQUIRE(mario->playerVerticalVelocity() < 0.0);
+    waitForEvents(2400);
+    REQUIRE(mario->activeEnemyCount() >= mario->goombaCount());
+    REQUIRE(mario->goombaCount() >= 0);
+    REQUIRE(mario->piranhaPlantCount() >= 0);
+    REQUIRE(mario->livesRemaining() > 0);
+    mario->stop();
+    mario->reset();
+    REQUIRE(mario->livesRemaining() == 3);
+    REQUIRE(mario->coinsCollected() == 0);
+
     std::unique_ptr<games::GameEngine> flappy(games::createGame(QStringLiteral("flappy")));
     auto* flappyGame = dynamic_cast<games::FlappyBirdGame*>(flappy.get());
     REQUIRE(flappyGame != nullptr);
