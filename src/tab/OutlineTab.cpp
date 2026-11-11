@@ -811,6 +811,7 @@ void OutlineTab::setupUI()
                 selected.push_back({tr("Powtórzenie %1").arg(i + 1), repetitions[i]});
         }
         const QJsonObject item = savedSeriesCombo->currentData().toJsonObject();
+        QVector<gui::DataPoint> savedSamples;
         if (!item.isEmpty()) {
             const QString storedPatient = item.value(QStringLiteral("patient_uuid")).toString();
             if (storedPatient != m_currentPatientUuid) {
@@ -819,19 +820,44 @@ void OutlineTab::setupUI()
                 return;
             }
             const QJsonArray points = item.value(QStringLiteral("points")).toArray();
-            QVector<gui::DataPoint> samples;
             const QDateTime base = QDateTime::fromString(
                 item.value(QStringLiteral("created_at")).toString(), Qt::ISODate);
             for (const QJsonValue& value : points) {
                 const QJsonArray pair = value.toArray();
                 if (pair.size() != 2) continue;
-                samples.push_back(gui::DataPoint(base.addMSecs(pair.at(0).toVariant().toLongLong()),
-                                                   pair.at(1).toDouble()));
+                savedSamples.push_back(gui::DataPoint(base.addMSecs(pair.at(0).toVariant().toLongLong()),
+                                                        pair.at(1).toDouble()));
             }
-            if (samples.size() >= 2)
-                selected.push_back({item.value(QStringLiteral("label")).toString(), samples});
+            if (savedSamples.size() >= 2)
+                selected.push_back({item.value(QStringLiteral("label")).toString(), savedSamples});
         }
         overlay->setSeries(selected);
+        if (!savedSamples.isEmpty() && m_forceGraph && m_forceGraph->dataPointCount() >= 3) {
+            const ForceMetrics current = calculateForceMetrics(m_forceGraph->getData());
+            const ForceMetrics previous = calculateForceMetrics(savedSamples);
+            auto delta = [](double now, double before) {
+                return before == 0.0 ? QStringLiteral("n/d")
+                    : QString("%1%").arg((now - before) * 100.0 / std::abs(before), 0, 'f', 1);
+            };
+            metricsBrowser->append(tr(
+                "<h4>Zmiana względem zapisanej sesji</h4><table>"
+                "<tr><th>Parametr</th><th>Poprzednio</th><th>Obecnie</th><th>Zmiana względna</th></tr>"
+                "<tr><td>Średnia siła</td><td>%1 N</td><td>%2 N</td><td>%3</td></tr>"
+                "<tr><td>Szczyt siły</td><td>%4 N</td><td>%5 N</td><td>%6</td></tr>"
+                "<tr><td>Zmienność (CV)</td><td>%7%</td><td>%8%</td><td>%9</td></tr>"
+                "<tr><td>Czas narastania</td><td>%10 ms</td><td>%11 ms</td><td>%12</td></tr></table>"
+                "<p><small>Zmiany procentowe są opisowe; porównanie jest miarodajne tylko przy zgodnym "
+                "czujniku, kalibracji, pozycji, instrukcji, filtracji i sposobie normalizacji próby.</small></p>")
+                .arg(previous.mean, 0, 'f', 2).arg(current.mean, 0, 'f', 2)
+                .arg(delta(current.mean, previous.mean))
+                .arg(previous.peak, 0, 'f', 2).arg(current.peak, 0, 'f', 2)
+                .arg(delta(current.peak, previous.peak))
+                .arg(previous.coefficientOfVariation, 0, 'f', 2)
+                .arg(current.coefficientOfVariation, 0, 'f', 2)
+                .arg(delta(current.coefficientOfVariation, previous.coefficientOfVariation))
+                .arg(previous.meanRiseMs, 0, 'f', 0).arg(current.meanRiseMs, 0, 'f', 0)
+                .arg(delta(current.meanRiseMs, previous.meanRiseMs)));
+        }
         if (selected.isEmpty()) {
             metricsBrowser->append(tr("<p>Brak poprawnych przebiegów do porównania.</p>"));
         } else {
