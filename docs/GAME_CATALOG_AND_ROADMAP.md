@@ -194,7 +194,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 ### 4.1. Precision Crane — dźwig precyzyjny
 
-<badge>Wersja gry zaimplementowana — PR</badge>
+**Status:** pierwsza grywalna wersja zaimplementowana (PR #270).
 
 - **Grafika:** port w widoku bocznym, suwnica z prowadnicą, wózek jezdny, lina, hak, ładunek, strefa odbioru, woda i tło portowe. Kołysanie podwieszonego ładunku sygnalizuje bezwładność.
 - **Funkcje:** podnoszenie i opuszczanie ładunku, transport poziomy, precyzyjne dostawy, serie udanych dostaw, premie punktowe, trzy pomyłki na sesję i pięć poziomów trudności ze zwężającą się strefą celu.
