@@ -91,8 +91,9 @@ QRectF PrecisionCraneGame::cargoRect() const
 {
     const double scaleX = qMax(0.5, width() / 640.0);
     const double scaleY = qMax(0.5, height() / 480.0);
-    const double size = qBound(22.0 * scaleX,
-        width() * 0.055 * std::sqrt(m_cargoMassKg), 56.0 * scaleX);
+    const double objectScale = qMin(scaleX, scaleY);
+    const double size = qBound(22.0 * objectScale,
+        width() * 0.055 * std::sqrt(m_cargoMassKg), 56.0 * objectScale);
     const double swingRatio = qBound(-0.42, m_sway / qMax(1.0, m_ropeLength), 0.42);
     const double verticalSwing = m_loadAttached
         ? m_ropeLength * (1.0 - std::cos(std::asin(swingRatio))) : 0.0;
