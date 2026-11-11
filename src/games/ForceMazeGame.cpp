@@ -3,6 +3,7 @@
 #include <QLinearGradient>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPolygonF>
 #include <QSettings>
 #include <QFont>
 #include <algorithm>
@@ -271,6 +272,10 @@ void ForceMazeGame::update(double deltaTime)
         ++m_lastProcessedRow;
         processRowCrossing(m_lastProcessedRow);
         if (m_lives <= 0 || !m_isRunning)
+            return;
+        // A wall collision rewinds progress to the last checkpoint. Do not
+        // continue processing rows from the pre-collision frame position.
+        if (static_cast<int>(std::floor(m_progressRows)) != currentRow)
             return;
     }
 
