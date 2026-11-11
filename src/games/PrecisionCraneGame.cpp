@@ -88,7 +88,11 @@ double PrecisionCraneGame::clampCarriage(double x) const
 QRectF PrecisionCraneGame::cargoRect() const
 {
     const double size = qBound(22.0, width() * 0.055 * std::sqrt(m_cargoMassKg), 56.0);
-    const double y = m_loadAttached ? qMin(m_hookY + 18.0, floorY() - size) : floorY() - size;
+    const double swingRatio = qBound(-0.42, m_sway / qMax(1.0, m_ropeLength), 0.42);
+    const double verticalSwing = m_loadAttached
+        ? m_ropeLength * (1.0 - std::cos(std::asin(swingRatio))) : 0.0;
+    const double y = m_loadAttached
+        ? qMin(m_hookY + 18.0 + verticalSwing, floorY() - size) : floorY() - size;
     const double x = m_loadAttached ? m_carriageX + m_sway - size * 0.5 : m_cargoX * width() - size * 0.5;
     return QRectF(x, y, size, size);
 }
