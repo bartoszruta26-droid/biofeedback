@@ -465,7 +465,27 @@ int main(int argc, char **argv)
     REQUIRE(craneSafety->carriagePosition() > positionAtTimeout);
     craneSafety->stop();
 
-    // A sub-minimum pulse is ignored; a valid short pulse grips only when
+    // A high-force gesture abandoned by a sensor timeout must be cancelled.
+    // A later release sample must not execute the stale gesture.
+    std::unique_ptr<games::GameEngine> craneStaleGestureBase(
+        games::createGame(QStringLiteral("precision_crane")));
+    auto* craneStaleGesture = dynamic_cast<games::PrecisionCraneGame*>(craneStaleGestureBase.get());
+    REQUIRE(craneStaleGesture != nullptr);
+    craneStaleGesture->resize(640, 480);
+    craneStaleGesture->start();
+    craneStaleGesture->handleSensorInput(90.0);
+    waitForEvents(160);
+    REQUIRE(craneStaleGesture->gestureActive());
+    waitForEvents(420); // Exceed the 350 ms input freshness limit.
+    REQUIRE(!craneStaleGesture->hasFreshSignal());
+    REQUIRE(!craneStaleGesture->gestureActive());
+    craneStaleGesture->handleSensorInput(0.0);
+    waitForEvents(60);
+    REQUIRE(craneStaleGesture->controlAxis() == games::PrecisionCraneGame::HorizontalAxis);
+    REQUIRE(!craneStaleGesture->loadAttached());
+    craneStaleGesture->stop();
+
+    // A sub-minimum pulse is ignored; a valid short pulse grips only when a valid short pulse grips only when
     // the single-sensor-controlled hook is aligned with the cargo.
     std::unique_ptr<games::GameEngine> craneGestureBase(
         games::createGame(QStringLiteral("precision_crane")));
