@@ -8,7 +8,7 @@
 #include <QVector>
 #include <memory>
 #include <vector>
-class QKeyEvent;
+class QResizeEvent;
 namespace games {
 class ArkanoidGame final : public GameEngine {
  Q_OBJECT
@@ -28,8 +28,7 @@ protected:
  void update(double deltaTime) override;
  void render(QPainter& painter) override;
  bool handleInput(double value) override;
- void keyPressEvent(QKeyEvent *event) override;
- void keyReleaseEvent(QKeyEvent *event) override;
+ void resizeEvent(QResizeEvent *event) override;
 private:
  struct Brick{QRectF rect;int hits{1};bool active{true};int row{0};};
  void updatePhysicsStep(double deltaTime);
@@ -45,7 +44,7 @@ private:
  std::vector<Brick> m_bricks;
  double m_currentForce,m_ballRadius,m_ballSpeed,m_paddleWidth,m_paddleHeight,m_comboRemaining;
  int m_difficultyLevel,m_level,m_lives,m_combo;
- bool m_moveLeft{false},m_moveRight{false};
+
  std::shared_ptr<sensor::SerialCommunication> m_serialPort;
  static constexpr double MIN_FORCE=0.0;
  static constexpr double MAX_FORCE=100.0;
