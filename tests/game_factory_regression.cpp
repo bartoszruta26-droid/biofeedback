@@ -18,6 +18,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QEventLoop>
+#include <QElapsedTimer>
 #include <QTimer>
 #include <QKeyEvent>
 #include <QStringList>
@@ -26,6 +27,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <functional>
 
 namespace games {
 struct PrecisionCraneGameTestAccess
@@ -148,6 +150,15 @@ static void waitForEvents(int milliseconds)
     QEventLoop loop;
     QTimer::singleShot(milliseconds, &loop, &QEventLoop::quit);
     loop.exec();
+}
+
+static bool waitForCondition(const std::function<bool()>& condition, int timeoutMilliseconds)
+{
+    QElapsedTimer elapsed;
+    elapsed.start();
+    while (!condition() && elapsed.elapsed() < timeoutMilliseconds)
+        waitForEvents(20);
+    return condition();
 }
 
 int main(int argc, char **argv)
@@ -638,16 +649,27 @@ int main(int argc, char **argv)
     carRaceGameOverInstance->resize(640, 480);
     carRaceGameOverInstance->start();
     carRaceGameOverInstance->handleSensorInput(50.0); // First obstacle: middle lane.
-    waitForEvents(3600);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->livesRemaining() < 3 ||
+               !carRaceGameOverInstance->isRunning();
+    }, 5000));
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 2);
     carRaceGameOverInstance->handleSensorInput(0.0); // Second obstacle: left lane.
-    waitForEvents(1500);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->livesRemaining() < 2 ||
+               !carRaceGameOverInstance->isRunning();
+    }, 5000));
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 1);
     // Allow the collision-protection window to expire before exposing the next lane.
-    waitForEvents(1200);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->collisionProtectionRemaining() <= 0.0;
+    }, 2500));
     carRaceGameOverInstance->handleSensorInput(90.0); // Third obstacle: right lane.
     carRaceGameOverInstance->handleSensorInput(90.0); // Cross the lane hysteresis from centre to right.
-    waitForEvents(1900);
+    REQUIRE(waitForCondition([&] {
+        return carRaceGameOverInstance->livesRemaining() == 0 ||
+               !carRaceGameOverInstance->isRunning();
+    }, 5000));
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 0);
     REQUIRE(!carRaceGameOverInstance->isRunning());
 
