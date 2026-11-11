@@ -137,9 +137,22 @@ bool SinGame::automaticDifficulty() const { return m_automaticDifficulty; }
 
 void SinGame::resizeEvent(QResizeEvent* event)
 {
+    const int oldHeight = event->oldSize().height();
+    const int newHeight = event->size().height();
+    if (newHeight > 0) {
+        if (oldHeight > 0)
+            m_cursorY = newHeight * 0.5 +
+                (m_cursorY - oldHeight * 0.5) *
+                (static_cast<double>(newHeight) / oldHeight);
+        else
+            m_cursorY = newHeight * 0.5;
+    }
     QWidget::resizeEvent(event);
     refreshGeometryParameters();
     calculateTargetY(width() * 0.72);
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
     QWidget::update();
 }
 
