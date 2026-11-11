@@ -120,6 +120,12 @@ void ArcherGame::update(double deltaTime)
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
     deltaTime = qMin(deltaTime, 0.1);
+    m_previousTarget = m_target;
+    m_previousArrowPositions.clear();
+    m_previousArrowPositions.reserve(m_arrows.size());
+    for (const Arrow& arrow : m_arrows)
+        m_previousArrowPositions.push_back(arrow.position);
+
     const bool sensorFresh = m_hasSensorSample && m_sensorClock.isValid() &&
                               m_sensorClock.elapsed() <= 350;
     if (sensorFresh) {
@@ -178,6 +184,32 @@ void ArcherGame::update(double deltaTime)
 
     m_arrows.erase(std::remove_if(m_arrows.begin(), m_arrows.end(),
         [](const Arrow& arrow) { return !arrow.active; }), m_arrows.end());
+}
+
+void ArcherGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const QRectF currentTarget = m_target;
+    m_target = QRectF(
+        m_previousTarget.x() + (currentTarget.x() - m_previousTarget.x()) * alpha,
+        m_previousTarget.y() + (currentTarget.y() - m_previousTarget.y()) * alpha,
+        currentTarget.width(), currentTarget.height());
+
+    QVector<QPointF> currentArrowPositions;
+    currentArrowPositions.reserve(m_arrows.size());
+    for (const Arrow& arrow : m_arrows)
+        currentArrowPositions.push_back(arrow.position);
+    if (m_previousArrowPositions.size() == m_arrows.size()) {
+        for (int i = 0; i < m_arrows.size(); ++i)
+            m_arrows[i].position = m_previousArrowPositions[i] +
+                (currentArrowPositions[i] - m_previousArrowPositions[i]) * alpha;
+    }
+
+    render(painter);
+
+    m_target = currentTarget;
+    for (int i = 0; i < m_arrows.size() && i < currentArrowPositions.size(); ++i)
+        m_arrows[i].position = currentArrowPositions[i];
 }
 
 void ArcherGame::render(QPainter& painter)
