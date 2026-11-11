@@ -39,6 +39,7 @@ protected:
     void render(QPainter& painter) override;
     bool handleInput(double value) override;
     void resizeEvent(QResizeEvent* event) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
     struct Projectile {
@@ -67,9 +68,15 @@ private:
     bool loseLife();
 
     QRectF m_player;
+    QRectF m_previousPlayer;
     QVector<Projectile> m_projectiles;
+    QVector<Projectile> m_previousProjectiles;
     QVector<Enemy> m_enemies;
+    QVector<Enemy> m_previousEnemies;
     QVector<PowerUp> m_powerUps;
+    QVector<PowerUp> m_previousPowerUps;
+    double m_previousBackgroundOffset{0.0};
+    double m_previousElapsed{0.0};
     double m_force;
     double m_sensorInputAge;
     double m_forceBeforeSpecialGesture;
