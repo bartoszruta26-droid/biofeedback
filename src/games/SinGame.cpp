@@ -76,6 +76,9 @@ void SinGame::initialize()
     m_accuracyWindowHitSeconds = 0.0;
     refreshGeometryParameters();
     calculateTargetY(width() * 0.72);
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
 }
 
 void SinGame::setDifficultyLevel(int level)
