@@ -53,6 +53,7 @@ protected:
     void initialize() override;
     void update(double deltaTime) override;
     void render(QPainter& painter) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
     bool handleInput(double value) override;
 
 private:
@@ -95,6 +96,7 @@ private:
     double m_lastReactionMs;
     double m_lastForce;
     double m_visualTime;
+    double m_previousVisualTime;
     double m_feedbackTime;
     double m_toastTime;
     bool m_hasSensorSample;
