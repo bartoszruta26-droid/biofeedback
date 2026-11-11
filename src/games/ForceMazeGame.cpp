@@ -183,7 +183,7 @@ void ForceMazeGame::mousePressEvent(QMouseEvent *event)
     const QRectF handButton(width() - margin - 132.0, 5.0, 132.0, 24.0);
     if (handButton.contains(event->pos())) {
         setLeftHanded(!m_leftHanded);
-        update();
+        QWidget::update();
         event->accept();
         return;
     }
