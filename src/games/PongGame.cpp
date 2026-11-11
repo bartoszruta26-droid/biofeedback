@@ -226,8 +226,15 @@ void PongGame::adaptToSize()
     if (m_lastSize.width() > 1 && m_lastSize.height() > 1) {
         const double sx = static_cast<double>(newSize.width()) / m_lastSize.width();
         const double sy = static_cast<double>(newSize.height()) / m_lastSize.height();
+        const double oldScale = qBound(0.50,
+            qMin(m_lastSize.width() / 640.0, m_lastSize.height() / 480.0), 2.0);
+        const double newScale = qBound(0.50,
+            qMin(newSize.width() / 640.0, newSize.height() / 480.0), 2.0);
+        const double velocityScale = newScale / oldScale;
         m_ballPos.setX(m_ballPos.x() * sx);
         m_ballPos.setY(m_ballPos.y() * sy);
+        // Preserve trajectory direction while adapting speed uniformly to the new logical scale.
+        m_ballVel *= velocityScale;
         m_leftPaddleY = static_cast<float>(m_leftPaddleY * sy);
         m_rightPaddleY = static_cast<float>(m_rightPaddleY * sy);
     } else {
