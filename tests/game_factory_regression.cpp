@@ -105,6 +105,11 @@ struct RhythmForceGameTestAccess
         game.update(deltaTime);
     }
 
+    static void setFinalBeat(RhythmForceGame& game)
+    {
+        game.m_nextBeatIndex = RhythmForceGame::kRoundBeats;
+    }
+
     static void setClock(RhythmForceGame& game, double songTime)
     {
         game.m_songTime = songTime;
@@ -898,6 +903,20 @@ int main(int argc, char **argv)
     rhythmSafety->handleSensorInput(70.0);
     REQUIRE(rhythmSafety->pulseActive());
     rhythmSafety->stop();
+
+    // Resolving beat 32 closes the finite round and stops the game cleanly.
+    std::unique_ptr<games::RhythmForceGame> rhythmFinal(new games::RhythmForceGame);
+    rhythmFinal->resize(640, 480);
+    rhythmFinal->start();
+    games::RhythmForceGameTestAccess::setFinalBeat(*rhythmFinal);
+    const double finalBeat = games::RhythmForceGameTestAccess::beatTime(*rhythmFinal, 32);
+    games::RhythmForceGameTestAccess::emitPulse(
+        *rhythmFinal, finalBeat, 0.12,
+        games::RhythmForceGameTestAccess::targetForce(*rhythmFinal, 32));
+    REQUIRE(rhythmFinal->roundCompleted());
+    REQUIRE(rhythmFinal->hitCount() == 1);
+    REQUIRE(rhythmFinal->nextBeatNumber() == 33);
+    REQUIRE(!rhythmFinal->isRunning());
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
