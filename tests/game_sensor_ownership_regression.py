@@ -47,7 +47,7 @@ if "m_gameTimer->setInterval(8)" not in game_engine:
     raise SystemExit("Game loop must run at the 120 Hz presentation cadence")
 if "m_liveUiTimer->setInterval(8)" not in training:
     raise SystemExit("TrainingTab must refresh the latest game-control sample at 120 Hz")
-if "std::exp(-deltaTime / 0.025)" not in arkanoid:
+if "std::exp(-dt/0.025)" not in arkanoid:
     raise SystemExit("Arkanoid paddle must interpolate between sensor samples")
 if "setAttribute(Qt::WA_OpaquePaintEvent, true)" not in game_engine:
     raise SystemExit("Game widget must avoid redundant background painting")
