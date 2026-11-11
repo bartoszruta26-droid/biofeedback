@@ -286,11 +286,12 @@ void ReactionForceGame::finishRound()
     m_roundCompleted = true;
     m_phase = Completed;
     m_awaitingNeutral = true;
-    if (m_hits == kTotalTrials)
+    if (m_hits == kTotalTrials && m_misses == 0)
         unlockAchievement(QStringLiteral("clean_round"), QStringLiteral("Bezbłędna seria"));
     if (m_perfectHits >= 10)
         unlockAchievement(QStringLiteral("perfect_10"), QStringLiteral("Dziesięć reakcji perfekcyjnych"));
-    if (m_hits >= 16)
+    if (m_hits + m_misses > 0 &&
+        100 * m_hits >= 80 * (m_hits + m_misses))
         unlockAchievement(QStringLiteral("accuracy_80"), QStringLiteral("Celność co najmniej 80%"));
 
     persistRecords();
@@ -444,11 +445,11 @@ void ReactionForceGame::render(QPainter& painter)
     const double upper = targetUpperPercent() / 100.0;
     QRectF targetBand(forceBar.left() + forceBar.width() * lower, forceBar.top(),
                       forceBar.width() * (upper - lower), forceBar.height());
-    painter.setBrush(QColor(35, 150, 100, 180));
-    painter.drawRect(targetBand);
     painter.setBrush(QColor(80, 190, 245));
     painter.drawRect(QRectF(forceBar.left(), forceBar.top(),
         forceBar.width() * qBound(0.0, m_lastForce / 100.0, 1.0), forceBar.height()));
+    painter.setBrush(QColor(35, 150, 100, 180));
+    painter.drawRect(targetBand);
     painter.setPen(QColor(235, 243, 252));
     painter.setFont(QFont(QStringLiteral("Sans Serif"), smallSize));
     painter.drawText(QRectF(forceBar.left(), forceBar.bottom() + 5, forceBar.width(), smallSize + 6),
