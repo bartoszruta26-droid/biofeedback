@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="300" viewBox="0 0 256 300" role="img" aria-labelledby="title desc">
+<title>Znak godności misyjnej — glob i krzyż</title><desc>Znak godności misyjnej — glob i krzyż — autorski znak heraldyczny do zastosowań ilustracyjnych.</desc>
+<defs><clipPath id="shield"><path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z"/></clipPath></defs>
+<path d="M18 16H238V157C238 224 188 270 128 294C68 270 18 224 18 157Z" fill="#d8b45a" stroke="#392d25" stroke-width="5"/>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="#1f5260" stroke="#f4ead5" stroke-width="3"/>
+<g clip-path="url(#shield)"><g fill="none" stroke="#d8b45a" stroke-width="4" opacity=".8"><path d="M38 45H218M38 255H218"/></g><circle cx="128" cy="151" r="67" fill="none" stroke="#f4ead5" stroke-width="7"/><path d="M61 151H195M128 84C96 116 96 186 128 218M128 84C160 116 160 186 128 218" fill="none" stroke="#d8b45a" stroke-width="5"/><path d="M128 54V154M98 91H158" stroke="#9e3438" stroke-width="12"/></g>
+<path d="M28 24H228V157C228 216 183 258 128 282C73 258 28 216 28 157Z" fill="none" stroke="#392d25" stroke-width="5"/>
+<path d="M128 30V275" stroke="#f4ead5" stroke-width="1.5" opacity=".5"/>
+</svg>
