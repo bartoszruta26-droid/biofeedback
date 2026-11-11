@@ -68,6 +68,7 @@ struct PrecisionCraneGameTestAccess
 struct BalanceTowerGameTestAccess
 {
     static void advance(BalanceTowerGame& game, double deltaTime) { game.update(deltaTime); }
+    static double targetPositionGoal(const BalanceTowerGame& game) { return game.m_targetPositionGoal; }
     static void placeBlock(BalanceTowerGame& game) { game.placeBlock(); }
 };
 
@@ -352,6 +353,14 @@ int main(int argc, char **argv)
     REQUIRE(balance->awaitingNeutral());
     balance->handleSensorInput(20.0);
     REQUIRE(!balance->awaitingNeutral());
+    balance->handleSensorInput(70.0);
+    const double requestedTowerPosition = games::BalanceTowerGameTestAccess::targetPositionGoal(*balance);
+    REQUIRE(requestedTowerPosition > 0.0);
+    REQUIRE(std::abs(balance->targetPosition()) < std::abs(requestedTowerPosition));
+    games::BalanceTowerGameTestAccess::advance(*balance, 1.0 / 120.0);
+    REQUIRE(balance->targetPosition() > 0.0);
+    REQUIRE(balance->targetPosition() < requestedTowerPosition);
+    balance->handleSensorInput(20.0);
     balance->handleSensorInput(90.0);
     games::BalanceTowerGameTestAccess::advance(*balance, 0.20);
     balance->handleSensorInput(20.0);
