@@ -631,6 +631,7 @@ int main(int argc, char **argv)
     // Allow the collision-protection window to expire before exposing the next lane.
     waitForEvents(1200);
     carRaceGameOverInstance->handleSensorInput(90.0); // Third obstacle: right lane.
+    carRaceGameOverInstance->handleSensorInput(90.0); // Cross the lane hysteresis from centre to right.
     waitForEvents(1900);
     REQUIRE(carRaceGameOverInstance->livesRemaining() == 0);
     REQUIRE(!carRaceGameOverInstance->isRunning());
