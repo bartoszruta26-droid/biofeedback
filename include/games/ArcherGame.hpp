@@ -45,7 +45,7 @@ private:
         bool focused;
     };
 
-    void fireArrow();
+    void fireArrow(bool focused = false);
     void repositionTarget();
     void activateFocusShot();
 
