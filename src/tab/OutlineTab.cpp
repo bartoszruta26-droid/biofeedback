@@ -1858,6 +1858,7 @@ void OutlineTab::setCurrentPatientContext(const QString& patientUuid, const QStr
         refreshRehabilitationAssessments();
         refreshRehabilitationGoals();
         refreshRehabilitationSession();
+        refreshForceSeriesArchive();
         return;
     }
     const QString safeName = displayName.trimmed().isEmpty()
