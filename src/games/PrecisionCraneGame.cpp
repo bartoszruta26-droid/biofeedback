@@ -276,6 +276,7 @@ void PrecisionCraneGame::update(double deltaTime)
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
     m_previousCarriageX = m_carriageX;
+    m_renderPreviousCarriageX = m_carriageX;
     m_previousHookY = m_hookY;
     m_previousSway = m_sway;
     m_previousObstacleClock = m_obstacleClock;
