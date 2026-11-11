@@ -459,6 +459,13 @@ void PrecisionCraneGame::resizeEvent(QResizeEvent *event)
     m_carriageX = clampCarriage(m_carriageX);
     m_hookY = qBound(height() * 0.24, m_hookY,
                      floorY() - 35.0 * qMax(0.5, height() / 480.0));
+
+    // A resize changes the coordinate system. Start interpolation from the
+    // transformed state, never from a position in the previous viewport.
+    m_renderPreviousCarriageX = m_carriageX;
+    m_previousHookY = m_hookY;
+    m_previousSway = m_sway;
+    m_previousObstacleClock = m_obstacleClock;
 }
 
 void PrecisionCraneGame::renderInterpolated(QPainter& painter, double alpha)
