@@ -1,6 +1,5 @@
 #include "games/ForceMazeGame.hpp"
 
-#include <QLinearGradient>
 #include <QPainter>
 #include <QMouseEvent>
 #include <QPainterPath>
@@ -379,10 +378,7 @@ void ForceMazeGame::update(double deltaTime)
 void ForceMazeGame::render(QPainter &painter)
 {
     const QRectF bounds = rect();
-    QLinearGradient background(0, 0, 0, height());
-    background.setColorAt(0.0, QColor(8, 18, 34));
-    background.setColorAt(1.0, QColor(17, 42, 55));
-    painter.fillRect(bounds, background);
+    painter.fillRect(bounds, QColor(11, 28, 43));
     painter.save();
     if (m_cameraShake > 0.0) {
         const qreal shake = m_cameraShake * 9.0;
