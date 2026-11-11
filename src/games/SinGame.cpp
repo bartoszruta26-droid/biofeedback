@@ -121,7 +121,9 @@ void SinGame::setWaveformMode(int mode)
     m_comboSeconds = 0.0;
     m_feedbackText = m_waveformMode == 0 ? QStringLiteral("Tryb: fala sinusoidalna")
         : (m_waveformMode == 1 ? QStringLiteral("Tryb: fala trójkątna")
-                               : QStringLiteral("Tryb: łagodny plateau"));
+        : (m_waveformMode == 2 ? QStringLiteral("Tryb: łagodny plateau")
+        : (m_waveformMode == 3 ? QStringLiteral("Tryb: fala piłokształtna")
+                               : QStringLiteral("Tryb: fala impulsowa"))));
 }
 
 int SinGame::waveformMode() const { return m_waveformMode; }
