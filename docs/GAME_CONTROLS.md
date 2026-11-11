@@ -18,7 +18,7 @@
 **Cel:** utrzymuj kursor na ruchomym celu i buduj serię precyzyjnych trafień. Gra obejmuje pięć przebiegów: sinusoidalny, trójkątny, łagodny plateau, piłokształtny i impulsowy.
 
 - **Tensometr:** ciągła, indywidualnie skalibrowana siła 0–100% steruje pionowym położeniem kursora. Im większa siła, tym wyższe położenie. Wygładzanie ogranicza drżenie sygnału bez zmiany źródła sterowania.
-- **Punktacja:** punkty rosną proporcjonalnie do dokładności i czasu utrzymania kursora w strefie celu. Dłuższe serie zwiększają mnożnik; precyzja co najmniej 90% przez kolejne okna daje premię za serię doskonałą. Rekord serii pozostaje widoczny w HUD.
+- **Punktacja:** punkty rosną proporcjonalnie do dokładności i czasu utrzymania kursora w strefie celu. Dłuższe serie zwiększają mnożnik; precyzja co najmniej 90% utrzymana przez 3 s daje premię 1,4×, a przez 5 s — 1,8×. Rekord serii pozostaje widoczny w HUD.
 - **Trudność:** pięć poziomów zmienia prędkość przebiegu i szerokość strefy tolerancji. Dostępny jest opcjonalny automatyczny dobór trudności na podstawie utrzymywanej dokładności.
 - **Grafika:** kontrastowa siatka, przebieg celu ze strefą tolerancji, pionowa bramka pomiarowa, kursor o zmiennej barwie, miernik siły i panel wyniku/serii.
 - **Utrata sygnału:** po 350 ms bez aktualnej próbki punktacja i seria zostają zatrzymane, a gra wyświetla komunikat o braku świeżego sygnału.
