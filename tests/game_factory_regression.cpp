@@ -188,16 +188,36 @@ int main(int argc, char **argv)
     forceMaze->resize(640, 480);
     forceMaze->start();
     REQUIRE(forceMaze->awaitingNeutral());
-    forceMaze->handleSensorInput(0.0);
+    forceMaze->handleSensorInput(20.0);
     REQUIRE(!forceMaze->awaitingNeutral());
+    REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
     forceMaze->handleSensorInput(0.0);
     REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
-    forceMaze->handleSensorInput(18.0);
+    forceMaze->handleSensorInput(10.0);
     REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
-    forceMaze->handleSensorInput(18.1);
+    forceMaze->handleSensorInput(20.0);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
+    forceMaze->handleSensorInput(30.0);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
+    forceMaze->handleSensorInput(30.1);
     REQUIRE(forceMaze->targetColumn() > 4.0);
     forceMaze->handleSensorInput(100.0);
     REQUIRE(std::abs(forceMaze->targetColumn() - 7.0) < 0.001);
+
+    // Switching hands reverses the direction, persists the preference and
+    // requires a neutral sample before accepting further steering.
+    forceMaze->setLeftHanded(true);
+    REQUIRE(forceMaze->isLeftHanded());
+    REQUIRE(forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(20.0);
+    REQUIRE(!forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(0.0);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 7.0) < 0.001);
+    forceMaze->handleSensorInput(100.0);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
+    forceMaze->setLeftHanded(false);
+    REQUIRE(!forceMaze->isLeftHanded());
+    forceMaze->handleSensorInput(20.0);
     games::ForceMazeGameTestAccess::advance(*forceMaze, 0.25);
     REQUIRE(forceMaze->hasFreshSignal());
     REQUIRE(forceMaze->playerColumn() > 4.0);
