@@ -23,6 +23,10 @@ public:
     int checkpointsReached() const { return m_checkpoints; }
     double progressRows() const { return m_progressRows; }
     double playerColumn() const { return m_playerColumn; }
+    double targetColumn() const { return m_targetColumn; }
+    int cleanLevels() const { return m_cleanLevels; }
+    int campaignDeaths() const { return m_campaignDeaths; }
+    int personalBestLevel() const { return m_personalBestLevel; }
     bool hasFreshSignal() const;
     bool awaitingNeutral() const { return m_awaitingNeutral; }
     bool campaignCompleted() const { return m_campaignCompleted; }
@@ -64,6 +68,9 @@ private:
     int m_lastProcessedRow;
     int m_personalBestScore;
     int m_personalBestCrystals;
+    int m_personalBestLevel;
+    int m_cleanLevels;
+    int m_campaignDeaths;
     double m_progressRows;
     double m_playerColumn;
     double m_targetColumn;
@@ -73,10 +80,13 @@ private:
     double m_hitFlash;
     double m_checkpointFlash;
     double m_crystalPulse;
+    double m_playerTrailPhase;
+    double m_cameraShake;
     bool m_hasSensorSample;
     bool m_awaitingNeutral;
     bool m_campaignCompleted;
     bool m_levelClean;
+    bool m_campaignClean;
     QString m_status;
     QVector<int> m_collectedCrystals;
     QVector<int> m_reachedCheckpoints;
