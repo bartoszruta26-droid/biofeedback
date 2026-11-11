@@ -48,6 +48,15 @@ public:
     bool playerCharging() const;
     double jumpCharge() const;
     int activeObstacleCount() const;
+    int activeEnemyCount() const;
+    int goombaCount() const;
+    int piranhaPlantCount() const;
+    int livesRemaining() const;
+    int coinsCollected() const;
+    bool doubleJumpAvailable() const;
+    double invulnerabilityRemaining() const;
+    double worldScrollDistance() const;
+    double animationClock() const;
     int currentLevel() const;
 
 protected:
@@ -69,6 +78,7 @@ private:
         bool isOnGround;       // Czy gracz jest na ziemi
         double chargeLevel;    // Poziom naładowania skoku (0.0 - 1.0)
         bool isCharging;       // Czy gracz ładuje skok
+        bool doubleJumpAvailable; // Dodatkowy skok w powietrzu
         int frame;             // Klatka animacji biegu
         double frameTimer;     // Timer animacji
     };
@@ -85,6 +95,19 @@ private:
     /**
      * @brief Struktura reprezentująca chmurkę (dekoracja)
      */
+    struct Enemy {
+        QRectF rect;
+        enum Type { GOOMBA, PIRANHA_PLANT } type;
+        double phase;
+        bool alive;
+    };
+
+    struct Collectible {
+        QRectF rect;
+        enum Type { COIN, STAR } type;
+        double phase;
+    };
+
     struct Cloud {
         QPointF pos;           // Pozycja chmurki
         double speed;          // Szybkość ruchu
@@ -102,6 +125,15 @@ private:
 
     // Aktualizacja przeszkód
     void updateObstacles(double deltaTime);
+    void updateCollectibles(double deltaTime);
+    void generateEnemies(double deltaTime);
+    void updateEnemies(double deltaTime);
+    void renderEnemies(QPainter& painter);
+    void renderClouds(QPainter& painter);
+    void renderParallaxBackground(QPainter& painter);
+    void renderCollectibles(QPainter& painter);
+    void launchJump(double force);
+    void applyDamage();
 
     // Wykrywanie kolizji
     bool checkCollision(const Player& player, const Obstacle& obstacle);
@@ -129,6 +161,9 @@ private:
     static constexpr double JUMP_FORCE = 650.0;      // Siła skoku
     static constexpr double MAX_CHARGE_TIME = 1.5;   // Maksymalny czas ładowania (sekundy)
     static constexpr double PLAYER_SPEED = 200.0;    // Prędkość biegu Mario
+    static constexpr int STARTING_LIVES = 3;
+    static constexpr double HIT_PROTECTION_TIME = 1.6;
+    static constexpr double STAR_POWER_TIME = 5.0;
     static constexpr double GROUND_Y_RATIO = 0.75;   // Pozycja ziemi (75% wysokości)
 
     // Stałe graficzne - paleta 4-bitowa (16 kolorów NES)
@@ -148,13 +183,23 @@ private:
 
     // Stan gry
     Player m_player;
+    QRectF m_previousPlayerBody;
     QVector<Obstacle> m_obstacles;
+    QVector<Collectible> m_collectibles;
+    QVector<Enemy> m_enemies;
+    double m_enemySpawnTimer = 0.0;
     QVector<Cloud> m_clouds;
+    double m_worldDistance = 0.0;
+    double m_animationTime = 0.0;
     
     // Poziomy
     int m_currentLevel;
     int m_obstaclesPassed;
     int m_obstaclesToNextLevel;
+    int m_lives = STARTING_LIVES;
+    int m_coinsCollected = 0;
+    int m_coinStreak = 0;
+    double m_invulnerabilityRemaining = 0.0;
     
     // Czas od ostatniego wygenerowania przeszkody
     double m_timeSinceLastObstacle;
