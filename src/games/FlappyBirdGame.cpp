@@ -61,6 +61,8 @@ void FlappyBirdGame::initialize() {
     
     // Czyszczenie przeszkód
     m_obstacles.clear();
+    m_previousBirdPos = m_birdPos;
+    m_previousObstacles.clear();
     m_obstacleSpawnTimer = 0.0f;
     
     // Sensor samples are routed by MainWindow or TrainingTab; games never own callbacks.
@@ -306,6 +308,8 @@ void FlappyBirdGame::resizeEvent(QResizeEvent* event) {
     const QSize newSize = event->size();
     adaptToSize(m_lastKnownSize, newSize);
     m_lastKnownSize = newSize;
+    m_previousBirdPos = m_birdPos;
+    m_previousObstacles = m_obstacles;
     GameEngine::resizeEvent(event);
 }
 
@@ -417,14 +421,13 @@ void FlappyBirdGame::checkCollisions() {
 void FlappyBirdGame::update(double deltaTime) {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
-    m_previousBirdPos = m_birdPos;
-    m_previousObstacles = m_obstacles;
     const QSize currentSize(width(), height());
     if (currentSize != m_lastKnownSize) {
         adaptToSize(m_lastKnownSize, currentSize);
         m_lastKnownSize = currentSize;
     }
-
+    m_previousBirdPos = m_birdPos;
+    m_previousObstacles = m_obstacles;
 
     // Ochrona wywołań bezpośrednich: nie wykonuj nieograniczonego skoku czasu.
     deltaTime = qMin(deltaTime, 0.1);
