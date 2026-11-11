@@ -68,7 +68,7 @@ Wspólny potok pomiarowy przekazuje skalibrowaną siłę w niutonach. Test `test
 
 ### 2.2. Istniejące gry
 
-W katalogach `src/games` i `include/games` znajduje się dwanaście gier:
+W katalogach `src/games` i `include/games` znajduje się trzynaście gier:
 
 1. Sinus Force Trainer — `SinGame.cpp`
 2. Tan Force Trainer — `TanGame.cpp`
@@ -240,7 +240,7 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 - **Sterowanie jednym tensometrem:** skalibrowana siła jest mapowana na położenie poziome kulki. Strefa neutralna 0–18% odpowiada środkowi pola; zakres powyżej 18% steruje pozycją w korytarzu. Oś postępu jest automatyczna, więc gra nie wymaga przełączania osi ani drugiego gestu sterującego.
 - **Przebieg i trudność:** pięć poziomów po 18 odcinków, trzy życia na kampanię, stopniowo rosnąca prędkość przewijania i deterministycznie generowana trasa. Punkty kontrolne rozmieszczone są co pięć odcinków; kolizja odbiera życie i cofa gracza do ostatniego punktu kontrolnego.
 - **Kryształy i punktacja:** kryształy są rozmieszczane deterministycznie w bezpiecznym korytarzu. Zebranie kryształu daje 100 pkt plus premię poziomu, osiągnięcie punktu kontrolnego 150 pkt, ukończenie poziomu 250 pkt razy numer poziomu, a ukończenie kampanii dodatkowe 1000 pkt. Kolizja odejmuje 25 pkt.
-- **Informacja zwrotna:** HUD pokazuje poziom, wynik, liczbę kryształów, pozostałe życia i punkty kontrolne. Kolizja daje czerwony błysk, punkt kontrolny złotą obwódkę, a kryształ pulsującą animację. Pasek statusu informuje o gotowości wejścia, sterowaniu i stanie bezpieczeństwa.
+- **Informacja zwrotna:** HUD pokazuje poziom, wynik, liczbę zebranych i dostępnych kryształów, pozostałe życia i punkty kontrolne. Kolizja daje czerwony błysk, punkt kontrolny złotą obwódkę, a kryształ pulsującą animację. Pasek statusu informuje o gotowości wejścia, sterowaniu i stanie bezpieczeństwa.
 - **Osiągnięcia:** pierwszy kryształ (`first_crystal`), kolekcjoner 10 kryształów (`crystal_collector`), pierwszy punkt kontrolny (`checkpoint`), ukończenie poziomu bez kolizji (`clean_level`) i ukończenie kampanii (`maze_master`). Odblokowania są zapisywane lokalnie w `QSettings`.
 - **Rekordy:** najlepszy wynik i największa liczba kryształów są trwale przechowywane w `QSettings` pod `games/force_maze/records`.
 - **Bezpieczeństwo sygnału:** wartości niefinitywne są odrzucane, wartości siły ograniczane do 0–100%, a po 350 ms bez świeżej próbki ruch świata i sterowanie zostają zatrzymane. Po uruchomieniu lub utracie sygnału wymagane jest ponowne uzbrojenie przez próbkę neutralną. Brak sygnału nie jest interpretowany jako zerowa siła ani ruch w stronę krawędzi.
