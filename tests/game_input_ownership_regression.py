@@ -3,7 +3,6 @@
 
 from pathlib import Path
 import re
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME_SOURCES = sorted((ROOT / "src" / "games").glob("*.cpp"))
@@ -15,12 +14,12 @@ if not GAME_SOURCES:
 for path in GAME_SOURCES + GAME_HEADERS:
     source = path.read_text(encoding="utf-8")
     forbidden = (
-        r"\\bkeyPressEvent\\s*\\(",
-        r"\\bkeyReleaseEvent\\s*\\(",
-        r"\\bmousePressEvent\\s*\\(",
-        r"\\bmouseReleaseEvent\\s*\\(",
-        r"\\bmouseMoveEvent\\s*\\(",
-        r"#\\s*include\\s*[<\"]Q(?:Key|Mouse)Event",
+        r"\bkeyPressEvent\s*\(",
+        r"\bkeyReleaseEvent\s*\(",
+        r"\bmousePressEvent\s*\(",
+        r"\bmouseReleaseEvent\s*\(",
+        r"\bmouseMoveEvent\s*\(",
+        r"#\s*include\s*[<\"]Q(?:Key|Mouse)Event",
     )
     for pattern in forbidden:
         if re.search(pattern, source):
@@ -29,7 +28,7 @@ for path in GAME_SOURCES + GAME_HEADERS:
         raise SystemExit(f"Game widget must not capture keyboard focus: {path.relative_to(ROOT)}")
     if re.search(r"Q(?:Linear|Radial)Gradient", source):
         raise SystemExit(f"Expensive gradient rendering is not allowed in the arcade profile: {path.relative_to(ROOT)}")
-    if re.search(r"setRenderHint\\(QPainter::Antialiasing\\s*,\\s*true\\)", source):
+    if re.search(r"setRenderHint\(QPainter::Antialiasing\s*,\s*true\)", source):
         raise SystemExit(f"Antialiasing must remain disabled in the arcade profile: {path.relative_to(ROOT)}")
 
 engine = (ROOT / "src" / "games" / "GameEngine.cpp").read_text(encoding="utf-8")
