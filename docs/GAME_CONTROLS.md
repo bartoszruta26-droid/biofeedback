@@ -17,12 +17,13 @@
 
 ### 1. Sinus Force Trainer
 
-**Cel:** prowadź kursor na wysokości punktu celu na sinusoidzie, w miejscu pionowej linii przerywanej.
+**Cel:** prowadź kursor położenia siły do ruchomego punktu celu, w miejscu pionowej linii przerywanej.
 
-- **Tensometr:** zmiana siły zmienia pionowe położenie kursora. Zwiększaj lub zmniejszaj nacisk, aby dopasować kursor do czerwonego punktu celu.
-- **Wskaźnik:** turkusowe kółko pokazuje położenie gracza, czerwony punkt położenie celu; zielone oznaczenie sygnalizuje trafienie.
-- **Informacje na ekranie:** bieżąca siła, tolerancja w pikselach, poziom trudności i status połączenia.
-- **Ustawienia:** poziom trudności, tryb fali, kalibrację i automatyczną trudność zmienia się w panelu ustawień gry. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
+- **Tensometr/HX711:** jedyny kontroler. Skalibrowana siła 0–100% płynnie ustawia pionowe położenie kursora; brak świeżej próbki przez ponad 350 ms zatrzymuje naliczanie wyniku i zeruje serię.
+- **Przebieg celu:** pięć ustawianych przed sesją trybów: sinusoidalny, trójkątny, łagodne plateau, piłokształtny i impulsowy. Obszar tolerancji podąża za wybranym przebiegiem.
+- **Punktacja:** wynik rośnie za utrzymanie kursora w paśmie celu; dokładność zwiększa liczbę punktów, seria rośnie wraz z czasem trafienia, a utrzymanie dokładności co najmniej 90% przez 3 i 5 sekund uruchamia premie precyzji.
+- **Rekord serii:** HUD pokazuje bieżącą oraz najlepszą serię w sesji.
+- **Kalibracja i trudność:** zakres kalibracji, poziom 1–5, tryb fali i automatyczną zmianę trudności ustawia się przed rozpoczęciem sesji. Podczas rozgrywki wejściem pozostaje wyłącznie tensometr.
 
 ### 2. Tan Force Trainer (Tangens)
 
