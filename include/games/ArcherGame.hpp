@@ -56,8 +56,6 @@ private:
     int m_shotsFired{0};
     int m_successfulHits{0};
     int m_missedShots{0};
-    bool m_aimUp{false};
-    bool m_aimDown{false};
 };
 
 } // namespace games
