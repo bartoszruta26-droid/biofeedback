@@ -26,7 +26,6 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_animationTime(0.0)
     , m_sway(0.0)
     , m_cargoX(0.25)
-    , m_cargoY(0.0)
     , m_targetX(0.76)
     , m_targetWidth(0.13)
     , m_difficulty(1)
@@ -36,7 +35,6 @@ PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     , m_axis(HorizontalAxis)
     , m_gestureActive(false)
     , m_loadAttached(false)
-    , m_lastGestureWasLong(false)
     , m_status(QStringLiteral("Oczekiwanie na sygnał tensometru"))
 {
     setFocusPolicy(Qt::NoFocus);
@@ -68,8 +66,8 @@ double PrecisionCraneGame::clampCarriage(double x) const
 QRectF PrecisionCraneGame::cargoRect() const
 {
     const double size = qBound(22.0, width() * 0.055, 48.0);
-    const double y = m_loadAttached ? m_hookY + 18.0 : floorY() - size;
-    const double x = m_loadAttached ? m_carriageX - size * 0.5 : m_cargoX * width() - size * 0.5;
+    const double y = m_loadAttached ? qMin(m_hookY + 18.0, floorY() - size) : floorY() - size;
+    const double x = m_loadAttached ? m_carriageX + m_sway - size * 0.5 : m_cargoX * width() - size * 0.5;
     return QRectF(x, y, size, size);
 }
 
@@ -149,7 +147,7 @@ void PrecisionCraneGame::toggleGrip()
 {
     if (!m_loadAttached) {
         const QRectF cargo = cargoRect();
-        const QPointF hook(m_carriageX, m_hookY + 12.0);
+        const QPointF hook(m_carriageX + m_sway, m_hookY + 12.0);
         const QPointF cargoCenter = cargo.center();
         const double dx = hook.x() - cargoCenter.x();
         const double dy = hook.y() - cargoCenter.y();
@@ -201,6 +199,11 @@ void PrecisionCraneGame::update(double deltaTime)
     m_animationTime += dt;
     m_inputAge += dt;
 
+    if (m_inputAge > 0.35) {
+        m_gestureActive = false;
+        m_gestureSeconds = 0.0;
+        m_status = QStringLiteral("Brak świeżego sygnału — ruch wstrzymany");
+    }
     if (m_gestureActive && m_inputAge <= 0.35)
         m_gestureSeconds += dt;
     processGesture();
