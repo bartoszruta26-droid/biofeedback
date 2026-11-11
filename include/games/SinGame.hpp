@@ -6,7 +6,6 @@
 #include <QPointF>
 #include <QVector>
 #include <QResizeEvent>
-#include <QKeyEvent>
 #include <QString>
 #include <memory>
 
@@ -34,7 +33,7 @@ public:
     double forceCalibrationMaximum() const;
     double normalizedForce() const;
 
-    // 0 = sinusoidal, 1 = triangular, 2 = smooth plateau.
+    // 0 = sinusoidal, 1 = triangular, 2 = smooth plateau, 3 = sawtooth, 4 = pulse.
     void setWaveformMode(int mode);
     int waveformMode() const;
 
@@ -51,7 +50,6 @@ signals:
     void serialDisconnected();
 
 protected:
-    void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private slots:
@@ -73,6 +71,9 @@ private:
     double m_scoreFraction;      // Fractional points accumulated between frames
     double m_comboSeconds;
     int m_combo;
+    int m_bestCombo;
+    int m_perfectStreak;
+    double m_lastAccuracy;
     double m_lastDistance;
     QString m_feedbackText;
     double m_calibrationMinimum;
