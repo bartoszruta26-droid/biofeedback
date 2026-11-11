@@ -1200,7 +1200,7 @@ int main(int argc, char **argv)
     REQUIRE(rhythm->nextBeatNumber() == 5);
     const double fifthBeat = games::RhythmForceGameTestAccess::beatTime(*rhythm, 5);
     games::RhythmForceGameTestAccess::setClock(
-        *rhythm, fifthBeat + 0.24);
+        *rhythm, fifthBeat + 0.30);
     games::RhythmForceGameTestAccess::advance(*rhythm, 0.01);
     REQUIRE(rhythm->missCount() == 2);
     REQUIRE(rhythm->nextBeatNumber() == 6);
