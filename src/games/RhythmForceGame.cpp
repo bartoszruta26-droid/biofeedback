@@ -174,13 +174,18 @@ void RhythmForceGame::finishPulse()
     m_pulseActive = false;
     m_pulseElapsed = 0.0;
 
+    const int nearestBeat = qMax(1, qRound((onset - kLeadInSeconds) / beatIntervalSeconds()) + 1);
     if (duration < kMinimumPulseSeconds || duration > kMaximumPulseSeconds) {
         registerMiss();
+        if (nearestBeat == m_nextBeatIndex &&
+            std::abs(onset - beatTimeSeconds(m_nextBeatIndex)) <= timingWindowSeconds()) {
+            advanceBeat();
+            finishRoundIfReady();
+        }
         m_status = QStringLiteral("Nieprawidłowa długość impulsu");
         return;
     }
 
-    const int nearestBeat = qMax(1, qRound((onset - kLeadInSeconds) / beatIntervalSeconds()) + 1);
     if (nearestBeat < m_nextBeatIndex || nearestBeat > kRoundBeats) {
         registerMiss();
         m_status = QStringLiteral("Impuls poza aktywnym taktem");
@@ -281,6 +286,12 @@ void RhythmForceGame::update(double deltaTime)
 
     while (m_nextBeatIndex <= kRoundBeats &&
            m_songTime > beatTimeSeconds(m_nextBeatIndex) + timingWindowSeconds()) {
+        // A pulse that began inside the active note window may legitimately
+        // finish later; defer expiry until its release determines pulse length.
+        const bool activePulseBelongsToBeat = m_pulseActive &&
+            std::abs(m_pulseStartedAt - beatTimeSeconds(m_nextBeatIndex)) <= timingWindowSeconds();
+        if (activePulseBelongsToBeat)
+            break;
         registerMiss();
         advanceBeat();
     }
