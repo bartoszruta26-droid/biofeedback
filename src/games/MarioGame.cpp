@@ -991,11 +991,27 @@ void MarioGame::renderObstacles(QPainter& painter)
 
 void MarioGame::renderBackground(QPainter& painter)
 {
-    QLinearGradient sky(0, 0, 0, height());
-    sky.setColorAt(0.0, QColor(0x36, 0x76, 0xD8));
-    sky.setColorAt(0.68, QColor(0x8C, 0xD8, 0xF4));
-    sky.setColorAt(1.0, QColor(0xD5, 0xF2, 0xFF));
-    painter.fillRect(rect(), sky);
+    // Solid-color bands keep the arcade renderer inexpensive on low-power
+    // devices while retaining the sky's top-to-horizon color progression.
+    constexpr int skyBands = 12;
+    const QColor skyTop(0x36, 0x76, 0xD8);
+    const QColor skyMiddle(0x8C, 0xD8, 0xF4);
+    const QColor skyBottom(0xD5, 0xF2, 0xFF);
+    for (int band = 0; band < skyBands; ++band) {
+        const double position = (static_cast<double>(band) + 0.5) / skyBands;
+        const QColor color = position < 0.68
+            ? QColor::fromRgbF(
+                  skyTop.redF() + (skyMiddle.redF() - skyTop.redF()) * (position / 0.68),
+                  skyTop.greenF() + (skyMiddle.greenF() - skyTop.greenF()) * (position / 0.68),
+                  skyTop.blueF() + (skyMiddle.blueF() - skyTop.blueF()) * (position / 0.68))
+            : QColor::fromRgbF(
+                  skyMiddle.redF() + (skyBottom.redF() - skyMiddle.redF()) * ((position - 0.68) / 0.32),
+                  skyMiddle.greenF() + (skyBottom.greenF() - skyMiddle.greenF()) * ((position - 0.68) / 0.32),
+                  skyMiddle.blueF() + (skyBottom.blueF() - skyMiddle.blueF()) * ((position - 0.68) / 0.32));
+        const int top = (band * height()) / skyBands;
+        const int bottom = ((band + 1) * height()) / skyBands;
+        painter.fillRect(QRect(0, top, width(), bottom - top), color);
+    }
 
     // Sun glow and pixel-style sun give the scene depth without external assets.
     painter.setPen(Qt::NoPen);
