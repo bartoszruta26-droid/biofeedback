@@ -26,6 +26,12 @@ GameEngine::GameEngine(QWidget *parent)
     // Request a steady 90 Hz presentation cadence. A precise timer avoids
     // coarse-timer drift; the fixed-step simulation remains independent of
     // display resolution and sensor acquisition frequency.
+    // Every game paints an opaque full-frame background. Let Qt skip the
+    // implicit background erase and compositor blending for this widget.
+    setAttribute(Qt::WA_OpaquePaintEvent, true);
+    setAttribute(Qt::WA_NoSystemBackground, true);
+    setAutoFillBackground(false);
+
     m_gameTimer->setInterval(11);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
