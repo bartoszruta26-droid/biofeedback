@@ -391,6 +391,9 @@ int main(int argc, char **argv)
     REQUIRE(crane->missionDeliveriesRemaining() == 3);
     REQUIRE(!crane->campaignCompleted());
     REQUIRE(crane->precisionSamples() == 0);
+    REQUIRE(crane->lifetimeDeliveries() >= 0);
+    REQUIRE(crane->lifetimePrecisionSamples() >= 0);
+    REQUIRE(crane->lifetimeCollisions() >= 0);
     REQUIRE(crane->averagePrecision() == 0.0);
     crane->setDifficultyLevel(5);
     REQUIRE(crane->difficultyLevel() == 5);
