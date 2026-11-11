@@ -3,6 +3,7 @@
 
 #include "games/GameEngine.hpp"
 #include <QString>
+#include <QStringList>
 
 namespace games {
 
@@ -34,6 +35,8 @@ public:
     bool hasFreshSignal() const;
     bool pulseActive() const { return m_pulseActive; }
     bool roundCompleted() const { return m_roundCompleted; }
+    int unlockedAchievementsCount() const { return m_achievements.size(); }
+    QString lastAchievement() const { return m_lastAchievement; }
 
 protected:
     void initialize() override;
@@ -60,6 +63,8 @@ private:
     void registerMiss();
     void advanceBeat();
     void finishRoundIfReady();
+    void unlockAchievement(const QString &id, const QString &title);
+    void evaluateRoundAchievements();
 
     int m_difficulty;
     int m_nextBeatIndex;
@@ -75,12 +80,17 @@ private:
     double m_pulsePeakForce;
     double m_lastTimingOffsetMs;
     double m_lastForce;
+    double m_visualTime;
+    double m_hitFlashSeconds;
+    double m_achievementToastSeconds;
     bool m_hasSensorSample;
     bool m_awaitingNeutral;
     bool m_pulseActive;
     bool m_roundCompleted;
     HitGrade m_lastGrade;
     QString m_status;
+    QStringList m_achievements;
+    QString m_lastAchievement;
 };
 
 } // namespace games
