@@ -1,7 +1,6 @@
 #include "games/BalanceTowerGame.hpp"
 
 #include <QPainter>
-#include <QLinearGradient>
 #include <QSettings>
 #include <QStandardPaths>
 #include <QDir>
@@ -287,10 +286,7 @@ void BalanceTowerGame::update(double deltaTime)
 void BalanceTowerGame::render(QPainter &painter)
 {
     const QRectF bounds = rect();
-    QLinearGradient bg(0, 0, 0, height());
-    bg.setColorAt(0.0, QColor(12, 24, 48));
-    bg.setColorAt(1.0, QColor(35, 67, 78));
-    painter.fillRect(bounds, bg);
+    painter.fillRect(bounds, QColor(18, 39, 58));
     painter.setRenderHint(QPainter::Antialiasing, false);
     const qreal scale = qMin(width() * 0.31, height() * 0.055);
     const qreal baseX = width() * 0.5;
