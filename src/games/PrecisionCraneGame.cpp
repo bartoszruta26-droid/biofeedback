@@ -153,6 +153,10 @@ void PrecisionCraneGame::initialize()
     setScore(0);
     setDifficultyLevel(m_difficulty);
     resetRound();
+    m_previousCarriageX = m_carriageX;
+    m_previousHookY = m_hookY;
+    m_previousSway = m_sway;
+    m_previousObstacleClock = m_obstacleClock;
 }
 
 bool PrecisionCraneGame::handleInput(double value)
