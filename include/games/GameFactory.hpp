@@ -6,6 +6,7 @@
 #include "games/ScorchedEarthGame.hpp"
 #include "games/PrecisionCraneGame.hpp"
 #include "games/RhythmForceGame.hpp"
+#include "games/ForceMazeGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/GalagaGame.hpp"
@@ -58,6 +59,10 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
     if (id == QStringLiteral("rhythm_force") || id == QStringLiteral("rhythm-force") ||
         id == QStringLiteral("rhythm force"))
         return new RhythmForceGame(parent);
+
+    if (id == QStringLiteral("force_maze") || id == QStringLiteral("force-maze") ||
+        id == QStringLiteral("force maze"))
+        return new ForceMazeGame(parent);
 
     if (id == QStringLiteral("scorched_earth") || id == QStringLiteral("scored_earth") ||
         id == QStringLiteral("scorched-earth") ||
