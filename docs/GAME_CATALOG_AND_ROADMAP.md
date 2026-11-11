@@ -194,10 +194,14 @@ Wszystkie nowe gry mają korzystać z istniejącego wspólnego potoku siły i si
 
 ### 4.1. Precision Crane — dźwig precyzyjny
 
-- **Grafika:** port, magazyn lub plac budowy w widoku bocznym; hak, lina, ładunki, strefa odkładania, prowadnice i wskaźnik kołysania.
-- **Funkcje:** podnoszenie ładunku, przenoszenie nad przeszkodami, precyzyjne odkładanie, punktacja za czas i dokładność.
-- **Tensometr:** siła mapuje się na wysokość haka. Gest wyboru trybu przełącza między wysokością i położeniem poziomym; krótki impuls rozpoczyna/zatrzymuje chwyt, a dłuższy gest potwierdza odłożenie. W danej chwili sterowany jest tylko jeden parametr.
-- **Wyróżnik:** gra zręcznościowa o wysokiej precyzji i kontroli płynności.
+<badge>Wersja gry zaimplementowana — PR</badge>
+
+- **Grafika:** port w widoku bocznym, suwnica z prowadnicą, wózek jezdny, lina, hak, ładunek, strefa odbioru, woda i tło portowe. Kołysanie podwieszonego ładunku sygnalizuje bezwładność.
+- **Funkcje:** podnoszenie i opuszczanie ładunku, transport poziomy, precyzyjne dostawy, serie udanych dostaw, premie punktowe, trzy pomyłki na sesję i pięć poziomów trudności ze zwężającą się strefą celu.
+- **Tensometr:** skalibrowana siła 0–100% jest jedynym źródłem sterowania. W zakresie roboczym 0–70% mapuje się płynnie na pozycję wózka albo wysokość haka. Długie przytrzymanie wysokiej siły (co najmniej 82%) i zwolnienie przełącza oś poziomą/pionową. Krótkie przytrzymanie (0,15–0,85 s) i zwolnienie wywołuje chwyt albo zwolnienie ładunku. W danej chwili regulowany jest tylko jeden parametr.
+- **Bezpieczeństwo wejścia:** nieprawidłowe próbki są ignorowane; po 350 ms bez świeżej próbki ruch i gesty są wstrzymywane. Utrata sygnału nie jest interpretowana jako polecenie.
+- **Status zakresu:** dostępna jest pierwsza grywalna wersja z podstawowym cyklem przenoszenia i punktacją. Zaawansowane przeszkody, kampania i zapisywanie rekordów pozostają dalszymi etapami.
+- **Wyróżnik:** zręcznościowa gra o precyzji i płynności ruchu, sterowana wyłącznie jednym tensometrem.
 
 ### 4.2. Rhythm Force — rytm siły
 
