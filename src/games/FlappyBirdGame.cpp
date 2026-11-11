@@ -417,6 +417,8 @@ void FlappyBirdGame::checkCollisions() {
 void FlappyBirdGame::update(double deltaTime) {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+    m_previousBirdPos = m_birdPos;
+    m_previousObstacles = m_obstacles;
     const QSize currentSize(width(), height());
     if (currentSize != m_lastKnownSize) {
         adaptToSize(m_lastKnownSize, currentSize);
@@ -436,6 +438,27 @@ void FlappyBirdGame::update(double deltaTime) {
     
     // Sprawdzenie kolizji
     checkCollisions();
+}
+
+void FlappyBirdGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const QPointF currentBird = m_birdPos;
+    const auto currentObstacles = m_obstacles;
+    m_birdPos = m_previousBirdPos + (currentBird - m_previousBirdPos) * alpha;
+    if (m_previousObstacles.size() == m_obstacles.size()) {
+        for (std::size_t i = 0; i < m_obstacles.size(); ++i) {
+            m_obstacles[i].xPosition = static_cast<float>(
+                m_previousObstacles[i].xPosition +
+                (currentObstacles[i].xPosition - m_previousObstacles[i].xPosition) * alpha);
+            m_obstacles[i].gapY = static_cast<float>(
+                m_previousObstacles[i].gapY +
+                (currentObstacles[i].gapY - m_previousObstacles[i].gapY) * alpha);
+        }
+    }
+    render(painter);
+    m_birdPos = currentBird;
+    m_obstacles = currentObstacles;
 }
 
 void FlappyBirdGame::render(QPainter &painter) {
