@@ -22,8 +22,9 @@ MarioGame::MarioGame(QWidget *parent)
         Cloud cloud;
         cloud.pos.setX(QRandomGenerator::global()->bounded(qMax(1, width())));
         cloud.pos.setY(QRandomGenerator::global()->bounded(qMax(1, height() / 3)));
-        cloud.speed = 20.0 + QRandomGenerator::global()->bounded(30);
-        cloud.size = 20 + QRandomGenerator::global()->bounded(30);
+        const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+        cloud.speed = (20.0 + QRandomGenerator::global()->bounded(30)) * scale;
+        cloud.size = qMax(1, qRound((20 + QRandomGenerator::global()->bounded(30)) * scale));
         m_clouds.append(cloud);
     }
 }
@@ -138,8 +139,10 @@ void MarioGame::initPlayer()
 {
     const double viewWidth = qMax(1, width());
     const double viewHeight = qMax(1, height());
-    const double playerWidth = qMin(32.0, viewWidth);
-    const double playerHeight = qMin(40.0, viewHeight * 0.5);
+    const double scaleX = qMax(0.5, viewWidth / 640.0);
+    const double scaleY = qMax(0.5, viewHeight / 480.0);
+    const double playerWidth = qMin(32.0 * scaleX, viewWidth);
+    const double playerHeight = qMin(40.0 * scaleY, viewHeight * 0.5);
     const double playerX = qBound(0.0, viewWidth * 0.08, viewWidth - playerWidth);
     m_player.body = QRectF(playerX, qMax(0.0, viewHeight * GROUND_Y_RATIO - playerHeight),
                            playerWidth, playerHeight);
@@ -168,10 +171,10 @@ void MarioGame::increaseDifficulty()
 {
     m_currentLevel++;
     m_obstaclesPassed = 0;
-    m_obstaclesToNextLevel = 10 + (m_currentLevel * 5);
+    m_obstaclesToNextLevel = 12 + (m_currentLevel * 3);
     
     // Zmniejsz interwał spawnowania przeszkód
-    m_obstacleSpawnInterval = qMax(1.0, 2.0 - ((m_currentLevel - 1) * 0.12));
+    m_obstacleSpawnInterval = qMax(1.7, 2.6 - ((m_currentLevel - 1) * 0.08));
 }
 
 void MarioGame::update(double deltaTime)
@@ -213,7 +216,7 @@ void MarioGame::updatePlayer(double deltaTime)
     const bool wasGrounded = m_player.isOnGround;
 
     if (!m_player.isOnGround)
-        m_player.velocityY += GRAVITY * deltaTime;
+        m_player.velocityY += GRAVITY * qMax(0.5, height() / 480.0) * deltaTime;
 
     m_player.body.translate(0.0, m_player.velocityY * deltaTime);
 
@@ -295,32 +298,40 @@ void MarioGame::generateObstacles(double deltaTime)
         
         // Losowanie typu przeszkody z uwzględnieniem poziomu trudności
         int rand = QRandomGenerator::global()->bounded(100);
+        const double scaleX = qMax(0.5, width() / 640.0);
+        const double scaleY = qMax(0.5, height() / 480.0);
         double groundY = height() * GROUND_Y_RATIO;
         
         if (rand < 20) {
             // Kolce (20%)
             obstacle.type = Obstacle::SPIKE;
-            obstacle.rect = QRectF(width(), groundY - 30, 30, 30);
+            obstacle.rect = QRectF(width(), groundY - 30.0 * scaleY,
+                                    30.0 * scaleX, 30.0 * scaleY);
         } else if (rand < 45) {
             // Rurka (25%)
             obstacle.type = Obstacle::PIPE;
             const int maximumPipeHeight = qMax(40, static_cast<int>(height() * 0.45));
-            int pipeHeight = qMin(maximumPipeHeight, 40 + (m_currentLevel * 8));
-            obstacle.rect = QRectF(width(), groundY - pipeHeight, 50, pipeHeight);
+            int pipeHeight = qMin(maximumPipeHeight,
+                qRound((40.0 + (m_currentLevel * 8.0)) * scaleY));
+            obstacle.rect = QRectF(width(), groundY - pipeHeight, 50.0 * scaleX, pipeHeight);
         } else if (rand < 60 && m_currentLevel >= 2) {
             // Platforma (15%, od poziomu 2)
             obstacle.type = Obstacle::PLATFORM;
-            obstacle.rect = QRectF(width(), groundY - 70 - (QRandomGenerator::global()->bounded(50)), 80, 20);
+            obstacle.rect = QRectF(width(),
+                groundY - 70.0 * scaleY - QRandomGenerator::global()->bounded(qMax(1, qRound(50.0 * scaleY))),
+                80.0 * scaleX, 20.0 * scaleY);
         } else if (rand < 75 && m_currentLevel >= 3) {
             // Dziura (15%, od poziomu 3)
             obstacle.type = Obstacle::GAP;
-            const double maximumGapWidth = qMax(40.0, width() * 0.25);
-            const double gapWidth = qMin(maximumGapWidth, 60.0 + (m_currentLevel * 8.0));
+            const double maximumGapWidth = qMax(40.0 * scaleX, width() * 0.22);
+            const double gapWidth = qMin(maximumGapWidth,
+                (52.0 + (m_currentLevel * 5.0)) * scaleX);
             obstacle.rect = QRectF(width(), groundY, gapWidth, height() - groundY);
         } else {
             // Domyślnie kolce
             obstacle.type = Obstacle::SPIKE;
-            obstacle.rect = QRectF(width(), groundY - 30, 30, 30);
+            obstacle.rect = QRectF(width(), groundY - 30.0 * scaleY,
+                                    30.0 * scaleX, 30.0 * scaleY);
         }
         
         m_obstacles.append(obstacle);
@@ -333,7 +344,7 @@ void MarioGame::updateObstacles(double deltaTime)
         auto& obs = m_obstacles[i];
         
         // Przesuwanie przeszkody w lewo
-        obs.rect.setX(obs.rect.x() - PLAYER_SPEED * deltaTime);
+        obs.rect.setX(obs.rect.x() - PLAYER_SPEED * qMax(0.5, width() / 640.0) * deltaTime);
         
         // Usunięcie jeśli poza ekranem
         if (obs.rect.right() < 0) {
@@ -404,7 +415,8 @@ bool MarioGame::handleInput(double value)
 
     if (wasPressed && !m_sensorPressed && m_player.isCharging && m_player.isOnGround) {
         const double chargeRatio = qBound(0.0, m_player.chargeLevel, 1.0);
-        const double jumpForce = JUMP_FORCE * (0.43 + 0.57 * chargeRatio);
+        const double jumpForce = JUMP_FORCE * qMax(0.5, height() / 480.0) *
+                                 (0.43 + 0.57 * chargeRatio);
         m_player.velocityY = -jumpForce;
         m_player.isJumping = true;
         m_player.isOnGround = false;
