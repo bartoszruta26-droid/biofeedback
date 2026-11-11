@@ -426,6 +426,53 @@ int main(int argc, char **argv)
     crane->stop();
     REQUIRE(!crane->isRunning());
 
+    // Sensor loss is fail-closed: movement and pending gestures stop until a valid
+    // fresh sample arrives. Invalid samples must not refresh the watchdog.
+    std::unique_ptr<games::GameEngine> craneSafetyBase(
+        games::createGame(QStringLiteral("precision_crane")));
+    auto* craneSafety = dynamic_cast<games::PrecisionCraneGame*>(craneSafetyBase.get());
+    REQUIRE(craneSafety != nullptr);
+    craneSafety->resize(640, 480);
+    craneSafety->start();
+    craneSafety->handleSensorInput(65.0);
+    waitForEvents(120);
+    const double positionBeforeTimeout = craneSafety->carriagePosition();
+    REQUIRE(craneSafety->hasFreshSignal());
+    REQUIRE(!craneSafety->gestureActive());
+    waitForEvents(420);
+    REQUIRE(!craneSafety->hasFreshSignal());
+    REQUIRE(craneSafety->normalizedForce() == 0.0);
+    craneSafety->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    craneSafety->handleSensorInput(std::numeric_limits<double>::infinity());
+    waitForEvents(120);
+    REQUIRE(!craneSafety->hasFreshSignal());
+    REQUIRE(craneSafety->carriagePosition() == positionBeforeTimeout);
+    craneSafety->handleSensorInput(65.0);
+    waitForEvents(80);
+    REQUIRE(craneSafety->hasFreshSignal());
+    REQUIRE(craneSafety->carriagePosition() > positionBeforeTimeout);
+    craneSafety->stop();
+
+    // A short pulse toggles grip only after a release; a sub-minimum pulse is ignored.
+    std::unique_ptr<games::GameEngine> craneGestureBase(
+        games::createGame(QStringLiteral("precision_crane")));
+    auto* craneGesture = dynamic_cast<games::PrecisionCraneGame*>(craneGestureBase.get());
+    REQUIRE(craneGesture != nullptr);
+    craneGesture->resize(640, 480);
+    craneGesture->start();
+    craneGesture->handleSensorInput(90.0);
+    waitForEvents(80);
+    craneGesture->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(!craneGesture->loadAttached());
+    craneGesture->handleSensorInput(90.0);
+    waitForEvents(260);
+    REQUIRE(craneGesture->gestureActive());
+    craneGesture->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(craneGesture->loadAttached());
+    craneGesture->stop();
+
     // End-to-end single-sensor delivery: align, lower, grip, transfer, lower and release.
     std::unique_ptr<games::GameEngine> craneDeliveryBase(
         games::createGame(QStringLiteral("precision_crane")));
