@@ -52,6 +52,19 @@ void ArcherGame::initialize()
 
 void ArcherGame::resizeEvent(QResizeEvent* event)
 {
+    const QSize oldSize = event->oldSize();
+    const QSize newSize = event->size();
+    if (oldSize.width() > 0 && oldSize.height() > 0 &&
+        newSize.width() > 0 && newSize.height() > 0) {
+        const double scaleX = static_cast<double>(newSize.width()) / oldSize.width();
+        const double scaleY = static_cast<double>(newSize.height()) / oldSize.height();
+        for (Arrow& arrow : m_arrows) {
+            arrow.position = QPointF(arrow.position.x() * scaleX,
+                                     arrow.position.y() * scaleY);
+            arrow.velocity = QPointF(arrow.velocity.x() * scaleX,
+                                     arrow.velocity.y() * scaleY);
+        }
+    }
     GameEngine::resizeEvent(event);
     if (width() > 0 && height() > 0) {
         const double scaleY = qMax(0.25, height() / 480.0);
@@ -59,13 +72,16 @@ void ArcherGame::resizeEvent(QResizeEvent* event)
         m_gravity = 260.0 * scaleY;
         repositionTarget();
         m_previousTarget = m_target;
-        m_previousArrowPositions.clear();
         for (Arrow& arrow : m_arrows) {
             if (arrow.position.x() > width() || arrow.position.y() > height())
                 arrow.active = false;
         }
         m_arrows.erase(std::remove_if(m_arrows.begin(), m_arrows.end(),
             [](const Arrow& arrow) { return !arrow.active; }), m_arrows.end());
+        m_previousArrowPositions.clear();
+        m_previousArrowPositions.reserve(m_arrows.size());
+        for (const Arrow& arrow : m_arrows)
+            m_previousArrowPositions.push_back(arrow.position);
     }
 }
 
