@@ -80,15 +80,19 @@
 
 ### 8. Archer Force Trainer
 
-**Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego i synchronizację strzału z ruchem celu.
+**Cel:** ćwicz precyzję celowania, przewidywanie toru balistycznego, kompensację wiatru i synchronizację strzału z ruchem celu.
 
-- **Tensometr/HX711:** ustawia kąt łuku w zakresie gry. Wartość siły 0–100% jest mapowana na kąt od około +31° (niższe celowanie) do około −52° (wyższe celowanie). Zmiana siły natychmiast aktualizuje kąt.
-- **Klawiatura:** przytrzymaj `W` lub `↑`, aby płynnie podnosić kąt; przytrzymaj `S` lub `↓`, aby go obniżać. Po zwolnieniu klawisza regulacja zatrzymuje się. Podczas przytrzymania klawisza sterowanie klawiaturą ma pierwszeństwo przed próbkami tensometru; po zwolnieniu wraca sterowanie czujnikiem. `SPACJA` oddaje pojedynczy strzał; kolejne strzały są ograniczone czasem odnowienia około 320 ms.
-- **Tor lotu:** kropkowana linia pokazuje przewidywany tor strzały z uwzględnieniem grawitacji i bieżącego kąta. Jest wskazówką, a poruszający się cel może zmienić położenie przed trafieniem.
-- **Strefy celu:** zewnętrzna część tarczy daje 10 punktów, środkowa 20, a środek 30. Trafienie zwiększa prędkość celu, maksymalnie do 150 jednostek na sekundę.
-- **Statystyki:** wynik, kąt celowania, łączna liczba oddanych strzałów, trafień, pudeł i strzał w locie.
+- **Tensometr/HX711:** ustawia kąt łuku. Wartość 0–100% jest mapowana na kąt od około +31° (niższe celowanie) do około −52° (wyższe celowanie). Wartość spoza zakresu jest ograniczana, a nieprawidłowe próbki (NaN lub nieskończoność) są odrzucane.
+- **Klawiatura — celowanie:** przytrzymaj `W` lub `↑`, aby płynnie podnosić kąt; przytrzymaj `S` lub `↓`, aby go obniżać. Po zwolnieniu klawisza regulacja zatrzymuje się. Podczas regulacji klawiaturą próbki czujnika nie nadpisują kąta; po zwolnieniu klawisza sterowanie czujnikiem wraca do działania.
+- **Klawiatura — strzał:** `SPACJA` oddaje zwykłą strzałę. Czas odnowienia wynosi około 320 ms. `F` lub `E` oddaje strzał skupiony, jeżeli dostępny jest ładunek skupienia i zakończył się czas odnowienia.
+- **Strzał skupiony:** na początku sesji dostępne są 3 ładunki. Strzała leci szybciej i jest mniej podatna na wiatr. Co 5 udanych trafień przywracany jest 1 ładunek, maksymalnie do 5. Strzał skupiony ma dłuższy czas odnowienia (około 480 ms) i dodatkową premię punktową.
+- **Balistyka i wiatr:** tor lotu uwzględnia grawitację oraz aktualny wiatr boczny. Wiatr zmienia siłę i kierunek w czasie; zwykła strzała podlega mu w pełni, a strzała skupiona w ograniczonym stopniu. Kropkowany podgląd toru jest prognozą dla chwili oddania strzału — ruch celu i zmiana wiatru w czasie lotu mogą zmienić wynik.
+- **Cel:** tarcza porusza się pionowo i poziomo. Jej rozmiar stopniowo maleje w kolejnych rundach, a prędkość wzrasta wraz z trafieniami. Przewiduj położenie celu w chwili przecięcia toru strzały, a nie tylko jego aktualne położenie.
+- **Punktacja:** trafienie w zewnętrzny pierścień daje 10 punktów, środkowy 20, a środek 30. Seria trafień w odstępach krótszych niż 3 sekundy zwiększa mnożnik punktów; pudło zeruje serię. Strzała skupiona daje dodatkowe 10 punktów.
+- **Postęp:** co 5 udanych trafień rozpoczyna się kolejna runda, cel staje się mniejszy, a jego prędkość wzrasta. Otrzymujesz wtedy również ładunek skupienia.
+- **Statystyki:** wynik, kąt, wiatr i jego kierunek, liczba strzałów, trafień, pudeł, aktywna seria, ładunki skupienia i numer rundy.
 - **Ograniczenia:** jednocześnie może istnieć maksymalnie 8 aktywnych strzał. Strzała, która opuści planszę, jest liczona jako pudło.
-- **Praktyka:** najpierw ustaw kąt tensometrem, następnie koryguj go krótkimi przytrzymaniami klawiszy. Obserwuj kropkowany tor oraz kierunek ruchu celu i oddaj strzał z wyprzedzeniem.
+- **Praktyka:** ustaw kąt tensometrem, obserwuj wiatr i przewidywany tor, a następnie wyprzedzaj ruch celu. Zachowuj ładunki skupienia na małe cele lub trudne warunki wiatrowe.
 
 ### 9. Galaga
 
@@ -103,14 +107,21 @@
 - **Ochrona:** po trafieniu statek otrzymuje krótką ochronę przed kolejnym uszkodzeniem. Zebrana osłona pochłania następne trafienie.
 - **Wskaźniki:** wynik, numer fali, życia, ładunki EMP, seria eliminacji i aktywne ulepszenie.
 
-### 10. Scorched Earth
+### 10. Scorched Earth Force Trainer
 
-**Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, dobierając kąt i siłę strzału oraz uwzględniając wiatr.
+**Cel:** rozgrywaj turowy pojedynek artyleryjski. Dobieraj kąt i moc, przewiduj wpływ wiatru, wykorzystuj ukształtowanie terenu oraz zadawaj obrażenia bezpośrednie i odłamkowe.
 
-- **Tensometr:** ustawia kąt działa w zakresie gry.
-- **Klawiatura:** `W` lub `↑` — zwiększ kąt; `S` lub `↓` — zmniejsz kąt; `+` lub `=` — zwiększ siłę; `-` — zmniejsz siłę; `SPACJA` — oddaj strzał, gdy trwa tura gracza.
-- **Wskaźniki:** zdrowie obu czołgów, runda, wynik i siła/wiatr zgodnie z informacją na ekranie.
-- **Wskazówka:** wiatr wpływa na tor pocisku. Po oddaniu strzału poczekaj na zakończenie lotu i ruch przeciwnika; nie można oddać kolejnego strzału w trakcie aktywnego pocisku.
+- **Tensometr:** ustawia kąt działa w zakresie 10–85°; wartość 0–100% jest mapowana liniowo na ten zakres.
+- **Mysz:** przesuwaj kursor w prawo od lufy, aby ustawić kąt zgodnie z kierunkiem celowania. Linia z punktów pokazuje przewidywany tor pocisku. Kliknięcie lewym przyciskiem oddaje strzał. Celowanie myszą jest blokowane podczas lotu pocisku i poza turą gracza.
+- **Klawiatura:** `W` lub `↑` — zwiększ kąt o 2°; `S` lub `↓` — zmniejsz kąt o 2°; `+` lub `=` — zwiększ moc o 3 punkty procentowe; `-` — zmniejsz moc o 3 punkty procentowe; `SPACJA` — oddaj strzał w swojej turze.
+- **Kółko myszy:** przewinięcie w górę zwiększa moc, a w dół ją zmniejsza — o 4 punkty procentowe na stopień przewinięcia. Moc jest ograniczona do 35–100%. Zmiana mocy jest dostępna podczas tury gracza, gdy żaden pocisk nie leci.
+- **Przeciwnik:** dobiera kąt i moc na podstawie aktualnego wiatru, grawitacji oraz ukształtowania terenu. Po kolejnych rundach jego strzały uwzględniają zmienione kratery.
+- **Balistyka:** podgląd toru uwzględnia grawitację i wiatr. Wiatr zmienia się po rozstrzygnięciu strzału; obserwuj jego wartość przed następną próbą.
+- **Eksplozje:** trafienie bezpośrednie zadaje większe obrażenia. Bliski wybuch może uszkodzić czołg także bez bezpośredniego kontaktu; siła obrażeń maleje wraz z odległością od środka wybuchu. Moc strzału wpływa na promień i głębokość krateru.
+- **Teren:** kratery pozostają na planszy i zmieniają ukształtowanie podłoża, wpływając na położenie czołgów i kolejne strzały.
+- **Postęp:** pokonanie przeciwnika rozpoczyna następną rundę, przywraca mu pełne zdrowie i odnawia część zdrowia gracza.
+- **Wskaźniki:** zdrowie obu czołgów, runda, wynik, moc, kąt, wiatr i informacja o aktualnej turze.
+- **Ważne:** oddanie strzału jest możliwe wyłącznie w turze gracza i gdy poprzedni pocisk zakończył lot. Start/pauza/reset pozostają w interfejsie treningowym.
 
 ## Skrócona tabela sterowania
 
@@ -123,9 +134,9 @@
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
-| Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
+| Archer | kąt celowania 0–100% | `W`/`↑` — wyżej, `S`/`↓` — niżej, `SPACJA` — zwykły strzał, `F`/`E` — strzał skupiony |
 | Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, `SPACJA` — ogień, `X` — EMP |
-| Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
+| Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA`, mysz i kółko myszy |
 
 ## Uwaga o wersjach i rozszerzeniach
 

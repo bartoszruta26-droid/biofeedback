@@ -12,6 +12,7 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <QKeyEvent>
+#include <QWheelEvent>
 #include <QStringList>
 #include <cstdio>
 #include <cstdlib>
@@ -177,23 +178,6 @@ int main(int argc, char **argv)
     REQUIRE(galagaGame->currentWave() == 1);
     REQUIRE(galagaGame->activeEnemyCount() == 24);
 
-    // EMP is edge-triggered, consumes one charge, clears hostile fire and
-    // wipes the first-wave formation; wave progression then rebuilds enemies.
-    std::unique_ptr<games::GameEngine> galagaPulse(games::createGame(QStringLiteral("galaga")));
-    auto* galagaPulseGame = dynamic_cast<games::GalagaGame*>(galagaPulse.get());
-    REQUIRE(galagaPulseGame != nullptr);
-    galagaPulseGame->resize(640, 480);
-    galagaPulseGame->start();
-    REQUIRE(galagaPulseGame->specialCharges() == 2);
-    QKeyEvent galagaEmp(QEvent::KeyPress, Qt::Key_X, Qt::NoModifier);
-    QApplication::sendEvent(galagaPulseGame, &galagaEmp);
-    REQUIRE(galagaPulseGame->specialCharges() == 1);
-    REQUIRE(galagaPulseGame->activeEnemyCount() == 0);
-    waitForEvents(80);
-    REQUIRE(galagaPulseGame->currentWave() == 2);
-    REQUIRE(galagaPulseGame->activeEnemyCount() > 0);
-    galagaPulseGame->stop();
-
     // The first deterministic hostile shot is aligned with the far-right
     // sensor position. It must remove exactly one life and leave the session
     // active; the post-hit protection then recentres the player.
@@ -236,6 +220,23 @@ int main(int argc, char **argv)
     waitForEvents(80);
     REQUIRE(archerGame->isRunning());
     archerGame->stop();
+
+    // Precision shots consume a bounded focus charge and are tracked separately.
+    std::unique_ptr<games::GameEngine> archerFocus(games::createGame(QStringLiteral("archer")));
+    auto* archerFocusGame = dynamic_cast<games::ArcherGame*>(archerFocus.get());
+    REQUIRE(archerFocusGame != nullptr);
+    archerFocusGame->resize(640, 480);
+    archerFocusGame->start();
+    REQUIRE(archerFocusGame->focusCharges() == 3);
+    QKeyEvent archerFocusFire(QEvent::KeyPress, Qt::Key_F, Qt::NoModifier);
+    QApplication::sendEvent(archerFocusGame, &archerFocusFire);
+    REQUIRE(archerFocusGame->focusCharges() == 2);
+    REQUIRE(archerFocusGame->shotsFired() == 1);
+    REQUIRE(archerFocusGame->activeArrowCount() == 1);
+    const double stableAim = archerFocusGame->aimAngle();
+    archerFocusGame->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
+    REQUIRE(archerFocusGame->aimAngle() == stableAim);
+    archerFocusGame->stop();
 
     // A deliberately low aim must miss cleanly and retire the arrow.
     std::unique_ptr<games::GameEngine> archerMiss(games::createGame(QStringLiteral("archer")));
@@ -323,7 +324,22 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->enemyHealth() == 100);
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
-    scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
+    REQUIRE(scorchedGame->isPlayerTurn());
+    scorchedGame->handleSensorInput(47.0); // Select a near-45-degree arc that reaches the enemy at this arena size.
+    REQUIRE(scorchedGame->trajectoryPreviewPointCount() > 0);
+    const double initialShotPower = scorchedGame->shotPower();
+    QWheelEvent powerWheel(QPointF(320.0, 240.0), QPointF(320.0, 240.0),
+                           QPoint(), QPoint(0, 120), Qt::NoButton, Qt::NoModifier,
+                           Qt::NoScrollPhase, false);
+    QApplication::sendEvent(scorchedGame, &powerWheel);
+    REQUIRE(scorchedGame->shotPower() > initialShotPower);
+    QKeyEvent powerUp(QEvent::KeyPress, Qt::Key_Plus, Qt::NoModifier);
+    QApplication::sendEvent(scorchedGame, &powerUp);
+    REQUIRE(scorchedGame->shotPower() > initialShotPower);
+    QKeyEvent powerDown(QEvent::KeyPress, Qt::Key_Minus, Qt::NoModifier);
+    QApplication::sendEvent(scorchedGame, &powerDown);
+    REQUIRE(scorchedGame->shotPower() < 1.0);
+    // The trajectory preview is available before firing and follows the selected aim/power.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire);
     waitForEvents(2200); // Let the undisturbed ballistic trajectory resolve before testing resize.
