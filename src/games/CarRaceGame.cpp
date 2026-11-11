@@ -137,7 +137,7 @@ bool CarRaceGame::handleInput(double value)
         return true;
     }
     if (m_boostGestureActive) {
-        if (force <= 30.0) {
+        if (force <= 60.0) {
             if (m_boostGestureSeconds >= 0.25 && m_boostGestureSeconds <= 1.2)
                 activateBoost();
             m_boostGestureActive = false;
