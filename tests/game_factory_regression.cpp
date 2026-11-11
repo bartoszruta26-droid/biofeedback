@@ -385,6 +385,13 @@ int main(int argc, char **argv)
     auto* crane = dynamic_cast<games::PrecisionCraneGame*>(craneBase.get());
     REQUIRE(crane != nullptr);
     REQUIRE(crane->gameName().contains(QStringLiteral("Precision Crane")));
+    REQUIRE(crane->obstacleCount() == 2);
+    REQUIRE(crane->cargoMassKg() > 0.0);
+    REQUIRE(crane->missionNumber() == 1);
+    REQUIRE(crane->missionDeliveriesRemaining() == 3);
+    REQUIRE(!crane->campaignCompleted());
+    REQUIRE(crane->precisionSamples() == 0);
+    REQUIRE(crane->averagePrecision() == 0.0);
     crane->setDifficultyLevel(5);
     REQUIRE(crane->difficultyLevel() == 5);
     crane->setDifficultyLevel(0);
@@ -525,6 +532,10 @@ int main(int argc, char **argv)
     craneDelivery->handleSensorInput(0.0);
     waitForEvents(80);
     REQUIRE(craneDelivery->deliveredLoads() == 1);
+    REQUIRE(craneDelivery->cargoType() == games::PrecisionCraneGame::StandardCargo);
+    REQUIRE(craneDelivery->missionDeliveriesRemaining() == 2);
+    REQUIRE(craneDelivery->precisionSamples() == 1);
+    REQUIRE(craneDelivery->averagePrecision() > 0.0);
     REQUIRE(craneDelivery->lastPrecisionBonus() > 0);
     REQUIRE(craneDelivery->getScore() >= 110 + craneDelivery->lastPrecisionBonus());
     craneDelivery->stop();
