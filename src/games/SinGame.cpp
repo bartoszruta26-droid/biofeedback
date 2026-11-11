@@ -27,6 +27,8 @@ SinGame::SinGame(QWidget *parent)
     , m_scoreFraction(0.0)
     , m_comboSeconds(0.0)
     , m_combo(0)
+    , m_bestCombo(0)
+    , m_perfectSeconds(0.0)
     , m_lastDistance(0.0)
     , m_feedbackText(QStringLiteral("Oczekiwanie na sygnał z czujnika"))
     , m_calibrationMinimum(0.0)
@@ -64,6 +66,8 @@ void SinGame::initialize()
     m_scoreFraction = 0.0;
     m_comboSeconds = 0.0;
     m_combo = 0;
+    m_bestCombo = 0;
+    m_perfectSeconds = 0.0;
     m_lastDistance = 0.0;
     m_feedbackText = QStringLiteral("Oczekiwanie na sygnał z czujnika");
     m_sessionSeconds = 0.0;
@@ -107,12 +111,16 @@ double SinGame::normalizedForce() const { return m_currentForce; }
 
 void SinGame::setWaveformMode(int mode)
 {
-    m_waveformMode = qBound(0, mode, 2);
+    m_waveformMode = qBound(0, mode, 4);
     m_combo = 0;
     m_comboSeconds = 0.0;
-    m_feedbackText = m_waveformMode == 0 ? QStringLiteral("Tryb: fala sinusoidalna")
-        : (m_waveformMode == 1 ? QStringLiteral("Tryb: fala trójkątna")
-                               : QStringLiteral("Tryb: łagodny plateau"));
+    m_perfectSeconds = 0.0;
+    static const QStringList modeNames = {
+        QStringLiteral("sinusoidalna"), QStringLiteral("trójkątna"),
+        QStringLiteral("łagodne plateau"), QStringLiteral("piłokształtna"),
+        QStringLiteral("impulsowa")
+    };
+    m_feedbackText = QStringLiteral("Tryb: fala %1").arg(modeNames.at(m_waveformMode));
 }
 
 int SinGame::waveformMode() const { return m_waveformMode; }
@@ -153,6 +161,12 @@ double SinGame::waveformValue(double phase) const
         const double limit = std::tanh(2.2);
         return std::tanh(2.2 * sine) / limit;
     }
+    if (m_waveformMode == 3) {
+        const double cycle = phase / (2.0 * 3.14159265358979323846);
+        return 2.0 * (cycle - std::floor(cycle + 0.5));
+    }
+    if (m_waveformMode == 4)
+        return sine >= 0.0 ? 0.72 : -0.72;
     return sine;
 }
 
@@ -286,6 +300,7 @@ void SinGame::update(double deltaTime)
         m_isHit = false;
         m_comboSeconds = 0.0;
         m_combo = 0;
+        m_perfectSeconds = 0.0;
         m_feedbackText = QStringLiteral("Brak aktualnego sygnału — sprawdź czujnik");
         return;
     }
@@ -296,9 +311,13 @@ void SinGame::update(double deltaTime)
         m_accuracyWindowHitSeconds += dt;
         m_timeInTarget += dt;
         m_comboSeconds += dt;
-        m_combo = qMin(5, 1 + static_cast<int>(m_comboSeconds / 2.0));
+        m_combo = qMin(10, 1 + static_cast<int>(m_comboSeconds / 1.5));
+        m_bestCombo = qMax(m_bestCombo, m_combo);
         const double accuracy = qBound(0.0, 1.0 - m_lastDistance / m_tolerance, 1.0);
-        const double pointsPerSecond = 2.0 + 4.0 * accuracy + 0.5 * m_combo;
+        m_perfectSeconds = accuracy >= 0.90 ? m_perfectSeconds + dt : 0.0;
+        const double precisionBonus = m_perfectSeconds >= 5.0 ? 1.8
+            : (m_perfectSeconds >= 3.0 ? 1.4 : 1.0);
+        const double pointsPerSecond = (2.0 + 5.0 * accuracy + 0.65 * m_combo) * precisionBonus;
         m_scoreFraction += pointsPerSecond * dt;
         const int earned = static_cast<int>(m_scoreFraction);
         if (earned > 0) {
@@ -311,6 +330,7 @@ void SinGame::update(double deltaTime)
     } else {
         m_comboSeconds = 0.0;
         m_combo = 0;
+        m_perfectSeconds = 0.0;
         m_feedbackText = m_cursorY > m_targetY
             ? QStringLiteral("Zwiększ siłę")
             : QStringLiteral("Zmniejsz siłę");
@@ -365,7 +385,7 @@ void SinGame::render(QPainter& painter)
     }
     for (int x = w; x >= 0; --x) {
         const double target = centerY +
-            std::sin(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
+            waveformValue(static_cast<double>(x) * m_frequency + m_phase) * amplitude;
         targetBand.lineTo(x, target + band);
     }
     targetBand.closeSubpath();
@@ -414,18 +434,19 @@ void SinGame::render(QPainter& painter)
     painter.setFont(QFont(QStringLiteral("Arial"), qMax(10, h / 52)));
     const double accuracyPercent = m_sessionSeconds > 0.0
         ? 100.0 * m_timeInTarget / m_sessionSeconds : 0.0;
-    const QString modeName = m_waveformMode == 0 ? QStringLiteral("SINUS")
-        : (m_waveformMode == 1 ? QStringLiteral("TRÓJKĄT") : QStringLiteral("PLATEAU"));
+    static const QStringList modeNames = {QStringLiteral("SINUS"), QStringLiteral("TRÓJKĄT"),
+        QStringLiteral("PLATEAU"), QStringLiteral("PIŁOKSZTAŁT"), QStringLiteral("IMPULS")};
+    const QString modeName = modeNames.at(m_waveformMode);
     painter.drawText(QRect(margin, h - 78, w - 2 * margin, 22),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3    Cel: %4%")
+        QStringLiteral("Siła: %1%    Wynik: %2    Seria: x%3 (rekord x%4)    Cel: %5%")
             .arg(static_cast<int>(std::round(m_currentForce * 100.0)))
-            .arg(getScore()).arg(m_combo)
+            .arg(getScore()).arg(m_combo).arg(m_bestCombo)
             .arg(static_cast<int>(std::round(accuracyPercent))));
 
     painter.drawText(QRect(margin, h - 52, w - 2 * margin, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("%1 | Kalibracja: %2–%3 | Auto: %4 | 1-3: tryb, +/-: trudność, A: auto, [: min, ]: max")
+        QStringLiteral("%1 | Kalibracja: %2–%3 | Auto: %4 | Tryb i trudność ustaw przed sesją")
             .arg(modeName)
             .arg(m_calibrationMinimum, 0, 'f', 1)
             .arg(m_calibrationMaximum, 0, 'f', 1)
