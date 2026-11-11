@@ -7,6 +7,7 @@
 #include "games/PrecisionCraneGame.hpp"
 #include "games/RhythmForceGame.hpp"
 #include "games/ForceMazeGame.hpp"
+#include "games/BalanceTowerGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/FlappyBirdGame.hpp"
 #include "games/GalagaGame.hpp"
@@ -63,6 +64,10 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
     if (id == QStringLiteral("force_maze") || id == QStringLiteral("force-maze") ||
         id == QStringLiteral("force maze"))
         return new ForceMazeGame(parent);
+
+    if (id == QStringLiteral("balance_tower") || id == QStringLiteral("balance-tower") ||
+        id == QStringLiteral("balance tower"))
+        return new BalanceTowerGame(parent);
 
     if (id == QStringLiteral("scorched_earth") || id == QStringLiteral("scored_earth") ||
         id == QStringLiteral("scorched-earth") ||
