@@ -6,7 +6,6 @@
 #include <QPointF>
 #include <QVector>
 #include <QResizeEvent>
-#include <QKeyEvent>
 #include <QString>
 #include <memory>
 
@@ -51,7 +50,6 @@ signals:
     void serialDisconnected();
 
 protected:
-    void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private slots:
