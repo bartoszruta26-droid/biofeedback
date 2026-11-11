@@ -30,6 +30,7 @@ protected:
     void initialize() override;
     void update(double deltaTime) override;
     void render(QPainter &painter) override;
+    void renderInterpolated(QPainter& painter, double alpha) override;
     bool handleInput(double value) override;
 
 private:
@@ -58,6 +59,11 @@ private:
     int m_falls{0};
     double m_targetPosition{0.0};
     double m_targetDepth{0.0};
+    double m_previousTargetPosition{0.0};
+    double m_previousTargetDepth{0.0};
+    double m_previousTilt{0.0};
+    double m_previousStability{1.0};
+    double m_previousVisualTime{0.0};
     double m_inputAge{1.0};
     double m_gestureDuration{0.0};
     double m_visualTime{0.0};
