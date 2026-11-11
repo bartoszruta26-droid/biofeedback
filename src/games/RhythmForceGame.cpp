@@ -3,6 +3,10 @@
 #include <QFont>
 #include <QPainter>
 #include <QPen>
+#include <QLinearGradient>
+#include <QRadialGradient>
+#include <QPolygonF>
+#include <QSettings>
 #include <algorithm>
 #include <cmath>
 
@@ -29,6 +33,9 @@ RhythmForceGame::RhythmForceGame(QWidget *parent)
     , m_pulsePeakForce(0.0)
     , m_lastTimingOffsetMs(0.0)
     , m_lastForce(0.0)
+    , m_visualTime(0.0)
+    , m_hitFlashSeconds(0.0)
+    , m_achievementToastSeconds(0.0)
     , m_hasSensorSample(false)
     , m_awaitingNeutral(true)
     , m_pulseActive(false)
@@ -113,6 +120,12 @@ void RhythmForceGame::initialize()
     m_pulsePeakForce = 0.0;
     m_lastTimingOffsetMs = 0.0;
     m_lastForce = 0.0;
+    m_visualTime = 0.0;
+    m_hitFlashSeconds = 0.0;
+    m_achievementToastSeconds = 0.0;
+    QSettings settings;
+    m_achievements = settings.value(QStringLiteral("games/rhythm_force/achievements")).toStringList();
+    m_lastAchievement.clear();
     m_hasSensorSample = false;
     m_awaitingNeutral = true;
     m_pulseActive = false;
@@ -235,6 +248,13 @@ void RhythmForceGame::finishPulse()
              : (m_lastGrade == Good ? QStringLiteral("DOBRZE") : QStringLiteral("TRAFIENIE")))
         .arg(qRound(m_lastTimingOffsetMs))
         .arg(qRound(peak));
+    m_hitFlashSeconds = 0.42;
+    if (m_hits == 1)
+        unlockAchievement(QStringLiteral("first_hit"), QStringLiteral("Pierwszy takt"));
+    if (m_lastGrade == Perfect)
+        unlockAchievement(QStringLiteral("first_perfect"), QStringLiteral("Perfekcyjne wyczucie"));
+    if (m_combo >= 8)
+        unlockAchievement(QStringLiteral("combo_8"), QStringLiteral("Rytm mistrza — seria 8"));
     advanceBeat();
     finishRoundIfReady();
 }
@@ -255,9 +275,31 @@ void RhythmForceGame::finishRoundIfReady()
 {
     if (m_nextBeatIndex > kRoundBeats && !m_roundCompleted) {
         m_roundCompleted = true;
+        evaluateRoundAchievements();
         m_status = QStringLiteral("Runda zakończona");
         stop();
     }
+}
+
+void RhythmForceGame::unlockAchievement(const QString &id, const QString &title)
+{
+    if (m_achievements.contains(id))
+        return;
+    m_achievements.append(id);
+    QSettings settings;
+    settings.setValue(QStringLiteral("games/rhythm_force/achievements"), m_achievements);
+    m_lastAchievement = title;
+    m_achievementToastSeconds = 3.2;
+}
+
+void RhythmForceGame::evaluateRoundAchievements()
+{
+    if (m_misses == 0 && m_hits == kRoundBeats)
+        unlockAchievement(QStringLiteral("flawless_round"), QStringLiteral("Bez pomyłki — pełna runda"));
+    if (m_perfectHits >= 16)
+        unlockAchievement(QStringLiteral("perfect_16"), QStringLiteral("Mistrz perfekcji — 16 trafień"));
+    if (accuracyPercent() >= 90.0)
+        unlockAchievement(QStringLiteral("accuracy_90"), QStringLiteral("Precyzja powyżej 90%"));
 }
 
 void RhythmForceGame::update(double deltaTime)
@@ -265,7 +307,11 @@ void RhythmForceGame::update(double deltaTime)
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
 
-    m_inputAge += qMin(deltaTime, 0.1);
+    const double frameStep = qMin(deltaTime, 0.1);
+    m_visualTime += frameStep;
+    m_hitFlashSeconds = qMax(0.0, m_hitFlashSeconds - frameStep);
+    m_achievementToastSeconds = qMax(0.0, m_achievementToastSeconds - frameStep);
+    m_inputAge += frameStep;
     if (!m_hasSensorSample || m_inputAge > kSignalTimeoutSeconds) {
         if (m_pulseActive) {
             m_pulseActive = false;
@@ -277,9 +323,9 @@ void RhythmForceGame::update(double deltaTime)
         return; // Freeze the chart; a disconnected sensor cannot cause misses.
     }
 
-    m_songTime += qMin(deltaTime, 0.1);
+    m_songTime += frameStep;
     if (m_pulseActive)
-        m_pulseElapsed += qMin(deltaTime, 0.1);
+        m_pulseElapsed += frameStep;
 
     while (m_nextBeatIndex <= kRoundBeats &&
            m_songTime > beatTimeSeconds(m_nextBeatIndex) + timingWindowSeconds()) {
