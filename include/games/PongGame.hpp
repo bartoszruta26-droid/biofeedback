@@ -36,6 +36,8 @@ public:
     bool hasFreshSensorInput() const;
     double playerPaddleY() const;
     double aiPaddleY() const;
+    double paddleWidth() const;
+    double paddleHeight() const;
     QPointF ballPosition() const;
     int playerMatchScore() const;
     int aiMatchScore() const;
@@ -88,7 +90,7 @@ private:
     void acceptForcePercent(double percent);
     QColor getDifficultyColor() const;
     void updateAIPaddle(double deltaTime);
-    void checkCollisions();
+    void checkCollisions(const QPointF& previousBallPos);
     void adaptToSize();
     bool sensorInputFresh() const;
 };
