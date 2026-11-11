@@ -345,8 +345,25 @@ void RhythmForceGame::render(QPainter &painter)
 {
     const int w = width();
     const int h = height();
-    painter.fillRect(rect(), QColor(13, 18, 34));
+    QLinearGradient background(0, 0, 0, h);
+    background.setColorAt(0.0, QColor(7, 12, 28));
+    background.setColorAt(0.52, QColor(17, 34, 61));
+    background.setColorAt(1.0, QColor(5, 9, 19));
+    painter.fillRect(rect(), background);
     painter.setRenderHint(QPainter::Antialiasing, true);
+    const QPointF horizon(w * 0.5, h * 0.34);
+    QRadialGradient atmosphere(horizon, w * 0.72);
+    atmosphere.setColorAt(0.0, QColor(44, 145, 194, 82));
+    atmosphere.setColorAt(1.0, QColor(12, 24, 48, 0));
+    painter.fillRect(rect(), atmosphere);
+    painter.setPen(QPen(QColor(74, 154, 202, 35), 1));
+    for (int i = -5; i <= 5; ++i)
+        painter.drawLine(horizon, QPointF(w * 0.5 + i * w * 0.13, h));
+    for (int i = 1; i <= 5; ++i) {
+        const double t = i / 5.0;
+        const double y = horizon.y() + (h - horizon.y()) * t * t;
+        painter.drawLine(QPointF(0, y), QPointF(w, y));
+    }
 
     const int margin = qBound(12, w / 28, 28);
     const int titleSize = qBound(12, h / 22, 24);
@@ -364,10 +381,17 @@ void RhythmForceGame::render(QPainter &painter)
                      Qt::AlignLeft, stats);
 
     const QRectF lane(margin, h * 0.37, w - 2.0 * margin, h * 0.28);
-    painter.setPen(QPen(QColor(70, 88, 120), 1));
-    painter.setBrush(QColor(25, 34, 56));
-    painter.drawRoundedRect(lane, 12, 12);
-
+    QPolygonF runway;
+    runway << QPointF(lane.center().x() - lane.width() * 0.31, lane.top())
+           << QPointF(lane.center().x() + lane.width() * 0.31, lane.top())
+           << QPointF(lane.right(), lane.bottom())
+           << QPointF(lane.left(), lane.bottom());
+    QLinearGradient runwayGradient(0, lane.top(), 0, lane.bottom());
+    runwayGradient.setColorAt(0.0, QColor(20, 50, 80, 245));
+    runwayGradient.setColorAt(1.0, QColor(10, 22, 43, 250));
+    painter.setPen(QPen(QColor(76, 179, 222, 150), 1.4));
+    painter.setBrush(runwayGradient);
+    painter.drawPolygon(runway);
     const double centreX = lane.center().x();
     painter.setPen(QPen(QColor(245, 220, 110), 2));
     painter.drawLine(QPointF(centreX, lane.top() - 12), QPointF(centreX, lane.bottom() + 12));
@@ -376,19 +400,48 @@ void RhythmForceGame::render(QPainter &painter)
     const double interval = beatIntervalSeconds();
     for (int beat = m_nextBeatIndex; beat <= qMin(kRoundBeats, m_nextBeatIndex + 5); ++beat) {
         const double secondsToBeat = beatTimeSeconds(beat) - m_songTime;
-        const double x = centreX + secondsToBeat / (interval * 2.5) * lane.width();
-        if (x < lane.left() - 18 || x > lane.right() + 18)
+        const double depth = qBound(0.0, 1.0 - secondsToBeat / (interval * 2.8), 1.0);
+        const double y = lane.top() + depth * lane.height();
+        const double perspective = 0.42 + depth * 0.78;
+        const double x = centreX + secondsToBeat / (interval * 2.8) * lane.width() * 0.26;
+        if (x < lane.left() - 24 || x > lane.right() + 24)
             continue;
         const double targetForce = targetForceForBeat(beat);
-        const double radius = 8.0 + targetForce / 18.0;
-        const QColor accent = beat == m_nextBeatIndex
-            ? QColor(80, 205, 240) : QColor(95, 125, 170);
-        painter.setBrush(accent);
-        painter.drawEllipse(QPointF(x, lane.center().y()), radius, radius);
-        painter.setPen(QColor(225, 235, 250));
-        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(7, hudSize - 1)));
-        painter.drawText(QRectF(x - 22, lane.bottom() + 5, 44, hudSize + 4),
+        const double radius = (6.0 + targetForce / 20.0) * perspective;
+        const bool active = beat == m_nextBeatIndex;
+        const QColor accent = active ? QColor(72, 218, 255) : QColor(95, 140, 184);
+        if (active) {
+            QRadialGradient glow(QPointF(x, y), radius * 2.8);
+            glow.setColorAt(0.0, QColor(67, 208, 255, 120));
+            glow.setColorAt(1.0, QColor(67, 208, 255, 0));
+            painter.setBrush(glow);
+            painter.drawEllipse(QPointF(x, y), radius * 2.8, radius * 2.8);
+        }
+        painter.setPen(QPen(accent, active ? 2.2 : 1.0));
+        painter.setBrush(active ? QColor(38, 160, 205) : QColor(45, 82, 122));
+        painter.drawEllipse(QPointF(x, y), radius, radius);
+        painter.setPen(QColor(232, 243, 255));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(7, qRound((hudSize - 1) * perspective))));
+        painter.drawText(QRectF(x - 25 * perspective, y + radius + 2, 50 * perspective, hudSize + 3),
                          Qt::AlignHCenter, QString::number(qRound(targetForce)) + QLatin1Char('%'));
+        painter.setPen(Qt::NoPen);
+    }
+
+    if (m_pulseActive) {
+        const double pulseScale = 1.0 + 0.16 * std::sin(m_visualTime * 13.0);
+        QRadialGradient pulseGlow(QPointF(centreX, lane.center().y()), lane.width() * 0.11 * pulseScale);
+        pulseGlow.setColorAt(0.0, QColor(255, 166, 72, 110));
+        pulseGlow.setColorAt(1.0, QColor(255, 166, 72, 0));
+        painter.setBrush(pulseGlow);
+        painter.drawEllipse(QPointF(centreX, lane.center().y()),
+                            lane.width() * 0.11 * pulseScale, lane.width() * 0.11 * pulseScale);
+    }
+    if (m_hitFlashSeconds > 0.0) {
+        const double alpha = qBound(0.0, m_hitFlashSeconds / 0.42, 1.0);
+        const double radius = 18.0 + (1.0 - alpha) * 38.0;
+        painter.setPen(QPen(QColor(116, 255, 190, qRound(alpha * 220)), 3));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawEllipse(QPointF(centreX, lane.center().y()), radius, radius);
         painter.setPen(Qt::NoPen);
     }
 
@@ -408,6 +461,17 @@ void RhythmForceGame::render(QPainter &painter)
         : (m_awaitingNeutral ? m_status : QStringLiteral("Oczekiwanie na sygnał tensometru"));
     painter.drawText(QRect(margin, h * 0.80, w - 2 * margin, hudSize + 12),
                      Qt::AlignHCenter | Qt::AlignVCenter, status);
+    if (m_achievementToastSeconds > 0.0 && !m_lastAchievement.isEmpty()) {
+        const double toastWidth = qMin<double>(w - 2 * margin, 360.0);
+        const QRectF toast((w - toastWidth) * 0.5, h * 0.12, toastWidth, 34.0);
+        painter.setPen(QPen(QColor(255, 207, 103, 220), 1.2));
+        painter.setBrush(QColor(48, 40, 23, 235));
+        painter.drawRoundedRect(toast, 9, 9);
+        painter.setPen(QColor(255, 225, 153));
+        painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(9, hudSize), QFont::DemiBold));
+        painter.drawText(toast, Qt::AlignCenter,
+                         QStringLiteral("OSIĄGNIĘCIE  •  %1").arg(m_lastAchievement));
+    }
     painter.drawText(QRect(margin, h - hudSize - margin, w - 2 * margin, hudSize + 4),
         Qt::AlignHCenter, QStringLiteral("Impuls 18–100% • zwolnienie ≤18% • dokładność %1%")
             .arg(accuracyPercent(), 0, 'f', 1));
