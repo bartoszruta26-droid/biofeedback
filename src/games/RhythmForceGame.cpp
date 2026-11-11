@@ -314,6 +314,8 @@ void RhythmForceGame::update(double deltaTime)
 {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
+    m_previousSongTime = m_songTime;
+    m_previousVisualTime = m_visualTime;
 
     const double frameStep = qMin(deltaTime, 0.1);
     m_visualTime += frameStep;
@@ -347,6 +349,18 @@ void RhythmForceGame::update(double deltaTime)
         advanceBeat();
     }
     finishRoundIfReady();
+}
+
+void RhythmForceGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double songTime = m_songTime;
+    const double visualTime = m_visualTime;
+    m_songTime = m_previousSongTime + (songTime - m_previousSongTime) * alpha;
+    m_visualTime = m_previousVisualTime + (visualTime - m_previousVisualTime) * alpha;
+    render(painter);
+    m_songTime = songTime;
+    m_visualTime = visualTime;
 }
 
 void RhythmForceGame::render(QPainter &painter)
