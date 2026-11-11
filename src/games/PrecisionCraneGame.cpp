@@ -452,6 +452,26 @@ void PrecisionCraneGame::resizeEvent(QResizeEvent *event)
                      floorY() - 35.0 * qMax(0.5, height() / 480.0));
 }
 
+void PrecisionCraneGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const double carriage = m_carriageX;
+    const double hook = m_hookY;
+    const double sway = m_sway;
+    const double obstacleClock = m_obstacleClock;
+    m_carriageX = m_previousCarriageX +
+        (carriage - m_previousCarriageX) * alpha;
+    m_hookY = m_previousHookY + (hook - m_previousHookY) * alpha;
+    m_sway = m_previousSway + (sway - m_previousSway) * alpha;
+    m_obstacleClock = m_previousObstacleClock +
+        (obstacleClock - m_previousObstacleClock) * alpha;
+    render(painter);
+    m_carriageX = carriage;
+    m_hookY = hook;
+    m_sway = sway;
+    m_obstacleClock = obstacleClock;
+}
+
 void PrecisionCraneGame::render(QPainter& painter)
 {
     painter.save();
