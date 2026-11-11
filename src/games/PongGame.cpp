@@ -75,10 +75,10 @@ void PongGame::setDifficultyLevel(int level)
     m_difficultyLevel = qBound(1, level, 5);
     // Speeds are expressed in reference-resolution units and scaled with
     // the logical playfield so HD displays do not make the rally harder.
-    const float scaleX = qMax(0.25f, width() / 640.0f);
-    const float scaleY = qMax(0.25f, height() / 480.0f);
-    m_aiSpeed = (80.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scaleY;
-    m_ballSpeed = (200.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scaleX;
+    const float scale = qBound(0.50f,
+        qMin(width() / 640.0f, height() / 480.0f), 2.0f);
+    m_aiSpeed = (80.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
+    m_ballSpeed = (200.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
     m_playerScore = 0;
     m_aiScore = 0;
     setScore(0);
@@ -218,8 +218,6 @@ void PongGame::adaptToSize()
         const double sy = static_cast<double>(newSize.height()) / m_lastSize.height();
         m_ballPos.setX(m_ballPos.x() * sx);
         m_ballPos.setY(m_ballPos.y() * sy);
-        m_ballVel.setX(m_ballVel.x() * sx);
-        m_ballVel.setY(m_ballVel.y() * sy);
         m_leftPaddleY = static_cast<float>(m_leftPaddleY * sy);
         m_rightPaddleY = static_cast<float>(m_rightPaddleY * sy);
     } else {
@@ -228,19 +226,19 @@ void PongGame::adaptToSize()
         m_rightPaddleY = m_leftPaddleY;
     }
 
-    const float scaleX = qMax(0.25f, newSize.width() / 640.0f);
-    const float scaleY = qMax(0.25f, newSize.height() / 480.0f);
-    const float minScale = qMin(scaleX, scaleY);
-    m_paddleHeight = qBound(60.0f * scaleY, static_cast<float>(newSize.height()) * 0.20f,
-                            120.0f * scaleY);
-    m_paddleWidth = qBound(24.0f * scaleX, static_cast<float>(newSize.width()) * 0.07f,
-                           48.0f * scaleX);
-    m_paddleMargin = qBound(16.0f * scaleX, static_cast<float>(newSize.width()) * 0.035f,
-                            26.0f * scaleX);
-    m_ballRadius = qBound(7.0f * minScale,
-        static_cast<float>(qMin(newSize.width(), newSize.height())) * 0.018f, 12.0f * minScale);
-    m_aiSpeed = (80.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scaleY;
-    m_ballSpeed = (200.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scaleX;
+    const float scale = qBound(0.50f,
+        qMin(newSize.width() / 640.0f, newSize.height() / 480.0f), 2.0f);
+    // Tall, narrow paddles: their width is deliberately independent of height.
+    m_paddleHeight = qBound(54.0f * scale,
+        static_cast<float>(newSize.height()) * 0.23f, 112.0f * scale);
+    m_paddleWidth = qBound(7.0f * scale,
+        static_cast<float>(newSize.width()) * 0.018f, 17.0f * scale);
+    m_paddleMargin = qBound(12.0f * scale,
+        static_cast<float>(newSize.width()) * 0.035f, 25.0f * scale);
+    m_ballRadius = qBound(5.0f * scale,
+        static_cast<float>(qMin(newSize.width(), newSize.height())) * 0.016f, 11.0f * scale);
+    m_aiSpeed = (80.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
+    m_ballSpeed = (200.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
 
     const float maxPaddleY = qMax(0.0f, static_cast<float>(newSize.height()) - m_paddleHeight);
     m_leftPaddleY = qBound(0.0f, m_leftPaddleY, maxPaddleY);
@@ -267,11 +265,11 @@ void PongGame::resetBall(int horizontalDirection)
         : (horizontalDirection < 0 ? -1 : 1);
     double vertical = QRandomGenerator::global()->bounded(2) == 0 ? -0.42 : 0.42;
     const double length = std::hypot(1.0, vertical);
-    const double scaleX = qMax(0.25, width() / 640.0);
-    const double scaleY = qMax(0.25, height() / 480.0);
-    const double baseSpeed = 200.0 + static_cast<double>(m_difficultyLevel) * 25.0;
-    m_ballVel.setX(direction * baseSpeed * scaleX / length);
-    m_ballVel.setY(vertical * baseSpeed * scaleY / length);
+    const double scale = qBound(0.50,
+        qMin(width() / 640.0, height() / 480.0), 2.0);
+    const double baseSpeed = (200.0 + static_cast<double>(m_difficultyLevel) * 25.0) * scale;
+    m_ballVel.setX(direction * baseSpeed / length);
+    m_ballVel.setY(vertical * baseSpeed / length);
 }
 
 void PongGame::updateAIPaddle(double deltaTime)
@@ -292,52 +290,71 @@ void PongGame::updateAIPaddle(double deltaTime)
     m_rightPaddle.moveTop(m_rightPaddleY);
 }
 
-void PongGame::checkCollisions()
+void PongGame::checkCollisions(const QPointF& previousBallPos)
 {
     const float maxPaddleY = qMax(0.0f, static_cast<float>(height()) - m_paddleHeight);
     m_leftPaddleY = static_cast<float>((1.0 - m_currentForce / 100.0) * maxPaddleY);
     m_leftPaddleY = qBound(0.0f, m_leftPaddleY, maxPaddleY);
     m_leftPaddle.moveTop(m_leftPaddleY);
 
-    if (m_ballPos.y() - m_ballRadius <= 0.0 ||
-        m_ballPos.y() + m_ballRadius >= height()) {
-        m_ballPos.setY(qBound(static_cast<double>(m_ballRadius), m_ballPos.y(),
-                               static_cast<double>(height()) - m_ballRadius));
-        m_ballVel.setY(-m_ballVel.y());
+    // Resolve wall contacts only while travelling into the corresponding wall.
+    if (m_ballVel.y() < 0.0 && m_ballPos.y() - m_ballRadius <= 0.0) {
+        m_ballPos.setY(m_ballRadius);
+        m_ballVel.setY(std::abs(m_ballVel.y()));
+    } else if (m_ballVel.y() > 0.0 &&
+               m_ballPos.y() + m_ballRadius >= height()) {
+        m_ballPos.setY(height() - m_ballRadius);
+        m_ballVel.setY(-std::abs(m_ballVel.y()));
     }
 
-    if (m_ballVel.x() < 0.0 &&
-        m_ballPos.x() - m_ballRadius <= m_leftPaddle.right() &&
-        m_ballPos.x() + m_ballRadius >= m_leftPaddle.left() &&
-        m_ballPos.y() + m_ballRadius >= m_leftPaddle.top() &&
-        m_ballPos.y() - m_ballRadius <= m_leftPaddle.bottom()) {
-        const double hitOffset = (m_ballPos.y() - m_leftPaddle.center().y()) /
-                                 qMax(1.0, m_paddleHeight / 2.0);
-        const double angle = qBound(-0.95, hitOffset, 0.95) * 1.05;
-        const double speed = qMin(std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.035,
-                                  static_cast<double>(m_ballSpeed) * 1.8);
-        m_ballVel = QPointF(std::cos(angle) * speed, std::sin(angle) * speed);
-        m_ballPos.setX(m_leftPaddle.right() + m_ballRadius);
-    }
-
-    if (m_ballVel.x() > 0.0 &&
-        m_ballPos.x() + m_ballRadius >= m_rightPaddle.left() &&
-        m_ballPos.x() - m_ballRadius <= m_rightPaddle.right() &&
-        m_ballPos.y() + m_ballRadius >= m_rightPaddle.top() &&
-        m_ballPos.y() - m_ballRadius <= m_rightPaddle.bottom()) {
-        const double hitOffset = (m_ballPos.y() - m_rightPaddle.center().y()) /
-                                 qMax(1.0, m_paddleHeight / 2.0);
-        const double angle = qBound(-0.95, hitOffset, 0.95) * 1.05;
-        const double speed = qMin(std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.025,
-                                  static_cast<double>(m_ballSpeed) * 1.8);
-        m_ballVel = QPointF(-std::cos(angle) * speed, std::sin(angle) * speed);
-        m_ballPos.setX(m_rightPaddle.left() - m_ballRadius);
+    // Swept face collision: test the ball's previous and current positions.
+    // This prevents tunnelling and rejects contacts with a paddle's short ends.
+    const double dx = m_ballPos.x() - previousBallPos.x();
+    const double dy = m_ballPos.y() - previousBallPos.y();
+    if (dx < 0.0 && m_ballVel.x() < 0.0) {
+        const double faceX = m_leftPaddle.right() + m_ballRadius;
+        if (previousBallPos.x() >= faceX && m_ballPos.x() <= faceX) {
+            const double t = qBound(0.0, (faceX - previousBallPos.x()) / dx, 1.0);
+            const double impactY = previousBallPos.y() + dy * t;
+            if (impactY >= m_leftPaddle.top() - m_ballRadius &&
+                impactY <= m_leftPaddle.bottom() + m_ballRadius) {
+                const double offset = qBound(-1.0,
+                    (impactY - m_leftPaddle.center().y()) /
+                        qMax(1.0, m_paddleHeight * 0.5), 1.0);
+                const double angle = offset * 1.05;
+                const double speed = qMin(std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.025,
+                                          static_cast<double>(m_ballSpeed) * 1.8);
+                m_ballVel = QPointF(std::cos(angle) * speed,
+                                    std::sin(angle) * speed);
+                m_ballPos.setX(faceX);
+                m_ballPos.setY(impactY + dy * (1.0 - t));
+            }
+        }
+    } else if (dx > 0.0 && m_ballVel.x() > 0.0) {
+        const double faceX = m_rightPaddle.left() - m_ballRadius;
+        if (previousBallPos.x() <= faceX && m_ballPos.x() >= faceX) {
+            const double t = qBound(0.0, (faceX - previousBallPos.x()) / dx, 1.0);
+            const double impactY = previousBallPos.y() + dy * t;
+            if (impactY >= m_rightPaddle.top() - m_ballRadius &&
+                impactY <= m_rightPaddle.bottom() + m_ballRadius) {
+                const double offset = qBound(-1.0,
+                    (impactY - m_rightPaddle.center().y()) /
+                        qMax(1.0, m_paddleHeight * 0.5), 1.0);
+                const double angle = offset * 1.05;
+                const double speed = qMin(std::hypot(m_ballVel.x(), m_ballVel.y()) * 1.025,
+                                          static_cast<double>(m_ballSpeed) * 1.8);
+                m_ballVel = QPointF(-std::cos(angle) * speed,
+                                    std::sin(angle) * speed);
+                m_ballPos.setX(faceX);
+                m_ballPos.setY(impactY + dy * (1.0 - t));
+            }
+        }
     }
 
     // A point is awarded only after the complete ball has left the court.
     if (m_ballPos.x() + m_ballRadius < 0.0) {
         ++m_aiScore;
-        resetBall(1); // Serve toward the player who conceded the point.
+        resetBall(1);
         m_serveDelayRemaining = kServeDelaySeconds;
     } else if (m_ballPos.x() - m_ballRadius > width()) {
         ++m_playerScore;
@@ -373,9 +390,10 @@ void PongGame::update(double deltaTime)
             continue;
         }
 
+        const QPointF previousBallPos = m_ballPos;
         m_ballPos += m_ballVel * stepTime;
         updateAIPaddle(stepTime);
-        checkCollisions();
+        checkCollisions(previousBallPos);
     }
 }
 
