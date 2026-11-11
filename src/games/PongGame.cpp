@@ -354,7 +354,7 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
                 m_ballVel = QPointF(-std::cos(angle) * speed,
                                     std::sin(angle) * speed);
                 m_ballPos.setX(faceX);
-                m_ballPos.setY(impactY + dy * (1.0 - t));
+                m_ballPos.setY(impactY);
             }
         }
     }
