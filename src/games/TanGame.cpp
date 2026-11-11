@@ -147,12 +147,26 @@ double TanGame::tangentSharpness() const { return m_tangentSharpness; }
 
 void TanGame::resizeEvent(QResizeEvent* event)
 {
+    const int oldHeight = event->oldSize().height();
+    const int newHeight = event->size().height();
+    if (newHeight > 0) {
+        if (oldHeight > 0)
+            m_cursorY = newHeight * 0.5 +
+                (m_cursorY - oldHeight * 0.5) *
+                (static_cast<double>(newHeight) / oldHeight);
+        else
+            m_cursorY = newHeight * 0.5;
+    }
     QWidget::resizeEvent(event);
     updateSpatialFrequency();
     const double scaleY = qMax(0.5, height() / 480.0);
     const double ratio = 0.145 - (m_difficultyLevel - 1) * 0.010;
     m_tolerance = qBound(12.0 * scaleY,
         static_cast<double>(height()) * ratio, 64.0 * scaleY);
+    calculateTargetY(width() * 0.72);
+    m_previousPhase = m_phase;
+    m_previousCursorY = m_cursorY;
+    m_previousTargetY = m_targetY;
     QWidget::update();
 }
 
