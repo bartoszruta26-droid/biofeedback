@@ -164,6 +164,7 @@ protected:
     virtual void renderInterpolated(QPainter& painter, double alpha);
 
     static constexpr double kFixedSimulationStepSeconds = 1.0 / 120.0;
+    double renderInterpolationAlpha() const { return m_renderInterpolationAlpha; }
 
     /**
      * @brief Obsługuje wejście specyficzne dla gry
