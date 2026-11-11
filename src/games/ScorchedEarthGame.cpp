@@ -37,6 +37,8 @@ void ScorchedEarthGame::initialize()
     m_wind = 0.0;
     m_enemyDelay = 0.0;
     m_playerShotDelay = m_playerShotInterval;
+    m_sensorClock.invalidate();
+    m_hasSensorSample = false;
     const double scaleY = qMax(0.25, height() / 480.0);
     m_gravity = 220.0 * scaleY;
     m_playerHealth = 100;
@@ -131,6 +133,8 @@ bool ScorchedEarthGame::handleInput(double value)
     if (!std::isfinite(value))
         return false;
     const double normalized = qBound(0.0, value / 100.0, 1.0);
+    m_sensorClock.restart();
+    m_hasSensorSample = true;
     m_aimDegrees = 15.0 + normalized * 65.0;
     return true;
 }
@@ -206,10 +210,16 @@ void ScorchedEarthGame::update(double deltaTime)
         return;
     deltaTime = qMin(deltaTime, 0.1);
 
+    const bool sensorFresh = m_hasSensorSample && m_sensorClock.isValid() &&
+                             m_sensorClock.elapsed() <= 350;
     if (m_projectiles.isEmpty() && m_playerTurn) {
-        m_playerShotDelay -= deltaTime;
-        if (m_playerShotDelay <= 0.0) {
-            fireProjectile(true);
+        if (sensorFresh) {
+            m_playerShotDelay -= deltaTime;
+            if (m_playerShotDelay <= 0.0) {
+                fireProjectile(true);
+                m_playerShotDelay = m_playerShotInterval;
+            }
+        } else {
             m_playerShotDelay = m_playerShotInterval;
         }
     } else if (m_projectiles.isEmpty()) {
