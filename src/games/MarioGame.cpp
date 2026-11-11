@@ -500,6 +500,14 @@ void MarioGame::update(double deltaTime)
     // Ogranicz bezpośrednie wywołania, tak jak w GameEngine.
     deltaTime = qMin(deltaTime, 0.1);
 
+    // Snapshot moving scene objects before advancing the fixed simulation tick.
+    m_previousPlayerBody = m_player.body;
+    m_previousWorldDistance = m_worldDistance;
+    m_previousObstacles = m_obstacles;
+    m_previousEnemies = m_enemies;
+    m_previousCollectibles = m_collectibles;
+    m_previousClouds = m_clouds;
+
     // A single scene clock drives all animation and parallax from real gameplay travel.
     m_animationTime += deltaTime;
     m_worldDistance += PLAYER_SPEED * qMax(0.5, width() / 640.0) * deltaTime;
@@ -783,6 +791,53 @@ bool MarioGame::handleInput(double value)
     }
 
     return m_sensorPressed && m_player.isCharging;
+}
+
+void MarioGame::renderInterpolated(QPainter& painter, double alpha)
+{
+    alpha = qBound(0.0, alpha, 1.0);
+    const Player currentPlayer = m_player;
+    const double currentWorldDistance = m_worldDistance;
+    const auto currentObstacles = m_obstacles;
+    const auto currentEnemies = m_enemies;
+    const auto currentCollectibles = m_collectibles;
+    const auto currentClouds = m_clouds;
+
+    m_player.body = QRectF(
+        m_previousPlayerBody.x() + (currentPlayer.body.x() - m_previousPlayerBody.x()) * alpha,
+        m_previousPlayerBody.y() + (currentPlayer.body.y() - m_previousPlayerBody.y()) * alpha,
+        currentPlayer.body.width(), currentPlayer.body.height());
+    m_worldDistance = m_previousWorldDistance +
+        (currentWorldDistance - m_previousWorldDistance) * alpha;
+
+    const auto interpolateRects = [alpha](auto& current, const auto& previous) {
+        if (current.size() != previous.size())
+            return;
+        for (int i = 0; i < current.size(); ++i) {
+            const QRectF now = current[i].rect;
+            const QRectF before = previous[i].rect;
+            current[i].rect = QRectF(
+                before.x() + (now.x() - before.x()) * alpha,
+                before.y() + (now.y() - before.y()) * alpha,
+                now.width(), now.height());
+        }
+    };
+    interpolateRects(m_obstacles, m_previousObstacles);
+    interpolateRects(m_enemies, m_previousEnemies);
+    interpolateRects(m_collectibles, m_previousCollectibles);
+    for (int i = 0; i < m_clouds.size() && i < m_previousClouds.size(); ++i) {
+        m_clouds[i].pos = m_previousClouds[i].pos +
+            (currentClouds[i].pos - m_previousClouds[i].pos) * alpha;
+    }
+
+    render(painter);
+
+    m_player = currentPlayer;
+    m_worldDistance = currentWorldDistance;
+    m_obstacles = currentObstacles;
+    m_enemies = currentEnemies;
+    m_collectibles = currentCollectibles;
+    m_clouds = currentClouds;
 }
 
 void MarioGame::render(QPainter& painter)
