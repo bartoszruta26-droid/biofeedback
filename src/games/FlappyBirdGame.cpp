@@ -9,8 +9,6 @@
 #include <QFont>
 #include <QRectF>
 #include <QRandomGenerator>
-#include <QKeyEvent>
-#include <QMouseEvent>
 #include <cmath>
 
 namespace games {
@@ -36,7 +34,7 @@ FlappyBirdGame::FlappyBirdGame(QWidget *parent)
     , m_wasFlapping(false)
     , m_obstaclesPassed(0)
 {
-    setFocusPolicy(Qt::StrongFocus);
+    setFocusPolicy(Qt::NoFocus);
 }
 
 FlappyBirdGame::~FlappyBirdGame() {
@@ -217,34 +215,6 @@ double FlappyBirdGame::birdVerticalVelocity() const {
 
 int FlappyBirdGame::activeObstacleCount() const {
     return static_cast<int>(m_obstacles.size());
-}
-
-void FlappyBirdGame::keyPressEvent(QKeyEvent* event) {
-    if (!event->isAutoRepeat() &&
-        (event->key() == Qt::Key_Space || event->key() == Qt::Key_Up ||
-         event->key() == Qt::Key_W || event->key() == Qt::Key_Return ||
-         event->key() == Qt::Key_Enter)) {
-        if (!isRunning())
-            start();
-        if (isRunning())
-            m_flapRequested = true;
-        event->accept();
-        return;
-    }
-    GameEngine::keyPressEvent(event);
-}
-
-void FlappyBirdGame::mousePressEvent(QMouseEvent* event) {
-    if (event->button() == Qt::LeftButton) {
-        if (!isRunning())
-            start();
-        if (isRunning())
-            m_flapRequested = true;
-        setFocus(Qt::MouseFocusReason);
-        event->accept();
-        return;
-    }
-    GameEngine::mousePressEvent(event);
 }
 
 void FlappyBirdGame::resetBird() {
