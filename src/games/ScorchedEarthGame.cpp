@@ -162,7 +162,6 @@ void ScorchedEarthGame::fireProjectile(bool playerOwned)
 
 void ScorchedEarthGame::render(QPainter& painter)
 {
-    const QVector<QPointF> preview = trajectoryPreview();
     painter.fillRect(rect(), QColor(55, 88, 125));
     painter.fillRect(QRect(0, height() / 2, width(), height() / 2),
                      QColor(202, 133, 83));
