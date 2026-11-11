@@ -306,7 +306,17 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->enemyHealth() == 100);
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
-    scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
+    REQUIRE(scorchedGame->isPlayerTurn());
+    scorchedGame->handleSensorInput(40.0);
+    REQUIRE(scorchedGame->trajectoryPreviewPointCount() > 0);
+    const double initialShotPower = scorchedGame->shotPower();
+    QKeyEvent powerUp(QEvent::KeyPress, Qt::Key_Plus, Qt::NoModifier);
+    QApplication::sendEvent(scorchedGame, &powerUp);
+    REQUIRE(scorchedGame->shotPower() > initialShotPower);
+    QKeyEvent powerDown(QEvent::KeyPress, Qt::Key_Minus, Qt::NoModifier);
+    QApplication::sendEvent(scorchedGame, &powerDown);
+    REQUIRE(scorchedGame->shotPower() < 1.0);
+    // The trajectory preview is available before firing and follows the selected aim/power.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire);
     waitForEvents(2200); // Let the undisturbed ballistic trajectory resolve before testing resize.
