@@ -331,6 +331,9 @@ int main(int argc, char **argv)
     arkanoidGame->start();
     waitForEvents(1800);
     REQUIRE(arkanoidGame->getScore() > 0); // Ball must hit at least one brick.
+    arkanoidGame->resize(1920, 1080);
+    REQUIRE(arkanoidGame->isRunning());
+    arkanoidGame->resize(640, 480);
     arkanoidGame->stop();
 
     std::unique_ptr<games::GameEngine> tan(games::createGame(QStringLiteral("tan")));
@@ -386,6 +389,9 @@ int main(int argc, char **argv)
     flappyGame->resize(640, 480);
     waitForEvents(80);
     REQUIRE(flappyGame->isRunning());
+    flappyGame->resize(1920, 1080);
+    REQUIRE(flappyGame->isRunning());
+    flappyGame->resize(640, 480);
     flappyGame->stop();
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
@@ -400,6 +406,9 @@ int main(int argc, char **argv)
     pongGame->update(std::numeric_limits<double>::quiet_NaN());
     pongGame->update(std::numeric_limits<double>::infinity());
     REQUIRE(pongGame->isRunning()); // Invalid deltas are ignored.
+    pongGame->resize(1920, 1080);
+    REQUIRE(pongGame->isRunning());
+    pongGame->resize(640, 480);
     pongGame->stop();
 
     std::unique_ptr<games::GameEngine> galaga(games::createGame(QStringLiteral("galaga")));
@@ -424,6 +433,9 @@ int main(int argc, char **argv)
     galagaGame->resize(640, 480);
     waitForEvents(80);
     REQUIRE(galagaGame->isRunning());
+    galagaGame->resize(1920, 1080);
+    REQUIRE(galagaGame->isRunning());
+    galagaGame->resize(640, 480);
     REQUIRE(galagaGame->livesRemaining() > 0);
     galagaGame->stop();
     galagaGame->reset();
@@ -565,6 +577,9 @@ int main(int argc, char **argv)
     carRaceGame->resize(640, 480);
     waitForEvents(120);
     REQUIRE(carRaceGame->isRunning());
+    carRaceGame->resize(1920, 1080);
+    REQUIRE(carRaceGame->isRunning());
+    carRaceGame->resize(640, 480);
     carRaceGame->stop();
     carRaceGame->reset();
     REQUIRE(carRaceGame->livesRemaining() == 3);
@@ -646,6 +661,9 @@ int main(int argc, char **argv)
     marioReset->resize(640, 480);
     waitForEvents(80);
     REQUIRE(marioReset->isRunning());
+    marioReset->resize(1920, 1080);
+    REQUIRE(marioReset->isRunning());
+    marioReset->resize(640, 480);
     marioReset->reset();
     REQUIRE(!marioReset->isRunning());
     marioReset->start();
