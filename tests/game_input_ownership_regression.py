@@ -37,12 +37,18 @@ required_engine_tokens = (
     "m_gameTimer->setInterval(8)",
     "m_gameTimer->setTimerType(Qt::PreciseTimer)",
     "constexpr double fixedStep = kFixedSimulationStepSeconds;",
+    "m_monotonicClock.nsecsElapsed()",
+    "/ 1.0e9",
     "Qt::WA_OpaquePaintEvent",
     "Qt::WA_NoSystemBackground",
 )
 for token in required_engine_tokens:
     if token not in engine:
         raise SystemExit(f"GameEngine is missing the arcade performance requirement: {token}")
+
+for path in GAME_SOURCES:
+    if "::renderInterpolated(" not in path.read_text(encoding="utf-8"):
+        raise SystemExit(f"Game is missing frame-rate-independent render interpolation: {path.relative_to(ROOT)}")
 if "static constexpr double kFixedSimulationStepSeconds = 1.0 / 120.0;" not in engine_header:
     raise SystemExit("GameEngine fixed simulation step must remain 120 Hz.")
 
