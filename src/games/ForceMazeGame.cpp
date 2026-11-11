@@ -1,7 +1,6 @@
 #include "games/ForceMazeGame.hpp"
 
 #include <QPainter>
-#include <QMouseEvent>
 #include <QPainterPath>
 #include <QPolygonF>
 #include <QSettings>
@@ -172,21 +171,6 @@ void ForceMazeGame::setLeftHanded(bool leftHanded)
     QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
     settings.setValue(QStringLiteral("games/force_maze/left_handed"), m_leftHanded);
     settings.sync();
-}
-
-void ForceMazeGame::mousePressEvent(QMouseEvent *event)
-{
-    if (!event)
-        return;
-    const qreal margin = qMax<qreal>(14.0, width() * 0.045);
-    const QRectF handButton(width() - margin - 132.0, 5.0, 132.0, 24.0);
-    if (handButton.contains(event->pos())) {
-        setLeftHanded(!m_leftHanded);
-        QWidget::update();
-        event->accept();
-        return;
-    }
-    event->ignore();
 }
 
 void ForceMazeGame::unlockAchievement(const QString &id)
@@ -541,19 +525,16 @@ void ForceMazeGame::render(QPainter &painter)
     painter.drawLine(QPointF(forceX, forceTrack.top() - 4),
                      QPointF(forceX, forceTrack.bottom() + 4));
 
-    const QRectF handButton(width() - margin - 132.0, 5.0, 132.0, 24.0);
-    painter.setPen(QPen(QColor(112, 206, 213), 1.0));
-    painter.setBrush(QColor(20, 57, 70, 230));
-    painter.drawRoundedRect(handButton, 7.0, 7.0);
     painter.setPen(Qt::white);
     painter.setFont(QFont(QStringLiteral("Sans Serif"), qMax(8, height() / 48), QFont::DemiBold));
-    painter.drawText(handButton, Qt::AlignCenter,
+    painter.drawText(QRectF(width() - margin - 132.0, 5.0, 132.0, 24.0),
+                     Qt::AlignCenter,
                      m_leftHanded ? QStringLiteral("Ręka: lewa") : QStringLiteral("Ręka: prawa"));
 
     const QRectF footer(margin, height() - 38, width() - 2 * margin, 28);
     painter.setPen(QColor(180, 211, 220));
     const QString state = hasFreshSignal()
-        ? QStringLiteral("Strefa neutralna 10–30% — poza nią siła reguluje położenie; kliknij u góry, aby zmienić rękę")
+        ? QStringLiteral("Strefa neutralna 10–30% — położenie reguluje wyłącznie tensometr; rękę zmienia się w ustawieniach")
         : QStringLiteral("PAUZA — oczekiwanie na świeży sygnał i nacisk w strefie neutralnej 10–30%");
     painter.drawText(footer, Qt::AlignCenter, m_status.isEmpty() ? state : m_status);
 
