@@ -269,6 +269,10 @@ void PongGame::adaptToSize()
     m_rightPaddle = QRectF(newSize.width() - m_paddleMargin - m_paddleWidth,
                            m_rightPaddleY, m_paddleWidth, m_paddleHeight);
     m_lastSize = newSize;
+    // A resize changes the coordinate space; do not interpolate across it.
+    m_previousBallPos = m_ballPos;
+    m_previousLeftPaddleY = m_leftPaddleY;
+    m_previousRightPaddleY = m_rightPaddleY;
 }
 
 void PongGame::resizeEvent(QResizeEvent *event)
@@ -281,6 +285,7 @@ void PongGame::resizeEvent(QResizeEvent *event)
 void PongGame::resetBall(int horizontalDirection)
 {
     m_ballPos = QPointF(width() / 2.0, height() / 2.0);
+    m_previousBallPos = m_ballPos;
     const int direction = horizontalDirection == 0
         ? (QRandomGenerator::global()->bounded(2) == 0 ? -1 : 1)
         : (horizontalDirection < 0 ? -1 : 1);
