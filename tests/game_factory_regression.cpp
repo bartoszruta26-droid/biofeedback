@@ -236,6 +236,19 @@ int main(int argc, char **argv)
         game->resize(640, 480);
         game->start();
         REQUIRE(game->isRunning());
+
+        // Exercise every registered game at common desktop and HD aspect ratios.
+        // Resizing must not stop the session or invalidate the game instance.
+        const QSize motionTestSizes[] = {
+            QSize(640, 480), QSize(1280, 720),
+            QSize(1920, 1080), QSize(2560, 1440), QSize(640, 480)
+        };
+        for (const QSize& testSize : motionTestSizes) {
+            game->resize(testSize);
+            waitForEvents(8);
+            REQUIRE(game->isRunning());
+        }
+
         game->handleSensorInput(25.0);
         waitForEvents(35);
         game->pause();
