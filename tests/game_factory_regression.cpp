@@ -523,7 +523,8 @@ int main(int argc, char **argv)
     craneDelivery->handleSensorInput(0.0);
     waitForEvents(80);
     REQUIRE(craneDelivery->deliveredLoads() == 1);
-    REQUIRE(craneDelivery->getScore() > 0);
+    REQUIRE(craneDelivery->lastPrecisionBonus() > 0);
+    REQUIRE(craneDelivery->getScore() >= 110 + craneDelivery->lastPrecisionBonus());
     craneDelivery->stop();
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
