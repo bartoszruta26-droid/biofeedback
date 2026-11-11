@@ -446,13 +446,29 @@ void RhythmForceGame::render(QPainter &painter)
     }
 
     const QRectF forceTrack(margin, h * 0.73, w - 2.0 * margin, 12);
-    painter.setBrush(QColor(40, 50, 72));
+    painter.setPen(QPen(QColor(93, 130, 165, 150), 1));
+    painter.setBrush(QColor(22, 34, 54));
     painter.drawRoundedRect(forceTrack, 6, 6);
+    const double target = nextTargetForcePercent();
+    const double targetLow = qBound(0.0, target - kPulseStrengthTolerance, 100.0);
+    const double targetHigh = qBound(0.0, target + kPulseStrengthTolerance, 100.0);
+    const QRectF targetBand(forceTrack.left() + forceTrack.width() * targetLow / 100.0,
+                            forceTrack.top(),
+                            forceTrack.width() * (targetHigh - targetLow) / 100.0,
+                            forceTrack.height());
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(87, 208, 170, 82));
+    painter.drawRoundedRect(targetBand, 5, 5);
     const double force = m_hasSensorSample && m_inputAge <= kSignalTimeoutSeconds
         ? qBound(0.0, m_lastForce / 100.0, 1.0) : 0.0;
     painter.setBrush(m_pulseActive ? QColor(255, 170, 75) : QColor(90, 190, 150));
     painter.drawRoundedRect(QRectF(forceTrack.left(), forceTrack.top(),
         forceTrack.width() * force, forceTrack.height()), 6, 6);
+    const double targetMarker = forceTrack.left() + forceTrack.width() * target / 100.0;
+    painter.setPen(QPen(QColor(255, 226, 137), 2));
+    painter.drawLine(QPointF(targetMarker, forceTrack.top() - 4),
+                     QPointF(targetMarker, forceTrack.bottom() + 4));
+    painter.setPen(Qt::NoPen);
 
     painter.setPen(QColor(215, 225, 240));
     painter.setFont(QFont(QStringLiteral("Sans Serif"), hudSize));
