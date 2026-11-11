@@ -46,7 +46,7 @@ Gry, które w tej iteracji przejęły interpolację stanu ruchu:
 - Mario — postać, przesuw świata, przeszkody, przeciwnicy, przedmioty i chmurki;
 - Scorched Earth — pociski.
 
-Pozostałe gry nadal korzystają z domyślnego renderowania. Nie należy uznawać migracji całego katalogu za zakończoną. Następne do migracji i testów są przede wszystkim Galaga, Flappy Bird, Car Race, Precision Crane, Balance Tower i Force Maze.
+Pozostałe gry nadal korzystają z domyślnego renderowania. Nie należy uznawać migracji całego katalogu za zakończoną.
 
 ## Ograniczenia weryfikacji etapu 2
 
@@ -57,6 +57,14 @@ Dalsza część etapu 2:
 - Flappy Bird — interpolowana pozycja ptaka i ruch przeszkód; własny paintEvent w trakcie gry przekazuje renderowanie do wspólnego silnika.
 - Car Race — interpolowana pozycja pojazdu, przeszkody, przewijanie drogi i pozycja wizualna pasa.
 - Reaction Force — interpolowany zegar wizualny; własny paintEvent korzysta z tego samego współczynnika prezentacji.
-- Mario — własny paintEvent został podłączony do interpolowanego renderera; interpolacja nie jest omijana przez niestandardową ścieżkę malowania.
+- Mario — własny paintEvent został podłączony do interpolowanego renderera.
+- Force Maze — interpolowana pozycja gracza, postęp tunelu, czas wizualny i drganie kamery.
+- Balance Tower — interpolowana pozycja celu, przechylenie, stabilność i zegar animacji.
+- Precision Crane — interpolowane położenie wózka, haka, kołysanie ładunku i faza przeszkód.
 
 Wszystkie wymienione migrowane gry zachowują oryginalne wejście czujnika i logikę symulacji. Przy zmianie rozmiaru lub restarcie migrowane stany poprzednie są synchronizowane z bieżącymi, aby uniknąć interpolacji przez różne układy współrzędnych.
+
+
+## Etap 3 — kolejne gry
+
+W tej iteracji migrację rozszerzono o Force Maze, Balance Tower i Precision Crane. Do migracji pozostają Galaga, Sin, Tan i Rhythm Force. Konieczna jest też kontrola wszystkich skalowań fizyki i kolizji, ponieważ interpolacja renderowania sama w sobie nie naprawia błędnej prędkości ani przenikania przez przeszkody.
