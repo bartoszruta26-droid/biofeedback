@@ -744,7 +744,7 @@ void OutlineTab::setupUI()
     saveSeriesButton->setObjectName(QStringLiteral("saveForceSeries"));
     auto* savedSeriesCombo = new QComboBox(metricsPage);
     savedSeriesCombo->setObjectName(QStringLiteral("savedForceSeries"));
-    auto* compareSeriesButton = new QPushButton(tr("Porównaj zaznaczone serie"), metricsPage);
+    auto* compareSeriesButton = new QPushButton(tr("Porównaj z wybraną serią"), metricsPage);
     compareSeriesButton->setObjectName(QStringLiteral("compareForceSeries"));
     auto* overlay = new ForceOverlayWidget(metricsPage);
     overlay->setObjectName(QStringLiteral("forceSeriesOverlay"));
@@ -779,7 +779,7 @@ void OutlineTab::setupUI()
         for (const QJsonValue& value : all) {
             const QJsonObject item = value.toObject();
             const QString label = item.value(QStringLiteral("label")).toString();
-            if (!label.isEmpty()) savedSeriesCombo->addItem(label, item);
+            if (!label.isEmpty()) savedSeriesCombo->addItem(label, QString::fromUtf8(QJsonDocument(item).toJson(QJsonDocument::Compact)));
         }
     };
     loadSavedSeries();
@@ -842,7 +842,7 @@ void OutlineTab::setupUI()
             for (int i = 0; i < repetitions.size(); ++i)
                 selected.push_back({tr("Powtórzenie %1").arg(i + 1), repetitions[i]});
         }
-        const QJsonObject item = savedSeriesCombo->currentData().toJsonObject();
+        const QJsonObject item = QJsonDocument::fromJson(savedSeriesCombo->currentData().toString().toUtf8()).object();
         QVector<gui::DataPoint> savedSamples;
         if (!item.isEmpty()) {
             const QString storedPatient = item.value(QStringLiteral("patient_uuid")).toString();
@@ -897,7 +897,7 @@ void OutlineTab::setupUI()
                                    .arg(selected.size()));
         }
     });
-    analysisTabs->addTab(new QLabel(tr("W kolejnych iteracjach można rozszerzyć archiwum o segmentację serii i automatyczne raporty trendów."), analysisTabs),
+    analysisTabs->addTab(new QLabel(tr("Archiwum przechowuje do 100 przebiegów. Porównuj próby wykonane tym samym protokołem, przy tej samej kalibracji i ustawieniu czujnika."), analysisTabs),
                          tr("Informacje"));
     graphLayout->addWidget(analysisTabs);
     connect(timeRangeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
