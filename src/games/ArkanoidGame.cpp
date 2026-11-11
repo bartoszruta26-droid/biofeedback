@@ -3,23 +3,29 @@
 #include <QPen>
 #include <QBrush>
 #include <QFont>
-#include <QKeyEvent>
+#include <QResizeEvent>
 #include <QtMath>
 #include <algorithm>
 #include <cmath>
 #include <utility>
 namespace games {
-ArkanoidGame::ArkanoidGame(QWidget *parent) : GameEngine(parent), m_currentForce(0.5), m_ballRadius(8.0), m_ballSpeed(280.0), m_paddleWidth(130.0), m_paddleHeight(14.0), m_difficultyLevel(1), m_level(1), m_lives(3) { setFocusPolicy(Qt::StrongFocus); }
+ArkanoidGame::ArkanoidGame(QWidget *parent) : GameEngine(parent), m_currentForce(0.5), m_ballRadius(8.0), m_ballSpeed(245.0), m_paddleWidth(130.0), m_paddleHeight(14.0), m_difficultyLevel(1), m_level(1), m_lives(3) { setFocusPolicy(Qt::NoFocus); }
 QString ArkanoidGame::gameName() const { return QStringLiteral("Arkanoid Force Trainer"); }
 void ArkanoidGame::initialize() {
- m_level=1; m_lives=3; m_currentForce=0.5; m_moveLeft=false; m_moveRight=false; m_combo=0; m_comboRemaining=0.0; m_ballTrail.clear(); setDifficultyLevel(m_difficultyLevel);
+ m_level=1; m_lives=3; m_currentForce=0.5; m_combo=0; m_comboRemaining=0.0; m_ballTrail.clear(); setDifficultyLevel(m_difficultyLevel);
  const double availableWidth=qMax(40.0,static_cast<double>(width())-20.0);
  m_paddleWidth=qMin(m_paddleWidth,availableWidth);
  m_paddle=QRectF((width()-m_paddleWidth)/2.0,height()-42.0,m_paddleWidth,m_paddleHeight);
  buildLevel(); resetBall();
 }
 void ArkanoidGame::setDifficultyLevel(int level) {
- m_difficultyLevel=qBound(1,level,5); m_ballSpeed=240.0+m_difficultyLevel*40.0; m_paddleWidth=154.0-m_difficultyLevel*12.0; setScore(0);
+ m_difficultyLevel=qBound(1,level,5);
+ const double scaleX=qMax(0.5,width()/640.0), scaleY=qMax(0.5,height()/480.0);
+ m_ballSpeed=(205.0+m_difficultyLevel*25.0)*scaleX;
+ m_ballRadius=6.0*qMin(scaleX,scaleY);
+ m_paddleWidth=qBound(112.0*scaleX,width()*(0.22-0.008*(m_difficultyLevel-1)),160.0*scaleX);
+ m_paddleHeight=14.0*scaleY;
+ setScore(0);
  if(!m_paddle.isNull()){const double aw=qMax(40.0,static_cast<double>(width())-20.0);m_paddle.setWidth(qMin(m_paddleWidth,aw));m_paddle.moveLeft(qBound(10.0,m_paddle.left(),qMax(10.0,static_cast<double>(width())-10.0-m_paddle.width())));}
  if(isRunning()){m_level=1;m_lives=3;m_combo=0;m_comboRemaining=0.0;buildLevel();resetBall();}
 }
@@ -30,32 +36,41 @@ void ArkanoidGame::setSerialConnection(std::shared_ptr<sensor::SerialCommunicati
 void ArkanoidGame::disconnectSerial(){m_serialPort.reset();}
 bool ArkanoidGame::isSerialConnected() const{return m_serialPort&&m_serialPort->isConnected();}
 bool ArkanoidGame::handleInput(double value){if(!std::isfinite(value))return false;m_currentForce=qBound(MIN_FORCE,value/MAX_FORCE,1.0);return true;}
-void ArkanoidGame::keyPressEvent(QKeyEvent *event){
- if(event->isAutoRepeat()){event->accept();return;}
- if(event->key()==Qt::Key_Left||event->key()==Qt::Key_A){m_moveLeft=true;event->accept();return;}
- if(event->key()==Qt::Key_Right||event->key()==Qt::Key_D){m_moveRight=true;event->accept();return;}
- QWidget::keyPressEvent(event);
-}
-void ArkanoidGame::keyReleaseEvent(QKeyEvent *event){
- // Auto-repeat release events are part of the operating system's key-repeat
- // sequence, not a physical key-up. Ignore them to avoid intermittent stops.
- if(event->isAutoRepeat()){event->accept();return;}
- if(event->key()==Qt::Key_Left||event->key()==Qt::Key_A){m_moveLeft=false;event->accept();return;}
- if(event->key()==Qt::Key_Right||event->key()==Qt::Key_D){m_moveRight=false;event->accept();return;}
- QWidget::keyReleaseEvent(event);
+void ArkanoidGame::resizeEvent(QResizeEvent *event) {
+ const QSize oldSize=event->oldSize(), newSize=event->size();
+ if(newSize.width()>0&&newSize.height()>0) {
+  const double sx=oldSize.width()>0?static_cast<double>(newSize.width())/oldSize.width():newSize.width()/640.0;
+  const double sy=oldSize.height()>0?static_cast<double>(newSize.height())/oldSize.height():newSize.height()/480.0;
+  if(oldSize.width()>0&&oldSize.height()>0) {
+   m_ballPosition=QPointF(m_ballPosition.x()*sx,m_ballPosition.y()*sy);
+   m_ballVelocity=QPointF(m_ballVelocity.x()*sx,m_ballVelocity.y()*sy);
+   for(Brick& brick:m_bricks)
+    brick.rect=QRectF(brick.rect.x()*sx,brick.rect.y()*sy,brick.rect.width()*sx,brick.rect.height()*sy);
+  }
+  const double scaleX=qMax(0.5,newSize.width()/640.0), scaleY=qMax(0.5,newSize.height()/480.0);
+  m_ballRadius=6.0*qMin(scaleX,scaleY);
+  m_paddleWidth=qBound(112.0*scaleX,newSize.width()*(0.22-0.008*(m_difficultyLevel-1)),160.0*scaleX);
+  m_paddleHeight=14.0*scaleY;
+  const double paddleX=qBound(10.0,m_paddle.center().x()*sx,newSize.width()-10.0-m_paddleWidth);
+  m_paddle=QRectF(paddleX-m_paddleWidth/2.0,newSize.height()-42.0*scaleY-m_paddleHeight,m_paddleWidth,m_paddleHeight);
+  if(oldSize.width()<=0||oldSize.height()<=0) buildLevel();
+ }
+ GameEngine::resizeEvent(event);
 }
 void ArkanoidGame::buildLevel(){
  m_bricks.clear();if(width()<=0||height()<=120)return;
- constexpr int columns=8;const int rows=qBound(4,4+(m_level-1)/2,7);const double margin=24.0,gap=6.0,brickHeight=18.0,totalGap=gap*(columns-1);
- const double brickWidth=qMax(12.0,(width()-2.0*margin-totalGap)/columns);
- for(int row=0;row<rows;++row)for(int column=0;column<columns;++column){Brick b;b.rect=QRectF(margin+column*(brickWidth+gap),58.0+row*(brickHeight+gap),brickWidth,brickHeight);b.row=row;b.hits=(m_level>=3&&row==0)?2:1;b.active=true;m_bricks.push_back(b);}
+ const double scaleX=qMax(0.5,width()/640.0),scaleY=qMax(0.5,height()/480.0);
+ constexpr int columns=8;const int rows=qBound(4,4+(m_level-1)/2,7);
+ const double margin=24.0*scaleX,gap=6.0*scaleX,brickHeight=18.0*scaleY,totalGap=gap*(columns-1);
+ const double brickWidth=qMax(12.0*scaleX,(width()-2.0*margin-totalGap)/columns);
+ for(int row=0;row<rows;++row)for(int column=0;column<columns;++column){Brick b;b.rect=QRectF(margin+column*(brickWidth+gap),58.0*scaleY+row*(brickHeight+gap),brickWidth,brickHeight);b.row=row;b.hits=(m_level>=3&&row==0)?2:1;b.active=true;m_bricks.push_back(b);}
 }
 void ArkanoidGame::resetBall(){
  m_ballPosition=QPointF(m_paddle.center().x(),m_paddle.top()-m_ballRadius-1.0);const double horizontal=m_ballSpeed*0.30;
  const double vertical=std::sqrt(qMax(0.0,m_ballSpeed*m_ballSpeed-horizontal*horizontal));m_ballVelocity=QPointF(horizontal,-vertical);m_ballTrail.clear();
 }
 bool ArkanoidGame::hasActiveBricks() const{return std::any_of(m_bricks.cbegin(),m_bricks.cend(),[](const Brick& b){return b.active;});}
-void ArkanoidGame::advanceLevel(){++m_level;m_ballSpeed=qMin(m_ballSpeed*1.06,800.0);m_combo=0;m_comboRemaining=0.0;addScore(100);buildLevel();resetBall();}
+void ArkanoidGame::advanceLevel(){++m_level;const double scaleX=qMax(0.5,width()/640.0);m_ballSpeed=qMin(m_ballSpeed*1.025,560.0*scaleX);m_combo=0;m_comboRemaining=0.0;addScore(100);buildLevel();resetBall();}
 void ArkanoidGame::update(double dt){
  if(!isRunning()||!std::isfinite(dt)||dt<=0.0||width()<=0||height()<=0)return;
  dt=qMin(dt,0.1);constexpr double maxStep=1.0/120.0;const int steps=qBound(1,static_cast<int>(std::ceil(dt/maxStep)),12);const double step=dt/steps;
@@ -65,8 +80,8 @@ void ArkanoidGame::updatePhysicsStep(double dt){
  if(!isRunning()||width()<=0||height()<=0)return;
  const double maxX=qMax(10.0,static_cast<double>(width())-10.0-m_paddle.width());
  const double sensorX=10.0+m_currentForce*qMax(0.0,static_cast<double>(width())-20.0-m_paddle.width());
- if(m_moveLeft||m_moveRight){const double dir=(m_moveRight?1.0:0.0)-(m_moveLeft?1.0:0.0);m_paddle.moveLeft(qBound(10.0,m_paddle.left()+dir*560.0*dt,maxX));}
- else { const double deltaTime = dt; const double alpha = 1.0 - std::exp(-deltaTime / 0.025); m_paddle.moveLeft(qBound(10.0, m_paddle.left() + (sensorX - m_paddle.left()) * alpha, maxX)); }
+ const double alpha=1.0-std::exp(-dt/0.045);
+ m_paddle.moveLeft(qBound(10.0,m_paddle.left()+(sensorX-m_paddle.left())*alpha,maxX));
  if(m_comboRemaining>0.0){m_comboRemaining=qMax(0.0,m_comboRemaining-dt);if(m_comboRemaining<=0.0)m_combo=0;}
  const QPointF previous=m_ballPosition;m_ballPosition+=m_ballVelocity*dt;m_ballTrail.push_front(m_ballPosition);while(m_ballTrail.size()>7)m_ballTrail.removeLast();
  if(m_ballPosition.x()-m_ballRadius<0){m_ballPosition.setX(m_ballRadius);m_ballVelocity.setX(std::abs(m_ballVelocity.x()));}
@@ -102,7 +117,7 @@ void ArkanoidGame::render(QPainter& p){
  p.setBrush(Qt::white);p.drawEllipse(m_ballPosition,m_ballRadius,m_ballRadius);p.setPen(Qt::white);p.setFont(QFont(QStringLiteral("Arial"),14,QFont::Bold));
  p.drawText(18,28,QStringLiteral("Wynik: %1").arg(getScore()));p.drawText(18,50,QStringLiteral("Poziom: %1").arg(m_level));p.drawText(width()-130,28,QStringLiteral("Życia: %1").arg(m_lives));
  if(m_combo>=2){p.setPen(QColor(255,220,100));p.drawText(width()/2-65,28,QStringLiteral("SERIA x%1").arg(qBound(1,1+(m_combo-1)/4,5)));}
- p.setPen(QColor(185,205,225));p.setFont(QFont(QStringLiteral("Arial"),9));p.drawText(18,height()-12,QStringLiteral("Czujnik: nacisk | Klawiatura: A/D lub ←/→"));p.drawText(width()-150,height()-12,QStringLiteral("Trudność: %1").arg(m_difficultyLevel));
+ p.setPen(QColor(185,205,225));p.setFont(QFont(QStringLiteral("Arial"),9));p.drawText(18,height()-12,QStringLiteral("Tensometr: położenie paletki"));p.drawText(width()-150,height()-12,QStringLiteral("Trudność: %1").arg(m_difficultyLevel));
  if(m_serialPort&&!m_serialPort->isConnected()){p.setPen(Qt::red);p.setFont(QFont(QStringLiteral("Arial"),12,QFont::Bold));p.drawText(rect(),Qt::AlignTop|Qt::AlignHCenter,QStringLiteral("BRAK POŁĄCZENIA Z CZUJNIKIEM"));}
 }
 } // namespace games
