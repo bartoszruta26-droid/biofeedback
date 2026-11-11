@@ -4,6 +4,7 @@
 #include "games/GameEngine.hpp"
 #include <QPointF>
 #include <QRectF>
+#include <QVector>
 
 namespace games {
 
@@ -13,6 +14,7 @@ class PrecisionCraneGame final : public GameEngine
 
 public:
     enum ControlAxis { HorizontalAxis = 0, VerticalAxis = 1 };
+    enum CargoType { LightCargo = 0, StandardCargo = 1, HeavyCargo = 2 };
 
     explicit PrecisionCraneGame(QWidget *parent = nullptr);
     QString gameName() const override;
@@ -24,6 +26,16 @@ public:
     int deliveredLoads() const { return m_delivered; }
     int mistakesRemaining() const { return m_mistakesRemaining; }
     int lastPrecisionBonus() const { return m_lastPrecisionBonus; }
+    CargoType cargoType() const { return m_cargoType; }
+    double cargoMassKg() const { return m_cargoMassKg; }
+    int missionNumber() const { return m_missionIndex + 1; }
+    int missionDeliveriesRemaining() const { return qMax(0, 3 - (m_delivered % 3)); }
+    bool campaignCompleted() const { return m_campaignCompleted; }
+    int obstacleCount() const { return 2; }
+    int collisionCount() const { return m_collisionCount; }
+    int bestScore() const { return m_bestScore; }
+    int precisionSamples() const { return m_precisionSamples; }
+    double averagePrecision() const { return m_precisionSamples > 0 ? m_precisionTotal / m_precisionSamples : 0.0; }
     double carriagePosition() const { return m_carriageX; }
     double hookPosition() const { return m_hookY; }
     double normalizedForce() const { return m_force; }
@@ -47,7 +59,13 @@ private:
     static constexpr double kMinimumControlForce = 0.18;
     static constexpr double kMaximumControlForce = 0.70;
 
+    struct MovingObstacle { double y; double width; double height; double speed; double phase; };
     void resetRound();
+    QRectF obstacleRect(int index) const;
+    bool checkObstacleCollision();
+    void configureCargo();
+    void loadRecords();
+    void saveRecords();
     void processGesture();
     void toggleGrip();
     void deliverOrDropLoad();
@@ -66,6 +84,10 @@ private:
     double m_swayVelocity;
     double m_previousCarriageX;
     double m_trolleyVelocity;
+    double m_cargoMassKg;
+    double m_ropeLength;
+    double m_precisionTotal;
+    double m_obstacleClock;
     double m_cargoX;
     double m_targetX;
     double m_targetWidth;
@@ -74,6 +96,13 @@ private:
     int m_mistakesRemaining;
     int m_lastPrecisionBonus;
     int m_combo;
+    int m_missionIndex;
+    int m_collisionCount;
+    int m_bestScore;
+    int m_precisionSamples;
+    CargoType m_cargoType;
+    bool m_campaignCompleted;
+    QVector<MovingObstacle> m_obstacles;
     ControlAxis m_axis;
     bool m_gestureActive;
     bool m_loadAttached;
