@@ -44,6 +44,7 @@ void ArkanoidGame::resizeEvent(QResizeEvent *event) {
   if(oldSize.width()>0&&oldSize.height()>0) {
    m_ballPosition=QPointF(m_ballPosition.x()*sx,m_ballPosition.y()*sy);
    m_ballVelocity=QPointF(m_ballVelocity.x()*sx,m_ballVelocity.y()*sy);
+   m_ballSpeed*=qMin(sx,sy);
    for(Brick& brick:m_bricks)
     brick.rect=QRectF(brick.rect.x()*sx,brick.rect.y()*sy,brick.rect.width()*sx,brick.rect.height()*sy);
   }
@@ -54,6 +55,7 @@ void ArkanoidGame::resizeEvent(QResizeEvent *event) {
   const double paddleX=qBound(10.0,m_paddle.center().x()*sx,newSize.width()-10.0-m_paddleWidth);
   m_paddle=QRectF(paddleX-m_paddleWidth/2.0,newSize.height()-42.0*scaleY-m_paddleHeight,m_paddleWidth,m_paddleHeight);
   if(oldSize.width()<=0||oldSize.height()<=0) buildLevel();
+  m_ballSpeed=(205.0+m_difficultyLevel*25.0)*scaleX;
  }
  GameEngine::resizeEvent(event);
 }
