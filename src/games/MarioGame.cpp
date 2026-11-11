@@ -179,6 +179,8 @@ void MarioGame::resetLevel()
     m_obstacles.clear();
     m_collectibles.clear();
     m_enemies.clear();
+    m_worldDistance = 0.0;
+    m_animationTime = 0.0;
     m_enemySpawnTimer = 0.0;
     m_obstaclesPassed = 0;
     m_timeSinceLastObstacle = 0.0;
@@ -720,6 +722,7 @@ void MarioGame::renderCollectibles(QPainter& painter)
                              QPointF(r.center().x(), r.bottom() - 4.0));
         } else {
             const QPointF c = r.center();
+            painter.save();
             painter.translate(c);
             painter.rotate(std::sin(item.phase) * 8.0);
             painter.translate(-c);
@@ -733,6 +736,7 @@ void MarioGame::renderCollectibles(QPainter& painter)
             painter.setPen(QPen(QColor(0x1A, 0x66, 0xB3), 1.5));
             painter.setBrush(QColor(0x6D, 0xE8, 0xFF));
             painter.drawPolygon(star);
+            painter.restore();
         }
     }
     painter.restore();
@@ -926,6 +930,11 @@ void MarioGame::renderObstacles(QPainter& painter)
                 painter.fillRect(tile, depth > 0.55 ? QColor(0x8A, 0x37, 0x12) : QColor(0xA0, 0x30, 0x00));
         }
     }
+    // Keep the entire opening clear after grass and texture have been painted.
+    for (const auto& obs : m_obstacles) {
+        if (obs.type == Obstacle::GAP)
+            painter.fillRect(obs.rect, QColor(0x12, 0x20, 0x32));
+    }
 }
 
 void MarioGame::renderBackground(QPainter& painter)
@@ -947,8 +956,8 @@ void MarioGame::renderBackground(QPainter& painter)
     painter.setBrush(QColor(0xFF, 0xE6, 0x75));
     painter.drawRect(sunRect);
 
-    renderClouds(painter);
     renderParallaxBackground(painter);
+    renderClouds(painter);
 }
 
 void MarioGame::renderClouds(QPainter& painter)
