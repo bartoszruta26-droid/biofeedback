@@ -10,6 +10,10 @@
 #include "games/ScorchedEarthGame.hpp"
 #include "games/PrecisionCraneGame.hpp"
 #include <QApplication>
+#include <QTemporaryDir>
+#include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QEventLoop>
 #include <QTimer>
 #include <QKeyEvent>
@@ -19,6 +23,33 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+
+namespace games {
+struct PrecisionCraneGameTestAccess
+{
+    static bool collideWithFirstObstacle(PrecisionCraneGame& game)
+    {
+        game.m_obstacleClock = 0.0;
+        const QRectF obstacle = game.obstacleRect(0);
+        game.configureCargo();
+        game.m_loadAttached = true;
+        game.m_sway = 0.0;
+        game.m_carriageX = obstacle.center().x();
+        game.m_hookY = obstacle.top() - 18.0;
+        return game.processObstacleCollision();
+    }
+
+    static void deliverAtTarget(PrecisionCraneGame& game)
+    {
+        game.configureCargo();
+        game.m_loadAttached = true;
+        game.m_sway = 0.0;
+        game.m_carriageX = game.targetRect().center().x();
+        game.m_hookY = game.floorY() - game.cargoRect().height() - 18.0;
+        game.deliverOrDropLoad();
+    }
+};
+} // namespace games
 
 #define REQUIRE(condition) do { \
     if (!(condition)) { \
@@ -611,6 +642,78 @@ int main(int argc, char **argv)
     REQUIRE(craneDelivery->missionDeliveriesRemaining() == 3);
     REQUIRE(craneDelivery->precisionSamples() == 3);
     craneDelivery->stop();
+
+    // Deterministic collision regression: place the suspended cargo at the
+    // first container's analytically known position at simulation time zero.
+    QTemporaryDir collisionRecords;
+    REQUIRE(collisionRecords.isValid());
+    {
+        games::PrecisionCraneGame collisionGame(
+            nullptr, collisionRecords.filePath(QStringLiteral("records.json")));
+        collisionGame.resize(640, 480);
+        collisionGame.start();
+        REQUIRE(games::PrecisionCraneGameTestAccess::collideWithFirstObstacle(collisionGame));
+        REQUIRE(collisionGame.collisionCount() == 1);
+        REQUIRE(collisionGame.lifetimeCollisions() == 1);
+        REQUIRE(collisionGame.mistakesRemaining() == 2);
+        REQUIRE(!collisionGame.loadAttached());
+        REQUIRE(collisionGame.deliveredLoads() == 0);
+        collisionGame.stop();
+    }
+
+    // Exercise all 15 campaign deliveries without wall-clock sleeps. The
+    // test positions the load in a physically valid target pose and invokes
+    // the same production delivery transition used by the short gesture.
+    QTemporaryDir campaignRecords;
+    REQUIRE(campaignRecords.isValid());
+    const QString campaignPath = campaignRecords.filePath(QStringLiteral("precision_crane_records.json"));
+    int completedMissions = 0;
+    {
+        games::PrecisionCraneGame campaign(nullptr, campaignPath);
+        campaign.resize(640, 480);
+        campaign.start();
+        REQUIRE(campaign.missionNumber() == 1);
+        for (int delivery = 1; delivery <= 15; ++delivery) {
+            const int missionBefore = campaign.missionNumber();
+            games::PrecisionCraneGameTestAccess::deliverAtTarget(campaign);
+            REQUIRE(campaign.deliveredLoads() == delivery);
+            REQUIRE(campaign.precisionSamples() == delivery);
+            REQUIRE(campaign.lifetimeDeliveries() == delivery);
+            if (delivery % 3 == 0 && delivery < 15) {
+                REQUIRE(campaign.missionNumber() == missionBefore + 1);
+                ++completedMissions;
+            }
+            if (delivery < 15) {
+                REQUIRE(campaign.isRunning());
+                REQUIRE(campaign.missionDeliveriesRemaining() ==
+                        (delivery % 3 == 0 ? 3 : 3 - (delivery % 3)));
+            }
+        }
+        REQUIRE(completedMissions == 4);
+        REQUIRE(campaign.campaignCompleted());
+        REQUIRE(campaign.deliveredLoads() == 15);
+        REQUIRE(campaign.missionNumber() == 5);
+        REQUIRE(campaign.missionDeliveriesRemaining() == 0);
+        REQUIRE(!campaign.isRunning());
+        REQUIRE(campaign.lifetimePrecisionSamples() == 15);
+        REQUIRE(campaign.bestScore() == campaign.getScore());
+    }
+
+    // A new game instance simulates an application restart and must restore
+    // cumulative counters and best score from the same atomically-written file.
+    {
+        games::PrecisionCraneGame restored(nullptr, campaignPath);
+        restored.resize(640, 480);
+        restored.start();
+        REQUIRE(restored.lifetimeDeliveries() == 15);
+        REQUIRE(restored.lifetimePrecisionSamples() == 15);
+        REQUIRE(restored.lifetimeCollisions() == 0);
+        REQUIRE(restored.bestScore() > 0);
+        REQUIRE(!restored.campaignCompleted());
+        REQUIRE(restored.deliveredLoads() == 0);
+        REQUIRE(restored.missionNumber() == 1);
+        restored.stop();
+    }
 
     REQUIRE(games::createGame(QStringLiteral("unknown-game")) == nullptr);
     return 0;
