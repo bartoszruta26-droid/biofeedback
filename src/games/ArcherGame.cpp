@@ -14,8 +14,8 @@ ArcherGame::ArcherGame(QWidget *parent)
     , m_aimAngle(-0.2)
     , m_targetDirection(1.0)
     , m_targetSpeed(55.0)
-    , m_gravity(520.0)
-    , m_fireCooldown(0.0)
+    , m_gravity(260.0)
+    , m_fireCooldown(2.4)
 {
     setFocusPolicy(Qt::StrongFocus);
 }
@@ -37,9 +37,10 @@ void ArcherGame::initialize()
     m_force = 0.5;
     m_aimAngle = -0.2;
     m_targetDirection = 1.0;
-    m_targetSpeed = 55.0;
-    m_gravity = 520.0;
-    m_fireCooldown = 0.0;
+    const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+    m_targetSpeed = 55.0 * scale;
+    m_gravity = 260.0 * scale;
+    m_fireCooldown = m_autoFireInterval;
     m_shotsFired = 0;
     m_successfulHits = 0;
     m_missedShots = 0;
@@ -91,8 +92,9 @@ void ArcherGame::fireArrow()
 {
     if (!isRunning() || m_fireCooldown > 0.0)
         return;
-    const QPointF origin(72.0, height() - 72.0);
-    constexpr double speed = 620.0;
+    const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+    const QPointF origin(width() * 0.11, height() * 0.85);
+    const double speed = 780.0 * scale;
     Arrow arrow;
     arrow.position = origin;
     arrow.velocity = QPointF(std::cos(m_aimAngle) * speed,
@@ -110,34 +112,16 @@ void ArcherGame::fireArrow()
     m_fireCooldown = 0.32;
 }
 
-void ArcherGame::keyPressEvent(QKeyEvent* event)
-{
-    if (event->key() == Qt::Key_Space) {
-        if (!event->isAutoRepeat()) fireArrow();
-        event->accept();
-    } else if (event->key() == Qt::Key_Up || event->key() == Qt::Key_W) {
-        m_aimUp = true; event->accept();
-    } else if (event->key() == Qt::Key_Down || event->key() == Qt::Key_S) {
-        m_aimDown = true; event->accept();
-    } else GameEngine::keyPressEvent(event);
-}
-
-void ArcherGame::keyReleaseEvent(QKeyEvent* event)
-{
-    if (event->isAutoRepeat()) { event->accept(); return; }
-    if (event->key() == Qt::Key_Up || event->key() == Qt::Key_W) {
-        m_aimUp = false; event->accept();
-    } else if (event->key() == Qt::Key_Down || event->key() == Qt::Key_S) {
-        m_aimDown = false; event->accept();
-    } else GameEngine::keyReleaseEvent(event);
-}
-
 void ArcherGame::update(double deltaTime)
 {
     if (!isRunning() || !std::isfinite(deltaTime) || deltaTime <= 0.0)
         return;
     deltaTime = qMin(deltaTime, 0.1);
-    m_fireCooldown = qMax(0.0, m_fireCooldown - deltaTime);
+    m_fireCooldown -= deltaTime;
+    if (m_fireCooldown <= 0.0) {
+        fireArrow();
+        m_fireCooldown = m_autoFireInterval;
+    }
     const double aimDirection = (m_aimDown ? 1.0 : 0.0) - (m_aimUp ? 1.0 : 0.0);
     m_aimAngle = qBound(-1.25, m_aimAngle + aimDirection * 1.35 * deltaTime, 0.85);
 
@@ -192,11 +176,13 @@ void ArcherGame::update(double deltaTime)
 void ArcherGame::render(QPainter& painter)
 {
     painter.fillRect(rect(), QColor(28, 42, 34));
-    painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(QColor(130, 95, 55), 7));
-    painter.drawLine(QPointF(72.0, height() - 72.0),
-                     QPointF(72.0 + std::cos(m_aimAngle) * 54.0,
-                             height() - 72.0 + std::sin(m_aimAngle) * 54.0));
+    painter.setRenderHint(QPainter::Antialiasing, false);
+    const double scale = qMax(0.5, qMin(width() / 640.0, height() / 480.0));
+    const QPointF origin(width() * 0.11, height() * 0.85);
+    painter.setPen(QPen(QColor(130, 95, 55), 7.0 * scale));
+    painter.drawLine(origin,
+                     QPointF(origin.x() + std::cos(m_aimAngle) * 54.0 * scale,
+                             origin.y() + std::sin(m_aimAngle) * 54.0 * scale));
 
     painter.setPen(QPen(QColor(235, 225, 190), 2));
     painter.setBrush(QColor(210, 70, 65));
@@ -222,8 +208,8 @@ void ArcherGame::render(QPainter& painter)
     painter.drawText(14, 68, QStringLiteral("Strzały: %1 | Trafienia: %2 | Pudła: %3")
         .arg(m_shotsFired).arg(m_successfulHits).arg(m_missedShots));
     painter.drawText(width() - 150, 24, QStringLiteral("W locie: %1").arg(activeArrowCount()));
-    const QPointF origin(72.0, height() - 72.0);
-    const QPointF initialVelocity(std::cos(m_aimAngle) * 620.0, std::sin(m_aimAngle) * 620.0);
+    const QPointF initialVelocity(std::cos(m_aimAngle) * 780.0 * scale,
+                                  std::sin(m_aimAngle) * 780.0 * scale);
     painter.setPen(Qt::NoPen);
     painter.setBrush(QColor(245, 235, 190, 145));
     for (int i = 1; i <= 18; ++i) {
@@ -235,7 +221,8 @@ void ArcherGame::render(QPainter& painter)
     }
     painter.setFont(QFont(QStringLiteral("Arial"), 10));
     painter.drawText(14, height() - 12,
-        QStringLiteral("Czujnik: kąt | W/↑: podnieś | S/↓: obniż | SPACJA: strzał"));
+        QStringLiteral("Tensometr: celowanie | Strzał automatyczny co %1 s")
+            .arg(m_autoFireInterval, 0, 'f', 1));
 }
 
 } // namespace games
