@@ -92,12 +92,16 @@
 
 ### 9. Galaga
 
-**Cel:** poruszaj statkiem, niszcz fale przeciwników i unikaj wrogich pocisków.
+**Cel:** steruj statkiem, niszcz kolejne formacje przeciwników, zbieraj ulepszenia i unikaj wrogiego ostrzału.
 
-- **Tensometr:** ustawia poziome położenie statku w obrębie planszy.
-- **Klawiatura:** `←` lub `A` — ruch w lewo; `→` lub `D` — ruch w prawo; przytrzymanie `SPACJI` — ciągły ogień.
-- **Wskaźniki:** wynik, numer fali i pozostałe życia.
-- **Wskazówka:** obserwuj położenie pocisków przeciwników i utrzymuj statek w takim miejscu, aby móc szybko zmienić kierunek.
+- **Tensometr:** ustawia poziome położenie statku w obrębie planszy. Wartość 0–100% odpowiada położeniu od lewej do prawej krawędzi.
+- **Klawiatura:** `←` lub `A` — ruch w lewo; `→` lub `D` — ruch w prawo; przytrzymanie `SPACJI` — ciągły ogień; `X` — jednorazowy impuls EMP.
+- **Impuls EMP:** usuwa wszystkie aktywne pociski przeciwników i zadaje jedno uszkodzenie każdemu aktywnemu przeciwnikowi. Na początku sesji dostępne są 2 ładunki; po ukończeniu fali przywracany jest 1 ładunek, maksymalnie do 4. Naciśnij `X` ponownie dopiero wtedy, gdy chcesz zużyć kolejny ładunek.
+- **Ulepszenia:** co piąty pokonany przeciwnik może pozostawić premię. Niebieska premia daje potrójny strzał, zielona uruchamia osłonę, a żółta zwiększa szybkostrzelność. Premie zbiera się przez zetknięcie statku z opadającym symbolem.
+- **Punktacja i seria:** kolejne eliminacje w krótkim odstępie zwiększają premię punktową. Seria wygasa po przerwie.
+- **Trudność:** następne fale zwiększają liczebność i wytrzymałość części przeciwników oraz tempo ostrzału. Ukończenie fali daje premię punktową i dodatkowy ładunek EMP.
+- **Ochrona:** po trafieniu statek otrzymuje krótką ochronę przed kolejnym uszkodzeniem. Zebrana osłona pochłania następne trafienie.
+- **Wskaźniki:** wynik, numer fali, życia, ładunki EMP, seria eliminacji i aktywne ulepszenie.
 
 ### 10. Scorched Earth
 
@@ -120,7 +124,7 @@
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
 | Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
 | Archer | kąt celowania 0–100% | przytrzymaj `W`/`↑` lub `S`/`↓` do płynnej korekty, `SPACJA` — strzał |
-| Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, przytrzymaj `SPACJĘ` |
+| Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, `SPACJA` — ogień, `X` — EMP |
 | Scorched Earth | kąt działa | `W`/`↑`, `S`/`↓`, `+`/`-`, `SPACJA` |
 
 ## Uwaga o wersjach i rozszerzeniach
