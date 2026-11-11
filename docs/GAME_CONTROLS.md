@@ -1,16 +1,16 @@
 # Instrukcja sterowania grami Biofeedback
 
-> Dokument opisuje sterowanie zaimplementowane w aktualnej gałęzi integracyjnej Biofeedback. Tensometr jest kontrolerem położenia/kąta w grach, które go obsługują; strzały w Archer i Scorched Earth są wyzwalane automatycznie przez zegar gry. Skróty klawiaturowe odnoszą się wyłącznie do gier, w których są jawnie wymienione.
+> Dokument opisuje sterowanie zaimplementowane w gałęzi main. Tensometr jest jedynym kontrolerem kierunkowym i pozycjonującym w grach, które go obsługują. Klawiatura może wyzwalać wyłącznie jawnie opisane działania lub ustawienia, a strzały w Archer i Scorched Earth są automatyczne.
 
 ## Zasady wspólne
 
 1. Wybierz grę w module treningowym i uruchom ją przyciskiem **Start**.
 2. Jeżeli gra korzysta z tensometru/HX711, podłącz urządzenie i sprawdź, czy aplikacja odbiera aktualne próbki. Wartość siły jest interpretowana zgodnie z mechaniką konkretnej gry — nie każda gra używa jej w ten sam sposób.
-3. Sterowanie klawiaturą działa, gdy widok gry ma fokus. Kliknij obszar gry, jeżeli klawisze nie reagują.
+3. Tensometr pozostaje jedynym wejściem kierunkowym. Klawisze wymienione w opisie gry uruchamiają wyłącznie działania dodatkowe (np. ogień, impuls EMP lub dopalacz), a nie zastępują sterowania tensometrem.
 4. **Pauza**, **wznowienie**, **zatrzymanie** i **reset** są obsługiwane przez wspólny interfejs modułu treningowego/silnika gry, a nie przez uniwersalny skrót klawiszowy.
 5. Jeżeli gra pokazuje komunikat o braku połączenia z czujnikiem, sprawdź połączenie urządzenia i strumień pomiarowy. Nie traktuj braku sygnału jako wartości zerowej ani jako polecenia wykonania ruchu.
 6. Po zmianie gry lub ponownym uruchomieniu sprawdź, czy gra rozpoczęła nową sesję i czy wynik/życia zostały zresetowane zgodnie z mechaniką gry.
-7. Silnik gier pracuje z docelowym krokiem symulacji i odświeżania około 90 Hz, z lekkim renderowaniem bez antyaliasingu. Faktyczna liczba wyświetlonych klatek zależy również od możliwości monitora, kompozytora pulpitu i obciążenia Raspberry Pi.
+7. Silnik gier ma docelowy krok symulacji 90 Hz i żąda odświeżania w odstępach około 11 ms. Renderowanie używa lekkiej grafiki pikselowej, bez antyaliasingu i zbędnych gradientów pełnoekranowych. Rzeczywista liczba wyświetlonych klatek zależy od odświeżania monitora, kompozytora pulpitu i obciążenia Raspberry Pi 4; 90 Hz wymaga również odpowiedniego trybu wyświetlacza.
 8. Automatyczne strzały w Archer i Scorched Earth wymagają świeżych próbek tensometru. Po utracie sygnału odliczanie jest wstrzymywane i rozpoczyna się ponownie po odzyskaniu pomiaru.
 
 ## Sterowanie poszczególnymi grami
@@ -40,7 +40,8 @@
 - **Tensometr:** zmienia pionowe położenie lewej paletki. Reguluj nacisk, aby ustawić paletkę na torze piłki.
 - **Skalowanie:** wysokość i szerokość paletki, marginesy oraz prędkości są proporcjonalne do wymiarów pola gry. Rozdzielczość HD nie zmniejsza względnej szerokości paletki ani nie zwiększa względnej prędkości piłki.
 - **Wskaźniki:** wynik gracza i przeciwnika, siła wejściowa oraz poziom trudności.
-- **Klawiatura:** w wersji bazowej brak odrębnego sterowania paletką klawiszami.
+- **Skalowanie:** szerokość i wysokość paletki, rozmiar piłki oraz prędkości są odniesione do logicznego pola gry 640×480. Większa rozdzielczość nie zmniejsza względnej szerokości paletki ani nie zwiększa względnej prędkości piłki.
+- **Sterowanie:** położenie paletki wyznacza wyłącznie tensometr.
 - **Punktacja:** punkt gracza jest naliczany po tym, gdy piłka minie stronę przeciwnika; odbicia od paletek i ścian nie są punktami.
 
 ### 4. Arkanoid
@@ -49,8 +50,10 @@
 
 - **Tensometr:** steruje poziomym położeniem paletki. Zmieniaj nacisk, aby przesuwać paletkę pod piłkę.
 - **Wskaźniki:** wynik, poziom, liczba żyć i trudność.
+- **Skalowanie:** paletka, piłka i klocki zachowują proporcje przy zmianie rozdzielczości.
+- **Trudność:** prędkość piłki rośnie łagodnie, a paletka pozostaje szeroka również na ekranach HD.
 - **Punktacja:** trafienie w klocek daje punkty; klocki wymagające kilku trafień mogą pozostać aktywne po pierwszym uderzeniu.
-- **Klawiatura:** w wersji bazowej brak odrębnych skrótów sterowania paletką.
+- **Sterowanie:** paletka jest sterowana wyłącznie tensometrem.
 
 ### 5. Flappy Bird
 
@@ -75,7 +78,7 @@
 **Cel:** prowadź samochód przez trzy pasy, omijaj ruch uliczny, utrzymuj serię bezkolizyjnych minięć i rozsądnie wykorzystuj dopalacz.
 
 - **Tensometr:** wybiera pas na podstawie wartości siły: niska wartość — lewy pas, środkowa — pas środkowy, wysoka — prawy pas. Sygnał jest filtrowany, a progi histerezy ograniczają przypadkowe przełączanie przy wahaniach pomiaru.
-- **Klawiatura:** `←` lub `A` — przesuń samochód o jeden pas w lewo; `→` lub `D` — przesuń o jeden pas w prawo; `SPACJA` lub `B` — aktywuj dopalacz. Ruch klawiaturą działa, gdy widok gry ma fokus.
+- **Działanie dodatkowe:** `SPACJA` lub `B` — aktywuj dopalacz. Klawisze kierunkowe nie sterują samochodem; wybór pasa odbywa się wyłącznie tensometrem.
 - **Płynność kierowania:** samochód wizualnie dojeżdża do wybranego pasa z krótką animacją. Pozycja kolizji nadal odpowiada wybranemu pasowi.
 - **Dopalacz:** przez 1,8 s zwiększa prędkość ruchu planszy. Po użyciu obowiązuje 5 s odnowienia; pasek HUD pokazuje stopień gotowości. Animowany płomień za samochodem sygnalizuje aktywne przyspieszenie.
 - **Punktacja:** punkty są przyznawane za pokonany dystans oraz za bezpieczne minięcie pojazdu. Kolejne bezkolizyjne minięcia budują serię i zwiększają premię punktową. Kolizja zeruje serię.
@@ -102,7 +105,7 @@
 **Cel:** steruj statkiem, niszcz kolejne formacje przeciwników, zbieraj ulepszenia i unikaj wrogiego ostrzału.
 
 - **Tensometr:** ustawia poziome położenie statku w obrębie planszy. Wartość 0–100% odpowiada położeniu od lewej do prawej krawędzi.
-- **Klawiatura:** `←` lub `A` — ruch w lewo; `→` lub `D` — ruch w prawo; przytrzymanie `SPACJI` — ciągły ogień; `X` — jednorazowy impuls EMP.
+- **Działania dodatkowe:** przytrzymanie `SPACJI` — ciągły ogień; `X` — jednorazowy impuls EMP. Ruch statku jest sterowany wyłącznie tensometrem.
 - **Impuls EMP:** usuwa wszystkie aktywne pociski przeciwników i zadaje jedno uszkodzenie każdemu aktywnemu przeciwnikowi. Na początku sesji dostępne są 2 ładunki; po ukończeniu fali przywracany jest 1 ładunek, maksymalnie do 4. Naciśnij `X` ponownie dopiero wtedy, gdy chcesz zużyć kolejny ładunek.
 - **Ulepszenia:** co piąty pokonany przeciwnik może pozostawić premię. Niebieska premia daje potrójny strzał, zielona uruchamia osłonę, a żółta zwiększa szybkostrzelność. Premie zbiera się przez zetknięcie statku z opadającym symbolem.
 - **Punktacja i seria:** kolejne eliminacje w krótkim odstępie zwiększają premię punktową. Seria wygasa po przerwie.
@@ -129,9 +132,9 @@
 | Arkanoid | poziome położenie paletki | brak skrótów gry |
 | Flappy Bird | impuls skoku po przekroczeniu progu | brak skrótu skoku |
 | Mario Run | przytrzymanie ładuje skok, zwolnienie wykonuje skok | brak skrótów skoku |
-| Car Race | wybór jednego z trzech pasów | `←`/`A`, `→`/`D` |
+| Car Race | wybór jednego z trzech pasów | `SPACJA`/`B` — dopalacz |
 | Archer | kąt celowania 0–100% | automatyczny strzał co 2,4 s |
-| Galaga | pozioma pozycja statku | `←`/`A`, `→`/`D`, `SPACJA` — ogień, `X` — EMP |
+| Galaga | pozioma pozycja statku | `SPACJA` — ogień, `X` — EMP |
 | Scorched Earth | kąt działa | automatyczny strzał po 2 s |
 
 ## Uwaga o wersjach i rozszerzeniach
@@ -139,18 +142,6 @@
 Niektóre usprawnienia sterowania są rozwijane w osobnych gałęziach i PR-ach. Dopóki nie zostaną scalone z gałęzią integracyjną, nie należy traktować ich jako dostępnych w tej wersji aplikacji. Dotyczy to między innymi dodatkowych skrótów kalibracji, adaptacyjnej trudności, alternatywnych przebiegów ćwiczeń oraz sterowania myszą w wybranych grach.
 
 Przy zmianie sterowania w kodzie należy zaktualizować ten plik oraz teksty instruktażowe wyświetlane bezpośrednio w grze. Każdy skrót powinien mieć test regresyjny, a opis powinien odpowiadać faktycznej implementacji.
-
-
-### 11. Precision Crane — Precyzyjny dźwig
-
-**Cel:** przenieś ładunek z miejsca odbioru do oznaczonej strefy i odłóż go precyzyjnie.
-
-- **Jedyny kontroler:** jeden tensometr/HX711, skalibrowany do zakresu siły 0–100%.
-- **Ruch poziomy i pionowy:** roboczy zakres 0–70% siły steruje płynnie aktualnie wybraną osią. Oś pozioma przesuwa wózek suwnicy, a pionowa reguluje wysokość haka.
-- **Zmiana osi:** przytrzymaj siłę co najmniej 82% przez minimum 0,85 s i zwolnij do 18% lub mniej. Zmienia się aktywna oś.
-- **Chwyt i zwolnienie:** impuls siły co najmniej 82% trwający od 0,15 do 0,85 s, zakończony zwolnieniem do 18% lub mniej, przełącza chwyt/zwolnienie. Hak musi znajdować się w pobliżu ładunku, aby go podnieść.
-- **Punktacja:** poprawna dostawa daje punkty i zwiększa serię. Zwolnienie poza strefą celu zużywa jedną z trzech prób. Co cztery dostawy wzrasta trudność.
-- **Brak sygnału:** po 350 ms bez świeżej próbki sterowanie jest wstrzymywane. Klawiatura, mysz, dotyk i gamepad nie sterują rozgrywką.
 
 
 ### 11. Precision Crane — Precyzyjny dźwig
