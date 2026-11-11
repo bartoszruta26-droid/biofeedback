@@ -118,9 +118,9 @@
 
 **Cel:** w turowej rozgrywce artyleryjskiej traf przeciwnika, ustawiając kąt działa tensometrem i uwzględniając wiatr.
 
-- **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału pozostaje ustawiona na stałym, zbalansowanym poziomie.
-- **Automatyczny strzał:** po uzyskaniu świeżego sygnału w turze gracza gra odlicza 2 s, a następnie automatycznie wypuszcza pocisk. Po utracie sygnału odliczanie rozpoczyna się od nowa.
-- **Wskaźniki:** zdrowie obu czołgów, runda, wynik i siła/wiatr zgodnie z informacją na ekranie.
+- **Tensometr:** jest jedynym kontrolerem kąta działa. Siła strzału jest stała i zbalansowana; żadna klawiatura, mysz ani ekran dotykowy nie sterują rozgrywką.
+- **Automatyczny strzał:** świeży sygnał tensometru uzbraja odliczanie 2 s w turze gracza; po utracie sygnału odliczanie jest zerowane. Siła i kąt pocisku zależą od ustawionej mechaniki gry i aktualnej próbki siły.
+- **Wskaźniki:** zdrowie obu czołgów, runda, wynik i aktualny wiatr.
 - **Wskazówka:** wiatr wpływa na tor pocisku. Po strzale poczekaj na zakończenie lotu i ruch przeciwnika; następna tura gracza rozpoczyna nowe dwusekundowe odliczanie.
 
 ## Skrócona tabela sterowania
