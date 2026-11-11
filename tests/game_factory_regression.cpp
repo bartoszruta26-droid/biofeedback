@@ -20,6 +20,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QEventLoop>
+#include <QImage>
+#include <QPainter>
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QKeyEvent>
@@ -168,6 +170,16 @@ struct ReactionForceGameTestAccess
         game.m_phase = ReactionForceGame::Go;
         game.update(0.01);
     }
+
+    static void renderAt(ReactionForceGame& game, int width, int height)
+    {
+        game.resize(width, height);
+        QImage image(width, height, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::transparent);
+        QPainter painter(&image);
+        game.render(painter);
+        painter.end();
+    }
 };
 
 
@@ -263,6 +275,16 @@ int main(int argc, char **argv)
     REQUIRE(reaction->combo() == 1);
     REQUIRE(reaction->getScore() > 0);
     REQUIRE(reaction->lastGrade() == games::ReactionForceGame::Perfect);
+    REQUIRE(reaction->hasAchievement(QStringLiteral("first_hit")));
+    REQUIRE(reaction->hasAchievement(QStringLiteral("first_perfect")));
+
+    // Exercise the complete vector scene at portrait, compact, HD and QHD
+    // sizes. Rendering must remain safe while the simulation keeps running.
+    games::ReactionForceGameTestAccess::renderAt(*reaction, 320, 480);
+    games::ReactionForceGameTestAccess::renderAt(*reaction, 320, 240);
+    games::ReactionForceGameTestAccess::renderAt(*reaction, 1920, 1080);
+    games::ReactionForceGameTestAccess::renderAt(*reaction, 2560, 1440);
+    REQUIRE(reaction->isRunning());
 
     // An impulse before the visual GO cue is a false start and requires neutral re-arming.
     reaction->handleSensorInput(70.0);
