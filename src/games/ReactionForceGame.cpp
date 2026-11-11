@@ -329,7 +329,9 @@ void ReactionForceGame::update(double deltaTime)
     m_visualTime += dt;
     m_feedbackTime = qMax(0.0, m_feedbackTime - dt);
     m_toastTime = qMax(0.0, m_toastTime - dt);
-    m_inputAge += dt;
+    // Freshness is measured against real elapsed time, not the capped
+    // simulation/render step; a delayed UI tick must fail closed immediately.
+    m_inputAge += deltaTime;
 
     if (!m_hasSensorSample || m_inputAge > kSignalTimeout) {
         if (m_pulseActive) {
