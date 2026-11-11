@@ -359,13 +359,12 @@ void GameEngine::paintEvent(QPaintEvent* event)
     // explicitly enable smoothing only where it materially improves clarity.
     painter.setRenderHint(QPainter::Antialiasing, false);
     
-    // Tło - czarne dla gier
-    painter.fillRect(rect(), Qt::black);
-    
-    // Renderowanie gry jeśli jest uruchomiona
+    // Running games render an opaque background themselves. Avoid a second
+    // full-window fill at 90 Hz, which is expensive on the Raspberry Pi 4.
     if (m_isRunning) {
         render(painter);
     } else {
+        painter.fillRect(rect(), Qt::black);
         // Ekran startowy/końcowy
         painter.setPen(Qt::white);
         painter.setFont(QFont("Arial", 12, QFont::Bold));
