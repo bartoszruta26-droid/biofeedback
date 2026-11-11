@@ -123,7 +123,7 @@ void RhythmForceGame::initialize()
     m_visualTime = 0.0;
     m_hitFlashSeconds = 0.0;
     m_achievementToastSeconds = 0.0;
-    QSettings settings;
+    QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
     m_achievements = settings.value(QStringLiteral("games/rhythm_force/achievements")).toStringList();
     m_lastAchievement.clear();
     m_hasSensorSample = false;
@@ -286,7 +286,7 @@ void RhythmForceGame::unlockAchievement(const QString &id, const QString &title)
     if (m_achievements.contains(id))
         return;
     m_achievements.append(id);
-    QSettings settings;
+    QSettings settings(QStringLiteral("Biofeedback"), QStringLiteral("Biofeedback"));
     settings.setValue(QStringLiteral("games/rhythm_force/achievements"), m_achievements);
     m_lastAchievement = title;
     m_achievementToastSeconds = 3.2;
