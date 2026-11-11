@@ -22,7 +22,6 @@ RhythmForceGame::RhythmForceGame(QWidget *parent)
     , m_perfectHits(0)
     , m_combo(0)
     , m_bestCombo(0)
-    , m_score(0)
     , m_songTime(0.0)
     , m_inputAge(kSignalTimeoutSeconds + 1.0)
     , m_pulseElapsed(0.0)
@@ -107,7 +106,6 @@ void RhythmForceGame::initialize()
     m_perfectHits = 0;
     m_combo = 0;
     m_bestCombo = 0;
-    m_score = 0;
     m_songTime = 0.0;
     m_inputAge = kSignalTimeoutSeconds + 1.0;
     m_pulseElapsed = 0.0;
@@ -231,8 +229,7 @@ void RhythmForceGame::finishPulse()
     ++m_hits;
     ++m_combo;
     m_bestCombo = qMax(m_bestCombo, m_combo);
-    m_score += timingPoints + strengthPoints + comboBonus;
-    setScore(m_score);
+    setScore(getScore() + timingPoints + strengthPoints + comboBonus);
     m_status = QStringLiteral("%1  |  czas %2 ms  |  siła %3%")
         .arg(m_lastGrade == Perfect ? QStringLiteral("PERFEKT")
              : (m_lastGrade == Good ? QStringLiteral("DOBRZE") : QStringLiteral("TRAFIENIE")))
