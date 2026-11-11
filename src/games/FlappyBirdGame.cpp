@@ -118,6 +118,9 @@ void FlappyBirdGame::setDifficultyLevel(int level) {
             break;
     }
     
+    const double scaleY = height() > 0 ? height() / 480.0 : 1.0;
+    m_minGapHeight = static_cast<float>(m_minGapHeight * scaleY);
+    m_maxGapHeight = static_cast<float>(m_maxGapHeight * scaleY);
     m_obstaclesPassed = 0;
     setScore(0);
 }
@@ -245,12 +248,14 @@ void FlappyBirdGame::mousePressEvent(QMouseEvent* event) {
 }
 
 void FlappyBirdGame::resetBird() {
-    // Reset pozycji ptaka na lewą stronę ekranu
-    m_birdPos.setX(width() / 4.0f);
-    m_birdPos.setY(height() / 2.0f);
+    // Restore the same logical 640x480 proportions on every new session.
+    const double scaleX = qMax(0.5, width() / 640.0);
+    const double scaleY = qMax(0.5, height() / 480.0);
+    m_birdPos = QPointF(width() / 4.0f, height() / 2.0f);
     m_birdVelocity.setX(0.0f);
     m_birdVelocity.setY(0.0f);
-    m_birdRadius = m_birdBaseRadius;
+    m_birdRadius = static_cast<float>(m_birdBaseRadius * qMin(scaleX, scaleY));
+    m_obstacleWidth = static_cast<float>(m_obstacleBaseWidth * scaleX);
 }
 
 void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
@@ -275,8 +280,6 @@ void FlappyBirdGame::adaptToSize(const QSize& oldSize, const QSize& newSize) {
             obstacle.gapY = static_cast<float>(obstacle.gapY * scaleY);
             obstacle.gapHeight = static_cast<float>(obstacle.gapHeight * scaleY);
         }
-        m_minGapHeight = static_cast<float>(m_minGapHeight * scaleY);
-        m_maxGapHeight = static_cast<float>(m_maxGapHeight * scaleY);
     } else {
         // A hidden widget may not receive resizeEvent until it is shown.
         // Restore the same logical 640x480 layout at the actual viewport size.
