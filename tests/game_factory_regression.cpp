@@ -442,7 +442,10 @@ int main(int argc, char **argv)
     QKeyEvent galagaFireDown(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QKeyEvent galagaFireUp(QEvent::KeyRelease, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(galagaGame, &galagaFireDown);
-    waitForEvents(900); // Space is held so the repeat-fire mechanic can shoot.
+    for (int sample = 0; sample < 9; ++sample) {
+        galagaGame->handleSensorInput(50.0);
+        waitForEvents(100);
+    } // Fresh tensometer samples keep automatic fire armed.
     QApplication::sendEvent(galagaGame, &galagaFireUp);
     REQUIRE(galagaGame->isRunning());
     REQUIRE(galagaGame->getScore() > 0); // A player shot must hit an enemy.
@@ -470,8 +473,11 @@ int main(int argc, char **argv)
     galagaPulseGame->resize(640, 480);
     galagaPulseGame->start();
     REQUIRE(galagaPulseGame->specialCharges() == 2);
-    QKeyEvent galagaEmp(QEvent::KeyPress, Qt::Key_X, Qt::NoModifier);
-    QApplication::sendEvent(galagaPulseGame, &galagaEmp);
+    for (int sample = 0; sample < 6; ++sample) {
+        galagaPulseGame->handleSensorInput(98.0);
+        waitForEvents(100);
+    }
+    galagaPulseGame->handleSensorInput(20.0); // Neutral release completes the timed EMP gesture.
     REQUIRE(galagaPulseGame->specialCharges() == 1);
     REQUIRE(galagaPulseGame->activeEnemyCount() == 0);
     waitForEvents(80);
