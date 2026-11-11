@@ -61,6 +61,8 @@ struct PrecisionCraneGameTestAccess
 struct ForceMazeGameTestAccess
 {
     static void advance(ForceMazeGame& game, double deltaTime) { game.update(deltaTime); }
+    static void completeLevel(ForceMazeGame& game) { game.completeLevel(); }
+    static void collectCrystal(ForceMazeGame& game, int row) { game.collectCrystal(row); }
 };
 
 struct RhythmForceGameTestAccess
@@ -188,7 +190,14 @@ int main(int argc, char **argv)
     REQUIRE(forceMaze->awaitingNeutral());
     forceMaze->handleSensorInput(0.0);
     REQUIRE(!forceMaze->awaitingNeutral());
+    forceMaze->handleSensorInput(0.0);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 1.0) < 0.001);
+    forceMaze->handleSensorInput(18.0);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 4.0) < 0.001);
+    forceMaze->handleSensorInput(18.1);
+    REQUIRE(forceMaze->targetColumn() > 4.0);
     forceMaze->handleSensorInput(100.0);
+    REQUIRE(std::abs(forceMaze->targetColumn() - 7.0) < 0.001);
     games::ForceMazeGameTestAccess::advance(*forceMaze, 0.25);
     REQUIRE(forceMaze->hasFreshSignal());
     REQUIRE(forceMaze->playerColumn() > 4.0);
@@ -205,6 +214,29 @@ int main(int argc, char **argv)
     forceMaze->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     REQUIRE(forceMaze->hasFreshSignal());
     forceMaze->stop();
+
+    // Achievement milestones are cumulative and persisted independently of
+    // the current run; a clean five-level campaign unlocks its own distinction.
+    std::unique_ptr<games::GameEngine> forceMazeAchievementsBase(
+        games::createGame(QStringLiteral("force_maze")));
+    auto* forceMazeAchievements =
+        dynamic_cast<games::ForceMazeGame*>(forceMazeAchievementsBase.get());
+    REQUIRE(forceMazeAchievements != nullptr);
+    forceMazeAchievements->start();
+    for (int row = 0; row < 10; ++row)
+        games::ForceMazeGameTestAccess::collectCrystal(*forceMazeAchievements, row);
+    REQUIRE(forceMazeAchievements->hasAchievement(QStringLiteral("first_crystal")));
+    REQUIRE(forceMazeAchievements->hasAchievement(QStringLiteral("crystal_collector")));
+    for (int level = 0; level < 5; ++level)
+        games::ForceMazeGameTestAccess::completeLevel(*forceMazeAchievements);
+    REQUIRE(forceMazeAchievements->campaignCompleted());
+    REQUIRE(forceMazeAchievements->hasAchievement(QStringLiteral("three_clean_levels")));
+    REQUIRE(forceMazeAchievements->hasAchievement(QStringLiteral("level_three")));
+    REQUIRE(forceMazeAchievements->hasAchievement(QStringLiteral("level_five")));
+    REQUIRE(forceMazeAchievements->hasAchievement(QStringLiteral("maze_master")));
+    REQUIRE(forceMazeAchievements->hasAchievement(QStringLiteral("untouched_campaign")));
+    REQUIRE(forceMazeAchievements->personalBestLevel() >= 5);
+    forceMazeAchievements->stop();
 
     std::unique_ptr<games::GameEngine> arkanoid(games::createGame(QStringLiteral("arkanoid")));
     auto* arkanoidGame = dynamic_cast<games::ArkanoidGame*>(arkanoid.get());
