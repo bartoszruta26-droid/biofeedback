@@ -453,15 +453,28 @@ int main(int argc, char **argv)
     REQUIRE(craneSafety->carriagePosition() > positionBeforeTimeout);
     craneSafety->stop();
 
-    // A short pulse toggles grip only after a release; a sub-minimum pulse is ignored.
+    // A sub-minimum pulse is ignored; a valid short pulse grips only when
+    // the single-sensor-controlled hook is aligned with the cargo.
     std::unique_ptr<games::GameEngine> craneGestureBase(
         games::createGame(QStringLiteral("precision_crane")));
     auto* craneGesture = dynamic_cast<games::PrecisionCraneGame*>(craneGestureBase.get());
     REQUIRE(craneGesture != nullptr);
     craneGesture->resize(640, 480);
     craneGesture->start();
+    const auto driveGestureCrane = [craneGesture](double force, int milliseconds) {
+        for (int elapsed = 0; elapsed < milliseconds; elapsed += 80) {
+            craneGesture->handleSensorInput(force);
+            waitForEvents(80);
+        }
+    };
+    driveGestureCrane(25.43, 1200); // Align trolley with the first cargo.
+    driveGestureCrane(90.0, 1120);  // Select vertical axis.
+    craneGesture->handleSensorInput(0.0);
+    waitForEvents(40);
+    REQUIRE(craneGesture->controlAxis() == games::PrecisionCraneGame::VerticalAxis);
+    driveGestureCrane(65.0, 1120); // Lower hook to cargo height.
     craneGesture->handleSensorInput(90.0);
-    waitForEvents(80);
+    waitForEvents(80);             // Deliberately shorter than 0.15 s.
     craneGesture->handleSensorInput(0.0);
     waitForEvents(40);
     REQUIRE(!craneGesture->loadAttached());
