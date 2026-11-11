@@ -184,6 +184,7 @@ private:
 
     // Stan gry
     Player m_player;
+    QRectF m_previousPlayerBody;
     QVector<Obstacle> m_obstacles;
     QVector<Collectible> m_collectibles;
     QVector<Enemy> m_enemies;

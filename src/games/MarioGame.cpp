@@ -177,7 +177,7 @@ void MarioGame::resetLevel()
     m_obstacles.clear();
     m_collectibles.clear();
     m_enemies.clear();
-    m_enemySpawnTimer = 1.5;
+    m_enemySpawnTimer = 0.0;
     m_obstaclesPassed = 0;
     m_timeSinceLastObstacle = 0.0;
     m_obstacleSpawnInterval = 2.0;
@@ -234,9 +234,15 @@ void MarioGame::update(double deltaTime)
         }
     }
     
-    // Sprawdzenie czy gracz spadł w dziurę
-    if (m_player.body.bottom() > height()) {
-        stop();
+    // Falling into a pit costs one life, then respawns at the ground line.
+    if (m_player.body.top() > height() || m_player.body.bottom() > height() + m_player.body.height()) {
+        applyDamage();
+        if (isRunning()) {
+            m_player.body.moveTop(height() * GROUND_Y_RATIO - m_player.body.height());
+            m_player.velocityY = -280.0;
+            m_player.isOnGround = false;
+            m_player.isJumping = true;
+        }
     }
 }
 
@@ -244,6 +250,7 @@ void MarioGame::updatePlayer(double deltaTime)
 {
     const double groundY = height() * GROUND_Y_RATIO;
     const QRectF previousBody = m_player.body;
+    m_previousPlayerBody = previousBody;
     const bool wasGrounded = m_player.isOnGround;
 
     if (!m_player.isOnGround)
@@ -444,7 +451,7 @@ void MarioGame::updateObstacles(double deltaTime)
 
 void MarioGame::updateEnemies(double deltaTime)
 {
-    const QRectF previous = m_player.body.translated(0.0, -m_player.velocityY * deltaTime);
+    const QRectF previous = m_previousPlayerBody;
     for (int i = m_enemies.size() - 1; i >= 0; --i) {
         Enemy& enemy = m_enemies[i];
         enemy.phase += deltaTime * (enemy.type == Enemy::GOOMBA ? 5.0 : 2.8);

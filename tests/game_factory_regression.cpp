@@ -328,8 +328,9 @@ int main(int argc, char **argv)
     REQUIRE(marioGame->goombaCount() == 0);
     REQUIRE(marioGame->piranhaPlantCount() == 0);
     marioGame->handleSensorInput(100.0);
-    waitForEvents(420);
-    REQUIRE(marioGame->activeEnemyCount() >= 0); // Enemy population remains safely queryable during gameplay.
+    waitForEvents(4000);
+    REQUIRE(marioGame->goombaCount() > 0); // A Goomba enters the course on the enemy spawn cadence.
+    REQUIRE(marioGame->activeEnemyCount() >= marioGame->goombaCount());
     REQUIRE(marioGame->playerCharging());
     REQUIRE(marioGame->jumpCharge() > 0.0);
     marioGame->handleSensorInput(0.0);
