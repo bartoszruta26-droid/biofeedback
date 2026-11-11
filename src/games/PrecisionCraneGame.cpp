@@ -7,14 +7,9 @@
 #include <QtMath>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace games {
-namespace {
-constexpr double kGestureForce = 0.82;
-constexpr double kReleaseForce = 0.18;
-constexpr double kLongGestureSeconds = 0.85;
-constexpr double kMinimumGestureSeconds = 0.15;
-}
 
 PrecisionCraneGame::PrecisionCraneGame(QWidget *parent)
     : GameEngine(parent)
@@ -109,8 +104,10 @@ bool PrecisionCraneGame::handleInput(double value)
 {
     if (!std::isfinite(value))
         return false;
-    // GameEngine's sensor pipeline provides calibrated force in the 0–100 range.
-    const bool signalWasStale = m_inputAge > 0.35;
+
+    // The central sensor pipeline supplies calibrated force in the 0–100 N domain.
+    // Invalid values are ignored; freshness is updated only by a valid sample.
+    const bool signalWasStale = m_inputAge > kSignalTimeoutSeconds;
     m_force = qBound(0.0, value / 100.0, 1.0);
     m_inputAge = 0.0;
     if (signalWasStale)
@@ -120,7 +117,7 @@ bool PrecisionCraneGame::handleInput(double value)
 
 void PrecisionCraneGame::processGesture()
 {
-    if (m_inputAge > 0.35)
+    if (m_inputAge > kSignalTimeoutSeconds)
         return;
 
     if (m_force >= kGestureForce) {
@@ -202,20 +199,22 @@ void PrecisionCraneGame::update(double deltaTime)
     m_animationTime += dt;
     m_inputAge += dt;
 
-    if (m_inputAge > 0.35) {
+    if (m_inputAge > kSignalTimeoutSeconds) {
         m_gestureActive = false;
         m_gestureSeconds = 0.0;
+        m_force = 0.0;
         m_status = QStringLiteral("Brak świeżego sygnału — ruch wstrzymany");
     }
-    if (m_gestureActive && m_inputAge <= 0.35)
+    if (m_gestureActive && m_inputAge <= kSignalTimeoutSeconds)
         m_gestureSeconds += dt;
     processGesture();
 
-    if (m_inputAge <= 0.35 && !m_gestureActive &&
+    if (m_inputAge <= kSignalTimeoutSeconds && !m_gestureActive &&
         m_force > kReleaseForce && m_force < kGestureForce) {
-        // The release band is a dead zone: it holds the current position,
-        // so finishing a gesture never snaps the crane to an endpoint.
-        const double control = qBound(0.0, (m_force - kReleaseForce) / (0.70 - kReleaseForce), 1.0);
+        // The 0–18% release band is a true dead zone: retain the last position.
+        const double control = qBound(0.0,
+            (m_force - kMinimumControlForce) /
+                (kMaximumControlForce - kMinimumControlForce), 1.0);
         if (m_axis == HorizontalAxis) {
             const double left = width() * 0.08;
             const double right = width() * 0.92;
