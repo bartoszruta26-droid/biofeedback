@@ -39,6 +39,7 @@
 #include <cmath>
 #include <limits>
 #include <QPainterPath>
+#include <QListWidget>
 
 
 namespace {
@@ -742,8 +743,10 @@ void OutlineTab::setupUI()
     comparisonBrowser->setMaximumHeight(125);
     auto* saveSeriesButton = new QPushButton(tr("Zapisz bieżący przebieg"), metricsPage);
     saveSeriesButton->setObjectName(QStringLiteral("saveForceSeries"));
-    auto* savedSeriesCombo = new QComboBox(metricsPage);
-    savedSeriesCombo->setObjectName(QStringLiteral("savedForceSeries"));
+    auto* savedSeriesList = new QListWidget(metricsPage);
+    savedSeriesList->setObjectName(QStringLiteral("savedForceSeries"));
+    savedSeriesList->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    savedSeriesList->setMaximumHeight(100);
     auto* compareSeriesButton = new QPushButton(tr("Porównaj z wybraną serią"), metricsPage);
     compareSeriesButton->setObjectName(QStringLiteral("compareForceSeries"));
     auto* overlay = new ForceOverlayWidget(metricsPage);
@@ -752,7 +755,7 @@ void OutlineTab::setupUI()
     metricsLayout->addWidget(comparisonBrowser);
     auto* seriesControls = new QHBoxLayout();
     seriesControls->addWidget(saveSeriesButton);
-    seriesControls->addWidget(savedSeriesCombo, 1);
+    seriesControls->addWidget(savedSeriesList, 1);
     seriesControls->addWidget(compareSeriesButton);
     metricsLayout->addLayout(seriesControls);
     metricsLayout->addWidget(overlay, 1);
@@ -769,8 +772,8 @@ void OutlineTab::setupUI()
 
     const QString seriesStorePath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
                                   + QStringLiteral("/rehabilitation_force_series.json");
-    auto loadSavedSeries = [seriesStorePath, savedSeriesCombo]() {
-        savedSeriesCombo->clear();
+    auto loadSavedSeries = [seriesStorePath, savedSeriesList]() {
+        savedSeriesList->clear();
         QFile file(seriesStorePath);
         if (!file.open(QIODevice::ReadOnly)) return;
         const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
@@ -779,12 +782,15 @@ void OutlineTab::setupUI()
         for (const QJsonValue& value : all) {
             const QJsonObject item = value.toObject();
             const QString label = item.value(QStringLiteral("label")).toString();
-            if (!label.isEmpty()) savedSeriesCombo->addItem(label, QString::fromUtf8(QJsonDocument(item).toJson(QJsonDocument::Compact)));
+            if (!label.isEmpty()) {
+                auto* entry = new QListWidgetItem(label, savedSeriesList);
+                entry->setData(Qt::UserRole, QString::fromUtf8(QJsonDocument(item).toJson(QJsonDocument::Compact)));
+            }
         }
     };
     loadSavedSeries();
     connect(saveSeriesButton, &QPushButton::clicked, this,
-            [this, seriesStorePath, savedSeriesCombo, loadSavedSeries, refreshForceMetrics]() {
+            [this, seriesStorePath, savedSeriesList, loadSavedSeries, refreshForceMetrics]() {
         if (!m_forceGraph || m_forceGraph->dataPointCount() < 3) {
             QMessageBox::information(this, tr("Zapis przebiegu"),
                                      tr("Wymagane są co najmniej trzy próbki."));
@@ -826,13 +832,16 @@ void OutlineTab::setupUI()
         file.write(QJsonDocument(all).toJson(QJsonDocument::Indented));
         file.close();
         loadSavedSeries();
-        savedSeriesCombo->setCurrentIndex(savedSeriesCombo->count() - 1);
+        if (savedSeriesList->count() > 0) {
+            savedSeriesList->clearSelection();
+            savedSeriesList->item(savedSeriesList->count() - 1)->setSelected(true);
+        }
         refreshForceMetrics();
         QMessageBox::information(this, tr("Zapis przebiegu"),
                                  tr("Zapisano serię pomiarową w lokalnym archiwum aplikacji."));
     });
     connect(compareSeriesButton, &QPushButton::clicked, this,
-            [this, savedSeriesCombo, overlay, metricsBrowser, comparisonBrowser]() {
+            [this, savedSeriesList, overlay, metricsBrowser, comparisonBrowser]() {
         comparisonBrowser->clear();
         QVector<ForceSeries> selected;
         if (m_forceGraph && m_forceGraph->dataPointCount() >= 2)
@@ -842,53 +851,61 @@ void OutlineTab::setupUI()
             for (int i = 0; i < repetitions.size(); ++i)
                 selected.push_back({tr("Powtórzenie %1").arg(i + 1), repetitions[i]});
         }
-        const QJsonObject item = QJsonDocument::fromJson(savedSeriesCombo->currentData().toString().toUtf8()).object();
-        QVector<gui::DataPoint> savedSamples;
-        if (!item.isEmpty()) {
+
+        QVector<QPair<QString, ForceMetrics>> comparisons;
+        for (QListWidgetItem* selectedItem : savedSeriesList->selectedItems()) {
+            const QJsonObject item = QJsonDocument::fromJson(
+                selectedItem->data(Qt::UserRole).toString().toUtf8()).object();
+            if (item.isEmpty()) continue;
             const QString storedPatient = item.value(QStringLiteral("patient_uuid")).toString();
             if (storedPatient != m_currentPatientUuid) {
                 QMessageBox::warning(this, tr("Porównanie serii"),
-                    tr("Wybrana seria należy do innego kontekstu pacjenta. Wybierz serię zapisaną dla bieżącego pacjenta."));
+                    tr("Co najmniej jedna wybrana seria należy do innego kontekstu pacjenta. Zaznacz wyłącznie serie bieżącego pacjenta."));
                 return;
             }
             const QJsonArray points = item.value(QStringLiteral("points")).toArray();
             const QDateTime base = QDateTime::fromString(
                 item.value(QStringLiteral("created_at")).toString(), Qt::ISODate);
+            QVector<gui::DataPoint> samples;
+            samples.reserve(points.size());
             for (const QJsonValue& value : points) {
                 const QJsonArray pair = value.toArray();
                 if (pair.size() != 2) continue;
-                savedSamples.push_back(gui::DataPoint(base.addMSecs(pair.at(0).toVariant().toLongLong()),
-                                                        pair.at(1).toDouble()));
+                samples.push_back(gui::DataPoint(base.addMSecs(pair.at(0).toVariant().toLongLong()),
+                                                   pair.at(1).toDouble()));
             }
-            if (savedSamples.size() >= 2)
-                selected.push_back({item.value(QStringLiteral("label")).toString(), savedSamples});
+            if (samples.size() < 2) continue;
+            const QString label = item.value(QStringLiteral("label")).toString();
+            selected.push_back({label, samples});
+            comparisons.push_back({label, calculateForceMetrics(samples)});
         }
+
         overlay->setSeries(selected);
-        if (!savedSamples.isEmpty() && m_forceGraph && m_forceGraph->dataPointCount() >= 3) {
+        if (!comparisons.isEmpty() && m_forceGraph && m_forceGraph->dataPointCount() >= 3) {
             const ForceMetrics current = calculateForceMetrics(m_forceGraph->getData());
-            const ForceMetrics previous = calculateForceMetrics(savedSamples);
             auto delta = [](double now, double before) {
                 return before == 0.0 ? QStringLiteral("n/d")
                     : QString("%1%").arg((now - before) * 100.0 / std::abs(before), 0, 'f', 1);
             };
-            comparisonBrowser->setHtml(tr(
-                "<h4>Zmiana względem zapisanej sesji</h4><table>"
-                "<tr><th>Parametr</th><th>Poprzednio</th><th>Obecnie</th><th>Zmiana względna</th></tr>"
-                "<tr><td>Średnia siła</td><td>%1 N</td><td>%2 N</td><td>%3</td></tr>"
-                "<tr><td>Szczyt siły</td><td>%4 N</td><td>%5 N</td><td>%6</td></tr>"
-                "<tr><td>Zmienność (CV)</td><td>%7%</td><td>%8%</td><td>%9</td></tr>"
-                "<tr><td>Czas narastania</td><td>%10 ms</td><td>%11 ms</td><td>%12</td></tr></table>"
-                "<p><small>Zmiany procentowe są opisowe; porównanie jest miarodajne tylko przy zgodnym "
-                "czujniku, kalibracji, pozycji, instrukcji, filtracji i sposobie normalizacji próby.</small></p>")
-                .arg(previous.mean, 0, 'f', 2).arg(current.mean, 0, 'f', 2)
-                .arg(delta(current.mean, previous.mean))
-                .arg(previous.peak, 0, 'f', 2).arg(current.peak, 0, 'f', 2)
-                .arg(delta(current.peak, previous.peak))
-                .arg(previous.coefficientOfVariation, 0, 'f', 2)
-                .arg(current.coefficientOfVariation, 0, 'f', 2)
-                .arg(delta(current.coefficientOfVariation, previous.coefficientOfVariation))
-                .arg(previous.meanRiseMs, 0, 'f', 0).arg(current.meanRiseMs, 0, 'f', 0)
-                .arg(delta(current.meanRiseMs, previous.meanRiseMs)));
+            QString report = tr("<h4>Zmiana względem zapisanych sesji</h4><table>"
+                                "<tr><th>Sesja odniesienia</th><th>Średnia siła</th>"
+                                "<th>Szczyt</th><th>CV</th><th>Czas narastania</th></tr>");
+            for (const auto& comparison : comparisons) {
+                const ForceMetrics& previous = comparison.second;
+                report += QString("<tr><td>%1</td><td>%2 N (%3)</td>"
+                                   "<td>%4 N (%5)</td><td>%6% (%7)</td>"
+                                   "<td>%8 ms (%9)</td></tr>")
+                    .arg(comparison.first.toHtmlEscaped())
+                    .arg(previous.mean, 0, 'f', 2).arg(delta(current.mean, previous.mean))
+                    .arg(previous.peak, 0, 'f', 2).arg(delta(current.peak, previous.peak))
+                    .arg(previous.coefficientOfVariation, 0, 'f', 2)
+                    .arg(delta(current.coefficientOfVariation, previous.coefficientOfVariation))
+                    .arg(previous.meanRiseMs, 0, 'f', 0)
+                    .arg(delta(current.meanRiseMs, previous.meanRiseMs));
+            }
+            report += tr("</table><p><small>Zmiany procentowe są opisowe; porównanie jest miarodajne tylko przy zgodnym "
+                         "czujniku, kalibracji, pozycji, instrukcji, filtracji i sposobie normalizacji próby.</small></p>");
+            comparisonBrowser->setHtml(report);
         }
         if (selected.isEmpty()) {
             metricsBrowser->append(tr("<p>Brak poprawnych przebiegów do porównania.</p>"));
