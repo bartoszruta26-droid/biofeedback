@@ -280,6 +280,22 @@ int main(int argc, char **argv)
     REQUIRE(!reaction->awaitingNeutral());
     reaction->handleSensorInput(std::numeric_limits<double>::quiet_NaN());
     REQUIRE(reaction->hasFreshSignal());
+
+    // Correct timing with force outside the target band must still be a miss.
+    games::ReactionForceGameTestAccess::prepareGo(*reaction, 0.20);
+    reaction->handleSensorInput(reaction->targetUpperPercent() + 5.0);
+    games::ReactionForceGameTestAccess::completePulse(*reaction, 0.16);
+    REQUIRE(reaction->hits() == 1);
+    REQUIRE(reaction->misses() == 2);
+    REQUIRE(reaction->trialIndex() == 2);
+
+    // A pulse shorter than the accepted duration is rejected as well.
+    games::ReactionForceGameTestAccess::prepareGo(*reaction, 0.20);
+    reaction->handleSensorInput(reaction->targetForcePercent());
+    games::ReactionForceGameTestAccess::completePulse(*reaction, 0.03);
+    REQUIRE(reaction->hits() == 1);
+    REQUIRE(reaction->misses() == 3);
+    REQUIRE(reaction->trialIndex() == 3);
     reaction->stop();
 
     // Balance Tower: one sensor, neutral arming, gesture placement, stability,
