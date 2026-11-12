@@ -326,7 +326,7 @@ void ScorchedEarthGame::render(QPainter& painter)
     painter.fillRect(rect(), QColor(55, 88, 125));
     painter.fillRect(QRect(0, height() / 2, width(), height() / 2),
                      QColor(202, 133, 83));
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
 
     QPolygonF ground = m_terrain;
     ground << QPointF(width(), height()) << QPointF(0.0, height());
