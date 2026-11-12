@@ -256,8 +256,10 @@ void TanGame::update(double deltaTime)
     m_previousCursorY = m_cursorY;
     m_previousTargetY = m_targetY;
     updateSpatialFrequency();
-    m_phase = std::remainder(
-        m_phase - m_scrollSpeed * m_frequency * dt, 2.0 * kPi);
+    // Keep phase unwrapped for interpolation. Wrapping with remainder here
+    // creates a discontinuity at +/-pi that appears as a sudden target jump.
+    // The waveform evaluator wraps angles locally when calculating the curve.
+    m_phase -= m_scrollSpeed * m_frequency * dt;
     m_inputAge += dt;
     m_sessionSeconds += dt;
 
