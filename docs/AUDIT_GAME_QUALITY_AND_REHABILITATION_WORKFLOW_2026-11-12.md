@@ -261,3 +261,20 @@ Prace rozpoczynają się od Etapu A, ponieważ telemetria umożliwi podejmowanie
 - Liczbę gier w opisie audytu ujednolicono z katalogiem testowanym przez fabrykę: 17 identyfikatorów.
 - Parser konspektów przekazuje teraz konkretną przyczynę błędu JSON, błędu odczytu, błędnej struktury ćwiczenia lub nieprawidłowego pola recepty. Błędny plik nie częściowo nadpisuje obiektu wynikowego.
 - Testy CI nie zastępują testów na rzeczywistym stanowisku z tensometrem i monitorem; potwierdzają kompilację i zachowanie w środowisku automatycznym.
+
+### Weryfikacja końcowa bieżącej rewizji — 2026-11-12
+
+- Zweryfikowany HEAD gałęzi: `91a0a5e48991b13d056636ab234df6a08ee836bc`.
+- Workflow „Linux desktop GUI build” zakończony statusem `success`. Zbudowano aplikację oraz pakiety dystrybucyjne; artefakty Linux DEB i archiwum x86_64 zostały opublikowane w Actions (retencja CI: 14 dni).
+- Workflow „security-regression” zakończony statusem `success`. CTest: **37/37 testów zaliczonych**, 0 niepowodzeń, 78,02 s. W tym: test recepty ćwiczenia, test prezentacji desktopowej, własności wejścia czujnika, silnika gry, fabryki 17 gier i test C++ własności strumienia czujnika.
+- Workflow „patient-log-privacy-regression” zakończony statusem `success`.
+- Poprzedni błąd testu statycznego `desktop_presentation_regression` wynikał z oczekiwania starego przypisania pola parsera. Test zaktualizowano tak, aby sprawdzał obecny parser transakcyjny, walidację struktury JSON i brak częściowego zapisu obiektu. Nowa rewizja przeszła cały zestaw.
+- Test 17 gier obejmuje renderowanie w czterech rozdzielczościach i potwierdza wykonanie kroków symulacji. Nie jest to jeszcze pełny deterministyczny test trajektorii i wszystkich typów kolizji każdej gry — to pozostaje zadaniem.
+- Kompilacja i CI nie potwierdzają fizycznej płynności na każdym monitorze ani poprawności kalibracji HX711 na rzeczywistym urządzeniu. Wymagane są osobne testy stanowiskowe.
+
+### Kolejny zakres prac
+
+1. Dodać deterministyczne testy trajektorii, czasu przelotu i kolizji dla pozostałych mechanik wszystkich 17 gier.
+2. Rozszerzyć testy odporności na utratę sygnału, wznowienie, zmianę proporcji okna i szybkie wejścia czujnika.
+3. Wprowadzić wersjonowanie recept i powiązanie wykonania ćwiczenia z niezmienną wersją recepty.
+4. Kontynuować projekt automatu sesji i trwałych punktów kontrolnych.
