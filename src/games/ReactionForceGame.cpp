@@ -425,6 +425,7 @@ void ReactionForceGame::paintEvent(QPaintEvent* event)
 
 void ReactionForceGame::render(QPainter& painter)
 {
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const qreal w = width(), h = height();
     if (w <= 0.0 || h <= 0.0) return;
     const qreal unit = qMin(w / 960.0, h / 540.0);
