@@ -163,10 +163,10 @@ protected:
     // fixed simulation states. Games opt in by interpolating their own state.
     virtual void renderInterpolated(QPainter& painter, double alpha);
 
-    static constexpr double kFixedSimulationStepSeconds = 1.0 / 240.0;
-    // Bias presentation toward the newest simulation state: only half of the
-    // previous-to-current interval is interpolated, reducing visual latency.
-    double renderInterpolationAlpha() const { return 0.5 + 0.5 * m_renderInterpolationAlpha; }
+    static constexpr double kFixedSimulationStepSeconds = 1.0 / 480.0;
+    // Keep interpolation minimal: render between 90% and 100% of the latest
+    // simulation interval to reduce visible lag without extrapolating.
+    double renderInterpolationAlpha() const { return 0.9 + 0.1 * m_renderInterpolationAlpha; }
 
     /**
      * @brief Obsługuje wejście specyficzne dla gry
