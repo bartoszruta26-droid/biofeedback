@@ -34,6 +34,7 @@
 #include "games/MarioGame.hpp"
 #include "games/SinGame.hpp"
 #include "games/TanGame.hpp"
+#include "games/FunctionTrackGame.hpp"
 #include "games/ArkanoidGame.hpp"
 #include "games/GalagaGame.hpp"
 #include "games/GameFactory.hpp"
@@ -440,6 +441,9 @@ void TrainingTab::setupUI()
     m_gameTypeCombo->addItem("Mario", "mario");
     m_gameTypeCombo->addItem("Sinusoidalna", "sin");
     m_gameTypeCombo->addItem("Tangensoidalna", "tan");
+    m_gameTypeCombo->addItem("Kotangensoidalna", "cotangent");
+    m_gameTypeCombo->addItem("Trapez", "trapezoid");
+    m_gameTypeCombo->addItem("Funkcje mieszane (sin/cos → tan/cot → trapez)", "mixed_functions");
     m_gameTypeCombo->addItem("Galaga", "galaga");
     m_gameTypeCombo->addItem("Archer", "archer");
     m_gameTypeCombo->addItem("Scorched Earth", "scorched_earth");
@@ -1036,6 +1040,10 @@ void TrainingTab::configureGameForExercise()
         sinusGame->setDifficultyLevel(m_sinusDifficultySpin ? m_sinusDifficultySpin->value() : 1);
         sinusGame->setAutomaticDifficulty(m_sinusAutoDifficultyCheck &&
                                           m_sinusAutoDifficultyCheck->isChecked());
+    }
+    if (auto* functionGame = dynamic_cast<games::FunctionTrackGame*>(selectedGame)) {
+        functionGame->setDifficultyLevel(1);
+        functionGame->setTrackWidth(0.30);
     }
     if (auto* reactionGame = dynamic_cast<games::ReactionForceGame*>(selectedGame)) {
         reactionGame->setDifficultyLevel(
