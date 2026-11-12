@@ -39,7 +39,7 @@ for path in GAME_SOURCES + GAME_HEADERS:
 engine = (ROOT / "src" / "games" / "GameEngine.cpp").read_text(encoding="utf-8")
 engine_header = (ROOT / "include" / "games" / "GameEngine.hpp").read_text(encoding="utf-8")
 required_engine_tokens = (
-    "m_gameTimer->setInterval(8",
+    "m_gameTimer->setInterval(8)",
     "m_gameTimer->setTimerType(Qt::PreciseTimer)",
     "constexpr double fixedStep = kFixedSimulationStepSeconds;",
     "update(fixedStep);",
