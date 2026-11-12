@@ -50,7 +50,23 @@ struct ExerciseData {
     int durationSeconds;        // Czas trwania ćwiczenia w sekundach
     int targetRepetitions;      // Docelowa liczba powtórzeń
     QString difficulty;         // Poziom trudności (easy/medium/hard)
-    
+
+    // Optional prescription fields; absent JSON keys preserve legacy behavior.
+    int orderIndex{-1};
+    QString phase;
+    QString permittedRom;
+    QString permittedLoad;
+    int setsTarget{0};
+    int repsTarget{0};
+    int holdSeconds{0};
+    int restSeconds{0};
+    double resistanceValue{0.0};
+    QString resistanceUnit;
+    QString tempo;
+    double rpeTarget{-1.0};
+    QString painPolicyId;
+    QString progressionRuleId;
+
     ExerciseData() : durationSeconds(0), targetRepetitions(0) {}
 };
 
