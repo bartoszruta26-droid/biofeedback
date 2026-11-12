@@ -24,16 +24,16 @@ GameEngine::GameEngine(QWidget *parent)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Pump the fixed-step simulation at approximately 240 Hz. This keeps the
-    // accumulator close to each 1/240 s physics boundary and reduces timer
-    // quantization before Qt coalesces paint requests to the display cadence.
+    // Pump the fixed-step simulation at approximately 120 Hz. The accumulator
+    // uses an exact 1/120 s step; Qt timer jitter is absorbed without changing
+    // game physics or tying simulation to the display refresh rate.
     // Every game paints an opaque full-frame background. Let Qt skip the
     // implicit background erase and compositor blending for this widget.
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAutoFillBackground(false);
 
-    m_gameTimer->setInterval(4);
+    m_gameTimer->setInterval(8);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
@@ -254,18 +254,18 @@ void GameEngine::gameLoop()
     constexpr double fixedStep = kFixedSimulationStepSeconds;
     m_simulationAccumulator += deltaTime;
     int steps = 0;
-    while (m_simulationAccumulator >= fixedStep && steps < 24 && m_isRunning && !m_isPaused) {
+    while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
         update(fixedStep);
         m_simulationAccumulator -= fixedStep;
         ++steps;
     }
     m_frameCount += static_cast<quint64>(steps);
-    if (steps == 24 && m_simulationAccumulator >= fixedStep)
+    if (steps == 12 && m_simulationAccumulator >= fixedStep)
         m_simulationAccumulator = std::fmod(m_simulationAccumulator, fixedStep);
 
     // Preserve the full accumulator fraction. Each rendered frame blends the
-    // previous and current fixed-step states, avoiding stepped motion when
-    // presentation runs at 120 Hz and simulation at 240 Hz.
+    // previous and current 120 Hz fixed-step states, including on 60/90/120 Hz
+    // displays, without advancing the simulation from the paint callback.
     m_renderInterpolationAlpha = qBound(0.0, m_simulationAccumulator / fixedStep, 1.0);
     QWidget::update();
 }
