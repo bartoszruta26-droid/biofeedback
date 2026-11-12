@@ -368,7 +368,7 @@ void RhythmForceGame::render(QPainter &painter)
     const int w = width();
     const int h = height();
     painter.fillRect(rect(), QColor(8, 19, 37));
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const QPointF horizon(w * 0.5, h * 0.34);
     painter.setPen(QPen(QColor(74, 154, 202, 35), 1));
     for (int i = -5; i <= 5; ++i)
