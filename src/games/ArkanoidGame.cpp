@@ -129,7 +129,15 @@ void ArkanoidGame::renderInterpolated(QPainter& p,double alpha){
  alpha=qBound(0.0,alpha,1.0);
  const QPointF currentBall=m_ballPosition;
  const QRectF currentPaddle=m_paddle;
- m_ballPosition=m_previousBallPosition+(currentBall-m_previousBallPosition)*alpha;
+ // Use the remaining fraction of the fixed step to predict only the visual
+ // ball position. The simulation state and collision handling stay untouched;
+ // unlike previous/current interpolation this avoids a one-step visual lag.
+ const double presentationLead=alpha*kFixedSimulationStepSeconds;
+ m_ballPosition=currentBall+m_ballVelocity*presentationLead;
+ m_ballPosition.setX(qBound(m_ballRadius,m_ballPosition.x(),
+                            qMax(m_ballRadius,width()-m_ballRadius)));
+ m_ballPosition.setY(qBound(m_ballRadius,m_ballPosition.y(),
+                            qMax(m_ballRadius,height()-m_ballRadius)));
  m_paddle=QRectF(m_previousPaddle.x()+(currentPaddle.x()-m_previousPaddle.x())*alpha,
                  m_previousPaddle.y()+(currentPaddle.y()-m_previousPaddle.y())*alpha,
                  currentPaddle.width(),currentPaddle.height());
