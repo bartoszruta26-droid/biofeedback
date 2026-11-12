@@ -255,9 +255,6 @@ int main(int argc, char **argv)
     const QStringList ids = {
         QStringLiteral("sin_game"),
         QStringLiteral("tan_game"),
-        QStringLiteral("kotangens"),
-        QStringLiteral("trapez"),
-        QStringLiteral("funkcje_mieszane"),
         QStringLiteral("pong"),
         QStringLiteral("arkanoid"),
         QStringLiteral("flappy_bird"),
