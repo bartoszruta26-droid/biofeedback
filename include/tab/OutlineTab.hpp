@@ -237,7 +237,7 @@ private:
     void createConnections();
     
     void loadOutlineFiles(const QString& directory);
-    bool parseOutlineFile(const QString& filename, OutlineData& outline);
+    bool parseOutlineFile(const QString& filename, OutlineData& outline, QString* error = nullptr);
     void populateOutlineCombo();
     void populateGameCombo();
     void updateProgressIndicators();
