@@ -15,7 +15,7 @@ namespace games {
 
 namespace {
 constexpr double kSensorTimeoutMs = 350.0;
-constexpr double kForceSmoothingSeconds = 0.075;
+constexpr double kForceSmoothingSeconds = 0.025;
 constexpr double kServeDelaySeconds = 0.65;
 constexpr double kPhysicsStep = 1.0 / 240.0;
 }
@@ -339,8 +339,8 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
         if (previousBallPos.x() >= faceX && m_ballPos.x() <= faceX) {
             const double t = qBound(0.0, (faceX - previousBallPos.x()) / dx, 1.0);
             const double impactY = previousBallPos.y() + dy * t;
-            if (impactY >= m_leftPaddle.top() - m_ballRadius &&
-                impactY <= m_leftPaddle.bottom() + m_ballRadius) {
+            if (impactY >= m_leftPaddle.top() &&
+                impactY <= m_leftPaddle.bottom()) {
                 const double offset = qBound(-1.0,
                     (impactY - m_leftPaddle.center().y()) /
                         qMax(1.0, m_paddleHeight * 0.5), 1.0);
@@ -362,8 +362,8 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
         if (previousBallPos.x() <= faceX && m_ballPos.x() >= faceX) {
             const double t = qBound(0.0, (faceX - previousBallPos.x()) / dx, 1.0);
             const double impactY = previousBallPos.y() + dy * t;
-            if (impactY >= m_rightPaddle.top() - m_ballRadius &&
-                impactY <= m_rightPaddle.bottom() + m_ballRadius) {
+            if (impactY >= m_rightPaddle.top() &&
+                impactY <= m_rightPaddle.bottom()) {
                 const double offset = qBound(-1.0,
                     (impactY - m_rightPaddle.center().y()) /
                         qMax(1.0, m_paddleHeight * 0.5), 1.0);
