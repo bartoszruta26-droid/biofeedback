@@ -30,7 +30,8 @@ for path in GAME_SOURCES + GAME_HEADERS:
         raise SystemExit(f"Expensive gradient rendering is not allowed in the arcade profile: {path.relative_to(ROOT)}")
     if path.name != "GameEngine.cpp" and re.search(r"setRenderHint\(QPainter::Antialiasing\s*,\s*false\s*\)", source):
         raise SystemExit(f"Subpixel antialiasing must remain enabled for smooth arcade motion: {path.relative_to(ROOT)}")
-    if path.name != "GameEngine.cpp" and not re.search(
+    # Render hints are implementation details; headers declare interfaces only.
+    if path.suffix == ".cpp" and path.name != "GameEngine.cpp" and not re.search(
         r"setRenderHint\(QPainter::Antialiasing\s*,\s*true\s*\)", source
     ):
         raise SystemExit(f"Game renderer must preserve fractional object positions: {path.relative_to(ROOT)}")
