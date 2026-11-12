@@ -262,15 +262,8 @@ void TanGame::update(double deltaTime)
         return;
     }
 
-    // The singularity is a transition, not a target to chase. Pause scoring
-    // around it so the unavoidable top-to-bottom jump is never penalized.
-    if (m_nearAsymptote) {
-        m_isHit = false;
-        m_trackingSeconds = 0.0;
-        m_combo = 0;
-        m_feedbackText = QStringLiteral("Przejście asymptoty — przygotuj się");
-        return;
-    }
+    // A bounded periodic tangent/cotangent track keeps the input cursor and
+    // scoring active through the former asymptote transition.
 
     const double distance = std::abs(m_cursorY - m_targetY);
     m_isHit = distance <= m_tolerance;
