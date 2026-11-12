@@ -487,11 +487,32 @@ void TrainingTab::setupUI()
     m_sinusAutoDifficultyCheck->setVisible(false);
     configLayout->addWidget(m_sinusAutoDifficultyCheck);
 
+    const auto makeMathWidthControl = [this, configLayout](const QString& label, int initial) {
+        auto* spin = new QSpinBox(this);
+        spin->setRange(12, 48);
+        spin->setValue(initial);
+        spin->setSuffix(QStringLiteral("%"));
+        spin->setPrefix(label);
+        spin->setVisible(false);
+        configLayout->addWidget(spin);
+        return spin;
+    };
+    m_mathSinusWidthSpin = makeMathWidthControl(QStringLiteral("Szerokość sinus/cosinus: "), 25);
+    m_mathTangentWidthSpin = makeMathWidthControl(QStringLiteral("Szerokość tangens/kotangens: "), 32);
+    m_mathTrapezoidWidthSpin = makeMathWidthControl(QStringLiteral("Szerokość trapezu: "), 38);
+
     const auto updateSinusOptionsVisibility = [this](int) {
-        const bool show = m_gameTypeCombo->currentData().toString() == QStringLiteral("sin");
-        m_sinusWaveformCombo->setVisible(show);
-        m_sinusDifficultySpin->setVisible(show);
-        m_sinusAutoDifficultyCheck->setVisible(show);
+        const QString selected = m_gameTypeCombo->currentData().toString();
+        const bool showSin = selected == QStringLiteral("sin");
+        m_sinusWaveformCombo->setVisible(showSin);
+        m_sinusDifficultySpin->setVisible(showSin);
+        m_sinusAutoDifficultyCheck->setVisible(showSin);
+        const bool mixed = selected == QStringLiteral("mixed_functions");
+        if (m_mathSinusWidthSpin) m_mathSinusWidthSpin->setVisible(mixed);
+        if (m_mathTangentWidthSpin)
+            m_mathTangentWidthSpin->setVisible(mixed || selected == QStringLiteral("cotangent"));
+        if (m_mathTrapezoidWidthSpin)
+            m_mathTrapezoidWidthSpin->setVisible(mixed || selected == QStringLiteral("trapezoid"));
     };
     const auto updateReactionForceOptionsVisibility = [this](int) {
         const bool show = m_gameTypeCombo->currentData().toString() == QStringLiteral("reaction_force");
@@ -1043,9 +1064,9 @@ void TrainingTab::configureGameForExercise()
     }
     if (auto* functionGame = dynamic_cast<games::FunctionTrackGame*>(selectedGame)) {
         functionGame->setDifficultyLevel(1);
-        functionGame->setSinusWidth(0.25);
-        functionGame->setTangentWidth(0.32);
-        functionGame->setTrapezoidWidth(0.38);
+        functionGame->setSinusWidth((m_mathSinusWidthSpin ? m_mathSinusWidthSpin->value() : 25) / 100.0);
+        functionGame->setTangentWidth((m_mathTangentWidthSpin ? m_mathTangentWidthSpin->value() : 32) / 100.0);
+        functionGame->setTrapezoidWidth((m_mathTrapezoidWidthSpin ? m_mathTrapezoidWidthSpin->value() : 38) / 100.0);
     }
     if (auto* reactionGame = dynamic_cast<games::ReactionForceGame*>(selectedGame)) {
         reactionGame->setDifficultyLevel(
