@@ -19,6 +19,21 @@ int main()
     REQUIRE(legacy.resistanceValue == 0.0 && legacy.rpeTarget == -1.0);
     REQUIRE(legacy.phase.isEmpty() && legacy.painPolicyId.isEmpty());
 
+    // Legacy exercise objects keep their original fields and do not require
+    // any of the new prescription keys.
+    const QJsonObject legacyExercise{
+        {QStringLiteral("id"), QStringLiteral("legacy-01")},
+        {QStringLiteral("name"), QStringLiteral("Range of motion")},
+        {QStringLiteral("durationSeconds"), 30},
+        {QStringLiteral("targetRepetitions"), 10},
+        {QStringLiteral("difficulty"), QStringLiteral("easy")}
+    };
+    tab::ExercisePrescription legacyWithOldFields;
+    REQUIRE(tab::ExercisePrescription::fromJson(legacyExercise, legacyWithOldFields, &error));
+    REQUIRE(legacyWithOldFields.setsTarget == 0);
+    REQUIRE(legacyWithOldFields.repsTarget == 0);
+    REQUIRE(legacyWithOldFields.rpeTarget == -1.0);
+
     const QJsonObject complete{
         {QStringLiteral("orderIndex"), 3},
         {QStringLiteral("phase"), QStringLiteral("strengthening")},
