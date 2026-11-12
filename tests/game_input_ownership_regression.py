@@ -85,8 +85,8 @@ arkanoid = (ROOT / "src" / "games" / "ArkanoidGame.cpp").read_text(encoding="utf
 pong = (ROOT / "src" / "games" / "PongGame.cpp").read_text(encoding="utf-8")
 if "constexpr double maxStep=1.0/240.0" not in arkanoid:
     raise SystemExit("Arkanoid physics must use the 240 Hz internal physics substep.")
-if "constexpr double kPhysicsStep = 1.0 / 240.0;" not in pong:
-    raise SystemExit("Pong physics must use the shared 240 Hz motion profile.")
+if "constexpr double kPhysicsStep = 1.0 / 120.0;" not in pong:
+    raise SystemExit("Pong physics must use the shared 120 Hz simulation step.")
 
 if "m_ballVelocity*presentationLead" not in arkanoid:
     raise SystemExit("Arkanoid must render its ball using presentation-time velocity prediction.")
