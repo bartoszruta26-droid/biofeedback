@@ -461,9 +461,9 @@ void PongGame::renderInterpolated(QPainter& painter, double alpha)
         m_ballPos = currentBall + m_ballVel * presentationLead;
         const double radius = static_cast<double>(m_ballRadius);
         m_ballPos.setX(qBound(radius, m_ballPos.x(),
-                              qMax(radius, static_cast<double>(width()) - radius));
+                              qMax(radius, static_cast<double>(width()) - radius)));
         m_ballPos.setY(qBound(radius, m_ballPos.y(),
-                              qMax(radius, static_cast<double>(height()) - radius));
+                              qMax(radius, static_cast<double>(height()) - radius)));
     }
 
     m_leftPaddleY = static_cast<float>(
