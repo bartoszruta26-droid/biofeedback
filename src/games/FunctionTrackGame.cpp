@@ -46,7 +46,7 @@ void FunctionTrackGame::setDifficultyLevel(int level)
 {
     m_difficulty = qBound(1, level, 5);
     // Tolerance is deliberately independent of screen resolution and track width.
-    m_tolerance = qMax(48.0, height() * (0.22 - (m_difficulty - 1) * 0.015));
+    m_tolerance = height() * (0.22 - (m_difficulty - 1) * 0.03);
 }
 
 int FunctionTrackGame::difficultyLevel() const { return m_difficulty; }
@@ -176,7 +176,7 @@ void FunctionTrackGame::update(double deltaTime)
     if (!isRunning() || width() <= 0 || height() <= 0 ||
         !std::isfinite(deltaTime) || deltaTime <= 0.0) return;
     const double dt = qMin(deltaTime, 0.05);
-    m_tolerance = qMax(48.0, height() * (0.22 - (m_difficulty - 1) * 0.015));
+    m_tolerance = height() * (0.22 - (m_difficulty - 1) * 0.03);
     m_previousPhase = m_phase;
     m_previousCursorY = m_cursorY;
     m_previousTargetY = m_targetY;
@@ -195,7 +195,7 @@ void FunctionTrackGame::update(double deltaTime)
         return;
     }
     const double distance = std::abs(m_cursorY - m_targetY);
-    const double tolerance = qMax(m_tolerance, height() * 0.20);
+    const double tolerance = m_tolerance;
     if (distance <= tolerance) {
         m_hitTime += dt;
         const double accuracy = qBound(0.0, 1.0 - distance / tolerance, 1.0);
@@ -214,7 +214,11 @@ void FunctionTrackGame::renderInterpolated(QPainter& painter, double alpha)
 {
     alpha = qBound(0.0, alpha, 1.0);
     const double phase = m_phase, cursor = m_cursorY, target = m_targetY;
-    m_phase = m_previousPhase + (phase - m_previousPhase) * alpha;
+    // Interpolate along the forward circular phase, not through the full
+    // range when the phase wraps from 2*pi back to zero.
+    double phaseDelta = std::fmod(phase - m_previousPhase + 2.0 * kPi, 2.0 * kPi);
+    if (phaseDelta < 0.0) phaseDelta += 2.0 * kPi;
+    m_phase = std::fmod(m_previousPhase + phaseDelta * alpha, 2.0 * kPi);
     m_cursorY = m_previousCursorY + (cursor - m_previousCursorY) * alpha;
     m_targetY = m_previousTargetY + (target - m_previousTargetY) * alpha;
     render(painter);
@@ -237,7 +241,7 @@ void FunctionTrackGame::render(QPainter& painter)
     painter.drawPath(path);
 
     const double gateX = w * 0.72;
-    const double tolerance = qMax(m_tolerance, h * 0.20);
+    const double tolerance = m_tolerance;
     painter.setPen(QPen(QColor(100, 220, 170, 75), 1, Qt::DashLine));
     painter.drawLine(QPointF(gateX, m_targetY - tolerance), QPointF(gateX, m_targetY + tolerance));
     painter.setPen(QPen(QColor(235, 240, 250, 150), 1.5, Qt::DashLine));
