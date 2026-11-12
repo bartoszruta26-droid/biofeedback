@@ -16,6 +16,7 @@
 #include "games/PongGame.hpp"
 #include "games/SinGame.hpp"
 #include "games/TanGame.hpp"
+#include "games/FunctionTrackGame.hpp"
 
 namespace games {
 
@@ -31,6 +32,17 @@ inline GameEngine* createGame(const QString& gameId, QWidget* parent = nullptr)
 
     if (id == QStringLiteral("tan") || id == QStringLiteral("tan_game"))
         return new TanGame(parent);
+
+    if (id == QStringLiteral("cot") || id == QStringLiteral("cotangent") ||
+        id == QStringLiteral("cotangens") || id == QStringLiteral("kotangens"))
+        return new FunctionTrackGame(FunctionTrackGame::Mode::Cotangent, parent);
+
+    if (id == QStringLiteral("trapezoid") || id == QStringLiteral("trapez"))
+        return new FunctionTrackGame(FunctionTrackGame::Mode::Trapezoid, parent);
+
+    if (id == QStringLiteral("mixed_functions") || id == QStringLiteral("mixed-functions") ||
+        id == QStringLiteral("funkcje_mieszane") || id == QStringLiteral("funkcje mieszane"))
+        return new FunctionTrackGame(FunctionTrackGame::Mode::Mixed, parent);
 
     if (id == QStringLiteral("pong"))
         return new PongGame(parent);

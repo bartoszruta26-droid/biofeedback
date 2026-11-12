@@ -20,9 +20,25 @@ constexpr double kAsymptoteGuard = 0.10;
 
 double tangentWave(double angle, double sharpness)
 {
-    // atan(tan(x)) is bounded to [-pi/2, pi/2] on each branch.
-    // The scale controls steepness without creating long clipped plateaus.
-    return (2.0 / kPi) * std::atan(sharpness * std::tan(angle));
+    // One uninterrupted cycle: tangent-like half, then cotangent-like half.
+    // Smooth cross-fades at both hand-offs prevent a target-position jump.
+    const double cycle = std::fmod(angle + 2.0 * kPi, 2.0 * kPi);
+    const double tangent = std::tanh((2.0 + sharpness) * std::sin(cycle) /
+                                     (std::abs(std::cos(cycle)) + 0.20));
+    const double cotangent = std::tanh((2.0 + sharpness) * std::cos(cycle) /
+                                       (std::abs(std::sin(cycle)) + 0.20));
+    const auto blend = [](double from, double to, double t) {
+        const double x = qBound(0.0, t, 1.0);
+        const double eased = x * x * (3.0 - 2.0 * x);
+        return from + (to - from) * eased;
+    };
+    if (cycle >= kPi - 0.25 && cycle <= kPi + 0.25)
+        return blend(tangent, cotangent, (cycle - (kPi - 0.25)) / 0.50);
+    if (cycle >= 2.0 * kPi - 0.25)
+        return blend(cotangent, tangent, (cycle - (2.0 * kPi - 0.25)) / 0.50);
+    if (cycle < 0.25)
+        return blend(cotangent, tangent, (cycle + 0.25) / 0.50);
+    return cycle < kPi ? tangent : cotangent;
 }
 }
 
@@ -98,9 +114,9 @@ void TanGame::setDifficultyLevel(int level)
 {
     m_difficultyLevel = qBound(1, level, 5);
     const double scaleY = qMax(0.5, height() / 480.0);
-    const double toleranceRatio = 0.145 - (m_difficultyLevel - 1) * 0.010;
-    m_tolerance = qBound(12.0 * scaleY,
-        static_cast<double>(height()) * toleranceRatio, 64.0 * scaleY);
+    const double toleranceRatio = 0.25 - (m_difficultyLevel - 1) * 0.012;
+    m_tolerance = qBound(40.0 * scaleY,
+        static_cast<double>(height()) * toleranceRatio, 145.0 * scaleY);
     updateSpatialFrequency();
     m_isHit = false;
     m_trackingSeconds = 0.0;
@@ -160,9 +176,9 @@ void TanGame::resizeEvent(QResizeEvent* event)
     QWidget::resizeEvent(event);
     updateSpatialFrequency();
     const double scaleY = qMax(0.5, height() / 480.0);
-    const double ratio = 0.145 - (m_difficultyLevel - 1) * 0.010;
-    m_tolerance = qBound(12.0 * scaleY,
-        static_cast<double>(height()) * ratio, 64.0 * scaleY);
+    const double ratio = 0.25 - (m_difficultyLevel - 1) * 0.012;
+    m_tolerance = qBound(40.0 * scaleY,
+        static_cast<double>(height()) * ratio, 145.0 * scaleY);
     calculateTargetY(width() * 0.72);
     m_previousPhase = m_phase;
     m_previousCursorY = m_cursorY;
@@ -219,7 +235,7 @@ bool TanGame::handleInput(double value)
 
 void TanGame::calculateTargetY(double x)
 {
-    const double angle = std::remainder(x * m_frequency + m_phase, kPi);
+    const double angle = std::remainder(x * m_frequency + m_phase, 2.0 * kPi);
     const double cosine = std::abs(std::cos(angle));
     m_nearAsymptote = cosine < kAsymptoteGuard;
 
@@ -241,7 +257,7 @@ void TanGame::update(double deltaTime)
     m_previousTargetY = m_targetY;
     updateSpatialFrequency();
     m_phase = std::remainder(
-        m_phase - m_scrollSpeed * m_frequency * dt, kPi);
+        m_phase - m_scrollSpeed * m_frequency * dt, 2.0 * kPi);
     m_inputAge += dt;
     m_sessionSeconds += dt;
 
@@ -262,15 +278,8 @@ void TanGame::update(double deltaTime)
         return;
     }
 
-    // The singularity is a transition, not a target to chase. Pause scoring
-    // around it so the unavoidable top-to-bottom jump is never penalized.
-    if (m_nearAsymptote) {
-        m_isHit = false;
-        m_trackingSeconds = 0.0;
-        m_combo = 0;
-        m_feedbackText = QStringLiteral("Przejście asymptoty — przygotuj się");
-        return;
-    }
+    // A bounded periodic tangent/cotangent track keeps the input cursor and
+    // scoring active through the former asymptote transition.
 
     const double distance = std::abs(m_cursorY - m_targetY);
     m_isHit = distance <= m_tolerance;
@@ -344,25 +353,15 @@ void TanGame::render(QPainter& painter)
 
     QPainterPath tangentPath;
     bool hasPrevious = false;
-    bool previousBranchPositive = false;
-    double previousY = 0.0;
     for (int x = 0; x <= w; ++x) {
         const double angle = std::remainder(
-            static_cast<double>(x) * m_frequency + m_phase, kPi);
-        const double cosine = std::cos(angle);
+            static_cast<double>(x) * m_frequency + m_phase, 2.0 * kPi);
         const double normalized = qBound(-1.0, tangentWave(angle, m_tangentSharpness), 1.0);
         const double y = centerY - normalized * amplitude;
-        const bool branchPositive = cosine >= 0.0;
 
-        // Never connect the two sides of a tangent asymptote.
-        if (!hasPrevious || branchPositive != previousBranchPositive ||
-            std::abs(y - previousY) > heightD * 0.35) {
-            tangentPath.moveTo(x, y);
-        } else {
-            tangentPath.lineTo(x, y);
-        }
-        previousY = y;
-        previousBranchPositive = branchPositive;
+        // The bounded cyclic curve is continuous across former asymptotes.
+        if (!hasPrevious) tangentPath.moveTo(x, y);
+        else tangentPath.lineTo(x, y);
         hasPrevious = true;
     }
 

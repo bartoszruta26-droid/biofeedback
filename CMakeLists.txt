@@ -335,6 +335,7 @@ if(Qt5_FOUND)
         src/games/GameEngine.cpp
         src/games/SinGame.cpp
         src/games/TanGame.cpp
+        src/games/FunctionTrackGame.cpp
         src/games/ArkanoidGame.cpp
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
@@ -378,6 +379,7 @@ if(Qt5_FOUND)
         include/games/GameEngine.hpp
         include/games/SinGame.hpp
         include/games/TanGame.hpp
+        include/games/FunctionTrackGame.hpp
         include/games/ArkanoidGame.hpp
         include/games/GalagaGame.hpp
         include/games/ArcherGame.hpp
@@ -450,6 +452,7 @@ if(Qt5_FOUND)
         src/games/GameEngine.cpp
         src/games/SinGame.cpp
         src/games/TanGame.cpp
+        src/games/FunctionTrackGame.cpp
         src/games/ArkanoidGame.cpp
         src/games/PongGame.cpp
         src/games/FlappyBirdGame.cpp
@@ -468,6 +471,7 @@ if(Qt5_FOUND)
         include/games/GameEngine.hpp
         include/games/SinGame.hpp
         include/games/TanGame.hpp
+        include/games/FunctionTrackGame.hpp
         include/games/ArkanoidGame.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
@@ -525,6 +529,7 @@ if(Qt5_FOUND)
         src/games/MarioGame.cpp
         src/games/SinGame.cpp
         src/games/TanGame.cpp
+        src/games/FunctionTrackGame.cpp
         src/games/ArkanoidGame.cpp
         src/games/GalagaGame.cpp
         src/games/ArcherGame.cpp
@@ -541,6 +546,7 @@ if(Qt5_FOUND)
         include/sensor/SerialCommunication.hpp
         include/measurement/MeasurementEngine.hpp
         include/games/GameEngine.hpp
+        include/games/FunctionTrackGame.hpp
         include/games/PongGame.hpp
         include/games/FlappyBirdGame.hpp
         include/games/MarioGame.hpp
