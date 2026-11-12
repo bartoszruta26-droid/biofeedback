@@ -69,7 +69,11 @@ for path in GAME_SOURCES:
     if "public GameEngine" not in header_source and "public games::GameEngine" not in header_source:
         raise SystemExit(f"Game must inherit the shared GameEngine profile: {header.relative_to(ROOT)}")
     source = path.read_text(encoding="utf-8")
-    if ("paintEvent(" in source and\n            "renderInterpolated(painter, renderInterpolationAlpha())" not in source and\n            "GameEngine::paintEvent(event)" not in source):
+    if (
+        "paintEvent(" in source
+        and "renderInterpolated(painter, renderInterpolationAlpha())" not in source
+        and "GameEngine::paintEvent(event)" not in source
+    ):
         raise SystemExit(f"Custom paintEvent must use the shared interpolation fraction: {path.relative_to(ROOT)}")
 
 arkanoid = (ROOT / "src" / "games" / "ArkanoidGame.cpp").read_text(encoding="utf-8")
