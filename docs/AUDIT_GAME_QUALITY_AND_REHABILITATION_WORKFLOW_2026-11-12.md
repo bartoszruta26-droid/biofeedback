@@ -3,7 +3,7 @@
 Data audytu: 2026-11-12  
 Repozytorium: `bartoszruta26-droid/biofeedback`  
 Gałąź bazowa audytu: `fix/smooth-game-motion`  
-Zakres: Linux desktop / Qt, 15 gier biofeedback, konspekty i proces rehabilitacji.
+Zakres: Linux desktop / Qt, 17 gier biofeedback, konspekty i proces rehabilitacji.
 
 ## 1. Streszczenie wykonawcze
 
@@ -20,7 +20,7 @@ Największa luka w konspektach polega na rozdzieleniu planu, wykonania i dokumen
 - `GameEngine` realizuje symulację ze stałym krokiem `1/120 s`.
 - Pętla używa monotonicznego zegara nanosekundowego, timera Qt o interwale 8 ms, akumulatora czasu i ograniczonego nadrabiania zaległości.
 - Silnik udostępnia współczynnik interpolacji stanu renderowania.
-- Katalog 15 gier ma implementacje `renderInterpolated`.
+- Katalog 17 gier ma implementacje `renderInterpolated`.
 - Wejście z wątku odczytu czujnika jest scalane do najnowszej próbki przed obsługą w GUI. Strumień próbek dla detektora powtórzeń pozostaje odrębny.
 - Istnieją testy cyklu życia silnika, fabryki gier, zmian rozdzielczości, wybranych kolizji i zachowania wejścia.
 - Wcześniejsze audyty opisują poprawki skalowania i ruchu, ale wyraźnie zaznaczają, że test zmiany rozmiaru nie dowodzi identycznej trajektorii fizycznej.
@@ -252,3 +252,12 @@ Prace rozpoczynają się od Etapu A, ponieważ telemetria umożliwi podejmowanie
 4. Dodać walidator konspektów i raport błędów importu.
 5. Zaprojektować i wdrożyć trwały, idempotentny automat sesji łączący konspekt z epizodem rehabilitacyjnym.
 6. Powiązać każdą obserwację z wersją recepty, a następnie dodać trwałe przypomnienia po 24 godzinach.
+
+
+### Uzupełnienie audytu — diagnostyka i weryfikacja CI
+
+- Zweryfikowano przebieg CI dla rewizji `9fda1df6833bd87d3574319721142c48c9b2cc04`: kompilacja Linux/Qt5 zakończona powodzeniem, regresje rdzenia zakończone powodzeniem, test prywatności danych pacjenta zakończony powodzeniem.
+- CTest uruchomił 37 testów; wszystkie 37 zakończyły się powodzeniem. Wśród nich znalazły się `exercise_prescription_regression`, `game_factory_regression` i `game_sensor_ownership_regression`.
+- Liczbę gier w opisie audytu ujednolicono z katalogiem testowanym przez fabrykę: 17 identyfikatorów.
+- Parser konspektów przekazuje teraz konkretną przyczynę błędu JSON, błędu odczytu, błędnej struktury ćwiczenia lub nieprawidłowego pola recepty. Błędny plik nie częściowo nadpisuje obiektu wynikowego.
+- Testy CI nie zastępują testów na rzeczywistym stanowisku z tensometrem i monitorem; potwierdzają kompilację i zachowanie w środowisku automatycznym.
