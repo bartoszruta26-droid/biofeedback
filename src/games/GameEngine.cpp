@@ -24,16 +24,16 @@ GameEngine::GameEngine(QWidget *parent)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Run deterministic game physics at 240 Hz and request presentation at 120 Hz.
-    // Qt's update() schedules painting efficiently and lets the window system
-    // coalesce work to the display refresh cadence instead of blocking the GUI.
+    // Pump the fixed-step simulation at approximately 240 Hz. This keeps the
+    // accumulator close to each 1/240 s physics boundary and reduces timer
+    // quantization before Qt coalesces paint requests to the display cadence.
     // Every game paints an opaque full-frame background. Let Qt skip the
     // implicit background erase and compositor blending for this widget.
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAutoFillBackground(false);
 
-    m_gameTimer->setInterval(8);
+    m_gameTimer->setInterval(4);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
