@@ -337,7 +337,7 @@ int main(int argc, char **argv)
         const int stepsMarker = engineStats.indexOf(QStringLiteral("simulation_steps="));
         REQUIRE(stepsMarker >= 0);
         bool stepsOk = false;
-        const int simulationSteps = engineStats.mid(stepsMarker + 18).section(',', 0, 0).toInt(&stepsOk);
+        const int simulationSteps = engineStats.mid(stepsMarker + 17).section(',', 0, 0).toInt(&stepsOk);
         REQUIRE(stepsOk && simulationSteps > 0);
 
         game->handleSensorInput(25.0);
