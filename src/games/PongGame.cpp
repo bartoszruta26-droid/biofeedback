@@ -17,7 +17,7 @@ namespace {
 constexpr double kSensorTimeoutMs = 350.0;
 constexpr double kForceSmoothingSeconds = 0.075;
 constexpr double kServeDelaySeconds = 0.65;
-constexpr double kPhysicsStep = 1.0 / 480.0;
+constexpr double kPhysicsStep = 1.0 / 240.0;
 }
 
 PongGame::PongGame(QWidget *parent)
