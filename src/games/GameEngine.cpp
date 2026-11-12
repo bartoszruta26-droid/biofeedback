@@ -24,16 +24,16 @@ GameEngine::GameEngine(QWidget *parent)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Pump the game at 500 Hz and advance its deterministic simulation at 480 Hz.
-    // repaint() in gameLoop requests an immediate paint instead of allowing Qt
-    // to merge queued update() requests; the display still sets the visible refresh ceiling.
+    // Run deterministic game physics at 240 Hz and request presentation at 120 Hz.
+    // Qt's update() schedules painting efficiently and lets the window system
+    // coalesce work to the display refresh cadence instead of blocking the GUI.
     // Every game paints an opaque full-frame background. Let Qt skip the
     // implicit background erase and compositor blending for this widget.
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAutoFillBackground(false);
 
-    m_gameTimer->setInterval(2);
+    m_gameTimer->setInterval(8);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
@@ -254,20 +254,20 @@ void GameEngine::gameLoop()
     constexpr double fixedStep = kFixedSimulationStepSeconds;
     m_simulationAccumulator += deltaTime;
     int steps = 0;
-    while (m_simulationAccumulator >= fixedStep && steps < 48 && m_isRunning && !m_isPaused) {
+    while (m_simulationAccumulator >= fixedStep && steps < 24 && m_isRunning && !m_isPaused) {
         update(fixedStep);
         m_simulationAccumulator -= fixedStep;
         ++steps;
     }
     m_frameCount += static_cast<quint64>(steps);
-    if (steps == 48 && m_simulationAccumulator >= fixedStep)
+    if (steps == 24 && m_simulationAccumulator >= fixedStep)
         m_simulationAccumulator = std::fmod(m_simulationAccumulator, fixedStep);
 
-    // Interpolation is presentation-only and restricted to the final 10% of
-    // the previous-to-current interval. Synchronous repaint() makes each
-    // timer pump generate a paint event instead of coalescing update() calls.
+    // Preserve the full accumulator fraction. Each rendered frame blends the
+    // previous and current fixed-step states, avoiding stepped motion when
+    // presentation runs at 120 Hz and simulation at 240 Hz.
     m_renderInterpolationAlpha = qBound(0.0, m_simulationAccumulator / fixedStep, 1.0);
-    repaint();
+    QWidget::update();
 }
 
 void GameEngine::handleSensorInput(double value)
@@ -381,7 +381,7 @@ void GameEngine::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::TextAntialiasing, false);
 
     // Running games render an opaque background themselves. Avoid a second
-    // full-window fill on every high-frequency paint (up to 500 Hz requested).
+    // full-window fill on every presentation frame (up to 120 Hz requested).
     if (m_isRunning) {
         renderInterpolated(painter, renderInterpolationAlpha());
     } else {
