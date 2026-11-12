@@ -392,6 +392,7 @@ void ForceMazeGame::renderInterpolated(QPainter& painter, double alpha)
 
 void ForceMazeGame::render(QPainter &painter)
 {
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const QRectF bounds = rect();
     painter.fillRect(bounds, QColor(11, 28, 43));
     painter.save();
