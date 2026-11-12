@@ -903,7 +903,8 @@ int main(int argc, char **argv)
     games::ArcherGameTestAccess::advance(*archerGame, archerDelta);
     const QPointF expectedArrowPosition(
         80.0 + 120.0 * archerDelta,
-        80.0 + (-30.0 + archerGravity * archerDelta) * archerDelta);
+        80.0 - 30.0 * archerDelta +
+            0.5 * archerGravity * archerDelta * archerDelta);
     const QPointF expectedArrowVelocity(120.0, -30.0 + archerGravity * archerDelta);
     const QPointF actualArrowPosition =
         games::ArcherGameTestAccess::arrowPosition(*archerGame);
