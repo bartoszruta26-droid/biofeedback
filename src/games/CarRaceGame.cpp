@@ -330,7 +330,7 @@ void CarRaceGame::renderInterpolated(QPainter& painter, double alpha)
 void CarRaceGame::render(QPainter& painter)
 {
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const double w = width(), h = height();
     const double roadWidth = w * kRoadWidthRatio;
     const double roadLeft = (w - roadWidth) / 2.0;
