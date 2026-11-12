@@ -59,12 +59,18 @@ for path in GAME_SOURCES:
     if path.name != "GameEngine.cpp" and "::renderInterpolated(" not in source:
         raise SystemExit(f"Game is missing frame-rate-independent render interpolation: {path.relative_to(ROOT)}")
 
-for path in GAME_HEADERS:
-    if path.name in {"GameEngine.hpp", "GameFactory.hpp"}:
+for path in GAME_SOURCES:
+    if path.name == "GameEngine.cpp":
         continue
+    header = ROOT / "include" / "games" / f"{path.stem}.hpp"
+    if not header.exists():
+        raise SystemExit(f"Game is missing its matching header: {header.relative_to(ROOT)}")
+    header_source = header.read_text(encoding="utf-8")
+    if "public GameEngine" not in header_source and "public games::GameEngine" not in header_source:
+        raise SystemExit(f"Game must inherit the shared GameEngine profile: {header.relative_to(ROOT)}")
     source = path.read_text(encoding="utf-8")
-    if "public GameEngine" not in source and "public games::GameEngine" not in source:
-        continue
+    if "paintEvent(" in source and "renderInterpolated(painter, renderInterpolationAlpha())" not in source:
+        raise SystemExit(f"Custom paintEvent must use the shared interpolation fraction: {path.relative_to(ROOT)}")
 
 arkanoid = (ROOT / "src" / "games" / "ArkanoidGame.cpp").read_text(encoding="utf-8")
 pong = (ROOT / "src" / "games" / "PongGame.cpp").read_text(encoding="utf-8")
@@ -85,4 +91,4 @@ for token in ("m_specialGestureActive", "target >= 0.95", "firePlayerShot()"):
 if "FlappyBirdGame::keyPressEvent" in flappy or "FlappyBirdGame::mousePressEvent" in flappy:
     raise SystemExit("Flappy Bird must use the tensometer impulse only.")
 
-print(f"PASS: {len(GAME_SOURCES) - 1} game sources and {len(GAME_HEADERS) - 2} game headers follow the shared 120 Hz presentation / 240 Hz simulation profile.")
+print(f"PASS: {len(GAME_SOURCES) - 1} games inherit the shared 120 Hz presentation / 240 Hz simulation profile and render through interpolation.")
