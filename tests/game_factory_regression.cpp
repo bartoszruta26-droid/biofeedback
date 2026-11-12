@@ -34,6 +34,16 @@
 #include <functional>
 
 namespace games {
+struct TanGameTestAccess
+{
+    static void setPhase(TanGame& game, double phase)
+    {
+        game.m_phase = phase;
+        game.m_previousPhase = phase;
+    }
+    static double phase(const TanGame& game) { return game.m_phase; }
+};
+
 struct PongGameTestAccess
 {
     static bool rejectsEarlyCornerBounce(PongGame& game)
@@ -66,6 +76,61 @@ struct PongGameTestAccess
         return game.m_ballVel.x() > 0.0 &&
                std::abs(game.m_ballPos.x() - faceX) < 1e-6;
     }
+
+    static bool advancesBallWithoutFreshSensor(PongGame& game)
+    {
+        game.m_hasSensorSample = false;
+        game.m_serveDelayRemaining = 0.0;
+        game.m_ballPos = QPointF(game.width() * 0.5, game.height() * 0.5);
+        game.m_previousBallPos = game.m_ballPos;
+        game.m_ballVel = QPointF(120.0, 0.0);
+        const QPointF before = game.m_ballPos;
+        game.update(1.0 / 240.0);
+        return game.m_ballPos.x() > before.x();
+    }
+};
+
+struct ArcherGameTestAccess
+{
+    static void injectArrow(ArcherGame& game, const QPointF& position,
+                            const QPointF& velocity)
+    {
+        game.m_arrows.clear();
+        game.m_arrows.push_back({position, velocity, true});
+        game.m_previousArrowPositions = {position};
+        game.m_hasSensorSample = false;
+    }
+    static QPointF arrowPosition(const ArcherGame& game)
+    {
+        return game.m_arrows.isEmpty() ? QPointF() : game.m_arrows.front().position;
+    }
+    static QPointF arrowVelocity(const ArcherGame& game)
+    {
+        return game.m_arrows.isEmpty() ? QPointF() : game.m_arrows.front().velocity;
+    }
+    static void advance(ArcherGame& game, double deltaTime) { game.update(deltaTime); }
+};
+
+struct ScorchedEarthGameTestAccess
+{
+    static void injectProjectile(ScorchedEarthGame& game, const QPointF& position,
+                                 const QPointF& velocity)
+    {
+        game.m_projectiles.clear();
+        game.m_projectiles.push_back({position, velocity, true, true});
+        game.m_previousProjectilePositions = {position};
+        game.m_wind = 0.0;
+    }
+    static QPointF projectilePosition(const ScorchedEarthGame& game)
+    {
+        return game.m_projectiles.isEmpty() ? QPointF() : game.m_projectiles.front().position;
+    }
+    static QPointF projectileVelocity(const ScorchedEarthGame& game)
+    {
+        return game.m_projectiles.isEmpty() ? QPointF() : game.m_projectiles.front().velocity;
+    }
+    static double gravity(const ScorchedEarthGame& game) { return game.m_gravity; }
+    static void advance(ScorchedEarthGame& game, double deltaTime) { game.update(deltaTime); }
 };
 
 struct PrecisionCraneGameTestAccess
@@ -290,7 +355,34 @@ int main(int argc, char **argv)
             game->resize(testSize);
             waitForEvents(8);
             REQUIRE(game->isRunning());
+
+            // Raster smoke-test every game at each supported desktop scale.
+            // This catches empty frames, invalid resize-dependent paint paths,
+            // and geometry code that only works at the reference resolution.
+            QImage frame(testSize, QImage::Format_ARGB32_Premultiplied);
+            REQUIRE(!frame.isNull());
+            frame.fill(Qt::transparent);
+            QPainter painter(&frame);
+            game->QWidget::render(&painter);
+            painter.end();
+            bool hasPaintedPixel = false;
+            for (int y = 0; y < frame.height() && !hasPaintedPixel; y += 16) {
+                for (int x = 0; x < frame.width(); x += 16) {
+                    if (qAlpha(frame.pixel(x, y)) != 0) {
+                        hasPaintedPixel = true;
+                        break;
+                    }
+                }
+            }
+            REQUIRE(hasPaintedPixel);
         }
+        waitForEvents(40); // Allow the precise 8 ms timer to produce fixed-step work.
+        const QString engineStats = game->getGameStats();
+        const int stepsMarker = engineStats.indexOf(QStringLiteral("simulation_steps="));
+        REQUIRE(stepsMarker >= 0);
+        bool stepsOk = false;
+        const int simulationSteps = engineStats.mid(stepsMarker + 17).section(';', 0, 0).toInt(&stepsOk);
+        REQUIRE(stepsOk && simulationSteps > 0);
 
         game->handleSensorInput(25.0);
         waitForEvents(35);
@@ -670,6 +762,18 @@ int main(int argc, char **argv)
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
 
+    // Tangent phase must remain continuous when crossing the old +/-pi wrap.
+    std::unique_ptr<games::TanGame> tangentMotion(new games::TanGame);
+    tangentMotion->resize(640, 480);
+    tangentMotion->start();
+    const double phaseBeforeWrap = -3.14159265358979323846 + 0.0005;
+    games::TanGameTestAccess::setPhase(*tangentMotion, phaseBeforeWrap);
+    tangentMotion->update(1.0 / 240.0);
+    const double phaseAfterWrap = games::TanGameTestAccess::phase(*tangentMotion);
+    REQUIRE(phaseAfterWrap < phaseBeforeWrap);
+    REQUIRE(std::abs(phaseAfterWrap - phaseBeforeWrap) < 0.01);
+    tangentMotion->stop();
+
     std::unique_ptr<games::GameEngine> pong(games::createGame(QStringLiteral("pong")));
     auto* pongGame = dynamic_cast<games::PongGame*>(pong.get());
     REQUIRE(pongGame != nullptr);
@@ -678,6 +782,7 @@ int main(int argc, char **argv)
     REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
     REQUIRE(games::PongGameTestAccess::rejectsEarlyCornerBounce(*pongGame));
     REQUIRE(games::PongGameTestAccess::bouncesAtVisibleSideContact(*pongGame));
+    REQUIRE(games::PongGameTestAccess::advancesBallWithoutFreshSensor(*pongGame));
     const double referencePaddleAspect = pongGame->paddleHeight() / pongGame->paddleWidth();
     pongGame->resize(1920, 1080);
     REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
@@ -787,6 +892,30 @@ int main(int argc, char **argv)
     std::unique_ptr<games::GameEngine> archer(games::createGame(QStringLiteral("archer")));
     auto* archerGame = dynamic_cast<games::ArcherGame*>(archer.get());
     REQUIRE(archerGame != nullptr);
+    archerGame->resize(640, 480);
+    archerGame->start();
+    archerGame->handleSensorInput(76.0);
+    // Arrow motion is checked independently of timers and wall-clock scheduling.
+    games::ArcherGameTestAccess::injectArrow(
+        *archerGame, QPointF(80.0, 80.0), QPointF(120.0, -30.0));
+    const double archerGravity = 260.0;
+    const double archerDelta = 0.05;
+    games::ArcherGameTestAccess::advance(*archerGame, archerDelta);
+    const QPointF expectedArrowPosition(
+        80.0 + 120.0 * archerDelta,
+        80.0 - 30.0 * archerDelta +
+            0.5 * archerGravity * archerDelta * archerDelta);
+    const QPointF expectedArrowVelocity(120.0, -30.0 + archerGravity * archerDelta);
+    const QPointF actualArrowPosition =
+        games::ArcherGameTestAccess::arrowPosition(*archerGame);
+    const QPointF actualArrowVelocity =
+        games::ArcherGameTestAccess::arrowVelocity(*archerGame);
+    REQUIRE(std::abs(actualArrowPosition.x() - expectedArrowPosition.x()) < 1e-6);
+    REQUIRE(std::abs(actualArrowPosition.y() - expectedArrowPosition.y()) < 1e-6);
+    REQUIRE(std::abs(actualArrowVelocity.x() - expectedArrowVelocity.x()) < 1e-6);
+    REQUIRE(std::abs(actualArrowVelocity.y() - expectedArrowVelocity.y()) < 1e-6);
+    // Restore a clean, naturally aimed shot sequence for the integration test.
+    archerGame->reset();
     archerGame->resize(640, 480);
     archerGame->start();
     archerGame->handleSensorInput(76.0);
@@ -942,6 +1071,39 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->enemyHealth() == 100);
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
+    // Deterministic ballistic integration: the committed shell endpoint must
+    // match the same constant-acceleration parabola used by swept collision tests.
+    // This guards against semi-implicit displacement drifting away from the
+    // collision path under gravity (and, in production, wind).
+    std::unique_ptr<games::GameEngine> artilleryPhysicsBase(
+        games::createGame(QStringLiteral("scorched_earth")));
+    auto* artilleryPhysics = dynamic_cast<games::ScorchedEarthGame*>(artilleryPhysicsBase.get());
+    REQUIRE(artilleryPhysics != nullptr);
+    artilleryPhysics->resize(640, 480);
+    artilleryPhysics->start();
+    const QPointF shellStart(320.0, 100.0);
+    const QPointF shellVelocity(100.0, -20.0);
+    const double shellDelta = 0.1;
+    const double shellGravity = games::ScorchedEarthGameTestAccess::gravity(*artilleryPhysics);
+    games::ScorchedEarthGameTestAccess::injectProjectile(
+        *artilleryPhysics, shellStart, shellVelocity);
+    games::ScorchedEarthGameTestAccess::advance(*artilleryPhysics, shellDelta);
+    const QPointF expectedShellPosition(
+        shellStart.x() + shellVelocity.x() * shellDelta,
+        shellStart.y() + shellVelocity.y() * shellDelta +
+            0.5 * shellGravity * shellDelta * shellDelta);
+    const QPointF expectedShellVelocity(
+        shellVelocity.x(), shellVelocity.y() + shellGravity * shellDelta);
+    const QPointF actualShellPosition =
+        games::ScorchedEarthGameTestAccess::projectilePosition(*artilleryPhysics);
+    const QPointF actualShellVelocity =
+        games::ScorchedEarthGameTestAccess::projectileVelocity(*artilleryPhysics);
+    REQUIRE(std::abs(actualShellPosition.x() - expectedShellPosition.x()) < 1e-6);
+    REQUIRE(std::abs(actualShellPosition.y() - expectedShellPosition.y()) < 1e-6);
+    REQUIRE(std::abs(actualShellVelocity.x() - expectedShellVelocity.x()) < 1e-6);
+    REQUIRE(std::abs(actualShellVelocity.y() - expectedShellVelocity.y()) < 1e-6);
+    artilleryPhysics->stop();
+
     scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire); // Must not trigger a manual shot.

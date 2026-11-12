@@ -17,7 +17,7 @@ namespace {
 constexpr double kSensorTimeoutMs = 350.0;
 constexpr double kForceSmoothingSeconds = 0.025;
 constexpr double kServeDelaySeconds = 0.65;
-constexpr double kPhysicsStep = 1.0 / 240.0;
+constexpr double kPhysicsStep = 1.0 / 120.0;
 }
 
 PongGame::PongGame(QWidget *parent)
@@ -397,13 +397,8 @@ void PongGame::update(double deltaTime)
         return;
 
     adaptToSize();
-    if (!sensorInputFresh()) {
-        m_previousBallPos = m_ballPos;
-        m_previousLeftPaddleY = m_leftPaddleY;
-        m_previousRightPaddleY = m_rightPaddleY;
-        return;
-    }
-
+    // Sensor loss must not freeze the game world. Keep the ball and AI moving;
+    // the player's paddle simply holds its last valid force position.
     m_previousBallPos = m_ballPos;
     m_previousLeftPaddleY = m_leftPaddleY;
     m_previousRightPaddleY = m_rightPaddleY;
@@ -451,20 +446,12 @@ void PongGame::renderInterpolated(QPainter& painter, double alpha)
     const float currentLeft = m_leftPaddleY;
     const float currentRight = m_rightPaddleY;
 
-    // Predict only the presentation position for the unconsumed fraction of
-    // one fixed step. Interpolating previous/current states adds a full-step
-    // visual delay and can smear a ball across a collision. Extrapolation from
-    // the latest collision-resolved state keeps the ball aligned with its
-    // current velocity while leaving authoritative physics untouched.
-    if (sensorInputFresh() && m_serveDelayRemaining <= 0.0) {
-        const double presentationLead = alpha * kFixedSimulationStepSeconds;
-        m_ballPos = currentBall + m_ballVel * presentationLead;
-        const double radius = static_cast<double>(m_ballRadius);
-        m_ballPos.setX(qBound(radius, m_ballPos.x(),
-                              qMax(radius, static_cast<double>(width()) - radius)));
-        m_ballPos.setY(qBound(radius, m_ballPos.y(),
-                              qMax(radius, static_cast<double>(height()) - radius)));
-    }
+    // Render between the last and current collision-resolved simulation states.
+    // Collision handlers reset m_previousBallPos at the contact point, so the
+    // interpolation never draws through a wall or paddle after a bounce.
+    const double presentationLead = (1.0 - alpha) * kPhysicsStep * 0.5;
+    m_ballPos = m_previousBallPos +
+        (currentBall - m_previousBallPos) * alpha + m_ballVel * presentationLead;
 
     m_leftPaddleY = static_cast<float>(
         m_previousLeftPaddleY + (currentLeft - m_previousLeftPaddleY) * alpha);

@@ -259,7 +259,17 @@ assert "m_resourceRepository->create(QStringLiteral(\"rehabilitation-assessments
 assert "if (!m_resourceRepository->get(QStringLiteral(\"patients\"), m_currentPatientUuid," in outline
 assert "Ocena nie została zapisana" in outline
 
-assert 'outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();' in outline
+# Outline parsing uses a temporary value object and commits only after full validation.
+assert 'parsedOutline.clinicalProtocolHtml = root.value(QStringLiteral("clinicalProtocolHtml")).toString();' in outline
+assert 'QJsonParseError jsonError;' in outline
+assert 'jsonError.error != QJsonParseError::NoError' in outline
+assert 'if (!doc.isObject())' in outline
+assert 'root.value(QStringLiteral("exercises")).isArray()' in outline
+assert 'if (!exerciseValue.isObject())' in outline
+assert 'ExercisePrescription::fromJson(exerciseObj, exercise.prescription,' in outline
+assert 'outline = parsedOutline;' in outline
+assert 'if (error)' in outline and 'error->clear();' in outline
+assert 'Ćwiczenie %1: %2' in outline
 # Both clinical outlines must be valid, non-empty, executable JSON plans.
 import json
 for outline_path in (

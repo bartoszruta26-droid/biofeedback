@@ -375,6 +375,7 @@ OutlineTab::OutlineTab(QWidget *parent)
     , m_currentExerciseIndex(-1)
     , m_isSessionActive(false)
     , m_isPaused(false)
+    , m_currentExerciseGameActive(false)
     , m_completedExercises(0)
     , m_sessionStartTime(0)
     , m_exerciseStartTime(0)
@@ -1287,63 +1288,96 @@ void OutlineTab::loadOutlineFiles(const QString& directory)
     }
 }
 
-bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline)
+bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline, QString* error)
 {
+    const auto fail = [error](const QString& message) {
+        if (error)
+            *error = message;
+        return false;
+    };
+
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return false;
+        return fail(QObject::tr("Nie można otworzyć pliku: %1").arg(file.errorString()));
     }
-    
-    QByteArray jsonData = file.readAll();
-    file.close();
-    
-    QJsonDocument doc = QJsonDocument::fromJson(jsonData);
-    if (doc.isNull()) {
-        return false;
+
+    const QByteArray jsonData = file.readAll();
+    if (file.error() != QFileDevice::NoError) {
+        return fail(QObject::tr("Błąd odczytu pliku: %1").arg(file.errorString()));
     }
-    
-    QJsonObject root = doc.object();
-    
-    // Parsowanie podstawowych danych konspektu
-    outline.id = root["id"].toString();
-    outline.name = root["name"].toString();
-    outline.description = root["description"].toString();
-    outline.author = root["author"].toString();
-    outline.category = root["category"].toString();
-    outline.estimatedDurationMinutes = root["estimatedDurationMinutes"].toInt(0);
-    outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();
-    
-    // Parsowanie ćwiczeń
-    QJsonArray exercisesArray = root["exercises"].toArray();
-    
-    for (const QJsonValue& exerciseValue : exercisesArray) {
-        QJsonObject exerciseObj = exerciseValue.toObject();
-        
+
+    QJsonParseError jsonError;
+    const QJsonDocument doc = QJsonDocument::fromJson(jsonData, &jsonError);
+    if (jsonError.error != QJsonParseError::NoError) {
+        return fail(QObject::tr("Nieprawidłowy JSON (pozycja %1): %2")
+                    .arg(jsonError.offset)
+                    .arg(jsonError.errorString()));
+    }
+    if (!doc.isObject()) {
+        return fail(QObject::tr("Główny element pliku JSON musi być obiektem."));
+    }
+
+    const QJsonObject root = doc.object();
+    if (!root.value(QStringLiteral("exercises")).isArray()) {
+        return fail(QObject::tr("Pole „exercises” musi być tablicą."));
+    }
+
+    OutlineData parsedOutline;
+    parsedOutline.id = root.value(QStringLiteral("id")).toString();
+    parsedOutline.name = root.value(QStringLiteral("name")).toString();
+    parsedOutline.description = root.value(QStringLiteral("description")).toString();
+    parsedOutline.author = root.value(QStringLiteral("author")).toString();
+    parsedOutline.category = root.value(QStringLiteral("category")).toString();
+    parsedOutline.estimatedDurationMinutes = root.value(QStringLiteral("estimatedDurationMinutes")).toInt(0);
+    parsedOutline.clinicalProtocolHtml = root.value(QStringLiteral("clinicalProtocolHtml")).toString();
+
+    const QJsonArray exercisesArray = root.value(QStringLiteral("exercises")).toArray();
+    for (int index = 0; index < exercisesArray.size(); ++index) {
+        const QJsonValue exerciseValue = exercisesArray.at(index);
+        if (!exerciseValue.isObject()) {
+            return fail(QObject::tr("Ćwiczenie %1 musi być obiektem JSON.").arg(index + 1));
+        }
+        const QJsonObject exerciseObj = exerciseValue.toObject();
+
         ExerciseData exercise;
-        exercise.id = exerciseObj["id"].toString();
-        exercise.name = exerciseObj["name"].toString();
-        exercise.description = exerciseObj["description"].toString();
-        exercise.imagePath = exerciseObj["imagePath"].toString();
-        exercise.videoPath = exerciseObj["videoPath"].toString();
-        exercise.gameId = exerciseObj["gameId"].toString();
+        exercise.id = exerciseObj.value(QStringLiteral("id")).toString();
+        exercise.name = exerciseObj.value(QStringLiteral("name")).toString();
+        exercise.description = exerciseObj.value(QStringLiteral("description")).toString();
+        exercise.imagePath = exerciseObj.value(QStringLiteral("imagePath")).toString();
+        exercise.videoPath = exerciseObj.value(QStringLiteral("videoPath")).toString();
+        exercise.gameId = exerciseObj.value(QStringLiteral("gameId")).toString();
         if (exercise.gameId == QStringLiteral("scored_earth"))
             exercise.gameId = QStringLiteral("scorched_earth");
-        exercise.durationSeconds = exerciseObj["durationSeconds"].toInt(0);
-        exercise.targetRepetitions = exerciseObj["targetRepetitions"].toInt(0);
-        exercise.difficulty = exerciseObj["difficulty"].toString("medium");
-        
-        outline.exercises.append(exercise);
+        exercise.durationSeconds = exerciseObj.value(QStringLiteral("durationSeconds")).toInt(0);
+        exercise.targetRepetitions = exerciseObj.value(QStringLiteral("targetRepetitions")).toInt(0);
+        exercise.difficulty = exerciseObj.value(QStringLiteral("difficulty")).toString(QStringLiteral("medium"));
+
+        QString prescriptionError;
+        if (!ExercisePrescription::fromJson(exerciseObj, exercise.prescription,
+                                             &prescriptionError)) {
+            return fail(QObject::tr("Ćwiczenie %1: %2").arg(index + 1).arg(prescriptionError));
+        }
+
+        parsedOutline.exercises.append(exercise);
     }
-    
-    return !outline.id.isEmpty() && !outline.exercises.isEmpty();
+
+    if (parsedOutline.id.isEmpty() || parsedOutline.exercises.isEmpty()) {
+        return fail(QObject::tr("Konspekt musi zawierać identyfikator i co najmniej jedno ćwiczenie."));
+    }
+
+    outline = parsedOutline;
+    if (error)
+        error->clear();
+    return true;
 }
 
 bool OutlineTab::loadOutlineFromFile(const QString& filename)
 {
     OutlineData outline;
-    if (!parseOutlineFile(filename, outline)) {
+    QString parseError;
+    if (!parseOutlineFile(filename, outline, &parseError)) {
         QMessageBox::warning(this, tr("Błąd ładowania"),
-                            tr("Nie udało się wczytać pliku konspektu."));
+                            tr("Nie udało się wczytać pliku konspektu:\n%1").arg(parseError));
         return false;
     }
     
@@ -1560,6 +1594,8 @@ void OutlineTab::onStartSessionClicked()
     m_exerciseScores.clear();
     m_exerciseScores.resize(m_currentOutline.exercises.size());
     std::fill(m_exerciseScores.begin(), m_exerciseScores.end(), 0);
+    m_exerciseCompletionRecorded.fill(false, m_currentOutline.exercises.size());
+    m_currentExerciseGameActive = false;
     m_sessionStartTime = QDateTime::currentMSecsSinceEpoch();
     
     // Zablokuj wybór konspektu podczas sesji
@@ -1584,6 +1620,9 @@ void OutlineTab::onStartSessionClicked()
     const ExerciseData& exercise = m_currentOutline.exercises[m_currentExerciseIndex];
     if (!exercise.gameId.isEmpty()) {
         emit requestGameStart(exercise.gameId, exercise);
+        // Arm only after the synchronous replacement handler has stopped the
+        // previous game, so its gameEnded signal cannot complete this exercise.
+        m_currentExerciseGameActive = true;
     }
 }
 
@@ -1629,6 +1668,9 @@ void OutlineTab::onPreviousExerciseClicked()
 void OutlineTab::onNextExerciseClicked()
 {
     if (m_currentExerciseIndex < m_currentOutline.exercises.size() - 1) {
+        // Disarm the old game's completion callback before requesting the next
+        // exercise; stopping/replacing a game may synchronously emit gameEnded.
+        m_currentExerciseGameActive = false;
         finishCurrentExercise();
         moveToNextExercise();
     }
@@ -1755,8 +1797,14 @@ void OutlineTab::finishCurrentExercise()
         return;
     }
     
-    m_completedExercises++;
-    
+    if (m_currentExerciseIndex >= m_exerciseCompletionRecorded.size() ||
+        m_exerciseCompletionRecorded[m_currentExerciseIndex]) {
+        return;
+    }
+
+    m_exerciseCompletionRecorded[m_currentExerciseIndex] = true;
+    ++m_completedExercises;
+
     emit exerciseCompleted(m_currentExerciseIndex, m_exerciseScores[m_currentExerciseIndex]);
 }
 
@@ -1776,6 +1824,7 @@ void OutlineTab::moveToNextExercise()
     const ExerciseData& exercise = m_currentOutline.exercises[m_currentExerciseIndex];
     if (!exercise.gameId.isEmpty()) {
         emit requestGameStart(exercise.gameId, exercise);
+        m_currentExerciseGameActive = true;
     }
 }
 
@@ -1783,7 +1832,8 @@ void OutlineTab::endSession()
 {
     m_isSessionActive = false;
     m_isPaused = false;
-    
+    m_currentExerciseGameActive = false;
+
     m_sessionTimer->stop();
     
     // Przywróć dostępność wyboru konspektu
@@ -1806,6 +1856,14 @@ void OutlineTab::endSession()
 
 void OutlineTab::onGameFinished(int score)
 {
+    // Ignore duplicate or late game-ended notifications. A completion belongs
+    // to the exercise only while its game is explicitly armed.
+    if (!m_isSessionActive || !m_currentExerciseGameActive) {
+        emit gameFinished(score);
+        return;
+    }
+    m_currentExerciseGameActive = false;
+
     // Zapisz wynik
     if (m_currentExerciseIndex >= 0 && 
         m_currentExerciseIndex < m_exerciseScores.size()) {

@@ -44,7 +44,15 @@ GraphWidget::GraphWidget(QWidget *parent)
     QTimer* pruneTimer = new QTimer(this);
     connect(pruneTimer, &QTimer::timeout, this, &GraphWidget::pruneOldData);
     pruneTimer->start(50);
-    
+
+    // Sensor samples can arrive faster than the display refresh rate. Keep
+    // acquisition independent and repaint at a stable 60 Hz presentation rate.
+    QTimer* presentationTimer = new QTimer(this);
+    presentationTimer->setTimerType(Qt::PreciseTimer);
+    presentationTimer->setInterval(16);
+    connect(presentationTimer, &QTimer::timeout, this, QOverload<>::of(&QWidget::update));
+    presentationTimer->start();
+
     // Debug logging for initialization
     core::DebugManager::instance().sendDebugMessage(
         "GraphWidget initialized", 
@@ -96,7 +104,7 @@ void GraphWidget::addDataPoint(double value, const QDateTime& timestamp)
         }
         
         m_cacheValid = false;
-        update();
+        // The presentation timer coalesces incoming samples into one paint.
     } catch (const std::exception& e) {
         m_errorCount++;
         core::DebugManager::instance().sendDebugMessage(

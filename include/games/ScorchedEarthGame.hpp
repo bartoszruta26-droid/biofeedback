@@ -36,6 +36,8 @@ protected:
     void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
+    friend struct ScorchedEarthGameTestAccess;
+
     struct Projectile {
         QPointF position;
         QPointF velocity;

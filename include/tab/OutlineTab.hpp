@@ -25,6 +25,7 @@
 #include <QSignalBlocker>
 #include <QListWidget>
 #include "data/JsonResourceRepository.hpp"
+#include "tab/ExercisePrescription.hpp"
 #include <memory>
 #include "sensor/SerialCommunication.hpp"
 #include "measurement/MeasurementEngine.hpp"
@@ -50,7 +51,9 @@ struct ExerciseData {
     int durationSeconds;        // Czas trwania ćwiczenia w sekundach
     int targetRepetitions;      // Docelowa liczba powtórzeń
     QString difficulty;         // Poziom trudności (easy/medium/hard)
-    
+
+    ExercisePrescription prescription;
+
     ExerciseData() : durationSeconds(0), targetRepetitions(0) {}
 };
 
@@ -234,7 +237,7 @@ private:
     void createConnections();
     
     void loadOutlineFiles(const QString& directory);
-    bool parseOutlineFile(const QString& filename, OutlineData& outline);
+    bool parseOutlineFile(const QString& filename, OutlineData& outline, QString* error = nullptr);
     void populateOutlineCombo();
     void populateGameCombo();
     void updateProgressIndicators();
@@ -386,10 +389,12 @@ private:
     int m_currentExerciseIndex;
     bool m_isSessionActive;
     bool m_isPaused;
+    bool m_currentExerciseGameActive;
     
     // Stan sesji
     int m_completedExercises;
     QVector<int> m_exerciseScores;
+    QVector<bool> m_exerciseCompletionRecorded;
     qint64 m_sessionStartTime;
     qint64 m_exerciseStartTime;
     

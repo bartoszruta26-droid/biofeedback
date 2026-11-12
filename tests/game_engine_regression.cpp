@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     game.resume();
     REQUIRE(game.isRunning() && !game.isPaused());
     waitForEvents(40);
-    REQUIRE(game.lastDelta() > 0.0 && game.lastDelta() <= 1.0 / 240.0 + 1e-9);
+    REQUIRE(std::abs(game.lastDelta() - 1.0 / 120.0) < 1e-9);
 
     // A paused session must not continue advancing the fixed-step simulation.
     game.pause();
@@ -142,6 +142,13 @@ int main(int argc, char **argv)
     const QString stats = game.getGameStats();
     REQUIRE(stats.contains(QStringLiteral("elapsed_ms=0")));
     REQUIRE(stats.contains(QStringLiteral("frames=0")));
+    REQUIRE(stats.contains(QStringLiteral("simulation_steps=0")));
+    REQUIRE(stats.contains(QStringLiteral("render_frames=0")));
+    REQUIRE(stats.contains(QStringLiteral("timer_pumps=0")));
+    REQUIRE(stats.contains(QStringLiteral("dropped_steps=0")));
+    REQUIRE(stats.contains(QStringLiteral("render_avg_us=0.00")));
+    REQUIRE(stats.contains(QStringLiteral("simulation_avg_us=0.00")));
+    REQUIRE(stats.contains(QStringLiteral("paint_fps_estimate=0.0")));
     REQUIRE(stats.contains(QStringLiteral("invalid_inputs=0")));
     REQUIRE(game.getScore() == 0);
     return 0;

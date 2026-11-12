@@ -247,9 +247,15 @@ void ScorchedEarthGame::update(double deltaTime)
         // segment so fast shells cannot tunnel through tanks or terrain.
         const QPointF oldPosition = projectile.position;
         const QPointF oldVelocity = projectile.velocity;
-        projectile.velocity.ry() += m_gravity * deltaTime;
-        projectile.velocity.rx() += m_wind * 0.08 * scaleX * deltaTime;
-        const QPointF displacement = projectile.velocity * deltaTime;
+        const QPointF acceleration(m_wind * 0.08 * scaleX, m_gravity);
+        const QPointF newVelocity = oldVelocity + acceleration * deltaTime;
+        // Keep the committed projectile position on the same analytic
+        // constant-acceleration trajectory used by the swept collision checks.
+        // Using newVelocity * dt here would over-advance the shell vertically
+        // and horizontally whenever gravity or wind is non-zero.
+        const QPointF displacement = oldVelocity * deltaTime +
+            acceleration * (0.5 * deltaTime * deltaTime);
+        projectile.velocity = newVelocity;
         const int samples = qBound(1, static_cast<int>(std::ceil(
             std::hypot(displacement.x(), displacement.y()) / maxSegmentLength)), 256);
         bool impacted = false;

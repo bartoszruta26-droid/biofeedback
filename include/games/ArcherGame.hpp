@@ -34,6 +34,8 @@ protected:
     void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
+    friend struct ArcherGameTestAccess;
+
     struct Arrow {
         QPointF position;
         QPointF velocity;

@@ -21,19 +21,26 @@ GameEngine::GameEngine(QWidget *parent)
     , m_simulationAccumulator(0.0)
     , m_renderInterpolationAlpha(0.0)
     , m_frameCount(0)
+    , m_renderFrameCount(0)
+    , m_timerPumpCount(0)
+    , m_droppedSimulationSteps(0)
+    , m_renderTimeNsTotal(0)
+    , m_renderTimeNsMax(0)
+    , m_simulationTimeNsTotal(0)
+    , m_simulationTimeNsMax(0)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Pump the fixed-step simulation at approximately 240 Hz. This keeps the
-    // accumulator close to each 1/240 s physics boundary and reduces timer
-    // quantization before Qt coalesces paint requests to the display cadence.
+    // Pump the fixed-step simulation at approximately 120 Hz. The accumulator
+    // uses an exact 1/120 s step; Qt timer jitter is absorbed without changing
+    // game physics or tying simulation to the display refresh rate.
     // Every game paints an opaque full-frame background. Let Qt skip the
     // implicit background erase and compositor blending for this widget.
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAutoFillBackground(false);
 
-    m_gameTimer->setInterval(4);
+    m_gameTimer->setInterval(8);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
@@ -176,9 +183,30 @@ QString GameEngine::getGameStats() const
         elapsed += m_monotonicClock.elapsed();
     const QString state = !m_isRunning ? QStringLiteral("stopped")
         : (m_isPaused ? QStringLiteral("paused") : QStringLiteral("running"));
-    return QStringLiteral("game=%1; state=%2; score=%3; elapsed_ms=%4; frames=%5; invalid_inputs=%6")
+    const double renderAverageUs = m_renderFrameCount > 0
+        ? static_cast<double>(m_renderTimeNsTotal) / static_cast<double>(m_renderFrameCount) / 1000.0
+        : 0.0;
+    const double simulationAverageUs = m_timerPumpCount > 0
+        ? static_cast<double>(m_simulationTimeNsTotal) / static_cast<double>(m_timerPumpCount) / 1000.0
+        : 0.0;
+    const double elapsedSeconds = static_cast<double>(elapsed) / 1000.0;
+    const double paintFpsEstimate = elapsedSeconds > 0.0
+        ? static_cast<double>(m_renderFrameCount) / elapsedSeconds
+        : 0.0;
+    return QStringLiteral("game=%1; state=%2; score=%3; elapsed_ms=%4; "
+                          "frames=%5; simulation_steps=%5; render_frames=%6; timer_pumps=%7; "
+                          "dropped_steps=%8; render_avg_us=%9; render_max_us=%10; "
+                          "simulation_avg_us=%11; simulation_max_us=%12; paint_fps_estimate=%13; invalid_inputs=%14")
         .arg(gameName()).arg(state).arg(m_score).arg(elapsed)
         .arg(static_cast<qulonglong>(m_frameCount))
+        .arg(static_cast<qulonglong>(m_renderFrameCount))
+        .arg(static_cast<qulonglong>(m_timerPumpCount))
+        .arg(static_cast<qulonglong>(m_droppedSimulationSteps))
+        .arg(renderAverageUs, 0, 'f', 2)
+        .arg(static_cast<double>(m_renderTimeNsMax) / 1000.0, 0, 'f', 2)
+        .arg(simulationAverageUs, 0, 'f', 2)
+        .arg(static_cast<double>(m_simulationTimeNsMax) / 1000.0, 0, 'f', 2)
+        .arg(paintFpsEstimate, 0, 'f', 1)
         .arg(static_cast<qulonglong>(m_invalidInputCount));
 }
 
@@ -187,6 +215,13 @@ void GameEngine::resetGameStats()
     setScore(0);
     m_accumulatedSessionMs = 0;
     m_frameCount = 0;
+    m_renderFrameCount = 0;
+    m_timerPumpCount = 0;
+    m_droppedSimulationSteps = 0;
+    m_renderTimeNsTotal = 0;
+    m_renderTimeNsMax = 0;
+    m_simulationTimeNsTotal = 0;
+    m_simulationTimeNsMax = 0;
     m_invalidInputCount = 0;
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     if (m_isRunning && !m_isPaused) {
@@ -221,6 +256,13 @@ void GameEngine::reset()
     m_simulationAccumulator = 0.0;
     m_renderInterpolationAlpha = 0.0;
     m_frameCount = 0;
+    m_renderFrameCount = 0;
+    m_timerPumpCount = 0;
+    m_droppedSimulationSteps = 0;
+    m_renderTimeNsTotal = 0;
+    m_renderTimeNsMax = 0;
+    m_simulationTimeNsTotal = 0;
+    m_simulationTimeNsMax = 0;
     m_invalidInputCount = 0;
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
@@ -247,25 +289,39 @@ void GameEngine::gameLoop()
     // Ignore negative/non-finite intervals and cap stalls to avoid tunnelling.
     if (!std::isfinite(deltaTime) || deltaTime < 0.0)
         deltaTime = 0.0;
-    deltaTime = qMin(deltaTime, 0.1);
+    if (deltaTime > 0.1) {
+        const double discardedSeconds = deltaTime - 0.1;
+        m_droppedSimulationSteps += static_cast<quint64>(
+            discardedSeconds / kFixedSimulationStepSeconds);
+        deltaTime = 0.1;
+    }
     
     // Fixed-step simulation keeps collision and movement behaviour independent
     // of GUI timer jitter. The frame delta is capped above to bound catch-up work.
     constexpr double fixedStep = kFixedSimulationStepSeconds;
     m_simulationAccumulator += deltaTime;
+    QElapsedTimer simulationTimer;
+    simulationTimer.start();
     int steps = 0;
-    while (m_simulationAccumulator >= fixedStep && steps < 24 && m_isRunning && !m_isPaused) {
+    while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
         update(fixedStep);
         m_simulationAccumulator -= fixedStep;
         ++steps;
     }
+    const qint64 simulationElapsedNs = simulationTimer.nsecsElapsed();
+    ++m_timerPumpCount;
+    m_simulationTimeNsTotal += simulationElapsedNs;
+    m_simulationTimeNsMax = qMax(m_simulationTimeNsMax, simulationElapsedNs);
     m_frameCount += static_cast<quint64>(steps);
-    if (steps == 24 && m_simulationAccumulator >= fixedStep)
+    if (steps == 12 && m_simulationAccumulator >= fixedStep) {
+        const quint64 dropped = static_cast<quint64>(m_simulationAccumulator / fixedStep);
+        m_droppedSimulationSteps += dropped;
         m_simulationAccumulator = std::fmod(m_simulationAccumulator, fixedStep);
+    }
 
     // Preserve the full accumulator fraction. Each rendered frame blends the
-    // previous and current fixed-step states, avoiding stepped motion when
-    // presentation runs at 120 Hz and simulation at 240 Hz.
+    // previous and current 120 Hz fixed-step states, including on 60/90/120 Hz
+    // displays, without advancing the simulation from the paint callback.
     m_renderInterpolationAlpha = qBound(0.0, m_simulationAccumulator / fixedStep, 1.0);
     QWidget::update();
 }
@@ -383,7 +439,13 @@ void GameEngine::paintEvent(QPaintEvent* event)
     // Running games render an opaque background themselves. Avoid a second
     // full-window fill on every presentation frame (up to 120 Hz requested).
     if (m_isRunning) {
+        QElapsedTimer renderTimer;
+        renderTimer.start();
         renderInterpolated(painter, renderInterpolationAlpha());
+        const qint64 renderElapsedNs = renderTimer.nsecsElapsed();
+        ++m_renderFrameCount;
+        m_renderTimeNsTotal += renderElapsedNs;
+        m_renderTimeNsMax = qMax(m_renderTimeNsMax, renderElapsedNs);
     } else {
         painter.fillRect(rect(), Qt::black);
         // Ekran startowy/końcowy
