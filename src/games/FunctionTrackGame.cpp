@@ -233,17 +233,40 @@ void FunctionTrackGame::render(QPainter& painter)
     if (w <= 0 || h <= 0) { painter.restore(); return; }
     painter.fillRect(rect(), QColor(15, 22, 36));
     QPainterPath path;
+    QPainterPath toleranceBand;
     for (int x = 0; x <= w; ++x) {
         const double y = targetAt(x);
-        if (x == 0) path.moveTo(x, y); else path.lineTo(x, y);
+        if (x == 0) {
+            path.moveTo(x, y);
+            toleranceBand.moveTo(x, y - m_tolerance);
+        } else {
+            path.lineTo(x, y);
+            toleranceBand.lineTo(x, y - m_tolerance);
+        }
     }
+    for (int x = w; x >= 0; --x)
+        toleranceBand.lineTo(x, targetAt(x) + m_tolerance);
+    toleranceBand.closeSubpath();
+
+    // Match the visible acceptance corridor to the tolerance used for scoring.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(32, 190, 130, 48));
+    painter.drawPath(toleranceBand);
     painter.setPen(QPen(QColor(90, 215, 170), 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setBrush(Qt::NoBrush);
     painter.drawPath(path);
 
     const double gateX = w * 0.72;
     const double tolerance = m_tolerance;
-    painter.setPen(QPen(QColor(100, 220, 170, 75), 1, Qt::DashLine));
-    painter.drawLine(QPointF(gateX, m_targetY - tolerance), QPointF(gateX, m_targetY + tolerance));
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(32, 190, 130, 78));
+    painter.drawRoundedRect(QRectF(gateX - 25.0, m_targetY - tolerance,
+                                   50.0, 2.0 * tolerance), 8.0, 8.0);
+    painter.setPen(QPen(QColor(125, 245, 190, 235), 2.0, Qt::DashLine));
+    painter.drawLine(QPointF(gateX - 28, m_targetY - tolerance),
+                     QPointF(gateX + 28, m_targetY - tolerance));
+    painter.drawLine(QPointF(gateX - 28, m_targetY + tolerance),
+                     QPointF(gateX + 28, m_targetY + tolerance));
     painter.setPen(QPen(QColor(235, 240, 250, 150), 1.5, Qt::DashLine));
     painter.drawLine(QPointF(gateX, 0), QPointF(gateX, h));
     const bool stale = m_inputAge > 0.35;
@@ -261,8 +284,8 @@ void FunctionTrackGame::render(QPainter& painter)
     painter.drawText(QRect(16, 50, w - 32, 28), Qt::AlignLeft | Qt::AlignVCenter, m_feedback);
     painter.setPen(QColor(210,220,235));
     painter.drawText(QRect(16, h - 38, w - 32, 24), Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Siła: %1%   Wynik: %2   Pasmo tolerancji: szerokie   Poziom: %3")
-        .arg(qRound(m_force * 100.0)).arg(getScore()).arg(m_difficulty));
+        QStringLiteral("Siła: %1%   Wynik: %2   Pasmo błędu: ±%3 px   Poziom: %4")
+        .arg(qRound(m_force * 100.0)).arg(getScore()).arg(qRound(m_tolerance)).arg(m_difficulty));
     painter.restore();
 }
 } // namespace games
