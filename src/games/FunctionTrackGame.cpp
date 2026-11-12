@@ -169,6 +169,7 @@ void FunctionTrackGame::update(double deltaTime)
     if (!isRunning() || width() <= 0 || height() <= 0 ||
         !std::isfinite(deltaTime) || deltaTime <= 0.0) return;
     const double dt = qMin(deltaTime, 0.05);
+    m_tolerance = qMax(48.0, height() * (0.22 - (m_difficulty - 1) * 0.015));
     m_previousPhase = m_phase;
     m_previousCursorY = m_cursorY;
     m_previousTargetY = m_targetY;
