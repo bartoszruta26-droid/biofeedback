@@ -25,6 +25,7 @@
 #include <QSignalBlocker>
 #include <QListWidget>
 #include "data/JsonResourceRepository.hpp"
+#include "tab/ExercisePrescription.hpp"
 #include <memory>
 #include "sensor/SerialCommunication.hpp"
 #include "measurement/MeasurementEngine.hpp"
@@ -51,21 +52,7 @@ struct ExerciseData {
     int targetRepetitions;      // Docelowa liczba powtórzeń
     QString difficulty;         // Poziom trudności (easy/medium/hard)
 
-    // Optional prescription fields; absent JSON keys preserve legacy behavior.
-    int orderIndex{-1};
-    QString phase;
-    QString permittedRom;
-    QString permittedLoad;
-    int setsTarget{0};
-    int repsTarget{0};
-    int holdSeconds{0};
-    int restSeconds{0};
-    double resistanceValue{0.0};
-    QString resistanceUnit;
-    QString tempo;
-    double rpeTarget{-1.0};
-    QString painPolicyId;
-    QString progressionRuleId;
+    ExercisePrescription prescription;
 
     ExerciseData() : durationSeconds(0), targetRepetitions(0) {}
 };
