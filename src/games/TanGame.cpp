@@ -22,7 +22,7 @@ double tangentWave(double angle, double sharpness)
 {
     // atan(tan(x)) is bounded to [-pi/2, pi/2] on each branch.
     // The scale controls steepness without creating long clipped plateaus.
-    return (2.0 / kPi) * std::atan(sharpness * std::tan(angle));
+    const double numerator = std::sin(angle);\n    const double denominator = std::abs(std::cos(angle)) + 0.20;\n    return std::tanh((2.0 + sharpness) * numerator / denominator);
 }
 }
 
@@ -98,7 +98,7 @@ void TanGame::setDifficultyLevel(int level)
 {
     m_difficultyLevel = qBound(1, level, 5);
     const double scaleY = qMax(0.5, height() / 480.0);
-    const double toleranceRatio = 0.145 - (m_difficultyLevel - 1) * 0.010;
+    const double toleranceRatio = 0.25 - (m_difficultyLevel - 1) * 0.012;
     m_tolerance = qBound(12.0 * scaleY,
         static_cast<double>(height()) * toleranceRatio, 64.0 * scaleY);
     updateSpatialFrequency();
@@ -160,7 +160,7 @@ void TanGame::resizeEvent(QResizeEvent* event)
     QWidget::resizeEvent(event);
     updateSpatialFrequency();
     const double scaleY = qMax(0.5, height() / 480.0);
-    const double ratio = 0.145 - (m_difficultyLevel - 1) * 0.010;
+    const double ratio = 0.25 - (m_difficultyLevel - 1) * 0.012;
     m_tolerance = qBound(12.0 * scaleY,
         static_cast<double>(height()) * ratio, 64.0 * scaleY);
     calculateTargetY(width() * 0.72);
