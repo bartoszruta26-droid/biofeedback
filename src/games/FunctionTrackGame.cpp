@@ -121,8 +121,12 @@ double FunctionTrackGame::targetAt(double x) const
         const double tangent = tangentLike(phase, false);
         const double cotangent = tangentLike(phase, true);
         const double trapezoidValue = trapezoid(phase);
-        if (cycle < 6.0) {
+        const double cosinus = std::cos(phase);
+        if (cycle < 3.0) {
             value = sinus;
+            selectedWidth = m_sinusWidth;
+        } else if (cycle < 6.0) {
+            value = cosinus;
             selectedWidth = m_sinusWidth;
         } else if (cycle < 12.0) {
             value = cycle < 9.0 ? tangent : cotangent;
@@ -134,9 +138,12 @@ double FunctionTrackGame::targetAt(double x) const
 
         // Cross-fade the mathematical segments over one second. Both the
         // target and its amplitude remain continuous at every hand-off.
-        if (cycle >= 5.5 && cycle < 6.5) {
+        if (cycle >= 2.5 && cycle < 3.5) {
+            const double t = cycle - 2.5;
+            value = smoothBlend(sinus, cosinus, t);
+        } else if (cycle >= 5.5 && cycle < 6.5) {
             const double t = cycle - 5.5;
-            value = smoothBlend(sinus, tangent, t);
+            value = smoothBlend(cosinus, tangent, t);
             selectedWidth = smoothBlend(m_sinusWidth, m_tangentWidth, t);
         } else if (cycle >= 8.5 && cycle < 9.5) {
             const double t = cycle - 8.5;
