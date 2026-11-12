@@ -164,7 +164,7 @@ void SinGame::refreshGeometryParameters()
     const double scaleY = qMax(0.5, h / 480.0);
     m_frequency = 2.0 * 3.14159265358979323846 * 1.5 / w;
     m_scrollSpeed = (65.0 + m_difficultyLevel * 18.0) * scaleX;
-    const double toleranceRatio = 0.14 - (m_difficultyLevel - 1) * 0.010;
+    const double toleranceRatio = 0.22 - (m_difficultyLevel - 1) * 0.012;
     m_tolerance = qBound(12.0 * scaleY, h * toleranceRatio, 64.0 * scaleY);
 }
 
