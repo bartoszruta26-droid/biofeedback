@@ -15,7 +15,7 @@ namespace games {
 namespace {
 constexpr double kPi = 3.14159265358979323846;
 constexpr double kSampleTimeoutSeconds = 0.35;
-constexpr double kCursorTimeConstantSeconds = 0.055;
+constexpr double kCursorTimeConstantSeconds = 0.035;
 constexpr double kAsymptoteGuard = 0.10;
 
 double tangentWave(double angle, double sharpness)
