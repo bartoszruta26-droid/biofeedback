@@ -189,10 +189,14 @@ QString GameEngine::getGameStats() const
     const double simulationAverageUs = m_timerPumpCount > 0
         ? static_cast<double>(m_simulationTimeNsTotal) / static_cast<double>(m_timerPumpCount) / 1000.0
         : 0.0;
+    const double elapsedSeconds = static_cast<double>(elapsed) / 1000.0;
+    const double paintFpsEstimate = elapsedSeconds > 0.0
+        ? static_cast<double>(m_renderFrameCount) / elapsedSeconds
+        : 0.0;
     return QStringLiteral("game=%1; state=%2; score=%3; elapsed_ms=%4; "
-                          "simulation_steps=%5; render_frames=%6; timer_pumps=%7; "
+                          "frames=%5; simulation_steps=%5; render_frames=%6; timer_pumps=%7; "
                           "dropped_steps=%8; render_avg_us=%9; render_max_us=%10; "
-                          "simulation_avg_us=%11; simulation_max_us=%12; invalid_inputs=%13")
+                          "simulation_avg_us=%11; simulation_max_us=%12; paint_fps_estimate=%13; invalid_inputs=%14")
         .arg(gameName()).arg(state).arg(m_score).arg(elapsed)
         .arg(static_cast<qulonglong>(m_frameCount))
         .arg(static_cast<qulonglong>(m_renderFrameCount))
@@ -202,6 +206,7 @@ QString GameEngine::getGameStats() const
         .arg(static_cast<double>(m_renderTimeNsMax) / 1000.0, 0, 'f', 2)
         .arg(simulationAverageUs, 0, 'f', 2)
         .arg(static_cast<double>(m_simulationTimeNsMax) / 1000.0, 0, 'f', 2)
+        .arg(paintFpsEstimate, 0, 'f', 1)
         .arg(static_cast<qulonglong>(m_invalidInputCount));
 }
 
