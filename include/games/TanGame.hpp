@@ -44,6 +44,7 @@ protected:
     bool handleInput(double value) override;
 
 private:
+    friend struct TanGameTestAccess;
     void calculateTargetY(double x);
     void updateSpatialFrequency();
     void updateAutomaticDifficulty(double deltaTime);
