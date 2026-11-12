@@ -22,7 +22,9 @@ double tangentWave(double angle, double sharpness)
 {
     // atan(tan(x)) is bounded to [-pi/2, pi/2] on each branch.
     // The scale controls steepness without creating long clipped plateaus.
-    const double numerator = std::sin(angle);\n    const double denominator = std::abs(std::cos(angle)) + 0.20;\n    return std::tanh((2.0 + sharpness) * numerator / denominator);
+    const double numerator = std::sin(angle);
+    const double denominator = std::abs(std::cos(angle)) + 0.20;
+    return std::tanh((2.0 + sharpness) * numerator / denominator);
 }
 }
 
