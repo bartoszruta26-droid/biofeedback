@@ -289,7 +289,12 @@ void GameEngine::gameLoop()
     // Ignore negative/non-finite intervals and cap stalls to avoid tunnelling.
     if (!std::isfinite(deltaTime) || deltaTime < 0.0)
         deltaTime = 0.0;
-    deltaTime = qMin(deltaTime, 0.1);
+    if (deltaTime > 0.1) {
+        const double discardedSeconds = deltaTime - 0.1;
+        m_droppedSimulationSteps += static_cast<quint64>(
+            discardedSeconds / kFixedSimulationStepSeconds);
+        deltaTime = 0.1;
+    }
     
     // Fixed-step simulation keeps collision and movement behaviour independent
     // of GUI timer jitter. The frame delta is capped above to bound catch-up work.
