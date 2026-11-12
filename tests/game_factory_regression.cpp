@@ -66,6 +66,18 @@ struct PongGameTestAccess
         return game.m_ballVel.x() > 0.0 &&
                std::abs(game.m_ballPos.x() - faceX) < 1e-6;
     }
+
+    static bool advancesBallWithoutFreshSensor(PongGame& game)
+    {
+        game.m_hasSensorSample = false;
+        game.m_serveDelayRemaining = 0.0;
+        game.m_ballPos = QPointF(game.width() * 0.5, game.height() * 0.5);
+        game.m_previousBallPos = game.m_ballPos;
+        game.m_ballVel = QPointF(120.0, 0.0);
+        const QPointF before = game.m_ballPos;
+        game.update(1.0 / 240.0);
+        return game.m_ballPos.x() > before.x();
+    }
 };
 
 struct PrecisionCraneGameTestAccess
@@ -678,6 +690,7 @@ int main(int argc, char **argv)
     REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
     REQUIRE(games::PongGameTestAccess::rejectsEarlyCornerBounce(*pongGame));
     REQUIRE(games::PongGameTestAccess::bouncesAtVisibleSideContact(*pongGame));
+    REQUIRE(games::PongGameTestAccess::advancesBallWithoutFreshSensor(*pongGame));
     const double referencePaddleAspect = pongGame->paddleHeight() / pongGame->paddleWidth();
     pongGame->resize(1920, 1080);
     REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
