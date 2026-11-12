@@ -219,7 +219,7 @@ bool TanGame::handleInput(double value)
 
 void TanGame::calculateTargetY(double x)
 {
-    const double angle = std::remainder(x * m_frequency + m_phase, kPi);
+    const double angle = std::remainder(x * m_frequency + m_phase, 2.0 * kPi);
     const double cosine = std::abs(std::cos(angle));
     m_nearAsymptote = cosine < kAsymptoteGuard;
 
@@ -347,13 +347,9 @@ void TanGame::render(QPainter& painter)
         const double y = centerY - normalized * amplitude;
         const bool branchPositive = cosine >= 0.0;
 
-        // Never connect the two sides of a tangent asymptote.
-        if (!hasPrevious || branchPositive != previousBranchPositive ||
-            std::abs(y - previousY) > heightD * 0.35) {
-            tangentPath.moveTo(x, y);
-        } else {
-            tangentPath.lineTo(x, y);
-        }
+        // The bounded cyclic curve is continuous across former asymptotes.
+        if (!hasPrevious) tangentPath.moveTo(x, y);
+        else tangentPath.lineTo(x, y);
         previousY = y;
         previousBranchPositive = branchPositive;
         hasPrevious = true;
