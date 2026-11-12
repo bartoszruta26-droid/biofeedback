@@ -1825,8 +1825,10 @@ void OutlineTab::onGameFinished(int score)
 {
     // Ignore duplicate or late game-ended notifications. A completion belongs
     // to the exercise only while its game is explicitly armed.
-    if (!m_isSessionActive || !m_currentExerciseGameActive)
+    if (!m_isSessionActive || !m_currentExerciseGameActive) {
+        emit gameFinished(score);
         return;
+    }
     m_currentExerciseGameActive = false;
 
     // Zapisz wynik
