@@ -1288,70 +1288,93 @@ void OutlineTab::loadOutlineFiles(const QString& directory)
     }
 }
 
-bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline)
+bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline, QString* error)
 {
+    const auto fail = [error](const QString& message) {
+        if (error)
+            *error = message;
+        return false;
+    };
+
     QFile file(filename);
     if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        return false;
+        return fail(QObject::tr("Nie można otworzyć pliku: %1").arg(file.errorString()));
     }
-    
-    QByteArray jsonData = file.readAll();
-    file.close();
-    
-    QJsonDocument doc = QJsonDocument::fromJson(jsonData);
-    if (doc.isNull()) {
-        return false;
+
+    const QByteArray jsonData = file.readAll();
+    if (file.error() != QFileDevice::NoError) {
+        return fail(QObject::tr("Błąd odczytu pliku: %1").arg(file.errorString()));
     }
-    
-    QJsonObject root = doc.object();
-    
-    // Parsowanie podstawowych danych konspektu
-    outline.id = root["id"].toString();
-    outline.name = root["name"].toString();
-    outline.description = root["description"].toString();
-    outline.author = root["author"].toString();
-    outline.category = root["category"].toString();
-    outline.estimatedDurationMinutes = root["estimatedDurationMinutes"].toInt(0);
-    outline.clinicalProtocolHtml = root["clinicalProtocolHtml"].toString();
-    
-    // Parsowanie ćwiczeń
-    QJsonArray exercisesArray = root["exercises"].toArray();
-    
-    for (const QJsonValue& exerciseValue : exercisesArray) {
-        QJsonObject exerciseObj = exerciseValue.toObject();
-        
+
+    QJsonParseError jsonError;
+    const QJsonDocument doc = QJsonDocument::fromJson(jsonData, &jsonError);
+    if (jsonError.error != QJsonParseError::NoError || !doc.isObject()) {
+        return fail(QObject::tr("Nieprawidłowy JSON (pozycja %1): %2")
+                    .arg(jsonError.offset)
+                    .arg(jsonError.errorString()));
+    }
+
+    const QJsonObject root = doc.object();
+    if (!root.value(QStringLiteral("exercises")).isArray()) {
+        return fail(QObject::tr("Pole „exercises” musi być tablicą."));
+    }
+
+    OutlineData parsedOutline;
+    parsedOutline.id = root.value(QStringLiteral("id")).toString();
+    parsedOutline.name = root.value(QStringLiteral("name")).toString();
+    parsedOutline.description = root.value(QStringLiteral("description")).toString();
+    parsedOutline.author = root.value(QStringLiteral("author")).toString();
+    parsedOutline.category = root.value(QStringLiteral("category")).toString();
+    parsedOutline.estimatedDurationMinutes = root.value(QStringLiteral("estimatedDurationMinutes")).toInt(0);
+    parsedOutline.clinicalProtocolHtml = root.value(QStringLiteral("clinicalProtocolHtml")).toString();
+
+    const QJsonArray exercisesArray = root.value(QStringLiteral("exercises")).toArray();
+    for (int index = 0; index < exercisesArray.size(); ++index) {
+        const QJsonValue exerciseValue = exercisesArray.at(index);
+        if (!exerciseValue.isObject()) {
+            return fail(QObject::tr("Ćwiczenie %1 musi być obiektem JSON.").arg(index + 1));
+        }
+        const QJsonObject exerciseObj = exerciseValue.toObject();
+
         ExerciseData exercise;
-        exercise.id = exerciseObj["id"].toString();
-        exercise.name = exerciseObj["name"].toString();
-        exercise.description = exerciseObj["description"].toString();
-        exercise.imagePath = exerciseObj["imagePath"].toString();
-        exercise.videoPath = exerciseObj["videoPath"].toString();
-        exercise.gameId = exerciseObj["gameId"].toString();
+        exercise.id = exerciseObj.value(QStringLiteral("id")).toString();
+        exercise.name = exerciseObj.value(QStringLiteral("name")).toString();
+        exercise.description = exerciseObj.value(QStringLiteral("description")).toString();
+        exercise.imagePath = exerciseObj.value(QStringLiteral("imagePath")).toString();
+        exercise.videoPath = exerciseObj.value(QStringLiteral("videoPath")).toString();
+        exercise.gameId = exerciseObj.value(QStringLiteral("gameId")).toString();
         if (exercise.gameId == QStringLiteral("scored_earth"))
             exercise.gameId = QStringLiteral("scorched_earth");
-        exercise.durationSeconds = exerciseObj["durationSeconds"].toInt(0);
-        exercise.targetRepetitions = exerciseObj["targetRepetitions"].toInt(0);
-        exercise.difficulty = exerciseObj["difficulty"].toString("medium");
+        exercise.durationSeconds = exerciseObj.value(QStringLiteral("durationSeconds")).toInt(0);
+        exercise.targetRepetitions = exerciseObj.value(QStringLiteral("targetRepetitions")).toInt(0);
+        exercise.difficulty = exerciseObj.value(QStringLiteral("difficulty")).toString(QStringLiteral("medium"));
 
-        // Optional prescription fields are validated as one value object.
-        // Missing keys retain neutral legacy defaults.
         QString prescriptionError;
         if (!ExercisePrescription::fromJson(exerciseObj, exercise.prescription,
-                                             &prescriptionError))
-            return false;
+                                             &prescriptionError)) {
+            return fail(QObject::tr("Ćwiczenie %1: %2").arg(index + 1, prescriptionError));
+        }
 
-        outline.exercises.append(exercise);
+        parsedOutline.exercises.append(exercise);
     }
-    
-    return !outline.id.isEmpty() && !outline.exercises.isEmpty();
+
+    if (parsedOutline.id.isEmpty() || parsedOutline.exercises.isEmpty()) {
+        return fail(QObject::tr("Konspekt musi zawierać identyfikator i co najmniej jedno ćwiczenie."));
+    }
+
+    outline = parsedOutline;
+    if (error)
+        error->clear();
+    return true;
 }
 
 bool OutlineTab::loadOutlineFromFile(const QString& filename)
 {
     OutlineData outline;
-    if (!parseOutlineFile(filename, outline)) {
+    QString parseError;
+    if (!parseOutlineFile(filename, outline, &parseError)) {
         QMessageBox::warning(this, tr("Błąd ładowania"),
-                            tr("Nie udało się wczytać pliku konspektu."));
+                            tr("Nie udało się wczytać pliku konspektu:\n%1").arg(parseError));
         return false;
     }
     
