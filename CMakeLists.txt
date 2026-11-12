@@ -725,3 +725,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     endforeach()
 endif()
 
+
+
+# C++ replacement for the former Python game sensor ownership guard.
+add_executable(game_sensor_ownership_regression tests/game_sensor_ownership_regression.cpp)
+target_compile_features(game_sensor_ownership_regression PRIVATE cxx_std_17)
+add_test(NAME game_sensor_ownership_regression COMMAND game_sensor_ownership_regression)
+set_tests_properties(game_sensor_ownership_regression PROPERTIES WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
