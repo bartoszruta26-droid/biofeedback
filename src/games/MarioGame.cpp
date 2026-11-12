@@ -370,7 +370,7 @@ void MarioGame::paintEvent(QPaintEvent* event)
 {
     Q_UNUSED(event);
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::TextAntialiasing, false);
     if (isRunning())
         renderInterpolated(painter, renderInterpolationAlpha());
@@ -878,7 +878,7 @@ void MarioGame::renderPlayer(QPainter& painter, const Player& player)
     };
 
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
 
     // Ground shadow gives the sprite a clear sense of height while jumping.
     painter.setPen(Qt::NoPen);
