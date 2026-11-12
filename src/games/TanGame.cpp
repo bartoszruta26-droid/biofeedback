@@ -257,7 +257,7 @@ void TanGame::update(double deltaTime)
     m_previousTargetY = m_targetY;
     updateSpatialFrequency();
     m_phase = std::remainder(
-        m_phase - m_scrollSpeed * m_frequency * dt, kPi);
+        m_phase - m_scrollSpeed * m_frequency * dt, 2.0 * kPi);
     m_inputAge += dt;
     m_sessionSeconds += dt;
 
