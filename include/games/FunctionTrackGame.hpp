@@ -17,6 +17,9 @@ public:
     int difficultyLevel() const;
     void setTrackWidth(double normalizedWidth);
     double trackWidth() const;
+    void setSinusWidth(double normalizedWidth);
+    void setTangentWidth(double normalizedWidth);
+    void setTrapezoidWidth(double normalizedWidth);
     void update(double deltaTime) override;
 
 protected:
@@ -31,6 +34,9 @@ private:
     Mode m_mode;
     int m_difficulty{1};
     double m_trackWidth{0.30};
+    double m_sinusWidth{0.25};
+    double m_tangentWidth{0.32};
+    double m_trapezoidWidth{0.38};
     double m_phase{0.0};
     double m_previousPhase{0.0};
     double m_cursorY{0.0};
