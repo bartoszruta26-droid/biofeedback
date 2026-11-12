@@ -1352,7 +1352,7 @@ bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline,
         QString prescriptionError;
         if (!ExercisePrescription::fromJson(exerciseObj, exercise.prescription,
                                              &prescriptionError)) {
-            return fail(QObject::tr("Ćwiczenie %1: %2").arg(index + 1, prescriptionError));
+            return fail(QObject::tr("Ćwiczenie %1: %2").arg(index + 1).arg(prescriptionError));
         }
 
         parsedOutline.exercises.append(exercise);
