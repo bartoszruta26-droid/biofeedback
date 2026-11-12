@@ -209,3 +209,30 @@ Automatyzacja ma porządkować pracę i przedstawiać rekomendacje. Nie może sa
 
 Prace rozpoczynają się od Etapu A, ponieważ telemetria umożliwi podejmowanie decyzji na podstawie pomiarów. Równolegle można przygotowywać Etap B, ale migracja danych musi zachować zgodność istniejących konspektów. Następnie należy zintegrować sesję przez jeden automat stanów. Każdy etap powinien kończyć się testami regresyjnymi i aktualizacją tego dokumentu o rzeczywisty stan, commit oraz wynik CI.
 
+
+
+## 10. Dziennik realizacji — 2026-11-12
+
+### Wdrożono w gałęzi `fix/smooth-game-motion`
+
+**Etap A — pierwszy podetap: telemetria silnika**
+- Rozdzielono liczbę kroków symulacji (`simulation_steps`) od liczby wywołań renderowania (`render_frames`) i liczby przebiegów timera (`timer_pumps`).
+- Dodano średni i maksymalny czas renderowania oraz aktualizacji symulacji w mikrosekundach.
+- Dodano licznik kroków symulacji odrzuconych podczas ograniczonego nadrabiania zaległości.
+- Dodano szacunkową częstotliwość wywołań malowania (`paint_fps_estimate`). Jest to pomiar paintEvent, a nie gwarantowana liczba klatek faktycznie wyświetlonych przez kompozytor/monitor.
+- Zachowano pole zgodności `frames`, które nadal oznacza liczbę kroków symulacji.
+- Liczniki są zerowane zarówno przez reset gry, jak i reset statystyk.
+
+**Etap C — pierwszy podetap: odporność przejść ćwiczeń**
+- Dodano rejestr zakończonych ćwiczeń w bieżącej sesji, aby wielokrotne wywołanie zakończenia nie zwiększało licznika postępu i nie emitowało ponownie `exerciseCompleted`.
+- Dodano uzbrajanie/rozbrajanie obsługi zakończenia gry przy przejściu między ćwiczeniami. Poprzednia gra jest rozbrajana przed wymianą, a nowa po obsłużeniu żądania uruchomienia.
+- Weryfikacja kompilacji i regresji dla tych zmian pozostaje w toku; nie należy traktować ich jako odebranych przed zielonym CI.
+
+### Następne zadania
+
+1. Uruchomić CI dla aktualnego HEAD i poprawić ewentualne błędy kompilacji/testów.
+2. Dodać deterministyczne testy porównania trajektorii i skalowania dla wszystkich gier.
+3. Rozszerzyć model recepty ćwiczenia wstecznie kompatybilnie z istniejącymi plikami JSON.
+4. Dodać walidator konspektów i raport błędów importu.
+5. Zaprojektować i wdrożyć trwały, idempotentny automat sesji łączący konspekt z epizodem rehabilitacyjnym.
+6. Powiązać każdą obserwację z wersją recepty, a następnie dodać trwałe przypomnienia po 24 godzinach.
