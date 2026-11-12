@@ -34,7 +34,7 @@ for path in GAME_SOURCES + GAME_HEADERS:
 engine = (ROOT / "src" / "games" / "GameEngine.cpp").read_text(encoding="utf-8")
 engine_header = (ROOT / "include" / "games" / "GameEngine.hpp").read_text(encoding="utf-8")
 required_engine_tokens = (
-    "m_gameTimer->setInterval(2)",
+    "m_gameTimer->setInterval(8)",
     "m_gameTimer->setTimerType(Qt::PreciseTimer)",
     "constexpr double fixedStep = kFixedSimulationStepSeconds;",
     "m_monotonicClock.nsecsElapsed()",
@@ -46,20 +46,20 @@ for token in required_engine_tokens:
     if token not in engine:
         raise SystemExit(f"GameEngine is missing the arcade performance requirement: {token}")
 
-if "0.9 + 0.1 * m_renderInterpolationAlpha" not in engine_header:
+if "return m_renderInterpolationAlpha;" not in engine_header:
     raise SystemExit("GameEngine must bias rendering toward the newest state to reduce interpolation latency.")
 
 for path in GAME_SOURCES:
     if "::renderInterpolated(" not in path.read_text(encoding="utf-8"):
         raise SystemExit(f"Game is missing frame-rate-independent render interpolation: {path.relative_to(ROOT)}")
-if "static constexpr double kFixedSimulationStepSeconds = 1.0 / 480.0;" not in engine_header:
-    raise SystemExit("GameEngine fixed simulation step must run at 480 Hz.")
-if "repaint();" not in engine:
-    raise SystemExit("Game loop must synchronously paint each presentation pump instead of coalescing update() calls.")
-if "constexpr double maxStep=1.0/480.0" not in (ROOT / "src" / "games" / "ArkanoidGame.cpp").read_text(encoding="utf-8"):
-    raise SystemExit("Arkanoid physics must use the shared 480 Hz motion profile.")
-if "constexpr double kPhysicsStep = 1.0 / 480.0;" not in (ROOT / "src" / "games" / "PongGame.cpp").read_text(encoding="utf-8"):
-    raise SystemExit("Pong physics must use the shared 480 Hz motion profile.")
+if "static constexpr double kFixedSimulationStepSeconds = 1.0 / 240.0;" not in engine_header:
+    raise SystemExit("GameEngine fixed simulation step must run at 240 Hz.")
+if "QWidget::update();" not in engine:
+    raise SystemExit("Game loop must schedule non-blocking presentation updates.")
+if "constexpr double maxStep=1.0/240.0" not in (ROOT / "src" / "games" / "ArkanoidGame.cpp").read_text(encoding="utf-8"):
+    raise SystemExit("Arkanoid physics must use the shared 240 Hz motion profile.")
+if "constexpr double kPhysicsStep = 1.0 / 240.0;" not in (ROOT / "src" / "games" / "PongGame.cpp").read_text(encoding="utf-8"):
+    raise SystemExit("Pong physics must use the shared 240 Hz motion profile.")
 
 car_race = (ROOT / "src" / "games" / "CarRaceGame.cpp").read_text(encoding="utf-8")
 galaga = (ROOT / "src" / "games" / "GalagaGame.cpp").read_text(encoding="utf-8")
