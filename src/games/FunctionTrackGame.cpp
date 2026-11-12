@@ -46,7 +46,7 @@ void FunctionTrackGame::setDifficultyLevel(int level)
 {
     m_difficulty = qBound(1, level, 5);
     // Tolerance is deliberately independent of screen resolution and track width.
-    m_tolerance = height() * (0.22 - (m_difficulty - 1) * 0.03);
+    m_tolerance = height() * (0.22 - (m_difficulty - 1) * 0.012);
 }
 
 int FunctionTrackGame::difficultyLevel() const { return m_difficulty; }
@@ -176,7 +176,7 @@ void FunctionTrackGame::update(double deltaTime)
     if (!isRunning() || width() <= 0 || height() <= 0 ||
         !std::isfinite(deltaTime) || deltaTime <= 0.0) return;
     const double dt = qMin(deltaTime, 0.05);
-    m_tolerance = height() * (0.22 - (m_difficulty - 1) * 0.03);
+    m_tolerance = height() * (0.22 - (m_difficulty - 1) * 0.012);
     m_previousPhase = m_phase;
     m_previousCursorY = m_cursorY;
     m_previousTargetY = m_targetY;
