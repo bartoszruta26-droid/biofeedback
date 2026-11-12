@@ -9,6 +9,8 @@ class QResizeEvent;
 
 namespace games {
 
+struct CarRaceGameTestAccess;
+
 class CarRaceGame final : public GameEngine
 {
     Q_OBJECT
@@ -37,6 +39,8 @@ protected:
     void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
+    friend struct CarRaceGameTestAccess;
+
     struct Obstacle {
         QRectF rect;
         int lane;
