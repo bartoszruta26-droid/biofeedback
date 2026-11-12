@@ -1586,8 +1586,10 @@ void OutlineTab::onStartSessionClicked()
     // Automatycznie uruchom grę dla pierwszego ćwiczenia
     const ExerciseData& exercise = m_currentOutline.exercises[m_currentExerciseIndex];
     if (!exercise.gameId.isEmpty()) {
-        m_currentExerciseGameActive = true;
         emit requestGameStart(exercise.gameId, exercise);
+        // Arm only after the synchronous replacement handler has stopped the
+        // previous game, so its gameEnded signal cannot complete this exercise.
+        m_currentExerciseGameActive = true;
     }
 }
 
@@ -1787,9 +1789,9 @@ void OutlineTab::moveToNextExercise()
     
     // Automatycznie uruchom grę dla następnego ćwiczenia
     const ExerciseData& exercise = m_currentOutline.exercises[m_currentExerciseIndex];
-    m_currentExerciseGameActive = !exercise.gameId.isEmpty();
-    if (m_currentExerciseGameActive) {
+    if (!exercise.gameId.isEmpty()) {
         emit requestGameStart(exercise.gameId, exercise);
+        m_currentExerciseGameActive = true;
     }
 }
 
