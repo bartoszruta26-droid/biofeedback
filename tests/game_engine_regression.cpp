@@ -68,7 +68,7 @@ int main(int argc, char **argv)
     game.resume();
     REQUIRE(game.isRunning() && !game.isPaused());
     waitForEvents(40);
-    REQUIRE(game.lastDelta() > 0.0 && game.lastDelta() <= 1.0 / 240.0 + 1e-9);
+    REQUIRE(std::abs(game.lastDelta() - 1.0 / 120.0) < 1e-9);
 
     // A paused session must not continue advancing the fixed-step simulation.
     game.pause();
