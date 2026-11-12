@@ -59,6 +59,18 @@ void FunctionTrackGame::setTrackWidth(double normalizedWidth)
 }
 
 double FunctionTrackGame::trackWidth() const { return m_trackWidth; }
+void FunctionTrackGame::setSinusWidth(double value) {
+    if (std::isfinite(value)) m_sinusWidth = qBound(0.12, value, 0.48);
+    updateTarget();
+}
+void FunctionTrackGame::setTangentWidth(double value) {
+    if (std::isfinite(value)) m_tangentWidth = qBound(0.12, value, 0.48);
+    updateTarget();
+}
+void FunctionTrackGame::setTrapezoidWidth(double value) {
+    if (std::isfinite(value)) m_trapezoidWidth = qBound(0.12, value, 0.48);
+    updateTarget();
+}
 
 bool FunctionTrackGame::handleInput(double value)
 {
@@ -74,7 +86,15 @@ double FunctionTrackGame::targetAt(double x) const
     const double w = qMax(1, width());
     const double h = qMax(1, height());
     const double phase = x / w * 2.0 * kPi + m_phase;
-    const double amplitude = h * m_trackWidth;
+    double selectedWidth = m_trackWidth;
+    if (m_mode == Mode::Cotangent) selectedWidth = m_tangentWidth;
+    else if (m_mode == Mode::Trapezoid) selectedWidth = m_trapezoidWidth;
+    else {
+        const double cycle = std::fmod(m_elapsed, 18.0);
+        selectedWidth = cycle < 6.0 ? m_sinusWidth
+            : (cycle < 12.0 ? m_tangentWidth : m_trapezoidWidth);
+    }
+    const double amplitude = h * selectedWidth;
     double value = 0.0;
 
     auto tangentLike = [](double a, bool cotangent) {
