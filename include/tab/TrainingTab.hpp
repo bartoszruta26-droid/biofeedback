@@ -378,6 +378,7 @@ private:
     std::shared_ptr<biofeedback::measurement::MeasurementEngine> m_measurementEngine;
     biofeedback::measurement::MeasurementEngine::CallbackToken m_measurementCallbackToken = 0;
     std::mutex m_measurementQueueMutex;
+    // Preserve acquired samples for repetition analysis; UI refresh is coalesced separately.
     std::deque<biofeedback::measurement::MeasurementSample> m_measurementQueue;
     bool m_measurementDrainScheduled{false};
     std::size_t m_droppedMeasurementSamples{0};
