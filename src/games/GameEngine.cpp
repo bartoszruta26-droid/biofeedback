@@ -24,16 +24,16 @@ GameEngine::GameEngine(QWidget *parent)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
-    // Request a steady 120 Hz presentation cadence. A precise timer avoids
-    // coarse-timer drift; the fixed-step simulation remains independent of
-    // display resolution and sensor acquisition frequency.
+    // Request a 250 Hz presentation cadence while advancing the simulation
+    // at 240 Hz. A precise timer minimizes scheduling jitter; QWidget may still
+    // coalesce paints to the monitor's actual refresh rate.
     // Every game paints an opaque full-frame background. Let Qt skip the
     // implicit background erase and compositor blending for this widget.
     setAttribute(Qt::WA_OpaquePaintEvent, true);
     setAttribute(Qt::WA_NoSystemBackground, true);
     setAutoFillBackground(false);
 
-    m_gameTimer->setInterval(8);
+    m_gameTimer->setInterval(4);
     m_gameTimer->setTimerType(Qt::PreciseTimer);
     
     // Połączenie timera z pętlą gry
@@ -254,17 +254,17 @@ void GameEngine::gameLoop()
     constexpr double fixedStep = kFixedSimulationStepSeconds;
     m_simulationAccumulator += deltaTime;
     int steps = 0;
-    while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
+    while (m_simulationAccumulator >= fixedStep && steps < 24 && m_isRunning && !m_isPaused) {
         update(fixedStep);
         m_simulationAccumulator -= fixedStep;
         ++steps;
     }
     m_frameCount += static_cast<quint64>(steps);
-    if (steps == 12 && m_simulationAccumulator >= fixedStep)
+    if (steps == 24 && m_simulationAccumulator >= fixedStep)
         m_simulationAccumulator = std::fmod(m_simulationAccumulator, fixedStep);
 
-    // Interpolate only presentation. Physics and sensor sampling remain on
-    // deterministic fixed ticks; alpha never feeds back into game logic.
+    // Interpolation is presentation-only. The accessor biases the blend
+    // toward the newest state (50–100%) to reduce the perceived display lag.
     m_renderInterpolationAlpha = qBound(0.0, m_simulationAccumulator / fixedStep, 1.0);
     QWidget::update();
 }
@@ -382,7 +382,7 @@ void GameEngine::paintEvent(QPaintEvent* event)
     // Running games render an opaque background themselves. Avoid a second
     // full-window fill at 120 Hz, which is expensive on the Raspberry Pi 4.
     if (m_isRunning) {
-        renderInterpolated(painter, m_renderInterpolationAlpha);
+        renderInterpolated(painter, renderInterpolationAlpha());
     } else {
         painter.fillRect(rect(), Qt::black);
         // Ekran startowy/końcowy
