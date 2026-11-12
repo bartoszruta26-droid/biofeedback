@@ -216,7 +216,15 @@ protected:
     double m_simulationAccumulator;
     double m_renderInterpolationAlpha;
     
+    // Simulation, presentation and timing telemetry are intentionally separate.
     quint64 m_frameCount;
+    quint64 m_renderFrameCount;
+    quint64 m_timerPumpCount;
+    quint64 m_droppedSimulationSteps;
+    qint64 m_renderTimeNsTotal;
+    qint64 m_renderTimeNsMax;
+    qint64 m_simulationTimeNsTotal;
+    qint64 m_simulationTimeNsMax;
     quint64 m_invalidInputCount;
     std::atomic<quint64> m_pendingInvalidInputCount{0};
 
