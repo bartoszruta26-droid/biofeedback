@@ -312,7 +312,33 @@ int main(int argc, char **argv)
             game->resize(testSize);
             waitForEvents(8);
             REQUIRE(game->isRunning());
+
+            // Raster smoke-test every game at each supported desktop scale.
+            // This catches empty frames, invalid resize-dependent paint paths,
+            // and geometry code that only works at the reference resolution.
+            QImage frame(testSize, QImage::Format_ARGB32_Premultiplied);
+            REQUIRE(!frame.isNull());
+            frame.fill(Qt::transparent);
+            QPainter painter(&frame);
+            game->QWidget::render(&painter);
+            painter.end();
+            bool hasPaintedPixel = false;
+            for (int y = 0; y < frame.height() && !hasPaintedPixel; y += 16) {
+                for (int x = 0; x < frame.width(); x += 16) {
+                    if (qAlpha(frame.pixel(x, y)) != 0) {
+                        hasPaintedPixel = true;
+                        break;
+                    }
+                }
+            }
+            REQUIRE(hasPaintedPixel);
         }
+        const QString engineStats = game->getGameStats();
+        const int stepsMarker = engineStats.indexOf(QStringLiteral("simulation_steps="));
+        REQUIRE(stepsMarker >= 0);
+        bool stepsOk = false;
+        const int simulationSteps = engineStats.mid(stepsMarker + 18).section(',', 0, 0).toInt(&stepsOk);
+        REQUIRE(stepsOk && simulationSteps > 0);
 
         game->handleSensorInput(25.0);
         waitForEvents(35);
