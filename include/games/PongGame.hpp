@@ -56,6 +56,8 @@ protected:
     void renderInterpolated(QPainter& painter, double alpha) override;
 
 private:
+    friend struct PongGameTestAccess;
+
     QRectF m_leftPaddle;
     QRectF m_rightPaddle;
     float m_leftPaddleY;

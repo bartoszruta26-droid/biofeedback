@@ -491,7 +491,7 @@ void PrecisionCraneGame::renderInterpolated(QPainter& painter, double alpha)
 void PrecisionCraneGame::render(QPainter& painter)
 {
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const double w = width(), h = height();
     const double ground = floorY();
 

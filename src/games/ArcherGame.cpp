@@ -235,7 +235,7 @@ void ArcherGame::renderInterpolated(QPainter& painter, double alpha)
 void ArcherGame::render(QPainter& painter)
 {
     painter.fillRect(rect(), QColor(28, 42, 34));
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const double scaleX = qMax(0.25, width() / 640.0);
     const double scaleY = qMax(0.25, height() / 480.0);
     const QPointF origin(width() * 0.11, height() * 0.85);

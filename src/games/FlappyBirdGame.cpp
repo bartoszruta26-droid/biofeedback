@@ -298,7 +298,7 @@ void FlappyBirdGame::paintEvent(QPaintEvent* event) {
     }
     Q_UNUSED(event);
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::TextAntialiasing, false);
     painter.fillRect(rect(), Qt::black);
     render(painter);
@@ -465,7 +465,7 @@ void FlappyBirdGame::renderInterpolated(QPainter& painter, double alpha)
 }
 
 void FlappyBirdGame::render(QPainter &painter) {
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     
     int w = width();
     int h = height();

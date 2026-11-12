@@ -138,7 +138,7 @@ void ArkanoidGame::renderInterpolated(QPainter& p,double alpha){
  m_paddle=currentPaddle;
 }
 void ArkanoidGame::render(QPainter& p){
- p.setRenderHint(QPainter::Antialiasing, false);p.fillRect(rect(),QColor(12,18,32));p.setPen(QPen(QColor(35,48,68),1));
+ p.setRenderHint(QPainter::Antialiasing, true);p.fillRect(rect(),QColor(12,18,32));p.setPen(QPen(QColor(35,48,68),1));
  for(int x=20;x<width();x+=40)p.drawLine(x,55,x,height()-28);
  for(const Brick& b:m_bricks){if(!b.active)continue;p.setBrush(brickColor(b));p.setPen(QPen(QColor(20,25,40),1));p.drawRoundedRect(b.rect,3,3);if(b.hits>1){p.setPen(QPen(QColor(255,235,235),1.5));p.drawLine(b.rect.left()+5,b.rect.center().y(),b.rect.right()-5,b.rect.center().y());}}
  p.setPen(Qt::NoPen);p.setBrush(QColor(90,210,235,35));p.drawRoundedRect(m_paddle.adjusted(-4,-3,4,3),8,8);p.setBrush(QColor(90,210,235));p.drawRoundedRect(m_paddle,6,6);

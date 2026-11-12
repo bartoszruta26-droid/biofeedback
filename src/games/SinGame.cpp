@@ -371,7 +371,7 @@ void SinGame::renderInterpolated(QPainter& painter, double alpha)
 void SinGame::render(QPainter& painter)
 {
     painter.save();
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
 
     const int w = width();
     const int h = height();

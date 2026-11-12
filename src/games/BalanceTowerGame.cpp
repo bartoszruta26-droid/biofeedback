@@ -340,7 +340,7 @@ void BalanceTowerGame::render(QPainter &painter)
 {
     const QRectF bounds = rect();
     painter.fillRect(bounds, QColor(18, 39, 58));
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     const qreal scale = qMin(width() * 0.31, height() * 0.055);
     const qreal baseX = width() * 0.5;
     const qreal baseY = height() * 0.79;

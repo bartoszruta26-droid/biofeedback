@@ -15,7 +15,7 @@ namespace games {
 
 namespace {
 constexpr double kSensorTimeoutMs = 350.0;
-constexpr double kForceSmoothingSeconds = 0.075;
+constexpr double kForceSmoothingSeconds = 0.025;
 constexpr double kServeDelaySeconds = 0.65;
 constexpr double kPhysicsStep = 1.0 / 240.0;
 }
@@ -79,8 +79,6 @@ void PongGame::initialize()
 void PongGame::setDifficultyLevel(int level)
 {
     m_difficultyLevel = qBound(1, level, 5);
-    // Speeds are expressed in reference-resolution units and scaled with
-    // the logical playfield so HD displays do not make the rally harder.
     const float scale = qBound(0.50f,
         qMin(width() / 640.0f, height() / 480.0f), 2.0f);
     m_aiSpeed = (80.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
@@ -151,7 +149,6 @@ void PongGame::onConnectionStatusChanged(bool connected, const std::string& mess
 
 void PongGame::normalizeForceValue(double rawValue)
 {
-    // The serial sensor path reports calibrated force in the configured 0–100 range.
     acceptForcePercent(rawValue);
 }
 
@@ -240,7 +237,6 @@ void PongGame::adaptToSize()
         const double velocityScale = newScale / oldScale;
         m_ballPos.setX(m_ballPos.x() * sx);
         m_ballPos.setY(m_ballPos.y() * sy);
-        // Preserve trajectory direction while adapting speed uniformly to the new logical scale.
         m_ballVel *= velocityScale;
         m_leftPaddleY = static_cast<float>(m_leftPaddleY * sy);
         m_rightPaddleY = static_cast<float>(m_rightPaddleY * sy);
@@ -252,13 +248,13 @@ void PongGame::adaptToSize()
 
     const float scale = qBound(0.50f,
         qMin(newSize.width() / 640.0f, newSize.height() / 480.0f), 2.0f);
-    // Tall, narrow paddles: their width is deliberately independent of height.
     m_paddleHeight = qBound(54.0f * scale,
         static_cast<float>(newSize.height()) * 0.23f, 112.0f * scale);
     m_paddleWidth = qBound(8.0f * scale, 11.5f * scale, 16.0f * scale);
     m_paddleMargin = 22.0f * scale;
     m_ballRadius = qBound(5.0f * scale,
         static_cast<float>(qMin(newSize.width(), newSize.height())) * 0.016f, 11.0f * scale);
+
     m_aiSpeed = (80.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
     m_ballSpeed = (200.0f + static_cast<float>(m_difficultyLevel) * 25.0f) * scale;
 
@@ -270,7 +266,6 @@ void PongGame::adaptToSize()
     m_rightPaddle = QRectF(newSize.width() - m_paddleMargin - m_paddleWidth,
                            m_rightPaddleY, m_paddleWidth, m_paddleHeight);
     m_lastSize = newSize;
-    // A resize changes the coordinate space; do not interpolate across it.
     if (sizeChanged) {
         m_previousBallPos = m_ballPos;
         m_previousLeftPaddleY = m_leftPaddleY;
@@ -292,7 +287,7 @@ void PongGame::resetBall(int horizontalDirection)
     const int direction = horizontalDirection == 0
         ? (QRandomGenerator::global()->bounded(2) == 0 ? -1 : 1)
         : (horizontalDirection < 0 ? -1 : 1);
-    double vertical = QRandomGenerator::global()->bounded(2) == 0 ? -0.42 : 0.42;
+    const double vertical = QRandomGenerator::global()->bounded(2) == 0 ? -0.42 : 0.42;
     const double length = std::hypot(1.0, vertical);
     const double scale = qBound(0.50,
         qMin(width() / 640.0, height() / 480.0), 2.0);
@@ -326,18 +321,17 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
     m_leftPaddleY = qBound(0.0f, m_leftPaddleY, maxPaddleY);
     m_leftPaddle.moveTop(m_leftPaddleY);
 
-    // Resolve wall contacts only while travelling into the corresponding wall.
     if (m_ballVel.y() < 0.0 && m_ballPos.y() - m_ballRadius <= 0.0) {
         m_ballPos.setY(m_ballRadius);
         m_ballVel.setY(std::abs(m_ballVel.y()));
+        m_previousBallPos = m_ballPos;
     } else if (m_ballVel.y() > 0.0 &&
                m_ballPos.y() + m_ballRadius >= height()) {
         m_ballPos.setY(height() - m_ballRadius);
         m_ballVel.setY(-std::abs(m_ballVel.y()));
+        m_previousBallPos = m_ballPos;
     }
 
-    // Swept face collision: test the ball's previous and current positions.
-    // This prevents tunnelling and rejects contacts with a paddle's short ends.
     const double dx = m_ballPos.x() - previousBallPos.x();
     const double dy = m_ballPos.y() - previousBallPos.y();
     if (dx < 0.0 && m_ballVel.x() < 0.0) {
@@ -345,8 +339,8 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
         if (previousBallPos.x() >= faceX && m_ballPos.x() <= faceX) {
             const double t = qBound(0.0, (faceX - previousBallPos.x()) / dx, 1.0);
             const double impactY = previousBallPos.y() + dy * t;
-            if (impactY >= m_leftPaddle.top() - m_ballRadius &&
-                impactY <= m_leftPaddle.bottom() + m_ballRadius) {
+            if (impactY >= m_leftPaddle.top() &&
+                impactY <= m_leftPaddle.bottom()) {
                 const double offset = qBound(-1.0,
                     (impactY - m_leftPaddle.center().y()) /
                         qMax(1.0, m_paddleHeight * 0.5), 1.0);
@@ -357,6 +351,10 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
                                     std::sin(angle) * speed);
                 m_ballPos.setX(faceX);
                 m_ballPos.setY(impactY);
+                // Collision is a discontinuity in velocity. Do not interpolate
+                // across the incoming segment after physics has already bounced:
+                // doing so makes the rendered ball appear out of sync with contact.
+                m_previousBallPos = m_ballPos;
             }
         }
     } else if (dx > 0.0 && m_ballVel.x() > 0.0) {
@@ -364,8 +362,8 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
         if (previousBallPos.x() <= faceX && m_ballPos.x() >= faceX) {
             const double t = qBound(0.0, (faceX - previousBallPos.x()) / dx, 1.0);
             const double impactY = previousBallPos.y() + dy * t;
-            if (impactY >= m_rightPaddle.top() - m_ballRadius &&
-                impactY <= m_rightPaddle.bottom() + m_ballRadius) {
+            if (impactY >= m_rightPaddle.top() &&
+                impactY <= m_rightPaddle.bottom()) {
                 const double offset = qBound(-1.0,
                     (impactY - m_rightPaddle.center().y()) /
                         qMax(1.0, m_paddleHeight * 0.5), 1.0);
@@ -376,11 +374,11 @@ void PongGame::checkCollisions(const QPointF& previousBallPos)
                                     std::sin(angle) * speed);
                 m_ballPos.setX(faceX);
                 m_ballPos.setY(impactY);
+                m_previousBallPos = m_ballPos;
             }
         }
     }
 
-    // A point is awarded only after the complete ball has left the court.
     if (m_ballPos.x() + m_ballRadius < 0.0) {
         ++m_aiScore;
         resetBall(1);
@@ -403,10 +401,9 @@ void PongGame::update(double deltaTime)
         m_previousBallPos = m_ballPos;
         m_previousLeftPaddleY = m_leftPaddleY;
         m_previousRightPaddleY = m_rightPaddleY;
-        return; // Freeze the rally instead of scoring against a missing sensor.
+        return;
     }
 
-    // Snapshot the last committed simulation state for display interpolation.
     m_previousBallPos = m_ballPos;
     m_previousLeftPaddleY = m_leftPaddleY;
     m_previousRightPaddleY = m_rightPaddleY;
@@ -478,7 +475,8 @@ void PongGame::render(QPainter &painter)
     const int w = width();
     const int h = height();
     painter.fillRect(rect(), QColor(10, 16, 30));
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    // Preserve sub-pixel ball and paddle geometry on high-refresh displays.
+    painter.setRenderHint(QPainter::Antialiasing, true);
 
     painter.setPen(QPen(QColor(85, 105, 135), 1, Qt::DashLine));
     painter.drawLine(w / 2, 8, w / 2, h - 8);
