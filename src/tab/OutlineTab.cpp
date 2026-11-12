@@ -375,6 +375,7 @@ OutlineTab::OutlineTab(QWidget *parent)
     , m_currentExerciseIndex(-1)
     , m_isSessionActive(false)
     , m_isPaused(false)
+    , m_currentExerciseGameActive(false)
     , m_completedExercises(0)
     , m_sessionStartTime(0)
     , m_exerciseStartTime(0)
@@ -1560,6 +1561,8 @@ void OutlineTab::onStartSessionClicked()
     m_exerciseScores.clear();
     m_exerciseScores.resize(m_currentOutline.exercises.size());
     std::fill(m_exerciseScores.begin(), m_exerciseScores.end(), 0);
+    m_exerciseCompletionRecorded.fill(false, m_currentOutline.exercises.size());
+    m_currentExerciseGameActive = false;
     m_sessionStartTime = QDateTime::currentMSecsSinceEpoch();
     
     // Zablokuj wybór konspektu podczas sesji
@@ -1583,6 +1586,7 @@ void OutlineTab::onStartSessionClicked()
     // Automatycznie uruchom grę dla pierwszego ćwiczenia
     const ExerciseData& exercise = m_currentOutline.exercises[m_currentExerciseIndex];
     if (!exercise.gameId.isEmpty()) {
+        m_currentExerciseGameActive = true;
         emit requestGameStart(exercise.gameId, exercise);
     }
 }
@@ -1629,6 +1633,9 @@ void OutlineTab::onPreviousExerciseClicked()
 void OutlineTab::onNextExerciseClicked()
 {
     if (m_currentExerciseIndex < m_currentOutline.exercises.size() - 1) {
+        // Disarm the old game's completion callback before requesting the next
+        // exercise; stopping/replacing a game may synchronously emit gameEnded.
+        m_currentExerciseGameActive = false;
         finishCurrentExercise();
         moveToNextExercise();
     }
@@ -1755,8 +1762,14 @@ void OutlineTab::finishCurrentExercise()
         return;
     }
     
-    m_completedExercises++;
-    
+    if (m_currentExerciseIndex >= m_exerciseCompletionRecorded.size() ||
+        m_exerciseCompletionRecorded[m_currentExerciseIndex]) {
+        return;
+    }
+
+    m_exerciseCompletionRecorded[m_currentExerciseIndex] = true;
+    ++m_completedExercises;
+
     emit exerciseCompleted(m_currentExerciseIndex, m_exerciseScores[m_currentExerciseIndex]);
 }
 
@@ -1774,7 +1787,8 @@ void OutlineTab::moveToNextExercise()
     
     // Automatycznie uruchom grę dla następnego ćwiczenia
     const ExerciseData& exercise = m_currentOutline.exercises[m_currentExerciseIndex];
-    if (!exercise.gameId.isEmpty()) {
+    m_currentExerciseGameActive = !exercise.gameId.isEmpty();
+    if (m_currentExerciseGameActive) {
         emit requestGameStart(exercise.gameId, exercise);
     }
 }
@@ -1783,7 +1797,8 @@ void OutlineTab::endSession()
 {
     m_isSessionActive = false;
     m_isPaused = false;
-    
+    m_currentExerciseGameActive = false;
+
     m_sessionTimer->stop();
     
     // Przywróć dostępność wyboru konspektu
@@ -1806,6 +1821,12 @@ void OutlineTab::endSession()
 
 void OutlineTab::onGameFinished(int score)
 {
+    // Ignore duplicate or late game-ended notifications. A completion belongs
+    // to the exercise only while its game is explicitly armed.
+    if (!m_isSessionActive || !m_currentExerciseGameActive)
+        return;
+    m_currentExerciseGameActive = false;
+
     // Zapisz wynik
     if (m_currentExerciseIndex >= 0 && 
         m_currentExerciseIndex < m_exerciseScores.size()) {
