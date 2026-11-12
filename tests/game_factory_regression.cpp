@@ -34,6 +34,16 @@
 #include <functional>
 
 namespace games {
+struct TanGameTestAccess
+{
+    static void setPhase(TanGame& game, double phase)
+    {
+        game.m_phase = phase;
+        game.m_previousPhase = phase;
+    }
+    static double phase(const TanGame& game) { return game.m_phase; }
+};
+
 struct PongGameTestAccess
 {
     static bool rejectsEarlyCornerBounce(PongGame& game)
@@ -681,6 +691,18 @@ int main(int argc, char **argv)
     flappyGame->stop();
     flappyGame->setGameSpeed(std::numeric_limits<float>::quiet_NaN());
     REQUIRE(std::abs(flappyGame->getGameSpeed() - defaultSpeed) < 1e-6f);
+
+    // Tangent phase must remain continuous when crossing the old +/-pi wrap.
+    std::unique_ptr<games::TanGame> tangentMotion(new games::TanGame);
+    tangentMotion->resize(640, 480);
+    tangentMotion->start();
+    const double phaseBeforeWrap = -3.14159265358979323846 + 0.0005;
+    games::TanGameTestAccess::setPhase(*tangentMotion, phaseBeforeWrap);
+    tangentMotion->update(1.0 / 240.0);
+    const double phaseAfterWrap = games::TanGameTestAccess::phase(*tangentMotion);
+    REQUIRE(phaseAfterWrap < phaseBeforeWrap);
+    REQUIRE(std::abs(phaseAfterWrap - phaseBeforeWrap) < 0.01);
+    tangentMotion->stop();
 
     std::unique_ptr<games::GameEngine> pong(games::createGame(QStringLiteral("pong")));
     auto* pongGame = dynamic_cast<games::PongGame*>(pong.get());
