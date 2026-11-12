@@ -217,6 +217,10 @@ void ArcherGame::update(double deltaTime)
             const double targetScaleY = qMax(0.25, height() / 480.0);
             m_targetSpeed = qMin(150.0 * targetScaleY, m_targetSpeed + 4.0 * targetScaleY);
             repositionTarget();
+            // A successful hit relocates the target; it is a teleport/game
+            // event, not continuous motion across the screen. Keep the
+            // interpolation origin aligned to the new target for this frame.
+            m_previousTarget = m_target;
             continue;
         }
         if (arrow.position.x() > width() || arrow.position.y() > height() ||
