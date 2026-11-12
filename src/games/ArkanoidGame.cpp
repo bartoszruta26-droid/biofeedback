@@ -83,7 +83,7 @@ bool ArkanoidGame::hasActiveBricks() const{return std::any_of(m_bricks.cbegin(),
 void ArkanoidGame::advanceLevel(){++m_level;m_ballSpeed=qMin(m_ballSpeed*1.025,560.0);m_combo=0;m_comboRemaining=0.0;addScore(100);buildLevel();resetBall();}
 void ArkanoidGame::update(double dt){
  if(!isRunning()||!std::isfinite(dt)||dt<=0.0||width()<=0||height()<=0)return;
- dt=qMin(dt,0.1);constexpr double maxStep=1.0/120.0;const int steps=qBound(1,static_cast<int>(std::ceil(dt/maxStep)),12);const double step=dt/steps;
+ dt=qMin(dt,0.1);constexpr double maxStep=1.0/240.0;const int steps=qBound(1,static_cast<int>(std::ceil(dt/maxStep)),24);const double step=dt/steps;
  for(int i=0;i<steps&&isRunning();++i)updatePhysicsStep(step);
 }
 void ArkanoidGame::updatePhysicsStep(double dt){

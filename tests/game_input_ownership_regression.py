@@ -37,20 +37,51 @@ required_engine_tokens = (
     "m_gameTimer->setInterval(8)",
     "m_gameTimer->setTimerType(Qt::PreciseTimer)",
     "constexpr double fixedStep = kFixedSimulationStepSeconds;",
+    "update(fixedStep);",
     "m_monotonicClock.nsecsElapsed()",
     "/ 1.0e9",
     "Qt::WA_OpaquePaintEvent",
     "Qt::WA_NoSystemBackground",
+    "m_renderInterpolationAlpha = qBound(0.0, m_simulationAccumulator / fixedStep, 1.0);",
+    "QWidget::update();",
 )
 for token in required_engine_tokens:
     if token not in engine:
-        raise SystemExit(f"GameEngine is missing the arcade performance requirement: {token}")
+        raise SystemExit(f"GameEngine is missing the shared arcade profile requirement: {token}")
+
+if "return m_renderInterpolationAlpha;" not in engine_header:
+    raise SystemExit("GameEngine must expose the standard accumulator interpolation fraction.")
+if "static constexpr double kFixedSimulationStepSeconds = 1.0 / 240.0;" not in engine_header:
+    raise SystemExit("All games must use the shared 240 Hz fixed simulation step.")
 
 for path in GAME_SOURCES:
-    if "::renderInterpolated(" not in path.read_text(encoding="utf-8"):
+    source = path.read_text(encoding="utf-8")
+    if path.name != "GameEngine.cpp" and "::renderInterpolated(" not in source:
         raise SystemExit(f"Game is missing frame-rate-independent render interpolation: {path.relative_to(ROOT)}")
-if "static constexpr double kFixedSimulationStepSeconds = 1.0 / 120.0;" not in engine_header:
-    raise SystemExit("GameEngine fixed simulation step must remain 120 Hz.")
+
+for path in GAME_SOURCES:
+    if path.name == "GameEngine.cpp":
+        continue
+    header = ROOT / "include" / "games" / f"{path.stem}.hpp"
+    if not header.exists():
+        raise SystemExit(f"Game is missing its matching header: {header.relative_to(ROOT)}")
+    header_source = header.read_text(encoding="utf-8")
+    if "public GameEngine" not in header_source and "public games::GameEngine" not in header_source:
+        raise SystemExit(f"Game must inherit the shared GameEngine profile: {header.relative_to(ROOT)}")
+    source = path.read_text(encoding="utf-8")
+    if (
+        "paintEvent(" in source
+        and "renderInterpolated(painter, renderInterpolationAlpha())" not in source
+        and "GameEngine::paintEvent(event)" not in source
+    ):
+        raise SystemExit(f"Custom paintEvent must use the shared interpolation fraction: {path.relative_to(ROOT)}")
+
+arkanoid = (ROOT / "src" / "games" / "ArkanoidGame.cpp").read_text(encoding="utf-8")
+pong = (ROOT / "src" / "games" / "PongGame.cpp").read_text(encoding="utf-8")
+if "constexpr double maxStep=1.0/240.0" not in arkanoid:
+    raise SystemExit("Arkanoid physics must use the shared 240 Hz motion profile.")
+if "constexpr double kPhysicsStep = 1.0 / 240.0;" not in pong:
+    raise SystemExit("Pong physics must use the shared 240 Hz motion profile.")
 
 car_race = (ROOT / "src" / "games" / "CarRaceGame.cpp").read_text(encoding="utf-8")
 galaga = (ROOT / "src" / "games" / "GalagaGame.cpp").read_text(encoding="utf-8")
@@ -64,4 +95,4 @@ for token in ("m_specialGestureActive", "target >= 0.95", "firePlayerShot()"):
 if "FlappyBirdGame::keyPressEvent" in flappy or "FlappyBirdGame::mousePressEvent" in flappy:
     raise SystemExit("Flappy Bird must use the tensometer impulse only.")
 
-print(f"PASS: {len(GAME_SOURCES)} game sources and {len(GAME_HEADERS)} headers follow the single-tensometer arcade profile.")
+print(f"PASS: {len(GAME_SOURCES) - 1} games inherit the shared 120 Hz presentation / 240 Hz simulation profile and render through interpolation.")

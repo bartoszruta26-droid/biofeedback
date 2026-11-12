@@ -163,7 +163,9 @@ protected:
     // fixed simulation states. Games opt in by interpolating their own state.
     virtual void renderInterpolated(QPainter& painter, double alpha);
 
-    static constexpr double kFixedSimulationStepSeconds = 1.0 / 120.0;
+    static constexpr double kFixedSimulationStepSeconds = 1.0 / 240.0;
+    // Standard accumulator interpolation blends adjacent 240 Hz simulation
+    // states smoothly at the presentation cadence, without jumping ahead.
     double renderInterpolationAlpha() const { return m_renderInterpolationAlpha; }
 
     /**
