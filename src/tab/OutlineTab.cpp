@@ -1333,22 +1333,12 @@ bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline)
         exercise.targetRepetitions = exerciseObj["targetRepetitions"].toInt(0);
         exercise.difficulty = exerciseObj["difficulty"].toString("medium");
 
-        // Optional prescription fields. Missing keys keep neutral defaults so
-        // existing outline JSON files load without migration.
-        exercise.orderIndex = exerciseObj.value(QStringLiteral("orderIndex")).toInt(-1);
-        exercise.phase = exerciseObj.value(QStringLiteral("phase")).toString();
-        exercise.permittedRom = exerciseObj.value(QStringLiteral("permittedRom")).toString();
-        exercise.permittedLoad = exerciseObj.value(QStringLiteral("permittedLoad")).toString();
-        exercise.setsTarget = exerciseObj.value(QStringLiteral("setsTarget")).toInt(0);
-        exercise.repsTarget = exerciseObj.value(QStringLiteral("repsTarget")).toInt(0);
-        exercise.holdSeconds = exerciseObj.value(QStringLiteral("holdSeconds")).toInt(0);
-        exercise.restSeconds = exerciseObj.value(QStringLiteral("restSeconds")).toInt(0);
-        exercise.resistanceValue = exerciseObj.value(QStringLiteral("resistanceValue")).toDouble(0.0);
-        exercise.resistanceUnit = exerciseObj.value(QStringLiteral("resistanceUnit")).toString();
-        exercise.tempo = exerciseObj.value(QStringLiteral("tempo")).toString();
-        exercise.rpeTarget = exerciseObj.value(QStringLiteral("rpeTarget")).toDouble(-1.0);
-        exercise.painPolicyId = exerciseObj.value(QStringLiteral("painPolicyId")).toString();
-        exercise.progressionRuleId = exerciseObj.value(QStringLiteral("progressionRuleId")).toString();
+        // Optional prescription fields are validated as one value object.
+        // Missing keys retain neutral legacy defaults.
+        QString prescriptionError;
+        if (!ExercisePrescription::fromJson(exerciseObj, exercise.prescription,
+                                             &prescriptionError))
+            return false;
 
         outline.exercises.append(exercise);
     }
