@@ -20,11 +20,25 @@ constexpr double kAsymptoteGuard = 0.10;
 
 double tangentWave(double angle, double sharpness)
 {
-    // atan(tan(x)) is bounded to [-pi/2, pi/2] on each branch.
-    // The scale controls steepness without creating long clipped plateaus.
-    const double numerator = std::sin(angle);
-    const double denominator = std::abs(std::cos(angle)) + 0.20;
-    return std::tanh((2.0 + sharpness) * numerator / denominator);
+    // One uninterrupted cycle: tangent-like half, then cotangent-like half.
+    // Smooth cross-fades at both hand-offs prevent a target-position jump.
+    const double cycle = std::fmod(angle + 2.0 * kPi, 2.0 * kPi);
+    const double tangent = std::tanh((2.0 + sharpness) * std::sin(cycle) /
+                                     (std::abs(std::cos(cycle)) + 0.20));
+    const double cotangent = std::tanh((2.0 + sharpness) * std::cos(cycle) /
+                                       (std::abs(std::sin(cycle)) + 0.20));
+    const auto blend = [](double from, double to, double t) {
+        const double x = qBound(0.0, t, 1.0);
+        const double eased = x * x * (3.0 - 2.0 * x);
+        return from + (to - from) * eased;
+    };
+    if (cycle >= kPi - 0.25 && cycle <= kPi + 0.25)
+        return blend(tangent, cotangent, (cycle - (kPi - 0.25)) / 0.50);
+    if (cycle >= 2.0 * kPi - 0.25)
+        return blend(cotangent, tangent, (cycle - (2.0 * kPi - 0.25)) / 0.50);
+    if (cycle < 0.25)
+        return blend(cotangent, tangent, (cycle + 0.25) / 0.50);
+    return cycle < kPi ? tangent : cotangent;
 }
 }
 
