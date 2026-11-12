@@ -21,6 +21,13 @@ GameEngine::GameEngine(QWidget *parent)
     , m_simulationAccumulator(0.0)
     , m_renderInterpolationAlpha(0.0)
     , m_frameCount(0)
+    , m_renderFrameCount(0)
+    , m_timerPumpCount(0)
+    , m_droppedSimulationSteps(0)
+    , m_renderTimeNsTotal(0)
+    , m_renderTimeNsMax(0)
+    , m_simulationTimeNsTotal(0)
+    , m_simulationTimeNsMax(0)
     , m_invalidInputCount(0)
     , m_sensorValue(0.0)
 {
@@ -176,9 +183,25 @@ QString GameEngine::getGameStats() const
         elapsed += m_monotonicClock.elapsed();
     const QString state = !m_isRunning ? QStringLiteral("stopped")
         : (m_isPaused ? QStringLiteral("paused") : QStringLiteral("running"));
-    return QStringLiteral("game=%1; state=%2; score=%3; elapsed_ms=%4; frames=%5; invalid_inputs=%6")
+    const double renderAverageUs = m_renderFrameCount > 0
+        ? static_cast<double>(m_renderTimeNsTotal) / static_cast<double>(m_renderFrameCount) / 1000.0
+        : 0.0;
+    const double simulationAverageUs = m_timerPumpCount > 0
+        ? static_cast<double>(m_simulationTimeNsTotal) / static_cast<double>(m_timerPumpCount) / 1000.0
+        : 0.0;
+    return QStringLiteral("game=%1; state=%2; score=%3; elapsed_ms=%4; "
+                          "simulation_steps=%5; render_frames=%6; timer_pumps=%7; "
+                          "dropped_steps=%8; render_avg_us=%9; render_max_us=%10; "
+                          "simulation_avg_us=%11; simulation_max_us=%12; invalid_inputs=%13")
         .arg(gameName()).arg(state).arg(m_score).arg(elapsed)
         .arg(static_cast<qulonglong>(m_frameCount))
+        .arg(static_cast<qulonglong>(m_renderFrameCount))
+        .arg(static_cast<qulonglong>(m_timerPumpCount))
+        .arg(static_cast<qulonglong>(m_droppedSimulationSteps))
+        .arg(renderAverageUs, 0, 'f', 2)
+        .arg(static_cast<double>(m_renderTimeNsMax) / 1000.0, 0, 'f', 2)
+        .arg(simulationAverageUs, 0, 'f', 2)
+        .arg(static_cast<double>(m_simulationTimeNsMax) / 1000.0, 0, 'f', 2)
         .arg(static_cast<qulonglong>(m_invalidInputCount));
 }
 
@@ -187,6 +210,13 @@ void GameEngine::resetGameStats()
     setScore(0);
     m_accumulatedSessionMs = 0;
     m_frameCount = 0;
+    m_renderFrameCount = 0;
+    m_timerPumpCount = 0;
+    m_droppedSimulationSteps = 0;
+    m_renderTimeNsTotal = 0;
+    m_renderTimeNsMax = 0;
+    m_simulationTimeNsTotal = 0;
+    m_simulationTimeNsMax = 0;
     m_invalidInputCount = 0;
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     if (m_isRunning && !m_isPaused) {
@@ -253,15 +283,24 @@ void GameEngine::gameLoop()
     // of GUI timer jitter. The frame delta is capped above to bound catch-up work.
     constexpr double fixedStep = kFixedSimulationStepSeconds;
     m_simulationAccumulator += deltaTime;
+    QElapsedTimer simulationTimer;
+    simulationTimer.start();
     int steps = 0;
     while (m_simulationAccumulator >= fixedStep && steps < 12 && m_isRunning && !m_isPaused) {
         update(fixedStep);
         m_simulationAccumulator -= fixedStep;
         ++steps;
     }
+    const qint64 simulationElapsedNs = simulationTimer.nsecsElapsed();
+    ++m_timerPumpCount;
+    m_simulationTimeNsTotal += simulationElapsedNs;
+    m_simulationTimeNsMax = qMax(m_simulationTimeNsMax, simulationElapsedNs);
     m_frameCount += static_cast<quint64>(steps);
-    if (steps == 12 && m_simulationAccumulator >= fixedStep)
+    if (steps == 12 && m_simulationAccumulator >= fixedStep) {
+        const quint64 dropped = static_cast<quint64>(m_simulationAccumulator / fixedStep);
+        m_droppedSimulationSteps += dropped;
         m_simulationAccumulator = std::fmod(m_simulationAccumulator, fixedStep);
+    }
 
     // Preserve the full accumulator fraction. Each rendered frame blends the
     // previous and current 120 Hz fixed-step states, including on 60/90/120 Hz
@@ -383,7 +422,13 @@ void GameEngine::paintEvent(QPaintEvent* event)
     // Running games render an opaque background themselves. Avoid a second
     // full-window fill on every presentation frame (up to 120 Hz requested).
     if (m_isRunning) {
+        QElapsedTimer renderTimer;
+        renderTimer.start();
         renderInterpolated(painter, renderInterpolationAlpha());
+        const qint64 renderElapsedNs = renderTimer.nsecsElapsed();
+        ++m_renderFrameCount;
+        m_renderTimeNsTotal += renderElapsedNs;
+        m_renderTimeNsMax = qMax(m_renderTimeNsMax, renderElapsedNs);
     } else {
         painter.fillRect(rect(), Qt::black);
         // Ekran startowy/końcowy
