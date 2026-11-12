@@ -170,26 +170,47 @@ void ArcherGame::update(double deltaTime)
         if (!arrow.active)
             continue;
         const QPointF previous = arrow.position;
+        const QPointF oldVelocity = arrow.velocity;
+        // Integrate the ballistic arc analytically so position and velocity
+        // describe the same constant-gravity trajectory for every time step.
+        arrow.position += QPointF(oldVelocity.x() * deltaTime,
+            oldVelocity.y() * deltaTime + 0.5 * m_gravity * deltaTime * deltaTime);
         arrow.velocity.ry() += m_gravity * deltaTime;
-        arrow.position += arrow.velocity * deltaTime;
 
-        // Segment sampling avoids skipping the target at high arrow velocity.
+        // Sweep the actual parabolic path and the moving target through the
+        // same time interval. A straight chord against only the final target
+        // can miss a crossing when either object moves quickly.
         const QPointF segment = arrow.position - previous;
         const int samples = qMax(1, static_cast<int>(std::ceil(
-            std::hypot(segment.x(), segment.y()) / 6.0)));
+            std::hypot(segment.x(), segment.y()) / 4.0)));
         bool hit = false;
+        QPointF hitPoint = arrow.position;
+        QRectF hitTarget = m_target;
         for (int sample = 1; sample <= samples; ++sample) {
-            const QPointF point = previous + segment * (static_cast<double>(sample) / samples);
-            const double rx = qMax(1.0, m_target.width() * 0.5);
-            const double ry = qMax(1.0, m_target.height() * 0.5);
-            const double nx = (point.x() - m_target.center().x()) / rx;
-            const double ny = (point.y() - m_target.center().y()) / ry;
-            if (nx * nx + ny * ny <= 1.0) { hit = true; break; }
+            const double fraction = static_cast<double>(sample) / samples;
+            const QPointF point = previous + QPointF(
+                oldVelocity.x() * deltaTime * fraction,
+                oldVelocity.y() * deltaTime * fraction +
+                    0.5 * m_gravity * deltaTime * deltaTime * fraction * fraction);
+            const QRectF targetAtTime(
+                m_previousTarget.x() + (m_target.x() - m_previousTarget.x()) * fraction,
+                m_previousTarget.y() + (m_target.y() - m_previousTarget.y()) * fraction,
+                m_target.width(), m_target.height());
+            const double rx = qMax(1.0, targetAtTime.width() * 0.5);
+            const double ry = qMax(1.0, targetAtTime.height() * 0.5);
+            const double nx = (point.x() - targetAtTime.center().x()) / rx;
+            const double ny = (point.y() - targetAtTime.center().y()) / ry;
+            if (nx * nx + ny * ny <= 1.0) {
+                hit = true;
+                hitPoint = point;
+                hitTarget = targetAtTime;
+                break;
+            }
         }
         if (hit) {
             arrow.active = false;
-            const double dx = (arrow.position.x() - m_target.center().x()) / qMax(1.0, m_target.width() * 0.5);
-            const double dy = (arrow.position.y() - m_target.center().y()) / qMax(1.0, m_target.height() * 0.5);
+            const double dx = (hitPoint.x() - hitTarget.center().x()) / qMax(1.0, hitTarget.width() * 0.5);
+            const double dy = (hitPoint.y() - hitTarget.center().y()) / qMax(1.0, hitTarget.height() * 0.5);
             const double radial = std::sqrt(dx * dx + dy * dy);
             addScore(radial <= 0.22 ? 30 : (radial <= 0.55 ? 20 : 10));
             ++m_successfulHits;
