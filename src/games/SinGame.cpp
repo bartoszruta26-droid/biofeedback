@@ -312,7 +312,7 @@ void SinGame::update(double deltaTime)
     // Time-constant smoothing: unlike a fixed 0.2 blend, this behaves the
     // same at 60, 120 or irregular GUI frame rates.
     const double rawCursorY = h * (1.0 - m_currentForce);
-    const double alpha = 1.0 - std::exp(-dt / 0.055);
+    const double alpha = 1.0 - std::exp(-dt / 0.035);
     m_cursorY += (rawCursorY - m_cursorY) * alpha;
 
     if (m_inputAge > 0.35) {
