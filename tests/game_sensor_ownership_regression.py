@@ -43,8 +43,8 @@ if "m_sensorThreshold(30.0)" not in Path("src/games/MarioGame.cpp").read_text(en
 game_engine = Path("src/games/GameEngine.cpp").read_text(encoding="utf-8")
 training = Path("src/tab/TrainingTab.cpp").read_text(encoding="utf-8")
 arkanoid = Path("src/games/ArkanoidGame.cpp").read_text(encoding="utf-8")
-if "m_gameTimer->setInterval(4)" not in game_engine:
-    raise SystemExit("Game loop must pump the 240 Hz fixed-step simulation at a stable cadence")
+if "m_gameTimer->setInterval(8)" not in game_engine or "kFixedSimulationStepSeconds = 1.0 / 120.0" not in Path("include/games/GameEngine.hpp").read_text(encoding="utf-8"):
+    raise SystemExit("Game loop must pump the 120 Hz fixed-step simulation at a stable cadence")
 if "m_liveUiTimer->setInterval(8)" not in training:
     raise SystemExit("TrainingTab must refresh the latest game-control sample at 120 Hz")
 if "std::exp(-dt/0.025)" not in arkanoid:
