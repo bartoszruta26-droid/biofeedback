@@ -34,6 +34,40 @@
 #include <functional>
 
 namespace games {
+struct PongGameTestAccess
+{
+    static bool rejectsEarlyCornerBounce(PongGame& game)
+    {
+        const double maxY = qMax(0.0, static_cast<double>(game.height()) - game.m_paddleHeight);
+        game.m_currentForce = 50.0;
+        game.m_leftPaddleY = static_cast<float>(maxY * 0.5);
+        game.m_leftPaddle = QRectF(game.m_paddleMargin, game.m_leftPaddleY,
+                                   game.m_paddleWidth, game.m_paddleHeight);
+        const double faceX = game.m_leftPaddle.right() + game.m_ballRadius;
+        const double impactY = game.m_leftPaddle.top() - game.m_ballRadius * 0.5;
+        game.m_ballPos = QPointF(faceX - 2.0, impactY);
+        game.m_ballVel = QPointF(-200.0, 0.0);
+        game.checkCollisions(QPointF(faceX + 2.0, impactY));
+        return game.m_ballVel.x() < 0.0;
+    }
+
+    static bool bouncesAtVisibleSideContact(PongGame& game)
+    {
+        const double maxY = qMax(0.0, static_cast<double>(game.height()) - game.m_paddleHeight);
+        game.m_currentForce = 50.0;
+        game.m_leftPaddleY = static_cast<float>(maxY * 0.5);
+        game.m_leftPaddle = QRectF(game.m_paddleMargin, game.m_leftPaddleY,
+                                   game.m_paddleWidth, game.m_paddleHeight);
+        const double faceX = game.m_leftPaddle.right() + game.m_ballRadius;
+        const double impactY = game.m_leftPaddle.center().y();
+        game.m_ballPos = QPointF(faceX - 2.0, impactY);
+        game.m_ballVel = QPointF(-200.0, 0.0);
+        game.checkCollisions(QPointF(faceX + 2.0, impactY));
+        return game.m_ballVel.x() > 0.0 &&
+               std::abs(game.m_ballPos.x() - faceX) < 1e-6;
+    }
+};
+
 struct PrecisionCraneGameTestAccess
 {
     static bool collideWithFirstObstacle(PrecisionCraneGame& game)
@@ -639,6 +673,8 @@ int main(int argc, char **argv)
     pongGame->resize(640, 480);
     pongGame->start();
     REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
+    REQUIRE(games::PongGameTestAccess::rejectsEarlyCornerBounce(*pongGame));
+    REQUIRE(games::PongGameTestAccess::bouncesAtVisibleSideContact(*pongGame));
     const double referencePaddleAspect = pongGame->paddleHeight() / pongGame->paddleWidth();
     pongGame->resize(1920, 1080);
     REQUIRE(pongGame->paddleHeight() > pongGame->paddleWidth() * 4.0);
