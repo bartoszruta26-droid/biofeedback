@@ -256,6 +256,13 @@ void GameEngine::reset()
     m_simulationAccumulator = 0.0;
     m_renderInterpolationAlpha = 0.0;
     m_frameCount = 0;
+    m_renderFrameCount = 0;
+    m_timerPumpCount = 0;
+    m_droppedSimulationSteps = 0;
+    m_renderTimeNsTotal = 0;
+    m_renderTimeNsMax = 0;
+    m_simulationTimeNsTotal = 0;
+    m_simulationTimeNsMax = 0;
     m_invalidInputCount = 0;
     m_pendingInvalidInputCount.store(0, std::memory_order_relaxed);
     
