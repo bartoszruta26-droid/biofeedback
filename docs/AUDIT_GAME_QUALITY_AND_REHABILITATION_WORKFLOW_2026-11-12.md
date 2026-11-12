@@ -228,6 +228,14 @@ Prace rozpoczynają się od Etapu A, ponieważ telemetria umożliwi podejmowanie
 - Dodano uzbrajanie/rozbrajanie obsługi zakończenia gry przy przejściu między ćwiczeniami. Poprzednia gra jest rozbrajana przed wymianą, a nowa po obsłużeniu żądania uruchomienia.
 - Weryfikacja kompilacji i regresji dla tych zmian pozostaje w toku; nie należy traktować ich jako odebranych przed zielonym CI.
 
+### Aktualizacja implementacji — model recepty i kontrakt testów
+
+- Rozszerzono `ExerciseData` o opcjonalne pola recepty: kolejność, fazę, dozwolony zakres ruchu i obciążenie, serie, powtórzenia, czas izometrii, przerwę, opór z jednostką, tempo, docelowe RPE oraz identyfikatory polityki bólu i reguły progresji.
+- Parser JSON odczytuje te pola tylko wtedy, gdy występują. Dla starych konspektów stosuje neutralne wartości domyślne; istniejące klucze `durationSeconds` i `targetRepetitions` zachowują dotychczasowe znaczenie.
+- Poprawiono dwa nieaktualne założenia testów: wspólny silnik ma krok symulacji 120 Hz i timer Qt 8 ms. Lokalny podkrok fizyki 240 Hz w wybranych grach pozostaje dozwolony.
+- Po zmianach testów uruchomiono ponownie CI dla HEAD `79252c5e35490c9253b9dac282f3aca4305af16d`. Kompilacja i pełna regresja są nadal w toku; nie uznajemy jeszcze tego etapu za odebrany.
+- Zakres testów trajektorii/kolizji/skali dla wszystkich gier wymaga dalszego rozszerzenia ponad istniejące testy fabryki i wybrane scenariusze. Nie deklarujemy jeszcze pełnego pokrycia wszystkich gier i czterech rozdzielczości.
+
 ### Następne zadania
 
 1. Uruchomić CI dla aktualnego HEAD i poprawić ewentualne błędy kompilacji/testów.
