@@ -39,7 +39,7 @@ for path in GAME_SOURCES + GAME_HEADERS:
 engine = (ROOT / "src" / "games" / "GameEngine.cpp").read_text(encoding="utf-8")
 engine_header = (ROOT / "include" / "games" / "GameEngine.hpp").read_text(encoding="utf-8")
 required_engine_tokens = (
-    "m_gameTimer->setInterval(8)",
+    "m_gameTimer->setInterval(4)",
     "m_gameTimer->setTimerType(Qt::PreciseTimer)",
     "constexpr double fixedStep = kFixedSimulationStepSeconds;",
     "update(fixedStep);",
@@ -87,6 +87,11 @@ if "constexpr double maxStep=1.0/240.0" not in arkanoid:
     raise SystemExit("Arkanoid physics must use the shared 240 Hz motion profile.")
 if "constexpr double kPhysicsStep = 1.0 / 240.0;" not in pong:
     raise SystemExit("Pong physics must use the shared 240 Hz motion profile.")
+
+if "m_ballVelocity*presentationLead" not in arkanoid:
+    raise SystemExit("Arkanoid must render its ball using presentation-time velocity prediction.")
+if "m_ballVel * presentationLead" not in pong:
+    raise SystemExit("Pong must render its ball using presentation-time velocity prediction.")
 
 car_race = (ROOT / "src" / "games" / "CarRaceGame.cpp").read_text(encoding="utf-8")
 galaga = (ROOT / "src" / "games" / "GalagaGame.cpp").read_text(encoding="utf-8")

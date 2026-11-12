@@ -451,8 +451,21 @@ void PongGame::renderInterpolated(QPainter& painter, double alpha)
     const float currentLeft = m_leftPaddleY;
     const float currentRight = m_rightPaddleY;
 
-    m_ballPos = m_previousBallPos +
-        (currentBall - m_previousBallPos) * alpha;
+    // Predict only the presentation position for the unconsumed fraction of
+    // one fixed step. Interpolating previous/current states adds a full-step
+    // visual delay and can smear a ball across a collision. Extrapolation from
+    // the latest collision-resolved state keeps the ball aligned with its
+    // current velocity while leaving authoritative physics untouched.
+    if (sensorInputFresh() && m_serveDelayRemaining <= 0.0) {
+        const double presentationLead = alpha * kFixedSimulationStepSeconds;
+        m_ballPos = currentBall + m_ballVel * presentationLead;
+        const double radius = static_cast<double>(m_ballRadius);
+        m_ballPos.setX(qBound(radius, m_ballPos.x(),
+                              qMax(radius, static_cast<double>(width()) - radius)));
+        m_ballPos.setY(qBound(radius, m_ballPos.y(),
+                              qMax(radius, static_cast<double>(height()) - radius)));
+    }
+
     m_leftPaddleY = static_cast<float>(
         m_previousLeftPaddleY + (currentLeft - m_previousLeftPaddleY) * alpha);
     m_rightPaddleY = static_cast<float>(
