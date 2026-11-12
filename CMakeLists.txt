@@ -432,6 +432,15 @@ if(Qt5_FOUND)
     add_test(NAME sample_journal_writer_regression COMMAND sample_journal_writer_regression)
     set_tests_properties(sample_journal_writer_regression PROPERTIES TIMEOUT 20)
 
+    # Backward-compatible, bounded exercise prescription JSON model.
+    add_executable(exercise_prescription_regression
+        tests/exercise_prescription_regression.cpp
+        include/tab/ExercisePrescription.hpp
+    )
+    target_include_directories(exercise_prescription_regression PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_libraries(exercise_prescription_regression PRIVATE Qt5::Core)
+    add_test(NAME exercise_prescription_regression COMMAND exercise_prescription_regression)
+
     # GameEngine lifecycle, monotonic timing, fixed-step simulation and
     # cross-thread sensor input regression.
     add_executable(game_engine_regression
