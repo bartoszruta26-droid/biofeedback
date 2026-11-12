@@ -39,7 +39,7 @@ for path in GAME_SOURCES + GAME_HEADERS:
 engine = (ROOT / "src" / "games" / "GameEngine.cpp").read_text(encoding="utf-8")
 engine_header = (ROOT / "include" / "games" / "GameEngine.hpp").read_text(encoding="utf-8")
 required_engine_tokens = (
-    "m_gameTimer->setInterval(4)",
+    "m_gameTimer->setInterval(8",
     "m_gameTimer->setTimerType(Qt::PreciseTimer)",
     "constexpr double fixedStep = kFixedSimulationStepSeconds;",
     "update(fixedStep);",
@@ -56,8 +56,8 @@ for token in required_engine_tokens:
 
 if "return m_renderInterpolationAlpha;" not in engine_header:
     raise SystemExit("GameEngine must expose the standard accumulator interpolation fraction.")
-if "static constexpr double kFixedSimulationStepSeconds = 1.0 / 240.0;" not in engine_header:
-    raise SystemExit("All games must use the shared 240 Hz fixed simulation step.")
+if "static constexpr double kFixedSimulationStepSeconds = 1.0 / 120.0;" not in engine_header:
+    raise SystemExit("All games must use the shared 120 Hz fixed simulation step.")
 
 for path in GAME_SOURCES:
     source = path.read_text(encoding="utf-8")
@@ -84,7 +84,7 @@ for path in GAME_SOURCES:
 arkanoid = (ROOT / "src" / "games" / "ArkanoidGame.cpp").read_text(encoding="utf-8")
 pong = (ROOT / "src" / "games" / "PongGame.cpp").read_text(encoding="utf-8")
 if "constexpr double maxStep=1.0/240.0" not in arkanoid:
-    raise SystemExit("Arkanoid physics must use the shared 240 Hz motion profile.")
+    raise SystemExit("Arkanoid physics must use the 240 Hz internal physics substep.")
 if "constexpr double kPhysicsStep = 1.0 / 240.0;" not in pong:
     raise SystemExit("Pong physics must use the shared 240 Hz motion profile.")
 
@@ -105,4 +105,4 @@ for token in ("m_specialGestureActive", "target >= 0.95", "firePlayerShot()"):
 if "FlappyBirdGame::keyPressEvent" in flappy or "FlappyBirdGame::mousePressEvent" in flappy:
     raise SystemExit("Flappy Bird must use the tensometer impulse only.")
 
-print(f"PASS: {len(GAME_SOURCES) - 1} games inherit the shared 120 Hz presentation / 240 Hz simulation profile and render through interpolation.")
+print(f"PASS: {len(GAME_SOURCES) - 1} games inherit the 120 Hz fixed simulation profile with local 240 Hz physics substeps where required and render through interpolation.")
