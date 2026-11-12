@@ -236,6 +236,14 @@ Prace rozpoczynają się od Etapu A, ponieważ telemetria umożliwi podejmowanie
 - Po zmianach testów uruchomiono ponownie CI dla HEAD `79252c5e35490c9253b9dac282f3aca4305af16d`. Kompilacja i pełna regresja są nadal w toku; nie uznajemy jeszcze tego etapu za odebrany.
 - Zakres testów trajektorii/kolizji/skali dla wszystkich gier wymaga dalszego rozszerzenia ponad istniejące testy fabryki i wybrane scenariusze. Nie deklarujemy jeszcze pełnego pokrycia wszystkich gier i czterech rozdzielczości.
 
+### Kontynuacja — testy skalowania i recepty (2026-11-12)
+
+- Rozszerzono `game_factory_regression`: każda z 17 zarejestrowanych odmian gry jest uruchamiana i renderowana w rozdzielczościach 640×480, 1280×720, 1920×1080 i 2560×1440, a następnie wraca do rozmiaru bazowego. Test kontroluje niepustą klatkę oraz to, czy silnik wykonał kroki symulacji.
+- Poprawiono statyczny test profilu Pong: wspólny krok fizyki wynosi 1/120 s. Wcześniejsze oczekiwanie 1/240 s było nieaktualne i powodowało awarię obu zestawów regresji, mimo poprawnej kompilacji.
+- Wyodrębniono `ExercisePrescription` jako typowany obiekt wartości. Parser sprawdza typy, zakresy i całkowitość wartości liczbowych; pola nieobecne w starych plikach JSON otrzymują neutralne wartości domyślne.
+- Dodano osobny test C++ dla pustej (legacy) recepty, kompletnej recepty oraz błędnych zakresów i typów pól.
+- CI dla najnowszego HEAD `44e25e7865904a30f5aac511e4cba94ec8e574ee` jest w toku. Wcześniejszy HEAD `3c635de8a3067a77fadb7f495a10b5ad34007e81` kompilował aplikację poprawnie, ale miał 1 błąd z 36 testów — nieaktualne oczekiwanie częstotliwości Pong. Pełne wyniki nowego testu skalowania i recepty wymagają zielonego CI.
+
 ### Następne zadania
 
 1. Uruchomić CI dla aktualnego HEAD i poprawić ewentualne błędy kompilacji/testów.
