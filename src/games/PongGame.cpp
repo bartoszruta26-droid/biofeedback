@@ -459,10 +459,11 @@ void PongGame::renderInterpolated(QPainter& painter, double alpha)
     if (sensorInputFresh() && m_serveDelayRemaining <= 0.0) {
         const double presentationLead = alpha * kFixedSimulationStepSeconds;
         m_ballPos = currentBall + m_ballVel * presentationLead;
-        m_ballPos.setX(qBound(m_ballRadius, m_ballPos.x(),
-                              qMax(m_ballRadius, width() - m_ballRadius)));
-        m_ballPos.setY(qBound(m_ballRadius, m_ballPos.y(),
-                              qMax(m_ballRadius, height() - m_ballRadius)));
+        const double radius = static_cast<double>(m_ballRadius);
+        m_ballPos.setX(qBound(radius, m_ballPos.x(),
+                              qMax(radius, static_cast<double>(width()) - radius));
+        m_ballPos.setY(qBound(radius, m_ballPos.y(),
+                              qMax(radius, static_cast<double>(height()) - radius));
     }
 
     m_leftPaddleY = static_cast<float>(
