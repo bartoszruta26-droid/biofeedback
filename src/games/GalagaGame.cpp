@@ -536,7 +536,7 @@ void GalagaGame::render(QPainter& painter)
 {
     painter.save();
     painter.fillRect(rect(), QColor(4, 7, 22));
-    painter.setRenderHint(QPainter::Antialiasing, false);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setPen(Qt::NoPen);
 
     // Layered star field with different parallax speeds.
