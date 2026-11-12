@@ -1403,12 +1403,10 @@ void TrainingTab::enqueueMeasurementSample(
     bool scheduleDrain = false;
     {
         std::lock_guard<std::mutex> lock(m_measurementQueueMutex);
-        constexpr std::size_t MaximumQueuedSamples = 2048;
-        // Retain the newest contiguous tail instead of clearing the entire
-        // measurement history when the GUI briefly falls behind.
+        constexpr std::size_t MaximumQueuedSamples = 64;
         if (m_measurementQueue.size() >= MaximumQueuedSamples) {
-            m_measurementQueue.pop_front();
-            ++m_droppedMeasurementSamples;
+            m_droppedMeasurementSamples += m_measurementQueue.size() + 1;
+            m_measurementQueue.clear();
         }
         m_measurementQueue.push_back(sample);
         if (!m_measurementDrainScheduled) {
@@ -1431,7 +1429,7 @@ void TrainingTab::enqueueMeasurementSample(
 
 void TrainingTab::drainMeasurementSamples()
 {
-    constexpr std::size_t MaximumBatch = 128;
+    constexpr std::size_t MaximumBatch = 16;
     std::vector<biofeedback::measurement::MeasurementSample> batch;
     std::size_t dropped = 0;
     bool scheduleAgain = false;
