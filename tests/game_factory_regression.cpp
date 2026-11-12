@@ -333,11 +333,12 @@ int main(int argc, char **argv)
             }
             REQUIRE(hasPaintedPixel);
         }
+        waitForEvents(40); // Allow the precise 8 ms timer to produce fixed-step work.
         const QString engineStats = game->getGameStats();
         const int stepsMarker = engineStats.indexOf(QStringLiteral("simulation_steps="));
         REQUIRE(stepsMarker >= 0);
         bool stepsOk = false;
-        const int simulationSteps = engineStats.mid(stepsMarker + 17).section(',', 0, 0).toInt(&stepsOk);
+        const int simulationSteps = engineStats.mid(stepsMarker + 17).section(';', 0, 0).toInt(&stepsOk);
         REQUIRE(stepsOk && simulationSteps > 0);
 
         game->handleSensorInput(25.0);
