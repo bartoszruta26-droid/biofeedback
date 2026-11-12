@@ -386,10 +386,12 @@ private:
     int m_currentExerciseIndex;
     bool m_isSessionActive;
     bool m_isPaused;
+    bool m_currentExerciseGameActive;
     
     // Stan sesji
     int m_completedExercises;
     QVector<int> m_exerciseScores;
+    QVector<bool> m_exerciseCompletionRecorded;
     qint64 m_sessionStartTime;
     qint64 m_exerciseStartTime;
     
