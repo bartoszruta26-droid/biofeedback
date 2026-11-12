@@ -87,43 +87,75 @@ double FunctionTrackGame::targetAt(double x) const
     const double h = qMax(1, height());
     const double phase = x / w * 2.0 * kPi + m_phase;
     double selectedWidth = m_trackWidth;
-    if (m_mode == Mode::Cotangent) selectedWidth = m_tangentWidth;
-    else if (m_mode == Mode::Trapezoid) selectedWidth = m_trapezoidWidth;
-    else {
-        const double cycle = std::fmod(m_elapsed, 18.0);
-        selectedWidth = cycle < 6.0 ? m_sinusWidth
-            : (cycle < 12.0 ? m_tangentWidth : m_trapezoidWidth);
-    }
-    const double amplitude = h * selectedWidth;
     double value = 0.0;
 
-    auto tangentLike = [](double a, bool cotangent) {
-        const double numerator = cotangent ? std::cos(a) : std::sin(a);
-        const double denominator = cotangent ? std::abs(std::sin(a)) + 0.20
-                                             : std::abs(std::cos(a)) + 0.20;
+    auto tangentLike = [](double angle, bool cotangent) {
+        const double numerator = cotangent ? std::cos(angle) : std::sin(angle);
+        const double denominator = cotangent ? std::abs(std::sin(angle)) + 0.20
+                                             : std::abs(std::cos(angle)) + 0.20;
         return smoothClamp(2.4 * numerator / denominator);
     };
-    auto trapezoid = [](double a) {
-        // Continuous periodic trapezoid: unequal upper/lower dwell lengths,
-        // with linear sloped sides and no discontinuity at the cycle boundary.
-        const double u = std::fmod(a / (2.0 * kPi) + 1.0, 1.0);
+    auto trapezoid = [](double angle) {
+        const double u = std::fmod(angle / (2.0 * kPi) + 1.0, 1.0);
         if (u < 0.18) return -1.0;
         if (u < 0.40) return -1.0 + (u - 0.18) / 0.22 * 2.0;
         if (u < 0.66) return 1.0;
         if (u < 0.88) return 1.0 - (u - 0.66) / 0.22 * 2.0;
         return -1.0;
     };
+    auto smoothBlend = [](double from, double to, double amount) {
+        const double t = qBound(0.0, amount, 1.0);
+        const double eased = t * t * (3.0 - 2.0 * t);
+        return from + (to - from) * eased;
+    };
 
     if (m_mode == Mode::Cotangent) {
         value = tangentLike(phase, true);
+        selectedWidth = m_tangentWidth;
     } else if (m_mode == Mode::Trapezoid) {
         value = trapezoid(phase);
+        selectedWidth = m_trapezoidWidth;
     } else {
         const double cycle = std::fmod(m_elapsed, 18.0);
-        if (cycle < 6.0) value = std::sin(phase);                 // sinus/cosinus
-        else if (cycle < 12.0) value = tangentLike(phase, (cycle >= 9.0)); // tangens/kotangens
-        else value = trapezoid(phase);                           // trapez
+        const double sinus = std::sin(phase);
+        const double tangent = tangentLike(phase, false);
+        const double cotangent = tangentLike(phase, true);
+        const double trapezoidValue = trapezoid(phase);
+        if (cycle < 6.0) {
+            value = sinus;
+            selectedWidth = m_sinusWidth;
+        } else if (cycle < 12.0) {
+            value = cycle < 9.0 ? tangent : cotangent;
+            selectedWidth = m_tangentWidth;
+        } else {
+            value = trapezoidValue;
+            selectedWidth = m_trapezoidWidth;
+        }
+
+        // Cross-fade the mathematical segments over one second. Both the
+        // target and its amplitude remain continuous at every hand-off.
+        if (cycle >= 5.5 && cycle < 6.5) {
+            const double t = cycle - 5.5;
+            value = smoothBlend(sinus, tangent, t);
+            selectedWidth = smoothBlend(m_sinusWidth, m_tangentWidth, t);
+        } else if (cycle >= 8.5 && cycle < 9.5) {
+            const double t = cycle - 8.5;
+            value = smoothBlend(tangent, cotangent, t);
+        } else if (cycle >= 11.5 && cycle < 12.5) {
+            const double t = cycle - 11.5;
+            value = smoothBlend(cotangent, trapezoidValue, t);
+            selectedWidth = smoothBlend(m_tangentWidth, m_trapezoidWidth, t);
+        } else if (cycle >= 17.5) {
+            const double t = cycle - 17.5;
+            value = smoothBlend(trapezoidValue, sinus, t);
+            selectedWidth = smoothBlend(m_trapezoidWidth, m_sinusWidth, t);
+        } else if (cycle < 0.5) {
+            const double t = cycle + 0.5;
+            value = smoothBlend(trapezoidValue, sinus, t);
+            selectedWidth = smoothBlend(m_trapezoidWidth, m_sinusWidth, t);
+        }
     }
+    const double amplitude = h * selectedWidth;
     return h * 0.5 - value * amplitude;
 }
 
