@@ -90,6 +90,49 @@ struct PongGameTestAccess
     }
 };
 
+struct ArcherGameTestAccess
+{
+    static void injectArrow(ArcherGame& game, const QPointF& position,
+                            const QPointF& velocity)
+    {
+        game.m_arrows.clear();
+        game.m_arrows.push_back({position, velocity, true});
+        game.m_previousArrowPositions = {position};
+        game.m_hasSensorSample = false;
+    }
+    static QPointF arrowPosition(const ArcherGame& game)
+    {
+        return game.m_arrows.isEmpty() ? QPointF() : game.m_arrows.front().position;
+    }
+    static QPointF arrowVelocity(const ArcherGame& game)
+    {
+        return game.m_arrows.isEmpty() ? QPointF() : game.m_arrows.front().velocity;
+    }
+    static void advance(ArcherGame& game, double deltaTime) { game.update(deltaTime); }
+};
+
+struct ScorchedEarthGameTestAccess
+{
+    static void injectProjectile(ScorchedEarthGame& game, const QPointF& position,
+                                 const QPointF& velocity)
+    {
+        game.m_projectiles.clear();
+        game.m_projectiles.push_back({position, velocity, true, true});
+        game.m_previousProjectilePositions = {position};
+        game.m_wind = 0.0;
+    }
+    static QPointF projectilePosition(const ScorchedEarthGame& game)
+    {
+        return game.m_projectiles.isEmpty() ? QPointF() : game.m_projectiles.front().position;
+    }
+    static QPointF projectileVelocity(const ScorchedEarthGame& game)
+    {
+        return game.m_projectiles.isEmpty() ? QPointF() : game.m_projectiles.front().velocity;
+    }
+    static double gravity(const ScorchedEarthGame& game) { return game.m_gravity; }
+    static void advance(ScorchedEarthGame& game, double deltaTime) { game.update(deltaTime); }
+};
+
 struct PrecisionCraneGameTestAccess
 {
     static bool collideWithFirstObstacle(PrecisionCraneGame& game)
@@ -852,6 +895,29 @@ int main(int argc, char **argv)
     archerGame->resize(640, 480);
     archerGame->start();
     archerGame->handleSensorInput(76.0);
+    // Arrow motion is checked independently of timers and wall-clock scheduling.
+    games::ArcherGameTestAccess::injectArrow(
+        *archerGame, QPointF(80.0, 80.0), QPointF(120.0, -30.0));
+    const double archerGravity = 260.0;
+    const double archerDelta = 0.05;
+    games::ArcherGameTestAccess::advance(*archerGame, archerDelta);
+    const QPointF expectedArrowPosition(
+        80.0 + 120.0 * archerDelta,
+        80.0 + (-30.0 + archerGravity * archerDelta) * archerDelta);
+    const QPointF expectedArrowVelocity(120.0, -30.0 + archerGravity * archerDelta);
+    const QPointF actualArrowPosition =
+        games::ArcherGameTestAccess::arrowPosition(*archerGame);
+    const QPointF actualArrowVelocity =
+        games::ArcherGameTestAccess::arrowVelocity(*archerGame);
+    REQUIRE(std::abs(actualArrowPosition.x() - expectedArrowPosition.x()) < 1e-6);
+    REQUIRE(std::abs(actualArrowPosition.y() - expectedArrowPosition.y()) < 1e-6);
+    REQUIRE(std::abs(actualArrowVelocity.x() - expectedArrowVelocity.x()) < 1e-6);
+    REQUIRE(std::abs(actualArrowVelocity.y() - expectedArrowVelocity.y()) < 1e-6);
+    // Restore a clean, naturally aimed shot sequence for the integration test.
+    archerGame->reset();
+    archerGame->resize(640, 480);
+    archerGame->start();
+    archerGame->handleSensorInput(76.0);
     QKeyEvent archerFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(archerGame, &archerFire);
     const auto refreshArcherSensor = [archerGame](int milliseconds, double force) {
@@ -1004,6 +1070,39 @@ int main(int argc, char **argv)
     REQUIRE(scorchedGame->enemyHealth() == 100);
     REQUIRE(scorchedGame->currentRound() == 1);
     REQUIRE(scorchedGame->terrainPointCount() > 1);
+    // Deterministic ballistic integration: the committed shell endpoint must
+    // match the same constant-acceleration parabola used by swept collision tests.
+    // This guards against semi-implicit displacement drifting away from the
+    // collision path under gravity (and, in production, wind).
+    std::unique_ptr<games::GameEngine> artilleryPhysicsBase(
+        games::createGame(QStringLiteral("scorched_earth")));
+    auto* artilleryPhysics = dynamic_cast<games::ScorchedEarthGame*>(artilleryPhysicsBase.get());
+    REQUIRE(artilleryPhysics != nullptr);
+    artilleryPhysics->resize(640, 480);
+    artilleryPhysics->start();
+    const QPointF shellStart(320.0, 100.0);
+    const QPointF shellVelocity(100.0, -20.0);
+    const double shellDelta = 0.1;
+    const double shellGravity = games::ScorchedEarthGameTestAccess::gravity(*artilleryPhysics);
+    games::ScorchedEarthGameTestAccess::injectProjectile(
+        *artilleryPhysics, shellStart, shellVelocity);
+    games::ScorchedEarthGameTestAccess::advance(*artilleryPhysics, shellDelta);
+    const QPointF expectedShellPosition(
+        shellStart.x() + shellVelocity.x() * shellDelta,
+        shellStart.y() + shellVelocity.y() * shellDelta +
+            0.5 * shellGravity * shellDelta * shellDelta);
+    const QPointF expectedShellVelocity(
+        shellVelocity.x(), shellVelocity.y() + shellGravity * shellDelta);
+    const QPointF actualShellPosition =
+        games::ScorchedEarthGameTestAccess::projectilePosition(*artilleryPhysics);
+    const QPointF actualShellVelocity =
+        games::ScorchedEarthGameTestAccess::projectileVelocity(*artilleryPhysics);
+    REQUIRE(std::abs(actualShellPosition.x() - expectedShellPosition.x()) < 1e-6);
+    REQUIRE(std::abs(actualShellPosition.y() - expectedShellPosition.y()) < 1e-6);
+    REQUIRE(std::abs(actualShellVelocity.x() - expectedShellVelocity.x()) < 1e-6);
+    REQUIRE(std::abs(actualShellVelocity.y() - expectedShellVelocity.y()) < 1e-6);
+    artilleryPhysics->stop();
+
     scorchedGame->handleSensorInput(40.0); // The trajectory enters the enemy tank's expanded collision bounds.
     QKeyEvent artilleryFire(QEvent::KeyPress, Qt::Key_Space, Qt::NoModifier);
     QApplication::sendEvent(scorchedGame, &artilleryFire); // Must not trigger a manual shot.
