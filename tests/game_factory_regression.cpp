@@ -142,6 +142,11 @@ struct RhythmForceGameTestAccess
     }
 };
 
+struct CarRaceGameTestAccess
+{
+    static void advance(CarRaceGame& game, double deltaTime) { game.update(deltaTime); }
+};
+
 struct ReactionForceGameTestAccess
 {
     static void prepareGo(ReactionForceGame& game, double reactionSeconds)
@@ -836,7 +841,11 @@ int main(int argc, char **argv)
     carRaceGame->resize(640, 480);
     carRaceGame->start();
     carRaceGame->handleSensorInput(50.0); // Stay in the first obstacle's deterministic lane.
-    waitForEvents(4000); // The first obstacle reaches the player's lane after the eased spawn and travel interval.
+    // Advance the simulation clock directly in fixed-size steps. Wall-clock
+    // waits are unreliable on loaded CI runners because GameEngine deliberately
+    // caps large frame deltas instead of simulating time that was not rendered.
+    for (int step = 0; step < 600 && carRaceGame->livesRemaining() == 3; ++step)
+        games::CarRaceGameTestAccess::advance(*carRaceGame, 1.0 / 120.0);
     REQUIRE(carRaceGame->livesRemaining() < 3);
     REQUIRE(carRaceGame->isRunning());
     carRaceGame->resize(180, 120);
