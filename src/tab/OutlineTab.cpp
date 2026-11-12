@@ -1308,10 +1308,13 @@ bool OutlineTab::parseOutlineFile(const QString& filename, OutlineData& outline,
 
     QJsonParseError jsonError;
     const QJsonDocument doc = QJsonDocument::fromJson(jsonData, &jsonError);
-    if (jsonError.error != QJsonParseError::NoError || !doc.isObject()) {
+    if (jsonError.error != QJsonParseError::NoError) {
         return fail(QObject::tr("Nieprawidłowy JSON (pozycja %1): %2")
                     .arg(jsonError.offset)
                     .arg(jsonError.errorString()));
+    }
+    if (!doc.isObject()) {
+        return fail(QObject::tr("Główny element pliku JSON musi być obiektem."));
     }
 
     const QJsonObject root = doc.object();
