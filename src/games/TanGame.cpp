@@ -352,18 +352,31 @@ void TanGame::render(QPainter& painter)
     painter.drawLine(0, h / 2, w, h / 2);
 
     QPainterPath tangentPath;
-    bool hasPrevious = false;
-    for (int x = 0; x <= w; ++x) {
+    QPainterPath toleranceBand;
+    auto targetAtX = [this, centerY, amplitude](int x) {
         const double angle = std::remainder(
             static_cast<double>(x) * m_frequency + m_phase, 2.0 * kPi);
         const double normalized = qBound(-1.0, tangentWave(angle, m_tangentSharpness), 1.0);
-        const double y = centerY - normalized * amplitude;
-
-        // The bounded cyclic curve is continuous across former asymptotes.
-        if (!hasPrevious) tangentPath.moveTo(x, y);
-        else tangentPath.lineTo(x, y);
-        hasPrevious = true;
+        return centerY - normalized * amplitude;
+    };
+    for (int x = 0; x <= w; ++x) {
+        const double y = targetAtX(x);
+        if (x == 0) {
+            tangentPath.moveTo(x, y);
+            toleranceBand.moveTo(x, y - m_tolerance);
+        } else {
+            tangentPath.lineTo(x, y);
+            toleranceBand.lineTo(x, y - m_tolerance);
+        }
     }
+    for (int x = w; x >= 0; --x)
+        toleranceBand.lineTo(x, targetAtX(x) + m_tolerance);
+    toleranceBand.closeSubpath();
+
+    // Broad translucent corridor follows the complete tangent/cotangent wave.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(32, 190, 130, 48));
+    painter.drawPath(toleranceBand);
 
     painter.setPen(QPen(getDifficultyColor(), 3.0, Qt::SolidLine,
                         Qt::RoundCap, Qt::RoundJoin));
@@ -371,13 +384,17 @@ void TanGame::render(QPainter& painter)
     painter.drawPath(tangentPath);
 
     // Target gate and its tolerance band.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(QColor(32, 190, 130, 72));
+    painter.drawRoundedRect(QRectF(gateX - 25.0, m_targetY - m_tolerance,
+                                   50.0, 2.0 * m_tolerance), 8.0, 8.0);
     painter.setPen(QPen(QColor(230, 238, 248, 150), 1.5, Qt::DashLine));
     painter.drawLine(QPointF(gateX, 0), QPointF(gateX, heightD));
-    painter.setPen(QPen(QColor(90, 220, 160, 190), 1, Qt::DashLine));
-    painter.drawLine(QPointF(gateX - 22, m_targetY - m_tolerance),
-                     QPointF(gateX + 22, m_targetY - m_tolerance));
-    painter.drawLine(QPointF(gateX - 22, m_targetY + m_tolerance),
-                     QPointF(gateX + 22, m_targetY + m_tolerance));
+    painter.setPen(QPen(QColor(125, 245, 190, 235), 2.0, Qt::DashLine));
+    painter.drawLine(QPointF(gateX - 28, m_targetY - m_tolerance),
+                     QPointF(gateX + 28, m_targetY - m_tolerance));
+    painter.drawLine(QPointF(gateX - 28, m_targetY + m_tolerance),
+                     QPointF(gateX + 28, m_targetY + m_tolerance));
 
     const bool stale = m_inputAge > kSampleTimeoutSeconds;
     const QColor cursorColor = stale ? QColor(145, 155, 170)
@@ -418,8 +435,8 @@ void TanGame::render(QPainter& painter)
             .arg(qRound(targetAccuracy)));
     painter.drawText(QRect(margin, h - 52, w - 2 * margin, 20),
         Qt::AlignLeft | Qt::AlignVCenter,
-        QStringLiteral("Trudność: +/- | Auto: A | Kalibracja: [ minimum, ] maksimum | Ostrość: , / . (%1)")
-            .arg(m_tangentSharpness, 0, 'f', 2));
+        QStringLiteral("Pasmo błędu: ±%1 px | Trudność: %2 | Auto: A | Ostrość: , / . (%3)")
+            .arg(qRound(m_tolerance)).arg(m_difficultyLevel).arg(m_tangentSharpness, 0, 'f', 2));
 
     const int meterW = qMax(12, qMin(22, w / 45));
     const int meterX = w - margin - meterW;
