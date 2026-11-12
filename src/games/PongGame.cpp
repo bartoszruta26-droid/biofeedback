@@ -449,8 +449,9 @@ void PongGame::renderInterpolated(QPainter& painter, double alpha)
     // Render between the last and current collision-resolved simulation states.
     // Collision handlers reset m_previousBallPos at the contact point, so the
     // interpolation never draws through a wall or paddle after a bounce.
+    const double presentationLead = (1.0 - alpha) * kPhysicsStep * 0.5;
     m_ballPos = m_previousBallPos +
-        (currentBall - m_previousBallPos) * alpha;
+        (currentBall - m_previousBallPos) * alpha + m_ballVel * presentationLead;
 
     m_leftPaddleY = static_cast<float>(
         m_previousLeftPaddleY + (currentLeft - m_previousLeftPaddleY) * alpha);
