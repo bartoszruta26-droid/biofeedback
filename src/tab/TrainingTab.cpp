@@ -1043,7 +1043,9 @@ void TrainingTab::configureGameForExercise()
     }
     if (auto* functionGame = dynamic_cast<games::FunctionTrackGame*>(selectedGame)) {
         functionGame->setDifficultyLevel(1);
-        functionGame->setTrackWidth(0.30);
+        functionGame->setSinusWidth(0.25);
+        functionGame->setTangentWidth(0.32);
+        functionGame->setTrapezoidWidth(0.38);
     }
     if (auto* reactionGame = dynamic_cast<games::ReactionForceGame*>(selectedGame)) {
         reactionGame->setDifficultyLevel(
